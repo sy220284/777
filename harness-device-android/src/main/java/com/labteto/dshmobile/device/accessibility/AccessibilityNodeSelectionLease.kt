@@ -43,7 +43,10 @@ internal class AccessibilityNodeSelectionLease {
         check(index >= 0 && snapshot.windowId == windowId) { EXPIRED_MESSAGE }
         val original = snapshot.nodes.getOrNull(index)
         check(original != null && original.editable) { EXPIRED_MESSAGE }
-        if (current.getOrNull(index) == original) return index
+        if (current.getOrNull(index) == original) {
+            check(observed === snapshot) { EXPIRED_MESSAGE }
+            return index
+        }
 
         val editable = current.filter {
             it.editable && it.className == original.className &&
@@ -55,10 +58,24 @@ internal class AccessibilityNodeSelectionLease {
             if (matchingBounds.size == 1) matchingBounds
             else if (editable.size == 1) editable else emptyList()
         } else {
-            // Compose fields typically omit view ids. Never guess among siblings.
-            editable.filter {
+            // Compose often reflows the same input when an IME or overlay opens.
+            // Geometry is the strongest match, but a single uniquely described
+            // editable field can also be rebound after it moves.
+            val sameGeometry = editable.filter {
                 it.bounds == original.bounds &&
                     it.contentDescription == original.contentDescription
+            }
+            if (sameGeometry.size == 1) sameGeometry else {
+                val sameSemantics = editable.filter {
+                    it.contentDescription == original.contentDescription &&
+                        it.text == original.text
+                }
+                when {
+                    sameGeometry.size > 1 -> emptyList()
+                    sameSemantics.size == 1 -> sameSemantics
+                    editable.size == 1 -> editable
+                    else -> emptyList()
+                }
             }
         }
         check(observed === snapshot) { EXPIRED_MESSAGE }
