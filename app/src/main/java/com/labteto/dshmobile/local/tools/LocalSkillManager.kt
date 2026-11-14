@@ -218,8 +218,7 @@ internal class LocalSkillStore(
             require(originalExists || Files.notExists(originalPath, LinkOption.NOFOLLOW_LINKS)) {
                 "技能规则文件不可读取：${preset.id}"
             }
-            val oversized = originalExists && Files.size(originalPath) > 128 * 1024
-            val current = if (!originalExists || oversized) null else workspace.readSkill(preset.id)
+            val current = if (!originalExists) null else workspace.readSkill(preset.id)
             val disabled = if (current != null) !workspace.skillMetadata(preset.id).modelInvocable else false
             val desired = withModelInvocationDisabled(baseDocument, disabled)
             val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
@@ -234,9 +233,8 @@ internal class LocalSkillStore(
                     // Legacy installation without a baseline: don't erase an unknown user edit.
                     (previousBaseline == null && current == desired)
                 )
-            // A UI editing limit is not an ownership boundary: workspace-authored rules
-            // can legitimately be 24 KB–128 KB. Only an unchanged bundled baseline
-            // is eligible for automatic replacement.
+            // Bundled upgrades may replace only known unchanged originals. Valid customized
+            // rules must survive regardless of their length.
             val validCustomDocument = current != null &&
                 current.lineSequence().firstOrNull()?.trim() == "---" &&
                 parseLocalSkillMetadata(preset.id, current).description.isNotBlank()
@@ -245,8 +243,8 @@ internal class LocalSkillStore(
                 // installations created before the fingerprint marker existed.
                 continue
             }
-            if (originalExists && (oversized || (current != null && !clean && current != desired))) {
-                // Preserve original bytes before repairing damaged or oversized rules.
+            if (originalExists && current != null && !clean && current != desired) {
+                // Preserve original bytes before repairing an invalid or damaged rule file.
                 val backup = File(skillsDir, "${preset.id}/SKILL.pre-repair.md")
                 if (Files.notExists(backup.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                     Files.copy(originalPath, backup.toPath())
