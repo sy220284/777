@@ -96,3 +96,22 @@
 - 用户可操作的生产 Android 界面已写入 PR；不把交互原型当作 APK 实测。
 
 **证据与边界**：Codex 来源 `/codex/codex-main-2.zip` 与可核验快照 `codex_verified_local_snapshot_2026-11-13.zip`；Claude 317 来源 `/反编译/Claude-Code-2.1.317-Linux-x64-完整反编译包.tar.zst`，包中独立核验记录版本与文件完整性已确认。借鉴协议与交互设计，不复制 Claude 反编译的专有代码。后续能力优先在原所有权链中增强，而非增加重复的 Agent 内核或重复 UI 配置页。
+
+
+## 2026-11-14 最新 27 项范围及会话采样源码对照
+
+用户已明确从 #895 剔除「外部编码代理历史迁移」和「实时双向语音」。本 PR 保留 27 项功能；旧审计的 29 项表格作为历史记录。
+
+### Codex 源码核验
+
+在本地校验过的 Codex 快照 `codex-rs/app-server/src/thread_sample.rs` 中，`thread/sample` 走短生命周期的临时 fork；入口限制 4000 字节输入、30 秒时限和 64 KiB 输出，能够指定来源轮次，独立取消；遇到工具调用时不将其作为正常采样结果。它会取得父线程的模型历史快照，不写回父线程。
+
+本轮新增的 777 Android `LocalConversationSampleCoordinator`、`LocalSessionSampleSheet` 复用统一的无工具模型请求、现有 TokenUsageAnalytics、会话 EventLog 和 Android 原生操作菜单；提供字节界限、超时、取消、费用展示、源会话 ID/最后一条消息失效检查。测试 `LocalConversationSampleCoordinatorTest` 覆盖 UTF-8 界限、对话复制和工具记录剔除。**当前只复制最近 16 条可见对话，仍需与真实模型上下文、长会话和设备重启的行为对照，不以源码提交视为完整等效。**
+
+### Claude 2.1.317 反编译核验
+
+已核对 `chunk-thp9mgjc.js:437–515` 的 Hook/权限聚合：拒绝优先于询问，询问优先于允许；请求与真实的 `tool_use_id` 对齐。777 已在 #904 复用原 ToolRegistry 前后事件、受信来源与真实工具调用身份；会话采样为无工具模型请求，不新增能绕过上述授权的执行通道。**该 Claude 片段用于对照执行审批语义，不能据此推定 Claude 支持 Codex 同名采样 API。**
+
+### 当前验收边界
+
+会话采样现为生产代码与 Android UI 已提交，专项 Gradle/Android 编译和真实模型及取消现场测试要以具体 SHA 的 CI/设备回执判断。其他 26 项中，部分接通的网络/远程环境/MCP 宿主/Computer Use/安全审查/记忆等仍分别按现有生产调用链验证。功能、服务与权限不可通过修改台账状态代替真实闭环。Figma Starter MCP 额度阻止在线设计稿写入，当前 Compose/V6 源码是原生界面实现依据。
