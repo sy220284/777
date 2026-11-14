@@ -556,12 +556,15 @@ internal fun PluginInventoryBrowser(
                 val pluginDetail = if (item.id.startsWith("codex-plugin:")) codexDetails[pluginId] else null
                 val oneSkill = pluginDetail?.skills?.singleOrNull()
                 val officialRoot = codexPlugins.firstOrNull { it.id == pluginId }?.sourcePath
-                val officialFolder = oneSkill?.let { pluginDetail?.skillDirectories?.get(it) }
-                val oneSkillInstalled = oneSkill != null && skills.any { installed ->
-                    installed.name == oneSkill || (officialRoot != null &&
-                        officialFolder != null && installed.sourceUrl?.endsWith(
-                            "/$officialRoot/$officialFolder") == true)
+                val missingPluginSkills = pluginDetail?.skills.orEmpty().filterNot { skillId ->
+                    val path = pluginDetail?.skillDirectories?.get(skillId)
+                    skills.any { installed ->
+                        installed.name == skillId || (officialRoot != null &&
+                            path != null && installed.sourceUrl?.endsWith(
+                                "/$officialRoot/$path") == true)
+                    }
                 }
+                val oneSkillInstalled = oneSkill == null || oneSkill !in missingPluginSkills
                 val endpoint = item.requirements.firstNotNullOfOrNull {
                     if (!it.registered) skillMcpHttpsEndpoint(it)?.let { url -> it.value to url }
                     else null
@@ -572,8 +575,11 @@ internal fun PluginInventoryBrowser(
                 val officialSupported = item.marketState.status != ExtensionMarketStatus.UNSUPPORTED
                 val canInstallPreset = item.installablePreset && onInstallPreset != null
                 val canInstallCurated = item.installableCurated && onInstallCurated != null
-                val canInstallOfficial = officialSupported && oneSkill != null &&
-                    !oneSkillInstalled && onInstallCodexPluginSkill != null
+                val canInstallOfficial = officialSupported &&
+                    missingPluginSkills.isNotEmpty() &&
+                    (onInstallCodexPlugin != null ||
+                        (oneSkill != null && !oneSkillInstalled &&
+                            onInstallCodexPluginSkill != null))
                 val canConnectOfficial = officialSupported &&
                     pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
                 val canConnectSkill = endpoint != null && onConnectSkillMcp != null
@@ -585,7 +591,8 @@ internal fun PluginInventoryBrowser(
                 if (hasDirectAction) SyButton(
                     text = when {
                         canInstallPreset || canInstallCurated -> "安装"
-                        canInstallOfficial -> "安装"
+                        canInstallOfficial -> if (missingPluginSkills.size > 1)
+                            "安装插件 · ${missingPluginSkills.size} 项技能" else "安装"
                         canConnectOfficial || canConnectSkill -> "连接并授权"
                         item.installedSkill || (onUseCapability != null && item.available) -> "使用"
                         item.connectedService -> "管理连接"
@@ -599,7 +606,11 @@ internal fun PluginInventoryBrowser(
                         when {
                             canInstallPreset -> onInstallPreset?.invoke(item.id.substringAfter(":"))
                             canInstallCurated -> onInstallCurated?.invoke(item.id.substringAfter(":"))
-                            canInstallOfficial -> onInstallCodexPluginSkill?.invoke(pluginId, requireNotNull(oneSkill))
+                            canInstallOfficial -> {
+                                if (onInstallCodexPlugin != null) onInstallCodexPlugin(pluginId)
+                                else if (oneSkill != null)
+                                    onInstallCodexPluginSkill?.invoke(pluginId, oneSkill)
+                            }
                             canConnectOfficial -> onConnectCodexPlugin?.invoke(pluginId)
                             canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
                                 onConnectSkillMcp?.invoke(serverId, url)
