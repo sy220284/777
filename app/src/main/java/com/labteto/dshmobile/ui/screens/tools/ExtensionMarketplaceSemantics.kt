@@ -25,8 +25,8 @@ internal fun installedSkillMarketState(
     )
     val missing = requirements.filterNot { it.registered }
     if (missing.isNotEmpty()) return ExtensionMarketState(
-        ExtensionMarketStatus.NEEDS_SETUP, "需要配置",
-        "缺少依赖：" + missing.joinToString("、") { it.description.ifBlank { it.value } },
+        ExtensionMarketStatus.NEEDS_SETUP, "待连接",
+        "有 ${missing.size} 项运行依赖尚未连接；可以在详情中查看并授权",
     )
     if (!modelInvocable) return ExtensionMarketState(
         ExtensionMarketStatus.MANUAL_ONLY, "手动调用", "此技能已关闭模型自动调用",
