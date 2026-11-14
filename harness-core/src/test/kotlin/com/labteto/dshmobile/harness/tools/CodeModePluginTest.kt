@@ -570,8 +570,8 @@ class CodeModePluginTest {
             })
         }
         val result = registry.execute("code_mode_run", script)
-        assertFalse(result.isError)
-        assertEquals(1, reads)
+        assertFalse(result.content, result.isError)
+        assertEquals(result.content, 1, reads)
     }
 
     @Test fun wrongPathReportsActualJsonFieldsForModelCorrection() = runTest {
