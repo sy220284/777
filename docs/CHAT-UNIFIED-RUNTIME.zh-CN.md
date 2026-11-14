@@ -37,7 +37,7 @@
 - Pending 原文持久化，当前会话分支版本检查阻止旧推断写入新分支。成功处理一个批次后，失败重试预算应复位。重新载入单聊会话时，根据 processedThroughSequence/pendingThroughSequence 恢复归并调度，不依赖下一条用户输入。
 - `chat/post-turn` 的 `updated`、`stale-discarded`、`parse-failed`、`session-busy` 等事件是排查积压的证据；不能从快照中有 Pending 直接推断为永久卡死。
 
-## 回归矩阵与仍待设备验证的环节
+## 运行行为与待完善事项
 
 - 话题暂停后连续弱回复不重新召回旧待续；明确重提时允许找回；否定句、保密请求不误判为换话题。
 - 双方确认同一个约定时精准结清；含多个同类事项时，错误 eventId 或模糊答复不能误删。

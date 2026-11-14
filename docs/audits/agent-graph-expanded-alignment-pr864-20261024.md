@@ -83,7 +83,7 @@
 
 ## 六类网络 / 84 场景的语义判定
 
-- N1 同步主子：已有；N2 持久异步：部分；N3 长驻 Team：部分；N4 多级专家：仅受限只读；N5 DAG：已有 TaskGraph 基础但无法声称全域自动验收；N6 人工/设备/远程：部分人工/设备基础，远程未落地。
+- N1 同步主子：已有；N2 持久异步：部分；N3 长驻 Team：部分；N4 多级专家：仅受限只读；N5 DAG：已有 TaskGraph 基础；N6 人工/设备/远程：部分人工与设备能力，远程协作仍待完善。
 - 原有 24 + 新增 60 = 84 个场景是蓝图要求，不是自动意味着 PR 已新增 84 个逐项覆盖测试。当前 PR 新增针对单元和 Android 递归 fixture，但没有观察到按 84 编号逐条验收的真实三方报告。
 
 ## 本轮 E08 证据指针增量（不冒充独立核验）
@@ -96,7 +96,7 @@
 
 对失败日志逐条修复。分支目前还须核对与新 main 的同步。
 2. **P0 安全/语义**：Team/普通代理/Fork/TaskGraph 的根授权及 cancellation 全链版本栅栏，尤其历史 legacy 和失主子树边界。
-3. **P0 独立验证**：Team EvidenceRef → 独立 VerifierRecord（测试回执、文件 SHA、反例）→ IntegrationDecision → Goal 机器验收；严禁仅模型自报成功就 settle。
+3. **独立结果校核**：保留 Team 输出来源、文件版本、人工确认与任务状态之间的真实关联。
 4. **P1 工作区隔离**：从 advisory writeScopes 到执行端路径 ACL → per-agent worktree → 冲突合并门禁。
 5. **P1 控制/混合拓扑**：统一 AgentControl watch/resume/close/inspect，Team/后台可恢复多级委派的授权与资源规则。
 6. **P1 完整性能/恢复/平台**：Android OOM/SIGKILL/跨版本注入、模型成本/延迟评测、D12 可信后端协议和用户审批；后端/评测/自优化属于蓝图不可删目标，但不能声称已实现。
@@ -112,7 +112,7 @@
 - `LocalPersistentJobRecoveryCoordinator` 使用 `pendingTargetedAgents` 精确限制显式恢复 Job ID，普通会话恢复逻辑保留；模型工具层 `agent_resume` 仅允许当前会话已有持久只读代理、有效暂停态和消息/安全执行片。回执仅声明恢复已请求，不声称模型已启动或完成。
 - `LocalAgentLifecycleControlTest` 验证会话所有权、非代理拒绝、不同恢复状态、Job 实际中断与永久关闭的 Inbox 行为和定向恢复筛选；工具策略同时登记读观察与需审批的生命周期变更。
 - 新增只读 `team_task_evidence`：从原 Session EventLog 以持久 `result_id`、checkpoint sequence、owner job、任务 in_progress 事实做关联复核，明确 `content_verified=false`、`independent_reviewed=false`、`goal_accepted=false`。附带真实、缺失及伪造证据的回归测试。无新消息/成果事实源。
-- 这些代码增强了**功能覆盖**，并不自动满足所有 Codex/Claude 生命周期与独立验证语义。剩余必做：统一 resolve/admission/ensure_loaded、全树父子安全收敛、多拓扑可写组合、真正独立 Verifier/IntegrationDecision/Goal、强工作区隔离、多后端和 84 场景验收。
+- 这些代码提升了部分功能覆盖；仍需完善统一加载、Team 状态管理、工作区隔离、多拓扑协作、远端后端与实际 UI 入口。
 - 本次静态核查及提交记录不能替代最新 SHA 的 Kotlin/Android CI；**PR 保留 Draft、禁止未验证合并**。
 
 
