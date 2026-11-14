@@ -44,16 +44,16 @@ class AndroidDevicePlugin(
         Spec("android_app_info", "app_info", "读取指定应用信息", mapOf("package" to "string"), setOf("package"), ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_app_launch", "app_launch", "启动指定 Android 应用", mapOf("package" to "string"), setOf("package"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_settings_get", "settings_get", "读取 Android 系统设置", mapOf("namespace" to "string", "key" to "string"), setOf("namespace", "key"), ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_screen", "accessibility_tree", "读取当前无障碍控件树，返回短生命周期 node 编号；未就绪时会返回系统无障碍授权引导", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
-        Spec("android_find", "accessibility_find", "按文本、控件 id、类型或可交互属性查找当前界面控件", mapOf("text" to "string", "id" to "string", "class" to "string", "clickable" to "boolean", "editable" to "boolean"), access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
+        Spec("android_screen", "accessibility_tree", "读取当前无障碍控件树。node 是最近一次界面观察的短生命周期编号；跨页面应重新定位；输入优先使用 android_input_text 的稳定 id 或当前焦点。无障碍未授权时返回引导", access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
+        Spec("android_find", "accessibility_find", "按文本、控件 id、类型或可交互属性查找实时控件；返回的 node 可用于同页后续点击/输入，界面切换后重新查找。编辑文字优先传 id 给 android_input_text", mapOf("text" to "string", "id" to "string", "class" to "string", "clickable" to "boolean", "editable" to "boolean"), access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_click_node", "accessibility_click_node", "按最近一次界面树/查找结果中的 node 编号点击控件", mapOf("node" to "integer"), setOf("node"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_set_text_node", "accessibility_set_text_node", "按 node 编号定位输入框，自动替换文字并回读确认；与 android_input_text 使用同一写入与验证机制", mapOf("node" to "integer", "value" to "string"), setOf("node", "value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_set_text_node", "accessibility_set_text_node", "使用最近一次 android_find/screen 的 node 定位输入框并替换文字。界面切换或节点重排时优先用 android_input_text(id/value) 或焦点；返回区分未定位、写入请求未确认及回读未确认", mapOf("node" to "integer", "value" to "string"), setOf("node", "value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_scroll", "accessibility_scroll", "滚动当前界面可滚动区域", mapOf("direction" to "string"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_wait", "accessibility_wait", "等待文本或控件 id 出现，避免固定延时猜测页面状态", mapOf("text" to "string", "id" to "string", "timeout_ms" to "integer"), access = ToolAccess.READ_ONLY, approval = ToolApprovalPolicy.ALWAYS),
         Spec("android_open_uri", "android_open_uri", "通过系统安全 VIEW Intent 打开 http/https/market/geo/mailto/tel URI", mapOf("uri" to "string"), setOf("uri"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap_text", "accessibility_click_text", "按文本定位并点击控件", mapOf("text" to "string"), setOf("text"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_type", "accessibility_set_text", "按现有文字定位输入框，或省略 search_text 使用当前焦点；自动替换文字并回读确认，与 android_input_text 使用同一机制", mapOf("search_text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
-        Spec("android_input_text", "accessibility_input_text", "一次完成 Android/Compose 文本输入：可用 node、控件 id、现有文本精确定位；全部留空时优先使用当前焦点，未聚焦但页面仅有一个可编辑框时自动选择。自动聚焦、替换文本并回读确认；返回 false 表示未确认生效。", mapOf("node" to "integer", "id" to "string", "text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_type", "accessibility_set_text", "按现有文字定位输入框，或省略 search_text 使用当前焦点；同 android_input_text 的统一写入与回读协议，回执可区分目标未找到与写入后未确认", mapOf("search_text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
+        Spec("android_input_text", "accessibility_input_text", "Android/Compose 输入：优先 id+value 精确选框；其次使用当前焦点对应的输入框（只传 value）；也可传最近 find 返回的 node 或现有 text。自动替换并回读。成功为 true；失败明确区分目标不可用、系统未确认写入、已接受写入但未能回读，后者先重读界面再决定下一步，避免重复修改。", mapOf("node" to "integer", "id" to "string", "text" to "string", "value" to "string"), setOf("value"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_tap", "accessibility_tap", "按屏幕坐标点击", mapOf("x" to "number", "y" to "number", "duration_ms" to "integer"), setOf("x", "y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_swipe", "accessibility_swipe", "按坐标执行滑动", mapOf("start_x" to "number", "start_y" to "number", "end_x" to "number", "end_y" to "number", "duration_ms" to "integer"), setOf("start_x", "start_y", "end_x", "end_y"), access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
         Spec("android_back", "android_back", "执行系统返回", access = ToolAccess.DEVICE, approval = ToolApprovalPolicy.MUTATION),
@@ -162,13 +162,33 @@ internal fun androidDeviceToolResult(
     value: String,
     retention: ToolResultRetention = ToolResultRetention.DURABLE,
 ): ToolResult {
-    val unconfirmed = capability in ANDROID_BOOLEAN_ACTIONS && value == "false"
+    val inputTool = capability in setOf(
+        "accessibility_set_text_node", "accessibility_set_text", "accessibility_input_text",
+    )
+    val errorCode = when {
+        inputTool && value == "input_target_unavailable" -> "ANDROID_INPUT_TARGET_UNAVAILABLE"
+        inputTool && value == "input_action_unconfirmed" -> "ANDROID_INPUT_ACTION_UNCONFIRMED"
+        inputTool && value == "input_readback_unconfirmed" -> "ANDROID_INPUT_READBACK_UNCONFIRMED"
+        capability in ANDROID_BOOLEAN_ACTIONS && value == "false" -> "ANDROID_ACTION_UNCONFIRMED"
+        else -> null
+    }
+    val message = when (errorCode) {
+        "ANDROID_INPUT_TARGET_UNAVAILABLE" ->
+            "当前界面找不到指定的可编辑控件；请使用 android_find 重新定位，优先选择控件 id 或当前焦点。"
+        "ANDROID_INPUT_ACTION_UNCONFIRMED" ->
+            "目标输入框已定位，但系统未确认接受文字写入请求；请读取当前控件内容核实状态。"
+        "ANDROID_INPUT_READBACK_UNCONFIRMED" ->
+            "系统已接受文字写入请求，尚未从同一输入框回读确认目标内容；先用 android_find/android_screen 核对实际文字，再决定是否修改。"
+        "ANDROID_ACTION_UNCONFIRMED" ->
+            "Android 未确认本次操作完成。请先重新检查当前界面或虚拟屏状态，再决定后续操作。"
+        else -> value
+    }
     return ToolResult(
-        content = if (unconfirmed) "Android 未确认本次操作完成。请先重新读取当前界面或虚拟屏状态，再决定后续操作。" else value,
-        isError = unconfirmed,
-        errorCode = if (unconfirmed) "ANDROID_ACTION_UNCONFIRMED" else null,
+        content = message,
+        isError = errorCode != null,
+        errorCode = errorCode,
         retryable = false,
-        recoveryHint = if (unconfirmed) "重新检查当前界面；有副作用的操作应先核对结果再执行。" else null,
+        recoveryHint = if (errorCode != null) message else null,
         retention = retention,
     )
 }

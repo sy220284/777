@@ -324,4 +324,33 @@ class LocalWorkDeliveryEvidenceTest {
     @Test fun discussionGoalDoesNotAcquireUnrelatedFileOrTestObligations() = scenario(emptyList(), emptyList()) { log, goal, root ->
         assertTrue(localWorkDeliveryEvidence(log, goal.copy(description = "讨论应用代码的构建方案"), root).missing.isEmpty())
     }
+
+    @Test fun verifierFailureReasonsExplainExactlyWhatToRepair() =
+        scenario(artifacts = emptyList()) { log, goal, root ->
+            val missing = localWorkDeliveryEvidence(log, goal, root).missing
+            assertTrue(missing.any { it.contains("尚无当前目标下的真实执行记录") })
+            result(log, goal, root, "failed", exit = 1, error = true)
+            assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any {
+                it.contains("最新执行失败") && it.contains("退出码：1")
+            })
+            result(log, goal, root, "no-exit", exit = null, error = false)
+            assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any {
+                it.contains("没有可核验的退出码")
+            })
+            result(log, goal, root, "recovered", exit = 0)
+            assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.isEmpty())
+        }
+
+    @Test fun artifactEvidenceDistinguishesMissingFileFromChangedVersion() = scenario { log, goal, root ->
+        assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any { it.contains("成果文件不存在") })
+        val saved = artifact(root)
+        result(log, goal, root, "checked")
+        assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.isEmpty())
+        saved.writeText("edited after check")
+        assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any { it.contains("成果版本已变化") })
+        assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any { it.contains("验收后成果版本已变化") })
+        saved.delete()
+        assertTrue(localWorkDeliveryEvidence(log, goal, root).missing.any { it.contains("成果文件不存在") })
+    }
+
 }

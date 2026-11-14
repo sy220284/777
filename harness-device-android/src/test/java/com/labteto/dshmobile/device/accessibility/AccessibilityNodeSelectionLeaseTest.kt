@@ -64,6 +64,33 @@ class AccessibilityNodeSelectionLeaseTest {
             listOf(node(0), node(1, "新增"), reindexed)))
     }
 
+    @Test fun currentEditableFastPathRequiresSameObservedIdentity() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
+            true, true, "[10,100][500,150]", 3, uniqueId = "input-42")
+        selection.replace(4, listOf(node(0), input))
+        org.junit.Assert.assertTrue(selection.matchesCurrentEditable(1, 4, input))
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 5, input))
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4,
+            input.copy(uniqueId = "other-input")))
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4,
+            input.copy(bounds = "[10,80][500,130]")))
+        selection.invalidate()
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4, input))
+    }
+
+    @Test fun movedInputWithoutStableIdentityMustNotSelectAnotherPage() {
+        val selection = AccessibilityNodeSelectionLease()
+        val original = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
+            true, true, "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), original))
+        val replacement = original.copy(index = 2, bounds = "[10,60][500,110]")
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 4,
+                listOf(node(0), node(1, "其他"), replacement))
+        }
+    }
+
     @Test fun composeInputRebindRejectsWindowChangeAndAmbiguousFields() {
         val selection = AccessibilityNodeSelectionLease()
         val input = AccessibilityNodeSnapshot(1, "", null, null, "EditText", false, true,

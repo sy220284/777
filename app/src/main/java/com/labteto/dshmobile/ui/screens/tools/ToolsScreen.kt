@@ -128,6 +128,7 @@ data class ToolsUiState(
     val codexLoading: Boolean = false,
     val codexError: String? = null,
     val codexDetails: Map<String, com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot> = emptyMap(),
+    val codexLogos: Map<String, ByteArray> = emptyMap(),
     val codexDetailLoadingId: String? = null,
     val codexDetailError: String? = null,
     val curatedLoading: Boolean = false,
@@ -224,6 +225,7 @@ class ToolsViewModel @Inject constructor(
     fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
     fun setDeepSeekSearchPreferred(enabled: Boolean) = networkSearchSettings.setDeepSeekPreferred(enabled)
     private val operationGate = ToolsOperationGate()
+    private val requestedCodexLogos = mutableSetOf<String>()
     private var mcpLoginJob: kotlinx.coroutines.Job? = null
     private val _githubBrowse = MutableStateFlow(GitHubBrowseState())
     internal val githubBrowse: StateFlow<GitHubBrowseState> = _githubBrowse.asStateFlow()
@@ -346,6 +348,7 @@ class ToolsViewModel @Inject constructor(
                     codexLoading = _state.value.codexLoading,
                     codexError = _state.value.codexError,
                     codexDetails = _state.value.codexDetails,
+                    codexLogos = _state.value.codexLogos,
                     codexDetailLoadingId = _state.value.codexDetailLoadingId,
                     codexDetailError = _state.value.codexDetailError,
                     curatedLoading = _state.value.curatedLoading,
@@ -389,6 +392,95 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Installation owns the whole user journey. Trusted skill metadata provides
+     * public HTTPS MCP endpoints; OAuth consent is still granted in the browser.
+     * A failed authorization leaves the installed skill intact and visible for retry.
+     */
+    private suspend fun finishSkillInstallation(
+        installedId: String,
+        officialPluginId: String? = null,
+        bundledSkillIds: List<String> = listOf(installedId),
+    ) {
+        require(bundledSkillIds.isNotEmpty()) { "安装结果没有技能" }
+        _state.value = _state.value.copy(
+            skills = localTools.installedSkills(),
+            presets = localTools.presetSkills(),
+            createdSkillId = installedId,
+        )
+        // Official plugin metadata is an authoritative source of its OAuth endpoint
+        // and client registration. A skill's YAML may not duplicate that declaration.
+        val officialDetail = officialPluginId?.let { _state.value.codexDetails[it] }
+        if (officialDetail?.mcpUrl != null && officialPluginId != null) {
+            val serverId = requireNotNull(officialDetail.mcpServerId)
+            val alreadyConnected = localTools.servers().any {
+                it.id == serverId && it.tools.isNotEmpty()
+            }
+            if (!alreadyConnected) {
+                _state.value = _state.value.copy(
+                    mcpLoginServerId = serverId,
+                    feedback = "技能已安装；正在打开 ${serverId} 账号授权。",
+                )
+                try {
+                    localTools.connectCodexPlugin(officialPluginId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    synchronizeExtensionInventory()
+                    _state.value = _state.value.copy(
+                        feedback = "技能 ${installedId} 已安装；${serverId} 授权未完成："
+                            + (failure.message ?: "可在技能详情中重新授权"),
+                    )
+                    return
+                } finally {
+                    _state.value = _state.value.copy(mcpLoginServerId = null)
+                }
+            }
+        }
+        // Re-read after OAuth so a newly connected official server is never
+        // requested a second time through the skill's dependency metadata.
+        val pending = localTools.installedSkills()
+            .filter { it.name in bundledSkillIds }
+            .flatMap { it.requirements }
+            .filterNot { it.registered }
+        val connections = pending.mapNotNull { requirement ->
+            skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
+                requirement.value to endpoint
+            }
+        }.distinctBy { it.first }
+        for ((serverId, endpoint) in connections) {
+            _state.value = _state.value.copy(
+                mcpLoginServerId = serverId,
+                feedback = "技能已安装；正在打开 ${serverId} 授权。",
+            )
+            try {
+                localTools.loginMcp(serverId, endpoint, null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(
+                    feedback = "技能 ${installedId} 已安装；${serverId} 授权未完成："
+                        + (failure.message ?: "可在技能详情中重新授权"),
+                )
+                return
+            } finally {
+                _state.value = _state.value.copy(mcpLoginServerId = null)
+            }
+        }
+        synchronizeExtensionInventory()
+        val unresolved = _state.value.skills.filter { it.name in bundledSkillIds }
+            .flatMap { it.requirements }
+            .count { !it.registered }
+        val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
+            else "技能 ${installedId}"
+        _state.value = _state.value.copy(
+            feedback = if (unresolved == 0)
+                "${scope}已安装，可直接使用"
+            else "${scope}已安装，还有 ${unresolved} 项运行依赖可在详情中查看",
+        )
+    }
+
     /** Fetch on user entry to Skills; discovery never installs a package. */
     fun refreshCuratedSkills() {
         if (_state.value.curatedLoading) return
@@ -418,9 +510,12 @@ class ToolsViewModel @Inject constructor(
                 val availableIds = plugins.map { it.id }.toSet()
                 val details = if (forceRefetch) emptyMap() else
                     _state.value.codexDetails.filterKeys { it in availableIds }
+                if (forceRefetch) requestedCodexLogos.clear()
                 _state.value = _state.value.copy(
                     codexLoading = false, codexPlugins = plugins,
                     codexDetails = details, codexDetailError = null,
+                    codexLogos = if (forceRefetch) emptyMap() else
+                        _state.value.codexLogos.filterKeys { it in availableIds },
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -428,6 +523,28 @@ class ToolsViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     codexLoading = false,
                     codexError = "Codex 官方市场读取失败：" + (failure.message ?: "请检查网络"),
+                )
+            }
+        }
+    }
+
+    /** Fetch artwork only as a marketplace row becomes visible.
+     * Loading and errors stay separate from installation/authorization.
+     */
+    fun loadCodexPluginLogo(id: String) {
+        if (_state.value.codexPlugins.none { it.id == id } ||
+            id in _state.value.codexLogos || !requestedCodexLogos.add(id)) return
+        viewModelScope.launch {
+            try {
+                val bytes = localTools.codexPluginLogo(id) ?: return@launch
+                _state.value = _state.value.copy(
+                    codexLogos = _state.value.codexLogos + (id to bytes),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.labteto.dshmobile.observability.AppLog.warn(
+                    "CodexPluginIcon", "官方插件图标加载失败：$id", failure,
                 )
             }
         }
@@ -493,11 +610,8 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val installed = localTools.installCodexPluginSkill(pluginId, skillId)
-                _state.value = _state.value.copy(
-                    loading = false, skills = localTools.installedSkills(),
-                    presets = localTools.presetSkills(), createdSkillId = installed,
-                    feedback = "已从 Codex 官方插件安装技能 $installed；可在已安装中查看",
-                )
+                finishSkillInstallation(installed, officialPluginId = pluginId)
+                _state.value = _state.value.copy(loading = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -508,18 +622,71 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    /** Codex uses the plugin bundle as the catalogue unit. Install all declared
+     * Android-compatible skills from their verified folders before OAuth setup.
+     * Repeated taps resume only missing skills; existing installations stay intact.
+     */
+    fun installCodexPlugin(pluginId: String) {
+        val plugin = _state.value.codexPlugins.firstOrNull { it.id == pluginId } ?: return
+        if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
+            plugin.sourceKind != "local") return
+        val detail = _state.value.codexDetails[pluginId] ?: return
+        if (detail.skills.isEmpty()) {
+            if (detail.mcpUrl != null) connectCodexPlugin(pluginId)
+            return
+        }
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            val installedThisTime = mutableListOf<String>()
+            try {
+                val installedBefore = localTools.installedSkills()
+                val missing = detail.skills.filterNot { id ->
+                    val folder = detail.skillDirectories[id]
+                    folder != null && codexPluginSkillInstalled(
+                        installedBefore, plugin.sourcePath, folder)
+                }
+                for (skillId in missing) {
+                    val installedId = localTools.installCodexPluginSkill(pluginId, skillId)
+                    installedThisTime += installedId
+                    _state.value = _state.value.copy(
+                        skills = localTools.installedSkills(),
+                        feedback = "正在安装 ${plugin.name}（${installedThisTime.size}/${missing.size}）",
+                    )
+                }
+                val allIds = localTools.installedSkills().filter { skill ->
+                    detail.skillDirectories.values.any { folder ->
+                        skill.sourceUrl?.endsWith("/${plugin.sourcePath}/$folder") == true
+                    }
+                }.map { it.name }.distinct()
+                if (allIds.isEmpty()) error("插件没有可安装的 Android 技能")
+                finishSkillInstallation(
+                    installedId = allIds.last(), officialPluginId = pluginId,
+                    bundledSkillIds = allIds,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(
+                    feedback = "插件 ${plugin.name} 安装中断："
+                        + (failure.message ?: "请重新安装")
+                        + if (installedThisTime.isNotEmpty())
+                            "；已安装 ${installedThisTime.size} 项，可再次点击继续" else "",
+                )
+            } finally {
+                _state.value = _state.value.copy(loading = false)
+            }
+        }
+    }
+
     fun installCuratedSkill(id: String) {
         if (id !in _state.value.curatedSkills) return
         launchOperation {
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val installedId = localTools.installCuratedSkill(id)
-                _state.value = _state.value.copy(
-                    loading = false,
-                    skills = localTools.installedSkills(),
-                    presets = localTools.presetSkills(),
-                    createdSkillId = installedId,
-                    feedback = "官方精选技能已安装：$installedId")
+                finishSkillInstallation(installedId)
+                _state.value = _state.value.copy(loading = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -537,11 +704,8 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val installed = localTools.installGitHubSkill(source)
-                _state.value = _state.value.copy(
-                    loading = false, skills = localTools.installedSkills(),
-                    presets = localTools.presetSkills(), createdSkillId = installed,
-                    feedback = "已安装技能：$installed；请查看其运行依赖状态",
-                )
+                finishSkillInstallation(installed)
+                _state.value = _state.value.copy(loading = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -623,7 +787,22 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
-    fun installPreset(id: String) = changeSkills { localTools.installPreset(id) }
+    fun installPreset(id: String) {
+        launchOperation {
+            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
+            try {
+                localTools.installPreset(id)
+                finishSkillInstallation(id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                _state.value = _state.value.copy(feedback = "安装技能失败：" +
+                    (failure.message ?: "请检查技能包"))
+            } finally {
+                _state.value = _state.value.copy(loading = false)
+            }
+        }
+    }
     fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         changeSkills(createdId = id) { localTools.createSkill(id, displayName, description, instructions) }
     fun importSkill(uri: Uri) {
@@ -1149,10 +1328,13 @@ fun ToolsScreen(
                                     codexLoading = state.codexLoading,
                                     codexError = state.codexError,
                                     codexDetails = state.codexDetails,
+                                    codexLogos = state.codexLogos,
+                                    onRequestCodexLogo = viewModel::loadCodexPluginLogo,
                                     codexDetailLoadingId = state.codexDetailLoadingId,
                                     codexDetailError = state.codexDetailError,
                                     onReadCodexPluginDetail = viewModel::loadCodexPluginDetail,
                                     onInstallCodexPluginSkill = viewModel::installCodexPluginSkill,
+                                    onInstallCodexPlugin = viewModel::installCodexPlugin,
                                     onConnectCodexPlugin = viewModel::connectCodexPlugin,
                                     onRefreshCodex = { viewModel.refreshCodexPlugins(true) },
                                     curatedLoading = state.curatedLoading,

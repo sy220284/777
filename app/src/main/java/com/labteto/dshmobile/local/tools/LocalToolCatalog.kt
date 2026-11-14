@@ -97,7 +97,7 @@ object LocalToolCatalog {
         add(tool("job_output", "读取后台任务状态和输出", properties(
             "job_id" to string("后台任务编号"),
         ), listOf("job_id")))
-        add(tool("job_kill", "停止一个后台任务", properties(
+        add(tool("job_kill", "按 job_list 返回的真实 job_id 停止当前会话的后台任务；如需关闭持久 Agent 使用 agent_close，团队成员先按 Team 生命周期处理，不把历史日志误当运行任务。", properties(
             "job_id" to string("后台任务编号"),
         ), listOf("job_id")))
         add(tool("media_image_options", "列出当前已配置且有真实 API Key 的图像创作服务和精确 offer_id；不会收费", properties()))
@@ -204,7 +204,7 @@ object LocalToolCatalog {
             "review_requirements" to buildJsonObject { put("type", "array"); put("items", string("仅任务明确要求时填写 code（独立代码审查）和/或 security（独立安全审查）；其他任务为 []。审查观点、人工确认与真实测试分别结算")) },
         ), listOf("description", "artifact_paths", "verification_commands")))
         add(tool("get_goal", "读取当前会话目标", properties()))
-        add(tool("update_goal", "更新目标状态", properties(
+        add(tool("update_goal", "更新当前 Work Goal 状态。完成前依据原目标真实执行已声明的验收命令并核验当前成果版本；命令未执行、最新失败、缺少退出码、文件缺失和版本变化会分别说明修复动作。受阻时保留已完成进度，按具体错误恢复后继续结算。", properties(
             "status" to string("active、paused、completed 或 blocked"),
             "note" to string("状态说明"),
         ), listOf("status")))
@@ -328,7 +328,7 @@ object LocalToolCatalog {
         add(tool("agent_resume", "仅请求已中断或 dormant 的持久只读代理通过既有恢复检查点重新激活；需要待处理 Inbox 消息或安全暂停执行片；返回的是请求回执，不代表轮次已被准入", properties(
             "agent_id" to string("当前 Work 会话中的持久可恢复代理编号"),
         ), listOf("agent_id")))
-        add(tool("agent_close", "永久取消当前 Work 会话的后台 Agent；Team 成员由团队生命周期解雇、释放任务并清理邮箱，普通代理清理持久 Inbox", properties(
+        add(tool("agent_close", "永久关闭当前 Work 会话的后台 Agent：先用 agent_inspect/list_agents 获取真实 agent_id；Team 成员按团队生命周期解雇、释放任务和清理邮箱，普通代理清理持久 Inbox。普通后台命令用 job_kill。", properties(
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
         add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空/字符串验收仅是窄文本检查，不证明通用交付", properties(
@@ -594,7 +594,7 @@ object LocalToolCatalog {
             "after" to integer("后置事件数，最多 20"),
             "offset_chars" to integer("可选；按上一页提示继续读取的字符偏移，默认 0"),
         ), listOf("seq")))
-        add(tool("present", "把工作区中的成果文件标记为最终交付物", properties(
+        add(tool("present", "标记工作区中已定稿的真实成果文件；先完成内容修改和原目标所需的测试/核验，再按实际相对路径交付，避免交付后修改造成证据版本变化。", properties(
             "path" to string("成果文件的相对路径"),
         ), listOf("path")))
     }

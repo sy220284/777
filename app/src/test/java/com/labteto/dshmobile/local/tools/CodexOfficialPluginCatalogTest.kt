@@ -49,6 +49,8 @@ class CodexOfficialPluginCatalogTest {
         val list = parseCodexOfficialMarketplace("""
             {"name":"openai-curated","plugins":[
              {"name":"bad", "source":{"source":"local","path":"../secrets"}},
+             {"name":"double", "source":{"source":"local","path":"plugins//fake"}},
+             {"name":"dot", "source":{"source":"local","path":"plugins/./fake"}},
              {"name":"git-url","source":{"source":"url","url":"https://example.org"}},
              {"name":"good","source":{"source":"local","path":"./plugins/good"},
               "policy":{"installation":"NOT_AVAILABLE","authentication":"ON_USE"}}
@@ -96,7 +98,12 @@ class CodexOfficialPluginCatalogTest {
               "interface":{
                 "displayName":"Figma",
                 "shortDescription":"Design and code",
-                "developerName":"Figma"
+                "developerName":"Figma",
+                "logo":"./assets/logo-padded.png",
+                "defaultPrompt":[
+                  "Inspect this design and implement it",
+                  "Create Code Connect templates"
+                ]
               }
             }
         """.trimIndent())
@@ -106,6 +113,9 @@ class CodexOfficialPluginCatalogTest {
         assertTrue(detail.hasApp)
         assertEquals(listOf("skills"), detail.skillRoots)
         assertFalse(detail.hasMcp)
+        assertEquals("assets/logo-padded.png", detail.logoPath)
+        assertEquals(2, detail.samplePrompts.size)
+        assertEquals("Inspect this design and implement it", detail.samplePrompts.first())
     }
     @Test fun pluginManifestPathsFollowActualDeclaration() {
         val detail = parseCodexOfficialPluginDetail("""
@@ -133,6 +143,17 @@ class CodexOfficialPluginCatalogTest {
         val endpoint = parseCodexOfficialMcpEndpoint(requireNotNull(detail.inlineMcpConfig), "example")
         assertEquals("https://mcp.example.com/mcp", endpoint?.url)
         assertEquals(null, detail.mcpPath)
+    }
+
+    @Test fun rejectsManifestLogoTraversalAndExcessiveExampleText() {
+        val detail = parseCodexOfficialPluginDetail(
+            """{"name":"example","interface":{
+                "logo":"../credentials.json",
+                "defaultPrompt":["Valid prompt", "", "second prompt",
+                    "third prompt", "fourth prompt"]}}"""
+        )
+        assertEquals(null, detail.logoPath)
+        assertEquals(3, detail.samplePrompts.size)
     }
 
 }
