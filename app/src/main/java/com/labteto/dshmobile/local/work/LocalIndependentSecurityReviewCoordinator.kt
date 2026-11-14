@@ -48,9 +48,11 @@ internal fun parseIndependentSecurityReviewDecision(response: String): LocalSecu
 }
 
 internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) {
-    fun request(id: String, ref: String, digest: String) {
+    fun request(id: String, ref: String, digest: String,
+        goal: LocalReviewGoalBinding? = null) {
         log.append("work/security-review-start", buildJsonObject {
             put("id", id); put("ref", ref); put("digest", digest)
+            goal?.let { put("goal_id", it.goalId); put("goal_revision", it.revision) }
         })
     }
 
@@ -58,10 +60,16 @@ internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) 
         verdict: String, profileId: String): LocalSecurityReview {
         require(verdict == "allow" || verdict == "block") { "安全审核裁决无效" }
         require(report.isNotBlank() && report.length <= 16_384) { "安全审核报告无效" }
+        val request = log.latestMatching(setOf("work/security-review-start")) {
+            it["id"]?.jsonPrimitive?.contentOrNull == id &&
+                it["digest"]?.jsonPrimitive?.contentOrNull == digest
+        }
         val event = log.append("work/security-review-result", buildJsonObject {
             put("id", id); put("ref", ref); put("digest", digest)
             put("report", report); put("verdict", verdict)
             put("reviewer_profile_id", profileId)
+            request?.data?.get("goal_id")?.let { put("goal_id", it) }
+            request?.data?.get("goal_revision")?.let { put("goal_revision", it) }
         })
         return LocalSecurityReview(id, ref, digest, report, verdict, event.sequence)
     }
@@ -97,9 +105,15 @@ internal class LocalSecurityReviewLedger(private val log: LocalSessionEventLog) 
         val review = read(id) ?: return@withWriterLease false
         if (review.verdict != "allow" || review.humanApproved ||
             review.evidenceSequence != sequence || review.digest != freshDigest) return@withWriterLease false
+        val request = log.latestMatching(setOf("work/security-review-start")) {
+            it["id"]?.jsonPrimitive?.contentOrNull == id &&
+                it["digest"]?.jsonPrimitive?.contentOrNull == freshDigest
+        }
         log.append("work/security-review-approved", buildJsonObject {
             put("id", id); put("sequence", sequence); put("digest", freshDigest)
             put("decision", "human_security_approval")
+            request?.data?.get("goal_id")?.let { put("goal_id", it) }
+            request?.data?.get("goal_revision")?.let { put("goal_revision", it) }
         })
         true
     }
@@ -117,9 +131,10 @@ internal class LocalIndependentSecurityReviewCoordinator @Inject constructor(
         val outboundPatch = prepareOutboundReviewPatch(patch)
         val id = UUID.randomUUID().toString()
         val digest = codeReviewDigest(repository, ref, statistics, patch, evidenceRevision)
-        val ledger = LocalSecurityReviewLedger(events.get(sessionId))
+        val log = events.get(sessionId)
+        val ledger = LocalSecurityReviewLedger(log)
         val profile = model.profileForRun()
-        ledger.request(id, ref, digest)
+        ledger.request(id, ref, digest, currentReviewGoalBinding(log, "security"))
         val reply = model.complete(
             model = profile.model, baseUrl = profile.baseUrl, profile = profile,
             tools = JsonArray(emptyList()),
