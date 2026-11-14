@@ -47,7 +47,6 @@ internal class LocalFileObservationCache(
 }
 
 private const val MAX_MODEL_SKILL_LIST = 128
-private const val MAX_SKILL_BYTES = 128 * 1024
 
 /** A file version is the content hash used for conditional, conflict-safe local writes. */
 data class LocalWorkspaceVersion(val revision: String, val bytes: Long)
@@ -907,11 +906,8 @@ class LocalWorkspace(
     /** Full rules, with a byte budget independent of the generic file-preview line limit. */
     fun readSkill(name: String): String {
         val file = skillFile(name)
-        require(file.length() <= MAX_SKILL_BYTES) { "技能规则超过 128 KB，请精简后重新加载" }
         val before = fingerprint(file)
-        val bytes = file.inputStream().use { it.readNBytes(MAX_SKILL_BYTES + 1) }
-        require(bytes.size <= MAX_SKILL_BYTES) { "技能规则超过 128 KB，请精简后重新加载" }
-        val content = bytes.toString(Charsets.UTF_8)
+        val content = file.readText(Charsets.UTF_8).removePrefix("\uFEFF")
         val after = fingerprint(file)
         require(before == after) { "技能在读取过程中发生变化，请重新加载" }
         observations.put(file.path, after)
@@ -921,7 +917,6 @@ class LocalWorkspace(
     /** Catalogs only need front matter; one unreadable skill cannot disable all other skills. */
     internal fun skillMetadata(name: String): LocalSkillMetadata {
         val file = skillFile(name)
-        require(file.length() <= MAX_SKILL_BYTES) { "技能规则超过 128 KB" }
         val header = file.bufferedReader().use { reader ->
             buildList {
                 repeat(96) {
