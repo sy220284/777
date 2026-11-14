@@ -15,8 +15,7 @@ import com.labteto.dshmobile.device.accessibility.AccessibilityNodeSnapshot
 import com.labteto.dshmobile.device.accessibility.HarnessAccessibilityService
 import com.labteto.dshmobile.device.notifications.HarnessNotificationListenerService
 import com.labteto.dshmobile.device.vscreen.VirtualDisplayController
-import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
-import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
+import com.labteto.dshmobile.harness.capability.HarnessAndroidDeviceProvider
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import com.labteto.dshmobile.harness.resource.HarnessResourceLease
 import com.labteto.dshmobile.harness.resource.HarnessResourceScheduler
@@ -51,7 +50,7 @@ class AndroidDeviceProvider(
     private val context: Context,
     private val virtualDisplays: VirtualDisplayController = VirtualDisplayController(context),
     private val resourceScheduler: HarnessResourceScheduler? = null,
-) : HarnessDeviceProvider, HarnessVirtualDisplayProvider {
+) : HarnessAndroidDeviceProvider {
     private val virtualDisplayLeases = ConcurrentHashMap<String, HarnessResourceLease>()
     private val displayOwnership = VirtualDisplayOwnership()
 
