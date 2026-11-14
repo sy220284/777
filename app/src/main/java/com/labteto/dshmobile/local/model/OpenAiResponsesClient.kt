@@ -963,6 +963,7 @@ class OpenAiResponsesClient @Inject constructor(
         requestId = requestId,
         providerCode = code,
         providerParam = param,
+        origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
     )
 
     private fun incompleteReason(event: JsonObject): String {
@@ -1019,6 +1020,7 @@ class OpenAiResponsesClient @Inject constructor(
                 providerRetryAfterMs = retryAfterMs,
                 requestId = requestId,
                 admissionState = LocalModelAdmissionState.REJECTED,
+                origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
             )
         }
 
@@ -1033,6 +1035,7 @@ class OpenAiResponsesClient @Inject constructor(
             providerCode = remoteCode,
             providerParam = remoteParam,
             admissionState = LocalModelAdmissionState.REJECTED,
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 
@@ -1115,6 +1118,7 @@ class OpenAiResponsesClient @Inject constructor(
             providerCode = code,
             providerParam = param,
             admissionState = admissionState,
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 
