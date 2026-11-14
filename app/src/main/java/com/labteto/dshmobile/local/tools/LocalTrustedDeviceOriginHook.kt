@@ -5,6 +5,7 @@ import com.labteto.dshmobile.harness.tools.ToolPreUseDecision
 import com.labteto.dshmobile.harness.tools.ToolPreUseRequest
 import com.labteto.dshmobile.local.security.LocalEffectiveExecutionPolicy
 import java.net.URI
+import java.net.URISyntaxException
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -19,7 +20,7 @@ internal class LocalTrustedDeviceOriginHook(
         if (request.tool.name != "android_open_uri") return ToolPreUseDecision.Allow
         val raw = request.input["uri"]?.jsonPrimitive?.contentOrNull
             ?: return ToolPreUseDecision.Deny("网页操作缺少目标地址")
-        val uri = try { URI(raw) } catch (_: IllegalArgumentException) {
+        val uri = try { URI(raw) } catch (_: URISyntaxException) {
             return ToolPreUseDecision.Deny("网页地址无效")
         }
         val scheme = uri.scheme.orEmpty()
