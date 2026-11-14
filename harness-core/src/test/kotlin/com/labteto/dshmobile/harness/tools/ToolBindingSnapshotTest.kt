@@ -104,7 +104,7 @@ class ToolBindingSnapshotTest {
             access = ToolAccess.PRIVILEGED,
             approvalPolicy = ToolApprovalPolicy.ALWAYS,
             exposure = ToolExposure.OPTIONAL,
-            metadata = ToolMetadata("MCP"),
+            metadata = ToolMetadata("MCP", discoveryKeywords = setOf("MCP", "工具发现")),
             executor = HarnessToolExecutor { _, _, _ ->
                 publishedCalls++
                 ToolResult("remote-ok")
