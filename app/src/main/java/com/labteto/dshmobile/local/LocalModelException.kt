@@ -25,4 +25,7 @@ internal class LocalModelException(
     val admissionState: LocalModelAdmissionState = LocalModelAdmissionState.NOT_APPLICABLE,
     val continuationEligible: Boolean = false,
     val origin: LocalModelFailureOrigin? = null,
+    /** Type/count only; never retain a raw SSE payload or user content here. */
+    val lastStreamEventType: String? = null,
+    val streamEventsSeen: Int? = null,
 ) : Exception(message, cause)
