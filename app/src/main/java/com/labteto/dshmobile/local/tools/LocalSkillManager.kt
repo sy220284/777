@@ -404,6 +404,19 @@ internal class LocalSkillStore(
         }
     }
 
+    /** Read Codex metadata from the admitted skill directory. This never invokes tools. */
+    fun dependencies(id: String): List<CodexSkillDependency> {
+        requireInstalled(id)
+        val folder = File(skillsDir, id).canonicalFile
+        val file = File(folder, "agents/openai.yaml")
+        if (!file.exists()) return emptyList()
+        require(!Files.isSymbolicLink(file.toPath()) && file.isFile &&
+            file.canonicalFile.toPath().startsWith(folder.toPath()) && file.length() <= 256 * 1024) {
+            "技能依赖元数据位置或大小无效"
+        }
+        return parseCodexSkillDependencies(file.readText(Charsets.UTF_8))
+    }
+
     fun readDocument(id: String): String {
         requireInstalled(id)
         return workspace.readRaw(".dsh/skills/$id/SKILL.md")
@@ -493,6 +506,7 @@ internal class LocalSkillManager @Inject constructor(
         .mapToSkillRefresh(): kotlinx.coroutines.flow.Flow<Unit> = map { Unit }
 
     fun githubSourceEvidence(id: String): String? = store.githubSourceEvidence(id)
+    fun dependencies(id: String): List<CodexSkillDependency> = store.dependencies(id)
     fun presets(): List<LocalPresetSkill> = store.presets()
     fun install(id: String) = store.install(id)
     fun create(id: String, displayName: String, description: String, instructions: String) =

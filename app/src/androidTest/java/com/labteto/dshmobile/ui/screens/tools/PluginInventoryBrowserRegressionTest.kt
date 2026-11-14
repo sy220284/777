@@ -95,7 +95,7 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-category-list").performScrollToIndex(4)
-        compose.onNodeWithText("创意与设计").performClick()
+        compose.onNodeWithText("创意设计").performClick()
         compose.onNodeWithText("视觉理解").assertIsDisplayed()
         compose.onNodeWithText("终端与运行环境").assertDoesNotExist()
     }
@@ -113,7 +113,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithText("报告生成").assertIsDisplayed()
         compose.onNodeWithText("整理资料并制作报告").assertIsDisplayed()
-        compose.onNodeWithText("已安装").assertIsDisplayed()
+        compose.onNodeWithText("已安装 · 1").assertIsDisplayed()
     }
 
     @Test
@@ -132,7 +132,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("精选").assertIsDisplayed().performClick()
+        compose.onNodeWithText("发现 · 1").assertIsDisplayed()
         compose.onNodeWithText("资料研究与核实").assertIsDisplayed()
         compose.onNodeWithText("安装").performClick()
         compose.runOnIdle { assertEquals("research-check", selected) }
@@ -474,4 +474,80 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("skill-rollback-confirm").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("rollback-demo", restored) }
     }
+    @Test
+    fun officialCodexPluginExposesRealSkillsAndOAuthAction() {
+        var selectedSkill: Pair<String, String>? = null
+        var connectedPlugin: String? = null
+        val pluginId = "figma@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "figma", "Creativity", "plugins/figma",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Figma", "设计协作", "Figma", "2.0",
+            listOf("figma-use"), true, true, false,
+            "figma", "https://mcp.figma.com/mcp",
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPluginSkill = { id, skill ->
+                        selectedSkill = id to skill
+                    },
+                    onConnectCodexPlugin = { connectedPlugin = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("可直接安装的技能").assertIsDisplayed()
+        compose.onNodeWithText("安装").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(pluginId to "figma-use", selectedSkill)
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("授权并连接 figma").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(pluginId, connectedPlugin)
+        }
+    }
+
+    @Test
+    fun installedPluginSkillRecognizesPinnedOriginWhenFolderAndSkillNameDiffer() {
+        var installRequests = 0
+        val pluginId = "zoom@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "zoom", "Productivity", "plugins/zoom",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Zoom", "会议", "Zoom", "1.0",
+            listOf("general"), false, false, false,
+            skillDirectories = mapOf("general" to "skills/general"),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "zoom-general", "Use Zoom", true,
+                        sourceUrl = "https://github.com/openai/plugins/tree/0123456789012345678901234567890123456789/plugins/zoom/skills/general",
+                    )),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPluginSkill = { _, _ -> installRequests++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("codex-skill-install-$pluginId-general")
+            .performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { assertEquals(0, installRequests) }
+    }
+
 }

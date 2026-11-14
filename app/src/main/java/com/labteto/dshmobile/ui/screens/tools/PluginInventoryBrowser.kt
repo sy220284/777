@@ -88,6 +88,9 @@ private data class InventoryRow(
     val sourceUrl: String? = null,
     val sourceWarning: String? = null,
     val rollbackAvailable: Boolean = false,
+    val sourceLabel: String = "",
+    val marketState: ExtensionMarketState = ExtensionMarketState(ExtensionMarketStatus.BUILTIN, "内置能力 · 按需授权"),
+    val requirements: List<com.labteto.dshmobile.uicontract.UiSkillRequirement> = emptyList(),
 )
 
 /** Match visible skill names first, then identifiers, then explanatory descriptions. */
@@ -117,6 +120,16 @@ internal fun PluginInventoryBrowser(
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     curatedSkills: List<String> = emptyList(),
+    codexPlugins: List<com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot> = emptyList(),
+    codexLoading: Boolean = false,
+    codexError: String? = null,
+    onRefreshCodex: (() -> Unit)? = null,
+    codexDetails: Map<String, com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot> = emptyMap(),
+    codexDetailLoadingId: String? = null,
+    codexDetailError: String? = null,
+    onReadCodexPluginDetail: ((String) -> Unit)? = null,
+    onInstallCodexPluginSkill: ((String, String) -> Unit)? = null,
+    onConnectCodexPlugin: ((String) -> Unit)? = null,
     curatedLoading: Boolean = false,
     curatedError: String? = null,
     pendingSkillUpdates: Map<String, String> = emptyMap(),
@@ -138,6 +151,8 @@ internal fun PluginInventoryBrowser(
     onRefreshCurated: (() -> Unit)? = null,
     onCreateSkill: ((String, String, String, String) -> Unit)? = null,
     onImportSkill: (() -> Unit)? = null,
+    onInstallGitHubSkill: ((String) -> Unit)? = null,
+    onConnectSkillMcp: ((String, String) -> Unit)? = null,
     onRemoveSkill: ((String) -> Unit)? = null,
     onShareSkillPackage: ((String) -> Unit)? = null,
     onCheckSkillUpdate: ((String) -> Unit)? = null,
@@ -161,6 +176,8 @@ internal fun PluginInventoryBrowser(
     var upgradeSkillChoice by remember { mutableStateOf<Pair<String, String>?>(null) }
     var rollbackSkillChoice by remember { mutableStateOf<String?>(null) }
     var newSkillId by remember { mutableStateOf("") }
+    var showGitHubImport by remember { mutableStateOf(false) }
+    var githubImportUrl by remember { mutableStateOf("") }
     var newSkillDisplayName by remember { mutableStateOf("") }
     var newSkillDescription by remember { mutableStateOf("") }
     var newSkillBody by remember { mutableStateOf("") }
@@ -205,7 +222,9 @@ internal fun PluginInventoryBrowser(
         }
         val copy = extensionPresentation(id, label, stringResource(hint), ExtensionKind.PLUGIN)
         InventoryRow("local:$id", copy.title, copy.description, connectedService = false,
-            icon = copy.icon, accent = copy.accent, group = copy.group, documentIcon = copy.documentIcon)
+            icon = copy.icon, accent = copy.accent, group = copy.group, documentIcon = copy.documentIcon,
+            sourceLabel = "777 · 随应用安装",
+            marketState = ExtensionMarketState(ExtensionMarketStatus.BUILTIN, "已内置 · 按需授权"))
     }
     val connected = connectedServices.sortedBy { it.id }.map { server ->
         val copy = extensionPresentation(server.id, server.id, "", ExtensionKind.CONNECTOR)
@@ -215,6 +234,8 @@ internal fun PluginInventoryBrowser(
             detail = "已连接 · " + server.tools.size + " 项工具 · " + server.transport.uppercase(),
             connectedService = true,
             available = false,
+            sourceLabel = "MCP · ${server.transport.uppercase()}",
+            marketState = connectorMarketState(server.registration, server.connection),
             icon = copy.icon,
             accent = copy.accent,
             group = copy.group,
@@ -231,14 +252,19 @@ internal fun PluginInventoryBrowser(
             group = copy.group, documentIcon = copy.documentIcon,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
             sourceUrl = skill.sourceUrl, sourceWarning = skill.sourceWarning,
-            rollbackAvailable = skill.rollbackAvailable)
+            rollbackAvailable = skill.rollbackAvailable,
+            requirements = skill.requirements,
+            sourceLabel = if (skill.sourceUrl != null) "GitHub · 已固定来源" else "777 · 本地技能",
+            marketState = installedSkillMarketState(skill.modelInvocable, skill.sourceWarning, skill.requirements))
     }
     val availablePresets = presets.filterNot { it.installed }.map { preset ->
         val copy = extensionPresentation(preset.id, preset.title, preset.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + preset.id, copy.title, copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = copy.group, documentIcon = copy.documentIcon,
-            available = false, installablePreset = true)
+            available = false, installablePreset = true,
+            sourceLabel = "777 · 内置精选",
+            marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "待安装"))
     }
     val installedIds = skills.map { it.name }.toSet()
     val presetIds = presets.map { it.id }.toSet()
@@ -250,26 +276,83 @@ internal fun PluginInventoryBrowser(
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = copy.group, documentIcon = copy.documentIcon,
             available = false, installableCurated = true,
+            sourceLabel = "OpenAI/skills · 官方精选",
+            marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "可安装 · 依赖待检查"),
         )
     }
-    // The horizontal categories describe real catalogue inventory, not a fabricated app store.
-    // Search always matches stable English IDs even when the cards show localized titles.
-    val list = (if (skillsOnly) when (selectedCategory) {
-        0 -> installedSkills
-        1 -> availablePresets + curated
-        2 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.OFFICE }
-        3 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.DEVELOPMENT }
-        4 -> (installedSkills + availablePresets + curated).filter { it.group == ExtensionGroup.CREATIVE }
-        else -> installedSkills
-    } else when (selectedCategory) {
-        1 -> filteredConnections
-        2 -> local.filter { it.group == ExtensionGroup.OFFICE || it.group == ExtensionGroup.DEVELOPMENT }
-        3 -> local.filter { it.group == ExtensionGroup.AUTOMATION }
-        4 -> local.filter { it.group == ExtensionGroup.CREATIVE }
-        else -> local
-    }).mapNotNull { item ->
-        inventorySearchScore(query, item.name, item.id, item.detail)?.let { score -> item to score }
-    }.sortedByDescending { it.second }.map { it.first }
+    // Codex separates discovery from local installation and runtime authorization.
+    val officialPlugins = if (skillsOnly) emptyList() else codexPlugins.map { plugin ->
+        val copy = extensionPresentation(plugin.name, plugin.name, "", ExtensionKind.PLUGIN)
+        val group = when (plugin.category.lowercase()) {
+            "creativity" -> ExtensionGroup.CREATIVE
+            "developer tools", "education & research" -> ExtensionGroup.DEVELOPMENT
+            "productivity", "communication", "finance" -> ExtensionGroup.OFFICE
+            else -> ExtensionGroup.GENERAL
+        }
+        val matchingService = connectedServices.firstOrNull {
+            it.id == plugin.name || it.id == codexDetails[plugin.id]?.mcpServerId
+        }
+        val installedFromPlugin = skills.any {
+            it.sourceUrl?.contains("/plugins/${plugin.name}/skills/") == true
+        }
+        val verifiedDetail = codexDetails[plugin.id]
+        val support = when {
+            plugin.codexOnly -> ExtensionMarketState(ExtensionMarketStatus.UNSUPPORTED,
+                "Codex 专属", "该插件要求 Codex 产品环境；777 当前无法直接启用")
+            plugin.installPolicy == "NOT_AVAILABLE" -> ExtensionMarketState(
+                ExtensionMarketStatus.UNSUPPORTED, "官方暂不可安装")
+            plugin.sourceKind != "local" -> ExtensionMarketState(
+                ExtensionMarketStatus.UNSUPPORTED, "第三方 Git 来源",
+                "Codex 使用 Git 插件安装器部署此插件；777 可以单独导入公开技能目录")
+            matchingService != null -> connectorMarketState(matchingService.registration, matchingService.connection)
+            installedFromPlugin -> ExtensionMarketState(
+                ExtensionMarketStatus.INSTALLED, "已安装部分技能",
+                "已导入可用技能；插件其他能力需进入详情按需连接")
+            verifiedDetail?.skills?.isNotEmpty() == true -> ExtensionMarketState(
+                ExtensionMarketStatus.INSTALLABLE, "可安装技能",
+                "点击了解，选择需要的技能；安装后显示其运行依赖")
+            verifiedDetail?.mcpUrl != null -> ExtensionMarketState(
+                ExtensionMarketStatus.NEEDS_SETUP, "连接后可用",
+                "官方授权策略：" +
+                    if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "连接时授权")
+            verifiedDetail != null && verifiedDetail.hasApp -> ExtensionMarketState(
+                ExtensionMarketStatus.NEEDS_SETUP, "需要应用连接",
+                "请查看详情并授权该应用的实际可用服务")
+            verifiedDetail != null && verifiedDetail.hasHooks -> ExtensionMarketState(
+                ExtensionMarketStatus.UNSUPPORTED, "Codex 钩子能力",
+                "此插件的钩子需要对应 Codex 执行环境")
+            else -> ExtensionMarketState(ExtensionMarketStatus.NEEDS_SETUP,
+                "查看能力", "点击了解，检查该插件在 Android 上可使用的部分")
+        }
+        InventoryRow("codex-plugin:" + plugin.id,
+            if (copy.title == "本地插件") plugin.name else copy.title,
+            if (copy.description == "已注册的本地扩展能力")
+                "Codex 官方插件 · ${plugin.category.ifBlank { "未分类" }}" else copy.description,
+            connectedService = false, icon = copy.icon, accent = copy.accent,
+            group = group, documentIcon = copy.documentIcon,
+            available = false,
+            sourceLabel = if (plugin.sourceKind == "local")
+                "Codex · openai/plugins · ${plugin.category}"
+            else "Codex · ${plugin.sourceKind} · 第三方仓库",
+            marketState = support)
+    }
+    val catalogue = local + connected + installedSkills + availablePresets + curated + officialPlugins
+    val list = catalogue.asSequence().filter { item ->
+        marketplaceTabAllows(
+            selectedTab = selectedCategory, skillsOnly = skillsOnly,
+            installedSkill = item.installedSkill,
+            installable = item.installablePreset || item.installableCurated ||
+                item.id.startsWith("codex-plugin:"),
+            connectedService = item.connectedService,
+            localPlugin = item.id.startsWith("local:"), group = item.group,
+        ) && (!item.connectedService || selectedCategory != 1 ||
+            connectedServices.firstOrNull { "service:${it.id}" == item.id }?.let {
+                pluginTransportMatches(it.transport, transportFilter)
+            } == true)
+    }.mapNotNull { item ->
+        inventorySearchScore(query, item.name, item.id, item.detail)?.let { item to it }
+    }.sortedWith(compareByDescending<Pair<InventoryRow, Int>> { it.second }
+        .thenBy { it.first.name }).map { it.first }.toList()
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -277,6 +360,14 @@ internal fun PluginInventoryBrowser(
                 title = stringResource(if (skillsOnly) R.string.skills_title else R.string.tools_catalog_title),
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
+            )
+            SySearchField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
+                    .testTag("plugin-inventory-search"),
+                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
             )
             LazyRow(
                 modifier = Modifier.testTag("plugin-category-list"),
@@ -286,17 +377,17 @@ internal fun PluginInventoryBrowser(
                 items(5) { category ->
                     SyFilterChip(
                         text = if (skillsOnly) when (category) {
-                            1 -> "精选"
-                            2 -> "效率与办公"
-                            3 -> "开发与研究"
-                            4 -> "创意与设计"
-                            else -> installedStatus
+                            1 -> installedStatus + " · " + installedSkills.size
+                            2 -> "办公效率"
+                            3 -> "开发研究"
+                            4 -> "创意设计"
+                            else -> "发现 · " + (installedSkills.size + availablePresets.size + curated.size)
                         } else when (category) {
                             1 -> connectionStatus + " · " + connectedServices.size
-                            2 -> stringResource(R.string.plugin_category_work)
+                            2 -> installedStatus + " · " + (installedSkills.size + local.size)
                             3 -> stringResource(R.string.plugin_category_device)
-                            4 -> "创意与设计"
-                            else -> installedStatus
+                            4 -> "创意设计"
+                            else -> "发现"
                         },
                         selected = selectedCategory == category,
                         onClick = { selectedCategory = category },
@@ -358,6 +449,26 @@ internal fun PluginInventoryBrowser(
                 ),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
+                if (query.isBlank() && selectedCategory == 0) {
+                    item(key = "extension-market-hero") {
+                        ExtensionMarketplaceHero(
+                            skillsOnly = skillsOnly,
+                            installedCount = installedSkills.size + if (skillsOnly) 0 else local.size,
+                            discoverableCount = availablePresets.size + curated.size + officialPlugins.size,
+                            connectedCount = connectedServices.size,
+                        )
+                    }
+                    item(key = "extension-market-section-heading") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("探索扩展", style = DsType.headline17.withReadingWeight(), color = colors.text)
+                            Text("${list.size} 项", style = DsType.small13, color = colors.textSecondary)
+                        }
+                    }
+                }
                 if (!skillsOnly && query.isBlank() && activeToolHookIds.isNotEmpty()) {
                     item(key = "registered-tool-hooks") {
                         Column(
@@ -415,6 +526,15 @@ internal fun PluginInventoryBrowser(
                                     )
                                 }
                             }
+                            if (onInstallGitHubSkill != null) {
+                                SyButton(
+                                    text = "从 GitHub 安装",
+                                    onClick = { showGitHubImport = true },
+                                    enabled = !loading,
+                                    variant = SyButtonVariant.Ghost,
+                                    modifier = Modifier.fillMaxWidth().testTag("skill-install-github"),
+                                )
+                            }
                             Text(
                                 stringResource(R.string.skills_import_hint),
                                 modifier = Modifier.fillMaxWidth(),
@@ -447,6 +567,22 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
+                if (!skillsOnly && (codexLoading || codexError != null || officialPlugins.isNotEmpty())) {
+                    item(key = "codex-market-status") {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(codexError ?: if (codexLoading) "正在读取 Codex 官方插件市场"
+                                else "Codex 官方插件 · ${officialPlugins.size} 项",
+                                style = DsType.small13.withReadingWeight(),
+                                color = if (codexError != null) colors.dangerInk else colors.textSecondary,
+                                modifier = Modifier.weight(1f))
+                            if (!codexLoading && onRefreshCodex != null) {
+                                SyButton(text = "刷新目录", onClick = onRefreshCodex,
+                                    size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
+                            }
+                        }
+                    }
+                }
                 if (skillsOnly && (curatedLoading || curatedError != null || curated.isNotEmpty())) {
                     item(key = "curated-status") {
                         Row(
@@ -456,7 +592,7 @@ internal fun PluginInventoryBrowser(
                         ) {
                             Text(
                                 curatedError ?: if (curatedLoading) "正在读取官方精选技能"
-                                    else "官方精选技能 · 可直接安装",
+                                    else "OpenAI 官方精选技能 · 安装后检查依赖",
                                 style = DsType.small13.withReadingWeight(),
                                 color = if (curatedError == null) colors.textSecondary else colors.dangerInk,
                                 modifier = Modifier.weight(1f),
@@ -515,18 +651,42 @@ internal fun PluginInventoryBrowser(
                             icon = item.icon,
                             accent = item.accent,
                             documentIcon = item.documentIcon,
-                            actionText = if (installable) "安装" else stringResource(
-                                if (onUseCapability != null && item.available) R.string.plugin_use
-                                else R.string.tools_catalog_details
-                            ),
+                            actionText = when {
+                                installable -> "安装"
+                                item.connectedService -> "管理"
+                                item.id.startsWith("codex-plugin:") -> "了解"
+                                item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
+                                    ExtensionMarketStatus.FAILED) -> "配置"
+                                else -> stringResource(
+                                    if (onUseCapability != null && item.available) R.string.plugin_use
+                                    else R.string.tools_catalog_details
+                                )
+                            },
+                            sourceLabel = item.sourceLabel,
+                            statusLabel = item.marketState.label,
+                            attentionNeeded = item.marketState.status in setOf(
+                                ExtensionMarketStatus.NEEDS_SETUP, ExtensionMarketStatus.FAILED,
+                                ExtensionMarketStatus.UNSUPPORTED),
                             enabled = !loading,
-                            onOpen = { selectedRow = item },
+                            onOpen = {
+                                selectedRow = item
+                                if (item.id.startsWith("codex-plugin:")) {
+                                    onReadCodexPluginDetail?.invoke(item.id.removePrefix("codex-plugin:"))
+                                }
+                            },
                             onAction = {
                                 when {
                                     item.installablePreset && onInstallPreset != null ->
                                         onInstallPreset(item.id.substringAfter(":"))
                                     item.installableCurated && onInstallCurated != null ->
                                         onInstallCurated(item.id.substringAfter(":"))
+                                    item.connectedService -> onManageConnections()
+                                    item.id.startsWith("codex-plugin:") -> {
+                                        selectedRow = item
+                                        onReadCodexPluginDetail?.invoke(item.id.removePrefix("codex-plugin:"))
+                                    }
+                                    item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
+                                        ExtensionMarketStatus.FAILED) -> selectedRow = item
                                     onUseCapability != null && item.available -> onUseCapability(usePrompt)
                                     else -> selectedRow = item
                                 }
@@ -535,14 +695,6 @@ internal fun PluginInventoryBrowser(
                     }
                 }
             }
-            // The search bar stays visible at the bottom, as in the reference catalogue.
-            SySearchField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd)
-                    .testTag("plugin-inventory-search"),
-                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
-            )
         }
     }
     selectedRow?.let { item ->
@@ -558,6 +710,7 @@ internal fun PluginInventoryBrowser(
                                              (item.installableCurated && onInstallCurated != null)) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
                         else if (item.connectedService) R.string.tools_external_services
+                        else if (item.id.startsWith("codex-plugin:")) R.string.common_close
                         else R.string.tools_catalog_return_chat,
                     ),
                     modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
@@ -568,7 +721,9 @@ internal fun PluginInventoryBrowser(
                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
                                          else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                        else if (item.connectedService) onManageConnections() else onReturnToChat()
+                        else if (item.connectedService) onManageConnections()
+                        else if (item.id.startsWith("codex-plugin:")) Unit
+                        else onReturnToChat()
                     },
                 )
             },
@@ -583,6 +738,129 @@ internal fun PluginInventoryBrowser(
                 style = DsType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
+            if (item.sourceLabel.isNotBlank()) {
+                Text(item.sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+            }
+            Text(item.marketState.label, style = DsType.small13Strong.withReadingWeight(),
+                color = if (item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
+                    ExtensionMarketStatus.FAILED, ExtensionMarketStatus.UNSUPPORTED))
+                    colors.warningInk else colors.successInk)
+            if (item.marketState.advice.isNotBlank()) {
+                Text(item.marketState.advice, style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary)
+            }
+            if (item.id.startsWith("codex-plugin:")) {
+                val pluginId = item.id.removePrefix("codex-plugin:")
+                Text(
+                    if (codexPlugins.firstOrNull { it.id == pluginId }?.sourceKind == "local")
+                        "官方来源：github.com/openai/plugins"
+                    else "官方目录收录的第三方仓库：${codexPlugins.firstOrNull { it.id == pluginId }?.sourceUrl.orEmpty()}",
+                    style = DsType.caption11, color = colors.textTertiary,
+                )
+                val details = codexDetails[pluginId]
+                when {
+                    details != null -> {
+                        Text(details.description, style = DsType.small13, color = colors.textSecondary)
+                        Text("发布方：${details.developerName.ifBlank { "OpenAI / 合作开发者" }} · ${details.version}",
+                            style = DsType.caption11, color = colors.textTertiary)
+                        val abilities = buildList {
+                            if (details.skills.isNotEmpty()) add("技能")
+                            if (details.hasMcp) add("MCP")
+                            if (details.hasApp) add("App")
+                            if (details.hasHooks) add("Hooks")
+                        }
+                        Text("包含能力：${abilities.joinToString(" / ").ifBlank { "元数据" }}",
+                            style = DsType.small13, color = colors.textSecondary)
+                        if (details.skills.isNotEmpty() &&
+                            item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
+                            Text("可直接安装的技能", style = DsType.std14Strong, color = colors.text)
+                            details.skills.forEach { skill ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(skill, modifier = Modifier.weight(1f),
+                                        style = DsType.small13, color = colors.text)
+                                    val officialRoot = codexPlugins
+                                        .firstOrNull { it.id == pluginId }?.sourcePath
+                                    val skillFolder = details.skillDirectories[skill]
+                                    val installed = skills.any { installedSkill ->
+                                        installedSkill.name == skill ||
+                                            (officialRoot != null && skillFolder != null &&
+                                                installedSkill.sourceUrl?.endsWith(
+                                                    "/$officialRoot/$skillFolder"
+                                                ) == true)
+                                    }
+                                    SyButton(
+                                        text = if (installed) "已安装" else "安装",
+                                        variant = SyButtonVariant.Info,
+                                        enabled = !loading && !installed && onInstallCodexPluginSkill != null,
+                                        modifier = Modifier.testTag("codex-skill-install-$pluginId-$skill"),
+                                        onClick = {
+                                            selectedRow = null
+                                            onInstallCodexPluginSkill?.invoke(pluginId, skill)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    codexDetailLoadingId == pluginId ->
+                        Text("正在检查官方插件包及技能目录…", style = DsType.small13,
+                            color = colors.textSecondary)
+                    else -> {
+                        Text(codexDetailError ?: "按需获取该插件的详细能力说明",
+                            style = DsType.small13, color = colors.textSecondary)
+                        if (onReadCodexPluginDetail != null) {
+                            SyButton(text = "重新读取插件详情", onClick = {
+                                onReadCodexPluginDetail(pluginId)
+                            }, variant = SyButtonVariant.Ghost)
+                        }
+                    }
+                }
+                Text("安装技能不会静默启动外部程序；MCP 服务需要你明确同意连接。",
+                    style = DsType.caption11, color = colors.textSecondary)
+                if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED &&
+                    details?.mcpUrl != null && onConnectCodexPlugin != null) {
+                    Text("连接地址：" + details.mcpUrl,
+                        style = DsType.caption11, color = colors.textSecondary)
+                    SyButton(text = "授权并连接 ${details.mcpServerId ?: "MCP"}",
+                        enabled = !loading, variant = SyButtonVariant.Info,
+                        onClick = {
+                            selectedRow = null
+                            onConnectCodexPlugin(pluginId)
+                        })
+                } else if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
+                    SyButton(text = "查看连接方式", variant = SyButtonVariant.Info,
+                        onClick = { selectedRow = null; onManageConnections() })
+                }
+            }
+            if (item.requirements.isNotEmpty()) {
+                Text("运行依赖", style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                item.requirements.forEach { requirement ->
+                    Text("${if (requirement.registered) "已登记" else "待配置"} · ${requirement.type}: ${requirement.value}",
+                        style = DsType.caption11.withReadingWeight(),
+                        color = if (requirement.registered) colors.successInk else colors.warningInk)
+                    val endpoint = if (!requirement.registered)
+                        skillMcpHttpsEndpoint(requirement) else null
+                    if (endpoint != null && onConnectSkillMcp != null) {
+                        Text("连接地址：$endpoint", style = DsType.caption11,
+                            color = colors.textSecondary)
+                        SyButton(
+                            text = "授权并连接 ${requirement.value}",
+                            enabled = !loading,
+                            variant = SyButtonVariant.Info,
+                            onClick = {
+                                selectedRow = null
+                                onConnectSkillMcp(requirement.value, endpoint)
+                            },
+                        )
+                    }
+                }
+                if (item.requirements.any { !it.registered }) {
+                    SyButton(text = "管理连接与授权", onClick = {
+                        selectedRow = null
+                        onManageConnections()
+                    }, variant = SyButtonVariant.Info)
+                }
+            }
             if (item.installedSkill && !item.modelInvocable) {
                 Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.textTertiary)
             }
@@ -719,6 +997,34 @@ internal fun PluginInventoryBrowser(
                     },
                 )
             }
+        }
+    }
+    if (showGitHubImport && onInstallGitHubSkill != null) {
+        SyResponsiveSheet(
+            title = "从 GitHub 安装技能",
+            subtitle = "选择包含 SKILL.md 的公开仓库目录；安装后检查工具和授权",
+            onDismiss = { showGitHubImport = false },
+            footer = {
+                SyButton(
+                    text = "确认安装",
+                    enabled = !loading && githubImportUrl.trim().startsWith("https://github.com/"),
+                    onClick = {
+                        val source = githubImportUrl.trim()
+                        showGitHubImport = false
+                        githubImportUrl = ""
+                        onInstallGitHubSkill(source)
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("skill-install-github-confirm"),
+                )
+            },
+        ) {
+            SyTextField(
+                value = githubImportUrl,
+                onValueChange = { githubImportUrl = it.take(2048) },
+                label = { Text("GitHub 技能目录链接") },
+                supportingText = { Text("例如 github.com/owner/repo/tree/main/skills/skill-name") },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
     if (showCreateSkill && onCreateSkill != null) {
