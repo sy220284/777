@@ -641,6 +641,30 @@ internal fun PluginInventoryBrowser(
                 style = DsType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
+            if (item.sourceLabel.isNotBlank()) {
+                Text(item.sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+            }
+            Text(item.marketState.label, style = DsType.small13Strong.withReadingWeight(),
+                color = if (item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
+                    ExtensionMarketStatus.FAILED)) colors.warningInk else colors.successInk)
+            if (item.marketState.advice.isNotBlank()) {
+                Text(item.marketState.advice, style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary)
+            }
+            if (item.requirements.isNotEmpty()) {
+                Text("运行依赖", style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                item.requirements.forEach { requirement ->
+                    Text("${if (requirement.registered) "已登记" else "待配置"} · ${requirement.type}: ${requirement.value}",
+                        style = DsType.caption11.withReadingWeight(),
+                        color = if (requirement.registered) colors.successInk else colors.warningInk)
+                }
+                if (item.requirements.any { !it.registered }) {
+                    SyButton(text = "管理连接与授权", onClick = {
+                        selectedRow = null
+                        onManageConnections()
+                    }, variant = SyButtonVariant.Info)
+                }
+            }
             if (item.installedSkill && !item.modelInvocable) {
                 Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.textTertiary)
             }
@@ -777,6 +801,34 @@ internal fun PluginInventoryBrowser(
                     },
                 )
             }
+        }
+    }
+    if (showGitHubImport && onInstallGitHubSkill != null) {
+        SyResponsiveSheet(
+            title = "从 GitHub 安装技能",
+            subtitle = "选择包含 SKILL.md 的公开仓库目录；安装后检查工具和授权",
+            onDismiss = { showGitHubImport = false },
+            footer = {
+                SyButton(
+                    text = "确认安装",
+                    enabled = !loading && githubImportUrl.trim().startsWith("https://github.com/"),
+                    onClick = {
+                        val source = githubImportUrl.trim()
+                        showGitHubImport = false
+                        githubImportUrl = ""
+                        onInstallGitHubSkill(source)
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("skill-install-github-confirm"),
+                )
+            },
+        ) {
+            SyTextField(
+                value = githubImportUrl,
+                onValueChange = { githubImportUrl = it.take(2048) },
+                label = { Text("GitHub 技能目录链接") },
+                supportingText = { Text("例如 github.com/owner/repo/tree/main/skills/skill-name") },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
     if (showCreateSkill && onCreateSkill != null) {
