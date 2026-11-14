@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -45,6 +46,7 @@ internal fun ExtensionCatalogCard(
     icon: ImageVector,
     accent: Color,
     documentIcon: Int? = null,
+    brandLogo: ImageBitmap? = null,
     actionText: String,
     enabled: Boolean = true,
     tagPrefix: String = "plugin-inventory",
@@ -73,16 +75,17 @@ internal fun ExtensionCatalogCard(
             ) {
                 Surface(
                     modifier = Modifier.size(54.dp).testTag(tagPrefix + "-icon-" + id),
-                    color = if (documentIcon == null) accent.copy(alpha = 0.09f)
-                        else colors.materialL4,
+                    color = if (documentIcon == null && brandLogo == null)
+                        accent.copy(alpha = 0.09f) else colors.materialL4,
                     shape = RoundedCornerShape(17.dp),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (documentIcon != null) {
-                            Image(painterResource(documentIcon), contentDescription = null,
-                                modifier = Modifier.size(42.dp))
-                        } else {
-                            Icon(icon, contentDescription = null, tint = accent,
+                        when {
+                            brandLogo != null -> Image(brandLogo, contentDescription = null,
+                                modifier = Modifier.size(44.dp))
+                            documentIcon != null -> Image(painterResource(documentIcon),
+                                contentDescription = null, modifier = Modifier.size(42.dp))
+                            else -> Icon(icon, contentDescription = null, tint = accent,
                                 modifier = Modifier.size(27.dp))
                         }
                     }
@@ -107,6 +110,11 @@ internal fun ExtensionCatalogCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                if (statusLabel == "已安装" || statusLabel == "已安装部分技能" ||
+                    statusLabel.startsWith("已内置")) {
+                    Text("已安装", style = DsType.small13.withReadingWeight(),
+                        color = colors.textTertiary, maxLines = 1)
                 }
                 Icon(FeatherIcons.ChevronRight, contentDescription = "查看详情",
                     tint = colors.textTertiary, modifier = Modifier.size(20.dp))
