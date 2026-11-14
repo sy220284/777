@@ -3,6 +3,10 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.files.LocalFileObservationCache
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -13,6 +17,62 @@ import org.junit.Before
 import org.junit.Test
 
 class LocalWorkspaceTest {
+    @Test
+    fun projectDirectoryMutationWaitsForExistingWorkspaceWriterGate() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val started = CountDownLatch(1)
+        val finished = CountDownLatch(1)
+        val failures = ConcurrentLinkedQueue<Throwable>()
+        val relocation = Thread {
+            try {
+                workspace.withWorkspaceFileMutation {
+                    entered.countDown()
+                    check(release.await(5, TimeUnit.SECONDS)) { "迁移测试锁未释放" }
+                }
+            } catch (failure: Throwable) {
+                failures.add(failure)
+            }
+        }
+        val writer = Thread {
+            started.countDown()
+            try {
+                workspace.write("并发/安全.txt", "写入内容")
+            } catch (failure: Throwable) {
+                failures.add(failure)
+            } finally {
+                finished.countDown()
+            }
+        }
+        relocation.start()
+        try {
+            assertTrue("迁移必须进入共享文件锁", entered.await(5, TimeUnit.SECONDS))
+            writer.start()
+            assertTrue("写入线程未启动", started.await(5, TimeUnit.SECONDS))
+            assertFalse("文件写入越过了目录迁移锁", finished.await(150, TimeUnit.MILLISECONDS))
+        } finally {
+            release.countDown()
+            relocation.join(5_000)
+            if (writer.state != Thread.State.NEW) writer.join(5_000)
+        }
+        assertFalse(relocation.isAlive)
+        assertFalse(writer.isAlive)
+        assertTrue("并发操作异常: $failures", failures.isEmpty())
+        assertEquals("写入内容", workspace.readRaw("并发/安全.txt"))
+    }
+
+    @Test
+    fun directoryMutationInvalidatesCachedDirectoryPages() {
+        root.resolve("原项目").mkdirs()
+        root.resolve("原项目/正文.txt").writeText("保留")
+        assertEquals(listOf("原项目"), workspace.directoryPage(".").entries.map { it.path })
+        workspace.withWorkspaceFileMutation {
+            Files.move(root.resolve("原项目").toPath(),
+                root.resolve("新项目").toPath(), StandardCopyOption.ATOMIC_MOVE)
+        }
+        assertEquals(listOf("新项目"), workspace.directoryPage(".").entries.map { it.path })
+        assertEquals("保留", workspace.readRaw("新项目/正文.txt"))
+    }
     @Test
     fun localVersionedFileApiCreatesUpdatesAndRejectsStaleRevision() {
         val missing = workspace.fileVersion("成果/文档.md")
