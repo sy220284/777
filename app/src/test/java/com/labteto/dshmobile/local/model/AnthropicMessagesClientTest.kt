@@ -422,6 +422,7 @@ class AnthropicMessagesClientTest {
         val interrupted = fixture(listOf(start, text)).complete(route(), emptyList(), emptyList(), null, true)
         assertEquals(LocalModelCompletionReason.INTERRUPTED, interrupted.completionReason)
         assertEquals("第一段", interrupted.content)
+        assertEquals("stream_interrupted_after_content_block_start", interrupted.rawStopReason)
     }
 
     @Test
