@@ -223,6 +223,7 @@ class LocalToolsUiFacade @Inject internal constructor(
                     }
                     com.labteto.dshmobile.uicontract.UiSkillRequirement(
                         requirement.type, requirement.value, requirement.description, registered,
+                        requirement.transport, requirement.url, requirement.command,
                     )
                 },
             )
