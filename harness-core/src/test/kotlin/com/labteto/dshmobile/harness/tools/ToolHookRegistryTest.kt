@@ -20,6 +20,34 @@ class ToolHookRegistryTest {
         executor = HarnessToolExecutor { _, _, _ -> execute() },
     )
 
+    @Test fun preAndPostHooksShareTheExactRunAndCallIdentity() = runTest {
+        val registry = ToolRegistry()
+        registry.register(tool())
+        var before: ToolHookInvocationIdentity? = null
+        var after: ToolHookInvocationIdentity? = null
+        val events = mutableListOf<String>()
+        registry.registerHook(ToolHookSubscription("trace", object : ToolLifecycleHook {
+            override suspend fun beforeUse(request: ToolPreUseRequest): ToolPreUseDecision {
+                before = request.identity
+                events += "pre"
+                return ToolPreUseDecision.Allow
+            }
+            override suspend fun afterUse(event: ToolPostUseEvent) {
+                after = event.identity
+                events += "post"
+            }
+        }))
+        val result = registry.executeTracked("patch", JsonObject(emptyMap()), context = ToolContext(
+            sessionId = "session-one",
+            attributes = mapOf("call_id" to "call-1", "execution_id" to "execution-2", "run_id" to "run-3"),
+            onExecutionFinished = { _, _ -> events += "receipt" },
+        ))
+        assertTrue(result.executionStarted)
+        assertEquals(ToolHookInvocationIdentity("call-1", "execution-2", "run-3"), before)
+        assertEquals(before, after)
+        assertEquals(listOf("pre", "receipt", "post"), events)
+    }
+
     @Test fun denialIsFailClosedAndDoesNotPromptOrEnterExecutor() = runTest {
         var approvals = 0
         var calls = 0
