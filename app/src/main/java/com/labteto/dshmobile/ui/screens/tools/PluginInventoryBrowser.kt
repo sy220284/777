@@ -783,7 +783,7 @@ internal fun PluginInventoryBrowser(
                                     val installed = skills.any { installedSkill ->
                                         installedSkill.name == skill ||
                                             (officialRoot != null && skillFolder != null &&
-                                                installedSkill.sourceUrl?.contains(
+                                                installedSkill.sourceUrl?.endsWith(
                                                     "/$officialRoot/$skillFolder"
                                                 ) == true)
                                     }
