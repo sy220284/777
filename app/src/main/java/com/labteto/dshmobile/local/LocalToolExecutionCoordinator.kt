@@ -462,12 +462,13 @@ internal class LocalToolExecutionCoordinator(
         suspend fun requestApprovalForTool(
             tool: HarnessTool,
             hookReason: String?,
+            concreteCall: LocalToolCall = call,
         ): Boolean {
-            val summary = approvalSummary(call, tool) +
+            val summary = approvalSummary(concreteCall, tool) +
                 hookReason?.takeIf(String::isNotBlank)?.let { "\n受信工具规则要求确认：" + it }.orEmpty()
-            val granted = approval(call, tool, summary)
-            // A policy escalation is still the exact same durable user decision.
-            recordAuthorizationDecision(sessionId, call, executionIdentity, granted)
+            val granted = approval(concreteCall, tool, summary)
+            // Keep each child authorization tied to its actual tool, arguments, and call ID.
+            recordAuthorizationDecision(sessionId, concreteCall, executionIdentity, granted)
             authorizationRecorded = true
             if (!granted) approvalDenied = true
             return granted
@@ -508,6 +509,17 @@ internal class LocalToolExecutionCoordinator(
                         },
                         approval = { tool -> requestApprovalForTool(tool, null) },
                         approvalWithReason = { tool, reason -> requestApprovalForTool(tool, reason) },
+                        approvalWithInvocation = { tool, arguments, attributes, reason ->
+                            val specificCall = if (tool.name == registered.name) call else
+                                call.copy(
+                                    id = (attributes["call_id"] as? String).orEmpty()
+                                        .ifBlank { call.id + "/nested/" + tool.name },
+                                    name = tool.name,
+                                    arguments = arguments,
+                                    rawArguments = arguments.toString(),
+                                )
+                            requestApprovalForTool(tool, reason, specificCall)
+                        },
                         onExecutionStarted = { admittedTool ->
                             // Registry.beforeExecution already checks current ownership after approval.
                             // Repeat only AFTER acquiring the workspace lease, where state may change.
