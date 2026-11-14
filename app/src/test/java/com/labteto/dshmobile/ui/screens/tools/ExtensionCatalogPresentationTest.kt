@@ -99,6 +99,11 @@ class ExtensionCatalogPresentationTest {
         ))
         assertTrue(!codexPluginSkillInstalled(urlOnlyImpersonation, "plugins/figma", "skills/figma-use"))
         assertTrue(codexOfficialPluginSourceMatches(items.last().sourceIdentity, "plugins/figma"))
+        assertTrue(codexOfficialPluginSourceMatches(
+            com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "OpenAI", "Plugins", "0123456789012345678901234567890123456789",
+                "plugins/figma/skills/figma-use",
+            ), "plugins/figma"))
         assertTrue(!codexOfficialPluginSourceMatches(spoofedSource.first().sourceIdentity, "plugins/figma"))
     }
 
