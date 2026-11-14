@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.LocalHarnessState
+import com.labteto.dshmobile.local.model.LocalAgentCognitionGuidance
 
 import com.labteto.dshmobile.local.chat.ChatCharacterState
 import com.labteto.dshmobile.local.chat.ChatContextAssembler
@@ -30,7 +31,8 @@ internal class LocalChatTurnCoordinator @Inject constructor(
     private val persistence: LocalChatPersistence? = null,
 ) {
     internal fun chatStablePrompt(snapshot: LocalHarnessState, base: String): String =
-        listOf(base, renderChatExpressionPreferences(
+        listOf(base, LocalAgentCognitionGuidance.DEFAULT, LocalAgentCognitionGuidance.CHAT,
+            renderChatExpressionPreferences(
             snapshot.chat.chatStyleGuardCustomPhrases, snapshot.chat.chatStyleGuardEnabled,
         )).filter(String::isNotBlank).joinToString("\n\n")
 
