@@ -296,7 +296,10 @@ internal fun PluginInventoryBrowser(
             else -> ExtensionMarketState(ExtensionMarketStatus.NEEDS_SETUP,
                 "需要连接", "官方授权策略：" + if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "安装时授权")
         }
-        InventoryRow("codex-plugin:" + plugin.id, copy.title, copy.description,
+        InventoryRow("codex-plugin:" + plugin.id,
+            if (copy.title == "本地插件") plugin.name else copy.title,
+            if (copy.description == "已注册的本地扩展能力")
+                "Codex 官方插件 · ${plugin.category.ifBlank { "未分类" }}" else copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = group, documentIcon = copy.documentIcon,
             available = false, sourceLabel = "Codex · openai/plugins · ${plugin.category}",
