@@ -256,7 +256,8 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             "edit", "edit_file" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
                 val path = args.string("path")
-                workspace.requireFreshObservation(path)
+                // edit verifies a unique old_text and the current file revision atomically;
+                // a separate read is useful context, not a required extra model call.
                 withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(
                     HarnessResourceKind.FILE_IO, "tool:edit",
                     units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
