@@ -451,6 +451,35 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    /** Explicitly approved plugin action, with the same cancelable OAuth lifecycle as manual MCP login. */
+    fun connectCodexPlugin(id: String) {
+        val plugin = _state.value.codexPlugins.firstOrNull { it.id == id } ?: return
+        if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
+            _state.value.codexDetails[id]?.mcpUrl == null) return
+        val serviceId = _state.value.codexDetails[id]?.mcpServerId ?: return
+        mcpLoginJob = viewModelScope.launch { operationGate.run {
+            _state.value = _state.value.copy(
+                loading = true, mcpLoginServerId = serviceId,
+                feedback = "请在浏览器授权 ${plugin.name}，完成后返回 777。", feedbackRes = null,
+            )
+            try {
+                val result = localTools.connectCodexPlugin(id)
+                _state.value = _state.value.copy(
+                    servers = localTools.servers(), feedback = result,
+                )
+            } catch (cancelled: CancellationException) {
+                _state.value = _state.value.copy(feedback = "插件授权已取消")
+                throw cancelled
+            } catch (failure: Exception) {
+                _state.value = _state.value.copy(
+                    feedback = "授权连接失败：" + (failure.message ?: "请查看服务授权说明"),
+                )
+            } finally {
+                _state.value = _state.value.copy(loading = false, mcpLoginServerId = null)
+            }
+        } }
+    }
+
     fun installCodexPluginSkill(pluginId: String, skillId: String) {
         val plugin = _state.value.codexPlugins.firstOrNull { it.id == pluginId } ?: return
         if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
@@ -1108,6 +1137,7 @@ fun ToolsScreen(
                                     codexDetailError = state.codexDetailError,
                                     onReadCodexPluginDetail = viewModel::loadCodexPluginDetail,
                                     onInstallCodexPluginSkill = viewModel::installCodexPluginSkill,
+                                    onConnectCodexPlugin = viewModel::connectCodexPlugin,
                                     onRefreshCodex = viewModel::refreshCodexPlugins,
                                     curatedLoading = state.curatedLoading,
                                     curatedError = state.curatedError,
