@@ -65,7 +65,7 @@
 
 ## 4. 后台任务、团队与虚拟屏
 
-后台任务通过 `job_list` 查询、`job_output` 读取、`job_kill` 终止。持久代理用 `agent_inspect` 查看、`agent_close` 关闭；Team 成员遵循 `team_request_shutdown` → `team_respond_shutdown` 的受信关闭流程，或使用对应 Agent 生命周期入口。按真实任务 ID 操作，不能把已停止任务、历史记录和执行槽位混为一谈。
+后台任务通过 `job_list` 查询、`job_output` 读取、`job_kill` 终止。持久代理用 `agent_inspect` 查看、`agent_close` 关闭；Team 可以用 `team_stop_all` 停止全部正在运行的成员激活（保留身份和恢复状态）；暂时停用指定成员用 `team_disable_member`（释放未完成任务）；永久移除成员用 `team_dismiss_member`（终止 Agent 并释放任务）；需要成员自主同意关闭时走 `team_request_shutdown` → `team_respond_shutdown`。按真实任务 ID 操作，分别检查运行状态、保留身份和历史记录，避免把已停止任务误当占用槽位的执行。
 
 虚拟屏启动优先用 `android_vscreen_start`，失败时系统是否允许应用在目标显示器启动是 Android 平台决定的；本次启动失败会清理刚创建的虚拟显示。分析平台拒绝原因时记录返回的系统异常，不通过重复创建虚拟显示绕过系统限制。
 
