@@ -55,7 +55,11 @@ class CodeModePluginTest {
         assertFalse(result.isError)
         assertEquals(listOf("read", "write"), calls)
         assertEquals(2, approvals)
-        assertEquals(listOf("read", "write", "code_mode_run"), receipts)
+        // Child calls appear as individually typed steps in the wrapper receipt.
+        // Only the outer registry call invokes the coordinator's lifecycle callbacks.
+        assertEquals(listOf("code_mode_run"), receipts)
+        assertTrue(result.content.contains("\"tool\":\"read\""))
+        assertTrue(result.content.contains("\"tool\":\"write\""))
         assertTrue(result.content.contains("\"completed_steps\":2"))
     }
 
