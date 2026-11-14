@@ -149,7 +149,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 if (rule.keys.any { it != "step" && it != "path" && it != "equals" } ||
                     source == null || source !in 1..index || rule["equals"] == null ||
                     (path != null && (path !is JsonPrimitive || !path.isString ||
-                        (path.content.isNotEmpty() && !REFERENCE_PATH.matches(path.content)))))
+                        parseReferencePath(path.content) == null)))
                     return rejection("CODE_MODE_BAD_CONDITION",
                         "步骤 ${index + 1} 的条件必须引用前序步骤及可验证字段")
             }
@@ -298,7 +298,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 node.keys.any { it != RESULT_REFERENCE_KEY && it != "path" } -> "包含未知字段"
                 index == null || index !in 1 until stepNumber -> "只能引用更早的步骤"
                 path != null && (path !is JsonPrimitive || !path.isString ||
-                    (path.content.isNotEmpty() && !REFERENCE_PATH.matches(path.content))) ->
+                    parseReferencePath(path.content) == null) ->
                     "字段路径无效"
                 else -> null
             }
@@ -308,6 +308,66 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
     }
 
     private class StepReferenceException(message: String) : IllegalArgumentException(message)
+
+    /**
+     * Unified field selector for both result references and conditions.
+     * Supports dotted keys, JSONPath roots and array/quoted-key brackets.
+     */
+    private fun parseReferencePath(raw: String): List<String>? {
+        if (raw.isEmpty() || raw == "$") return emptyList()
+        var cursor = 0
+        if (raw[0] == '$') {
+            cursor = 1
+            if (cursor < raw.length && raw[cursor] == '.') cursor++
+            else if (cursor < raw.length && raw[cursor] != '[') return null
+        }
+        if (cursor >= raw.length) return null
+        val segments = mutableListOf<String>()
+        var previousWasSegment = false
+        while (cursor < raw.length) {
+            when (raw[cursor]) {
+                '.' -> {
+                    if (!previousWasSegment || cursor == raw.lastIndex) return null
+                    cursor++
+                    previousWasSegment = false
+                }
+                '[' -> {
+                    val close = raw.indexOf(']', cursor + 1)
+                    if (close < 0) return null
+                    val token = raw.substring(cursor + 1, close)
+                    val segment = when {
+                        token.matches(Regex("""0|[1-9][0-9]*""")) -> token
+                        token.length >= 2 && token.first() == '"' && token.last() == '"' ->
+                            try {
+                                (Json.parseToJsonElement(token) as? JsonPrimitive)
+                                    ?.takeIf { it.isString }?.content
+                            } catch (_: kotlinx.serialization.SerializationException) { null }
+                        token.length >= 2 && token.first() == '\'' && token.last() == '\'' &&
+                            !token.substring(1, token.lastIndex).contains('\'') ->
+                            token.substring(1, token.lastIndex)
+                        else -> null
+                    }
+                    if (segment.isNullOrEmpty()) return null
+                    segments += segment
+                    cursor = close + 1
+                    previousWasSegment = true
+                }
+                ']' -> return null
+                else -> {
+                    if (previousWasSegment) return null
+                    val start = cursor
+                    while (cursor < raw.length && raw[cursor] !in charArrayOf('.', '[', ']'))
+                        cursor++
+                    val key = raw.substring(start, cursor)
+                    if (key.isBlank()) return null
+                    segments += key
+                    previousWasSegment = true
+                }
+            }
+        }
+        return segments.takeIf { previousWasSegment }
+    }
+
 
     /** Only durable results can be reused. Resolved inputs pass through ToolRegistry again,
      * retaining schema validation, approval, registration identity and Hooks. */
@@ -327,7 +387,8 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             }
             var selected: JsonElement = parsed
             val path = (node["path"] as? JsonPrimitive)?.content.orEmpty()
-            if (path.isNotEmpty()) for (segment in path.split('.')) {
+            for (segment in (parseReferencePath(path)
+                ?: throw StepReferenceException("步骤 $ordinal 的字段路径无效：$path"))) {
                 selected = when (val value = selected) {
                     is JsonObject -> value[segment]
                     is JsonArray -> segment.toIntOrNull()?.let { index -> value.getOrNull(index) }
@@ -374,7 +435,6 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         const val MAX_REFERENCE_SOURCE_CHARS = 128_000
         const val MAX_REFERENCE_VALUE_CHARS = 8_192
         const val RESULT_REFERENCE_KEY = "\$step_result"
-        val REFERENCE_PATH = Regex("""[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*""")
         const val MAX_RESULT_CHARS = 4_000
     }
 }

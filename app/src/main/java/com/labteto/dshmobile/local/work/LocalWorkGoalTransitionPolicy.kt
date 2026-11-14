@@ -8,6 +8,10 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** A rejected Goal completion is a verified precondition failure, not an unknown file mutation. */
+internal class LocalWorkGoalAcceptanceRejectedException(message: String) :
+    IllegalStateException(message)
+
 internal fun resolveWorkGoalTransition(
     current: LocalGoal,
     candidate: LocalGoal,
@@ -59,7 +63,7 @@ internal fun resolveWorkGoalUpdate(
             put("test_evidence", delivery?.testCallId ?: "")
             transition.reason?.let { put("reason", it) }
         })
-        error(transition.reason ?: "目标状态变更被运行时拒绝")
+        throw LocalWorkGoalAcceptanceRejectedException(transition.reason ?: "目标状态变更被运行时拒绝")
     }
     return transition.value
 }

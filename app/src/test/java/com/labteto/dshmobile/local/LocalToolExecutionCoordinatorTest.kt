@@ -39,6 +39,27 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
 
+    @Test fun failedGoalAcceptanceDoesNotPoisonSubsequentSettlement() = runBlocking {
+        val registry = ToolRegistry()
+        registry.register(tool("update_goal", ToolAccess.SESSION_WRITE,
+            ToolApprovalPolicy.NEVER) {
+            throw com.labteto.dshmobile.local.work.LocalWorkGoalAcceptanceRejectedException(
+                "成果版本已变化，需要重新验收")
+        })
+        val run = coordinator(registry)
+        val result = run.executeScoped(
+            LocalToolCall("goal-rejected", "update_goal", buildJsonObject {}, "{}"),
+            "s1", true, false,
+            approval = { _, _, _ -> true },
+        )
+        assertTrue(result.isError)
+        assertEquals("WORK_GOAL_ACCEPTANCE_REJECTED", result.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, result.sideEffect)
+        assertTrue(result.executionId != null)
+        assertTrue(result.recoveryHint.orEmpty().contains("无需新建目标"))
+    }
+
+
     @Test fun codeModeRunsRealChildStepsThroughFreshAuthorizationAndExecutionIdentities() = runBlocking {
         val registry = ToolRegistry()
         val invoked = mutableListOf<String>()

@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
+import com.labteto.dshmobile.local.work.LocalWorkGoalAcceptanceRejectedException
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -632,6 +633,19 @@ internal class LocalToolExecutionCoordinator(
                 retryable = false,
                 sideEffect = AgentToolSideEffect.NONE,
                 recoveryHint = "读取最新已提交的用户要求，不要重复执行旧调用。",
+            )
+        } catch (rejected: LocalWorkGoalAcceptanceRejectedException) {
+            // The Goal policy validated the files/tests before changing status.
+            // Its rejection only appends an audit fact, never mutates a deliverable.
+            // Treating it as POSSIBLE would permanently poison this Goal's ledger.
+            return AgentToolResult(
+                content = rejected.message ?: "目标尚未通过当前版本验收",
+                isError = true,
+                errorCode = "WORK_GOAL_ACCEPTANCE_REJECTED",
+                retryable = false,
+                sideEffect = AgentToolSideEffect.NONE,
+                executionId = executionIdentity.executionId.takeIf { executionStarted },
+                recoveryHint = "保留当前目标，完成缺少的验收并再次结算，无需新建目标。",
             )
         } catch (error: LocalWebException) {
             return thrownFailure(call, registered, error.code, error.message ?: "网页工具失败", executionStarted,

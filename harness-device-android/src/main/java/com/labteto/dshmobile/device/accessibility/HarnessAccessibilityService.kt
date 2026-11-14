@@ -36,15 +36,9 @@ class HarnessAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Node indices belong to the last inspected screen, not a permanent Android control.
-        // Any content/window/scroll/input change invalidates them before the next action.
-        val changingEvents = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
-            AccessibilityEvent.TYPE_WINDOWS_CHANGED or
-            AccessibilityEvent.TYPE_VIEW_SCROLLED or
-            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED or
-            AccessibilityEvent.TYPE_VIEW_CLICKED
-        if (event != null && (event.eventType and changingEvents) != 0) nodeSelection.invalidate()
+        // Android/Compose can emit unrelated content events between a find and an action.
+        // Keep the inspected identity; nodeAt checks it against the LIVE active window
+        // at execution time. Real window/control changes still reject stale selections.
     }
 
     override fun onInterrupt() = Unit
@@ -136,7 +130,7 @@ class HarnessAccessibilityService : AccessibilityService() {
         }
         val root = rootInActiveWindow ?: return false
         val target = when {
-            nodeIndex != null -> nodeAt(nodeIndex)
+            nodeIndex != null -> nodeAt(nodeIndex, rebindEditable = true)
             !viewId.isNullOrBlank() -> requireUniqueAccessibilityTarget(
                 root.findAccessibilityNodeInfosByViewId(viewId)
                     .filter { it.isVisibleToUser && it.isEditable }, "输入文字")
@@ -144,6 +138,8 @@ class HarnessAccessibilityService : AccessibilityService() {
                 root.findAccessibilityNodeInfosByText(searchText)
                     .filter { it.isVisibleToUser && it.isEditable }, "输入文字")
             else -> root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                ?.takeIf { it.isVisibleToUser && it.isEditable }
+                ?: onlyVisibleEditable(root)
         }?.takeIf { it.isVisibleToUser && it.isEditable } ?: return false
 
         val windowId = target.windowId
@@ -172,6 +168,24 @@ class HarnessAccessibilityService : AccessibilityService() {
                 return true
         }
         return false
+    }
+
+    /** No selector is needed for a page with exactly one visible editable field. */
+    private fun onlyVisibleEditable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var sole: AccessibilityNodeInfo? = null
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+            if (node.isVisibleToUser && node.isEditable) {
+                if (sole != null) return null
+                sole = node
+            }
+            for (childIndex in 0 until node.childCount) {
+                node.getChild(childIndex)?.let(queue::add)
+            }
+        }
+        return sole
     }
 
     fun globalBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
@@ -291,30 +305,34 @@ class HarnessAccessibilityService : AccessibilityService() {
         )
     }
 
-    private fun nodeAt(index: Int): AccessibilityNodeInfo? {
+    private fun nodeAt(index: Int, rebindEditable: Boolean = false): AccessibilityNodeInfo? {
         if (index < 0) return null
         val root = rootInActiveWindow ?: run {
             nodeSelection.invalidate()
             return null
         }
         val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
+        val nodes = mutableListOf<AccessibilityNodeInfo>()
+        val current = mutableListOf<AccessibilityNodeSnapshot>()
         queue.add(root to 0)
-        var current = 0
         while (queue.isNotEmpty()) {
             val (node, depth) = queue.removeFirst()
-            if (current == index) {
-                nodeSelection.requireCurrent(
-                    index, root.windowId, describeNode(current, node, depth),
-                )
-                return node
-            }
-            current++
+            val currentIndex = nodes.size
+            nodes += node
+            current += describeNode(currentIndex, node, depth)
             for (childIndex in 0 until node.childCount) {
                 node.getChild(childIndex)?.let { queue.add(it to depth + 1) }
             }
         }
-        nodeSelection.invalidate()
-        return null
+        val resolved = if (rebindEditable) {
+            nodeSelection.resolveEditableIndex(index, root.windowId, current)
+        } else {
+            nodeSelection.requireCurrent(
+                index, root.windowId, current.getOrNull(index) ?: return null,
+            )
+            index
+        }
+        return nodes.getOrNull(resolved)
     }
 
     private fun clickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {

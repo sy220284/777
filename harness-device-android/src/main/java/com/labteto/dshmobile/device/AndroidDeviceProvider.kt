@@ -143,7 +143,11 @@ class AndroidDeviceProvider(
             "notification_status" -> notificationStatus()
             "notification_list" -> notificationList()
             "clipboard_get" -> clipboardGet()
-            "clipboard_set" -> clipboardSet(arguments.required("text"))
+            "clipboard_set" -> {
+                // Empty text is a valid request to clear, not a missing parameter.
+                val text = arguments["text"] ?: error("缺少参数：text")
+                if (text.isEmpty()) clipboardClear() else clipboardSet(text)
+            }
             "clipboard_clear" -> clipboardClear()
             "vscreen_create" -> virtualStatus(createToolDisplay(arguments))
             "vscreen_start" -> {

@@ -43,6 +43,41 @@ class AccessibilityNodeSelectionLeaseTest {
         }
         selection.requireCurrent(0, 1, node(0, "取消"))
     }
+    @Test fun unchangedNodeRemainsUsableAcrossUnrelatedScreenEvents() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(2, "", null, null, "EditText", true, true,
+            "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), node(1), input))
+        // A content event alone is not evidence that this control has changed.
+        selection.requireCurrent(2, 4, input)
+        org.junit.Assert.assertEquals(2, selection.resolveEditableIndex(2, 4,
+            listOf(node(0), node(1), input)))
+    }
+
+    @Test fun composeInputRebindsAfterSemanticsTreeReindexes() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(1, "", null, null, "EditText", true, true,
+            "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), input))
+        val reindexed = input.copy(index = 2)
+        org.junit.Assert.assertEquals(2, selection.resolveEditableIndex(1, 4,
+            listOf(node(0), node(1, "新增"), reindexed)))
+    }
+
+    @Test fun composeInputRebindRejectsWindowChangeAndAmbiguousFields() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(1, "", null, null, "EditText", false, true,
+            "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), input))
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 8, listOf(input))
+        }
+        val live = listOf(node(0), node(1), input.copy(index = 2), input.copy(index = 3))
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 4, live)
+        }
+    }
+
     @Test fun textActionsNeverGuessAmongDuplicateControls() {
         org.junit.Assert.assertNull(requireUniqueAccessibilityTarget(emptyList<String>(), "点击"))
         org.junit.Assert.assertEquals(

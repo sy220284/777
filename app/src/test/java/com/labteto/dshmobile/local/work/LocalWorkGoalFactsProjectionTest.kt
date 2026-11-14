@@ -61,6 +61,42 @@ class LocalWorkGoalFactsProjectionTest {
         } finally { log.close() }
     }
 
+    @Test fun oldRejectedGoalTransitionDoesNotBlockReverificationOfSameGoal() {
+        val log = LocalSessionEventLog(File(temporary.root, "old-goal-rejected.jsonl"), Json)
+        try {
+            log.append("tool/call", buildJsonObject {
+                put("id", "rejected"); put("name", "update_goal")
+                put("goal_id", goal.id); put("execution_started", false)
+            })
+            log.append("tool/execution-started", buildJsonObject {
+                put("id", "rejected"); put("name", "update_goal")
+                put("execution_id", "goal-execution")
+                put("attributes", buildJsonObject { put("goal_id", goal.id) })
+            })
+            // Older tool coordinator incorrectly recorded a known policy rejection
+            // as a possible external effect. The actual Goal state is replayable.
+            log.append("tool/result", buildJsonObject {
+                put("id", "rejected"); put("name", "update_goal")
+                put("execution_id", "goal-execution"); put("is_error", true)
+                put("side_effect", "possible"); put("error_code", "TOOL_ERROR")
+                put("content", "目标尚不能标记完成：成果版本已变化")
+            })
+            val facts = LocalWorkGoalFactsProjection().assess(log, goal)
+            assertTrue(facts.attempts.single().outcomeUncertain)
+            assertFalse(facts.hasUnresolvedTools())
+
+            // An actual unfinished file mutation must still block settlement.
+            log.append("tool/execution-started", buildJsonObject {
+                put("id", "unsettled-write"); put("name", "write")
+                put("execution_id", "unsettled-write-exec")
+                put("attributes", buildJsonObject { put("goal_id", goal.id) })
+            })
+            assertTrue(LocalWorkGoalFactsProjection().assess(log, goal).hasUnresolvedTools())
+        } finally {
+            log.close()
+        }
+    }
+
     @Test fun repeatedAssessmentAppliesOnlyNewEventsAndMatchesFullRebuild() {
         val log = LocalSessionEventLog(File(temporary.root, "goal.jsonl"), Json)
         repeat(2_000) { log.append("note", buildJsonObject { put("text", "history") }) }
