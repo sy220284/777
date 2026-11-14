@@ -78,6 +78,41 @@ class AccessibilityNodeSelectionLeaseTest {
         }
     }
 
+    @Test fun androidUniqueNodeIdentitySurvivesComposeLayoutMovement() {
+        val selection = AccessibilityNodeSelectionLease()
+        val original = AccessibilityNodeSnapshot(1, "", "内容", "app:id/content",
+            "EditText", false, true, "[0,100][400,150]", 3, uniqueId = "node-123")
+        selection.replace(10, listOf(node(0), original))
+        val moved = original.copy(index = 3, bounds = "[0,300][400,350]", text = "已变化")
+        org.junit.Assert.assertEquals(3, selection.resolveEditableIndex(
+            1, 10, listOf(node(0), node(1), node(2), moved)))
+    }
+
+    @Test fun reusingViewIdOnDifferentPageCannotChangeSelectedInput() {
+        val selection = AccessibilityNodeSelectionLease()
+        val original = AccessibilityNodeSnapshot(1, "", "内容", "app:id/content",
+            "EditText", false, true, "[0,100][400,150]", 3, uniqueId = "original-node")
+        selection.replace(10, listOf(node(0), original))
+        val replacement = original.copy(index = 3, uniqueId = "replacement-node")
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 10, listOf(node(0), node(1), node(2), replacement))
+        }
+    }
+
+    @Test fun withoutUniqueIdMovedViewIdMustNotGuessAnotherField() {
+        val selection = AccessibilityNodeSelectionLease()
+        val original = AccessibilityNodeSnapshot(1, "", "输入", "app:id/input",
+            "EditText", false, true, "[0,100][400,150]", 3)
+        selection.replace(10, listOf(node(0), original))
+        val differentPlace = original.copy(index = 2, bounds = "[0,400][400,450]")
+        assertThrows(IllegalStateException::class.java) {
+            selection.resolveEditableIndex(1, 10, listOf(node(0), node(1), differentPlace))
+        }
+        val reindexedAtSamePlace = original.copy(index = 2)
+        org.junit.Assert.assertEquals(2, selection.resolveEditableIndex(
+            1, 10, listOf(node(0), node(1), reindexedAtSamePlace)))
+    }
+
     @Test fun textActionsNeverGuessAmongDuplicateControls() {
         org.junit.Assert.assertNull(requireUniqueAccessibilityTarget(emptyList<String>(), "点击"))
         org.junit.Assert.assertEquals(
