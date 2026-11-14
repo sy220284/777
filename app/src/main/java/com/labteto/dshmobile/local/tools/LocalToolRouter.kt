@@ -167,13 +167,15 @@ internal object LocalToolRouter {
      * This never infers additional capabilities from descriptions or old task text.
      * The execution coordinator still enforces the current registry, schema budget and approval.
      */
+    private const val MAX_EXACT_SELECTION_NAMES = 128
+
     fun exactSelection(query: String): List<String>? {
         val command = query.trim()
         if (!command.startsWith("select:", ignoreCase = true)) return null
         val names = command.substringAfter(':').split(',', '，').map(String::trim)
-        require(names.isNotEmpty() && names.size <= 16 && names.all {
+        require(names.isNotEmpty() && names.size <= MAX_EXACT_SELECTION_NAMES && names.all {
             it.matches(Regex("[A-Za-z][A-Za-z0-9_-]{0,127}"))
-        }) { "精确工具选择格式：select:工具名1,工具名2（最多 16 个）" }
+        }) { "精确工具选择格式：select:工具名1,工具名2（最多 $MAX_EXACT_SELECTION_NAMES 个）" }
         return names.distinct()
     }
 
