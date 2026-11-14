@@ -981,6 +981,14 @@
     <string name="chat_scroll_start">回到开头</string>
     <string name="chat_scroll_latest">回到最新</string>
 
+    <string name="usage_action_session_sample">会话采样</string>
+    <string name="local_session_sample_title">会话采样</string>
+    <string name="local_session_sample_hint">在当前会话的独立临时上下文中请求一次模型回复。会产生真实用量，但不会写入对话或执行工具。</string>
+    <string name="local_session_sample_prompt">希望模型尝试回答什么？</string>
+    <string name="local_session_sample_start">生成预览</string>
+    <string name="local_session_sample_cancel">取消采样</string>
+    <string name="local_session_sample_result">模拟回复（未发送）</string>
+    <string name="local_session_sample_usage_unreported">服务商未返回用量，已在用量明细中保留请求记录</string>
     <string name="local_reply_suggestions_title">回复建议</string>
     <string name="local_reply_suggestions_open">回复建议</string>
     <string name="local_reply_suggestions_hint">点一下会填进输入框，你可以继续改，不会自动发送。每组会给不同风格，并保留一条更大胆、夸张或脑洞一点的选项。</string>
