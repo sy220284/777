@@ -474,4 +474,46 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("skill-rollback-confirm").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("rollback-demo", restored) }
     }
+    @Test
+    fun officialCodexPluginExposesRealSkillsAndOAuthAction() {
+        var selectedSkill: Pair<String, String>? = null
+        var connectedPlugin: String? = null
+        val pluginId = "figma@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "figma", "Creativity", "plugins/figma",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Figma", "设计协作", "Figma", "2.0",
+            listOf("figma-use"), true, true, false,
+            "figma", "https://mcp.figma.com/mcp",
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPluginSkill = { id, skill ->
+                        selectedSkill = id to skill
+                    },
+                    onConnectCodexPlugin = { connectedPlugin = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("可直接安装的技能").assertIsDisplayed()
+        compose.onNodeWithText("安装").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(pluginId to "figma-use", selectedSkill)
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("授权并连接 figma").performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(pluginId, connectedPlugin)
+        }
+    }
+
 }
