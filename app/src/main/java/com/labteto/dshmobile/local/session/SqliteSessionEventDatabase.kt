@@ -122,32 +122,18 @@ class SqliteSessionEventDatabase(
                     previousSession = session
                     previous = null
                 }
-                val old = json.parseToJsonElement(rows.getString(2)).jsonObject
-                val array = old["messages"] as? JsonArray
-                    ?: error("旧请求消息面缺少 messages：$session/$sequence")
-                val messages = array.map { element ->
-                    element as? JsonObject
-                        ?: error("旧请求消息面包含非法对象：$session/$sequence")
-                }
-                val digest = (old["digest"] as? JsonPrimitive)?.contentOrNull
-                    ?: error("旧请求消息面缺少摘要：$session/$sequence")
-                check(stableJsonSha256(JsonArray(messages)) == digest) {
-                    "旧请求消息摘要不匹配，停止迁移：$session/$sequence"
-                }
-                val redacted = (old["redacted"] as? JsonPrimitive)?.booleanOrNull ?: false
-                val encoded = encodeLocalRequestMessageSurface(
-                    messages, digest, redacted, previous,
+                val original = json.parseToJsonElement(rows.getString(2)).jsonObject
+                val (encoded, state) = compactLegacyMessageSurface(
+                    session, sequence, original, previous,
                 )
-                if (encoded.bytesSaved > 0) {
+                if (encoded != original) {
                     db.execSQL(
                         "UPDATE session_events SET payload=? WHERE session_id=? AND sequence=?",
-                        arrayOf(encoded.payload.toString(), session, sequence),
+                        arrayOf(encoded.toString(), session, sequence),
                     )
                     changed++
                 }
-                previous = LocalRequestMessageSurfaceState(
-                    sequence, messages, digest, encoded.depth, redacted,
-                )
+                previous = state
             }
         }
         if (changed > 0) {
@@ -155,6 +141,31 @@ class SqliteSessionEventDatabase(
             db.delete("session_search_coverage", null, null)
             db.execSQL("UPDATE session_request_migration SET pending_vacuum=1 WHERE id=1")
         }
+    }
+
+    private fun compactLegacyMessageSurface(
+        sessionId: String,
+        sequence: Long,
+        source: JsonObject,
+        previous: LocalRequestMessageSurfaceState?,
+    ): Pair<JsonObject, LocalRequestMessageSurfaceState> {
+        val array = source["messages"] as? JsonArray
+            ?: error("旧请求消息面缺少 messages：$sessionId/$sequence")
+        val messages = array.map { element ->
+            element as? JsonObject
+                ?: error("旧请求消息面包含非法对象：$sessionId/$sequence")
+        }
+        val digest = (source["digest"] as? JsonPrimitive)?.contentOrNull
+            ?: error("旧请求消息面缺少摘要：$sessionId/$sequence")
+        check(stableJsonSha256(JsonArray(messages)) == digest) {
+            "旧请求消息摘要不匹配，停止迁移：$sessionId/$sequence"
+        }
+        val redacted = (source["redacted"] as? JsonPrimitive)?.booleanOrNull ?: false
+        val encoded = encodeLocalRequestMessageSurface(
+            messages, digest, redacted, previous,
+        )
+        return (if (encoded.bytesSaved > 0) encoded.payload else source) to
+            LocalRequestMessageSurfaceState(sequence, messages, digest, encoded.depth, redacted)
     }
 
     private fun createRequestMigrationMarker(db: SQLiteDatabase) {
@@ -348,17 +359,25 @@ class SqliteSessionEventDatabase(
                     put("instance", UUID.randomUUID().toString())
                 })
                 var expected = 0L
+                var previousRequest: LocalRequestMessageSurfaceState? = null
                 legacy.forEachAfter(-1L) { event ->
                     check(event.sequence == expected) {
                         "旧事件序号不连续，停止迁移 $sessionId：预期 $expected，实际 ${event.sequence}"
                     }
+                    val payload = if (event.type == "request/message-surface") {
+                        val (encoded, state) = compactLegacyMessageSurface(
+                            sessionId, event.sequence, event.data, previousRequest,
+                        )
+                        previousRequest = state
+                        encoded
+                    } else event.data
                     db.insertOrThrow("session_events", null, ContentValues().apply {
                         put("session_id", sessionId)
                         put("sequence", event.sequence)
                         put("event_type", event.type)
                         put("created_at", event.createdAt)
                         put("schema_version", EVENT_SCHEMA_VERSION)
-                        put("payload", event.data.toString())
+                        put("payload", payload.toString())
                         put("visible_hint", if (isVisibleTranscriptCandidate(event.type, event.data)) 1 else 0)
                     })
                     expected++
