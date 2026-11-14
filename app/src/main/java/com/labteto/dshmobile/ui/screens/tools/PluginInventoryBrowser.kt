@@ -355,6 +355,16 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
+                if (!skillsOnly && query.isBlank() && connectedServices.isNotEmpty()) {
+                    item(key = "mcp-process-boundary") {
+                        Text(
+                            "MCP 扩展使用独立工作进程，当前与应用共享系统身份；文件、网络及设备操作仍按原有工具审批和管理策略执行。",
+                            style = DsType.caption11,
+                            color = colors.textSecondary,
+                            modifier = Modifier.fillMaxWidth().testTag("mcp-worker-permission-status"),
+                        )
+                    }
+                }
                 if (skillsOnly && query.isBlank()) {
                     item(key = "skill-creation-actions") {
                         Column(
