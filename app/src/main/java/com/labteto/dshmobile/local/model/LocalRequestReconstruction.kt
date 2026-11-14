@@ -186,10 +186,8 @@ internal fun reconstructLocalModelRequest(
         issues += "V3 request/header 缺少 resolved_tool_surface_digest"
     }
 
-    val messages = messageSurface?.data?.get("messages").asObjectListOrNull().also {
-        if (messageSurface != null && it == null) {
-            issues += "request/message-surface 缺少合法 messages"
-        }
+    val messages = messageSurface?.let { surface ->
+        replayLocalRequestMessageSurface(surface, eventAt, issues)
     }
     val tools = toolSurface?.data?.get("schemas") as? JsonArray
         ?: if (toolSurface != null) {
@@ -440,7 +438,9 @@ private fun reconstructProviderAttempt(
     val toolSurface = surface("tool_surface_seq", REQUEST_TOOL_SURFACE_EVENT)
     val contextSurface = surface("context_surface_seq", REQUEST_CONTEXT_SURFACE_EVENT)
 
-    val messages = messageSurface?.data?.get("messages").asObjectListOrNull()
+    val messages = messageSurface?.let { surface ->
+        replayLocalRequestMessageSurface(surface, eventAt, issues)
+    }
     val tools = toolSurface?.data?.get("schemas") as? JsonArray
     val nativeTools = if (headerVersion >= 3) {
         toolSurface?.data?.get("native_tools") as? JsonArray
