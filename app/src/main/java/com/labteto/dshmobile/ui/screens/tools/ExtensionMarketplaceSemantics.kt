@@ -98,3 +98,16 @@ internal fun marketplaceTabAllows(
     4 -> (installedSkill || installable || localPlugin) && group == ExtensionGroup.CREATIVE
     else -> false
 }
+
+/**
+ * A Codex skill belongs to a plugin only when its pinned installation origin
+ * points to that plugin's declared directory. Display-name collisions are not
+ * proof that a package is installed.
+ */
+internal fun codexPluginSkillInstalled(
+    skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot>,
+    pluginRoot: String,
+    skillDirectory: String,
+): Boolean = skills.any { skill ->
+    skill.sourceUrl?.endsWith("/$pluginRoot/$skillDirectory") == true
+}
