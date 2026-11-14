@@ -36,12 +36,12 @@ data class ToolContext(
     /** Trusted Hook can request more restrictive approval without authorizing execution. */
     val approvalWithReason: (suspend (HarnessTool, String) -> Boolean)? = null,
     val onExecutionStarted: (suspend (HarnessTool) -> Unit)? = null,
-    /** Revalidate the owning run before each admitted operation, including Code Mode children. */
-    val beforeExecution: (suspend (HarnessTool) -> Unit)? = null,
     /** Optional exact tool identity captured with the model-visible permission/tool surface. */
     val expectedRegistration: HarnessTool? = null,
     /** Execution receipt, persisted before returning to a possibly cancelled caller. */
     val onExecutionFinished: (suspend (HarnessTool, ToolResult) -> Unit)? = null,
+    /** Revalidate the owning run before each admitted operation, including Code Mode children. */
+    val beforeExecution: (suspend (HarnessTool) -> Unit)? = null,
 )
 
 @kotlinx.serialization.Serializable
