@@ -85,7 +85,7 @@ class CodeModePluginTest {
         assertEquals(listOf("read", "read"), calls)
         assertEquals(1, parentStarted)
         assertEquals(1, parentFinished)
-        assertTrue(outcome.content.contains("\\"completed_steps\\":2"))
+        assertTrue(outcome.content.contains("\"completed_steps\":2"))
     }
 
     @Test fun scriptsWithMoreThanEightStepsCompleteUsingOriginalToolRules() = runTest {
