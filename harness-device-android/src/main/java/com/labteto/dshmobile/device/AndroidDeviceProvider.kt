@@ -106,9 +106,11 @@ class AndroidDeviceProvider(
             "accessibility_click_node" ->
                 accessibility().clickNode(arguments.deviceRequiredInt("node")).toString()
             "accessibility_set_text_node" ->
-                accessibility().setTextNode(
-                    arguments.deviceRequiredInt("node"),
-                    arguments.deviceStringIncludingEmpty("value"),
+                accessibility().inputText(
+                    nodeIndex = arguments.deviceRequiredInt("node"),
+                    viewId = null,
+                    searchText = null,
+                    value = arguments.deviceStringIncludingEmpty("value"),
                 ).toString()
             "accessibility_scroll" -> accessibility().scroll(arguments["direction"] ?: "forward").toString()
             "accessibility_wait" -> accessibilityWait(arguments)
@@ -116,9 +118,12 @@ class AndroidDeviceProvider(
             "accessibility_click_text" ->
                 accessibility().clickText(arguments.required("text")).toString()
             "accessibility_set_text" ->
-                accessibility().setText(
-                    arguments.deviceStringIncludingEmpty("search_text"),
-                    arguments.deviceStringIncludingEmpty("value"),
+                accessibility().inputText(
+                    nodeIndex = null,
+                    viewId = null,
+                    searchText = arguments.deviceStringIncludingEmpty("search_text")
+                        .takeIf(String::isNotBlank),
+                    value = arguments.deviceStringIncludingEmpty("value"),
                 ).toString()
             "accessibility_input_text" ->
                 accessibility().inputText(
