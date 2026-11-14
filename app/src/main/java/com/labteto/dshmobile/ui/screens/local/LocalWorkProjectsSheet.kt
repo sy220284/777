@@ -32,6 +32,7 @@ internal data class LocalWorkProjectsUiActions(
     val rename: (String, String) -> Boolean,
     val update: (String, String, String) -> Boolean,
     val changeRoot: (String, String) -> Boolean,
+    val moveDirectory: (String, String, String) -> Boolean,
     val move: (String, Int) -> Boolean,
     val delete: (String) -> Boolean,
     val assignCurrentSession: (String, String?) -> Boolean,
@@ -58,6 +59,8 @@ internal fun LocalWorkProjectsSheet(
     var folder by remember { mutableStateOf(".") }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
+    var moveDestination by remember { mutableStateOf("") }
+    var confirmingMove by remember { mutableStateOf(false) }
 
     fun openCreate(useCurrent: Boolean) {
         creating = true
@@ -65,6 +68,7 @@ internal fun LocalWorkProjectsSheet(
         editorId = null
         name = ""
         folder = if (useCurrent) currentFolder else ""
+        moveDestination = ""
         error = null
     }
 
@@ -101,7 +105,7 @@ internal fun LocalWorkProjectsSheet(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("沿用当前工作区的原有文件夹，移除项目时仍保留文件。",
+                Text("重新关联只修改项目指向；下面的“移动实际文件夹”会迁移文件及 Git 历史。",
                     style = DsType.caption11, color = colors.textSecondary)
                 SyButton(
                     text = "使用当前目录",
@@ -109,6 +113,27 @@ internal fun LocalWorkProjectsSheet(
                     variant = SyButtonVariant.Ghost,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (editing != null && editing.root != ".") {
+                    SyTextField(
+                        value = moveDestination,
+                        onValueChange = { moveDestination = it },
+                        label = { Text("移动到新的工作区相对目录") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("work_project_move_destination"),
+                    )
+                    SyButton(
+                        text = "移动实际文件夹",
+                        enabled = moveDestination.isNotBlank() &&
+                            moveDestination.trim() != editing.root,
+                        onClick = { confirmingMove = true },
+                        variant = SyButtonVariant.Outline,
+                        modifier = Modifier.fillMaxWidth().testTag("work_project_move"),
+                    )
+                    Text(
+                        "目标目录需尚不存在，上级文件夹已创建；文件、子目录和 Git 历史将一起移动。",
+                        style = DsType.caption11, color = colors.textSecondary,
+                    )
+                }
             } else {
                 Text("将自动创建独立的本地项目文件夹，直接保存即可。",
                     style = DsType.caption11, color = colors.textSecondary)
@@ -190,6 +215,7 @@ internal fun LocalWorkProjectsSheet(
                                 editorId = project.id
                                 name = project.name
                                 folder = project.root
+                                moveDestination = ""
                                 error = null
                             },
                             variant = SyButtonVariant.Ghost,
@@ -212,6 +238,27 @@ internal fun LocalWorkProjectsSheet(
                 }
             }
         }
+    }
+    if (confirmingMove && editing != null) {
+        val destination = moveDestination.trim()
+        ConfirmDialog(
+            title = "移动实际项目文件夹",
+            body = "将“" + editing.root + "”的全部文件移动到“" + destination +
+                "”。项目关联会同步更新，原路径将不再存在。",
+            confirmLabel = "确认移动",
+            onDismiss = { confirmingMove = false },
+            onConfirm = {
+                try {
+                    actions.moveDirectory(editing.id, editing.root, destination)
+                    folder = destination
+                    moveDestination = ""
+                    error = null
+                } catch (failure: Exception) {
+                    error = failure.message ?: "项目文件夹移动失败"
+                }
+                confirmingMove = false
+            },
+        )
     }
     if (confirmDeleteId != null) {
         ConfirmDialog(
