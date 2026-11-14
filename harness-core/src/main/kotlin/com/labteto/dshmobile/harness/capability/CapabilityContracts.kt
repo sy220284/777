@@ -64,6 +64,9 @@ interface HarnessVirtualDisplayProvider {
     fun releaseAgentVirtualDisplay(id: String)
 }
 
+/** The android-device registry entry must expose both device tools and isolated displays. */
+interface HarnessAndroidDeviceProvider : HarnessDeviceProvider, HarnessVirtualDisplayProvider
+
 interface HarnessLlmProvider {
     suspend fun complete(model: String, payload: String): String
 }

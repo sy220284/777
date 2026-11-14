@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.device
 
+import com.labteto.dshmobile.harness.capability.HarnessAndroidDeviceProvider
 import com.labteto.dshmobile.harness.capability.HarnessDeviceProvider
+import com.labteto.dshmobile.harness.capability.HarnessVirtualDisplayProvider
 import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
@@ -11,6 +13,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,6 +25,8 @@ class AndroidDevicePluginTest {
         val registry = PluginRegistry()
         registry.install(AndroidDevicePlugin(provider))
 
+        assertSame(provider, registry.context.capabilities.require("android-device", HarnessDeviceProvider::class))
+        assertSame(provider, registry.context.capabilities.require("android-device", HarnessVirtualDisplayProvider::class))
         val names = registry.context.tools.names().toSet()
         assertTrue("android_device_info" in names)
         assertTrue("android_vscreen_create" in names)
@@ -138,7 +143,7 @@ class AndroidDevicePluginTest {
 
     private class RecordingProvider(
         private val response: (String) -> String = { "ok:$it" },
-    ) : HarnessDeviceProvider {
+    ) : HarnessAndroidDeviceProvider {
         override val capabilities: Set<String> = emptySet()
         val calls = mutableListOf<Pair<String, Map<String, String>>>()
         var closed: Boolean = false
@@ -150,6 +155,10 @@ class AndroidDevicePluginTest {
             calls += capability to arguments
             return response(capability)
         }
+
+        override suspend fun acquireAgentVirtualDisplay(owner: String): String = "virtual:$owner"
+
+        override fun releaseAgentVirtualDisplay(id: String) = Unit
 
         override fun close() {
             closed = true
