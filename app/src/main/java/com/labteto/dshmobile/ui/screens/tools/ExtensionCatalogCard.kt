@@ -63,34 +63,34 @@ internal fun ExtensionCatalogCard(
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().heightIn(min = 108.dp)
-                .padding(horizontal = 15.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Surface(
-                    modifier = Modifier.size(48.dp).testTag(tagPrefix + "-icon-" + id),
+                    modifier = Modifier.size(44.dp).testTag(tagPrefix + "-icon-" + id),
                     color = accent.copy(alpha = 0.13f),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         if (documentIcon != null) {
                             Image(
                                 painter = painterResource(documentIcon), contentDescription = null,
-                                modifier = Modifier.size(36.dp),
+                                modifier = Modifier.size(32.dp),
                             )
                         } else {
                             Icon(icon, contentDescription = null, tint = accent,
-                                modifier = Modifier.size(25.dp))
+                                modifier = Modifier.size(24.dp))
                         }
                     }
                 }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
                 ) {
                     Text(
                         title,
@@ -127,7 +127,7 @@ internal fun ExtensionCatalogCard(
                 ) {
                     Text(
                         statusLabel,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         style = DsType.caption11Strong.withReadingWeight(),
                         color = if (attentionNeeded) colors.warningInk else colors.successInk,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
