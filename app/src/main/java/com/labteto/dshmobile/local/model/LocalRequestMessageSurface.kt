@@ -131,7 +131,7 @@ internal fun replayLocalRequestMessageSurface(
             val tail = objectMessages(data["tail"])
             val advertisedDepth = (data["depth"] as? JsonPrimitive)?.intOrNull
             if (keep == null || keep < 0 || keep > content.size ||
-                tail == null || advertisedDepth != depth + 1
+                tail == null || advertisedDepth == null || advertisedDepth != depth + 1
             ) {
                 issues += "request/message-surface 增量内容或深度不合法：${event.sequence}"
                 return null
