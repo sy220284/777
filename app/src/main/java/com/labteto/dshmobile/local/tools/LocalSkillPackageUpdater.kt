@@ -168,7 +168,7 @@ internal class LocalSkillPackageUpdater(private val workspace: LocalWorkspace) {
         }
         // An update candidate only becomes visible after the final atomic directory move.
         systemRoot.listFiles().orEmpty().filter {
-            it.name.startsWith(".skill-update-")
+            it.name.startsWith(".skill-update-") || it.name.startsWith(".skill-import-")
         }.forEach { abandoned ->
             requireNoLinks(abandoned)
             require(abandoned.deleteRecursively()) { "未完成的技能更新临时文件清理失败" }
