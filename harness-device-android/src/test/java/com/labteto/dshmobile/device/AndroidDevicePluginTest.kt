@@ -342,4 +342,43 @@ class AndroidDevicePluginTest {
         assertEquals(12.5f, mapOf("x" to "12.5").deviceRequiredFiniteFloat("x"))
     }
 
+
+    @Test
+    fun inputResultDistinguishesSelectionActionAndReadbackFailures() {
+        val cases = listOf(
+            "input_target_unavailable" to "ANDROID_INPUT_TARGET_UNAVAILABLE",
+            "input_action_unconfirmed" to "ANDROID_INPUT_ACTION_UNCONFIRMED",
+            "input_readback_unconfirmed" to "ANDROID_INPUT_READBACK_UNCONFIRMED",
+        )
+        for (capability in listOf(
+            "accessibility_set_text_node", "accessibility_set_text", "accessibility_input_text",
+        )) {
+            for ((providerResult, code) in cases) {
+                val outcome = androidDeviceToolResult(capability, providerResult)
+                assertTrue(outcome.isError)
+                assertEquals(code, outcome.errorCode)
+                assertTrue(outcome.content.isNotBlank())
+                assertEquals(outcome.content, outcome.recoveryHint)
+                assertFalse(outcome.retryable)
+            }
+            assertFalse(androidDeviceToolResult(capability, "true").isError)
+        }
+        val alreadyApplied = androidDeviceToolResult(
+            "accessibility_input_text", "input_readback_unconfirmed",
+        )
+        assertTrue(alreadyApplied.content.contains("已接受"))
+        assertTrue(alreadyApplied.content.contains("核对"))
+    }
+
+    @Test
+    fun androidInputToolSchemaExplainsStableSelectionAndOutcome() = runTest {
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(RecordingProvider()))
+        val schema = registry.context.tools.get("android_input_text")!!.schema.toString()
+        assertTrue(schema.contains("优先 id"))
+        assertTrue(schema.contains("当前焦点"))
+        assertTrue(schema.contains("回读"))
+        assertTrue(schema.contains("目标不可用"))
+    }
+
 }
