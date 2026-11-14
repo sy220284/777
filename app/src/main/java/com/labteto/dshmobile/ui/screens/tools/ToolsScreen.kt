@@ -464,9 +464,8 @@ class ToolsViewModel @Inject constructor(
             )
             try {
                 val result = localTools.connectCodexPlugin(id)
-                _state.value = _state.value.copy(
-                    servers = localTools.servers(), feedback = result,
-                )
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(feedback = result)
             } catch (cancelled: CancellationException) {
                 _state.value = _state.value.copy(feedback = "插件授权已取消")
                 throw cancelled
@@ -750,10 +749,9 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
                 localTools.connectHttpWithCredential(serverId, endpoint, bearer)
+                synchronizeExtensionInventory()
                 _state.value = _state.value.copy(
                     loading = false,
-                    servers = localTools.servers(),
-                    localPlugins = localTools.installedPluginIds(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -768,14 +766,26 @@ class ToolsViewModel @Inject constructor(
         }
     }
 
+    /** Refreshes owner-backed connections and recomputes skill dependency availability together. */
+    private suspend fun synchronizeExtensionInventory() {
+        val servers = localTools.servers()
+        val plugins = localTools.installedPluginIds()
+        val skills = localTools.installedSkills()
+        _state.value = _state.value.copy(
+            servers = servers,
+            localPlugins = plugins,
+            skills = skills,
+        )
+    }
+
     fun loginMcp(serverId: String, endpoint: String, clientId: String) {
         mcpLoginJob = viewModelScope.launch { operationGate.run {
             _state.value = _state.value.copy(loading = true, mcpLoginServerId = serverId,
                 feedback = "请在浏览器完成 MCP 登录，再返回此处。", feedbackRes = null)
             try {
                 localTools.loginMcp(serverId, endpoint, clientId.takeIf(String::isNotBlank))
-                _state.value = _state.value.copy(servers = localTools.servers(),
-                    localPlugins = localTools.installedPluginIds(), feedback = "MCP 已登录并连接。")
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(feedback = "MCP 已登录并连接。")
             } catch (cancelled: CancellationException) {
                 _state.value = _state.value.copy(feedback = "MCP 登录已取消。")
                 throw cancelled
@@ -797,7 +807,8 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 localTools.refreshMcpLogin(serverId, endpoint)
-                _state.value = _state.value.copy(servers = localTools.servers(), feedback = "MCP 登录已刷新并重新连接。")
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(feedback = "MCP 登录已刷新并重新连接。")
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _state.value = _state.value.copy(feedback = "MCP 登录刷新未完成，请重新授权。") }
             finally { _state.value = _state.value.copy(loading = false) }
@@ -809,7 +820,8 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
             try {
                 val remote = localTools.revokeMcpLogin(serverId, endpoint)
-                _state.value = _state.value.copy(servers = localTools.servers(), feedback = if (remote)
+                synchronizeExtensionInventory()
+                _state.value = _state.value.copy(feedback = if (remote)
                     "MCP 授权已撤销，本机凭据已清除。" else
                     "已断开并清除本机凭据；服务未确认远程撤销，可前往服务账户页检查授权。")
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -823,10 +835,9 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, notice = ToolsNotice.CONNECTING)
             try {
                 localTools.connectStdio(serverId, command, workingDirectory)
+                synchronizeExtensionInventory()
                 _state.value = _state.value.copy(
                     loading = false,
-                    servers = localTools.servers(),
-                    localPlugins = localTools.installedPluginIds(),
                     notice = ToolsNotice.CONNECTED,
                 )
             } catch (cancelled: CancellationException) {
@@ -846,10 +857,10 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, feedback = null)
             try {
                 localTools.clearMcpCredential(serverId)
+                synchronizeExtensionInventory()
                 _state.value = _state.value.copy(
                     loading = false,
                     feedback = "MCP 已断开，本机凭据已清除。",
-                    servers = localTools.servers(),
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -911,10 +922,9 @@ class ToolsViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, notice = null)
             try {
                 localTools.disconnect(serverId)
+                synchronizeExtensionInventory()
                 _state.value = _state.value.copy(
                     loading = false,
-                    servers = localTools.servers(),
-                    localPlugins = localTools.installedPluginIds(),
                     notice = ToolsNotice.DISCONNECTED,
                 )
             } catch (cancelled: CancellationException) {
