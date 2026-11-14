@@ -708,6 +708,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             requestId = requestId,
             providerCode = type,
             admissionState = LocalModelAdmissionState.REJECTED,
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 
@@ -726,6 +727,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             providerRetryAfterMs = retryAfterMs,
             requestId = requestId,
             providerCode = type ?: "stream_error_after_admission",
+            origin = LocalModelFailureOrigin.PROVIDER_REJECTED,
         )
     }
 
