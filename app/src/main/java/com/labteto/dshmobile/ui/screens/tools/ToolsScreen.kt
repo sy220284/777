@@ -614,10 +614,8 @@ class ToolsViewModel @Inject constructor(
                 val installedBefore = localTools.installedSkills()
                 val missing = detail.skills.filterNot { id ->
                     val folder = detail.skillDirectories[id]
-                    installedBefore.any { skill ->
-                        skill.name == id || (folder != null && skill.sourceUrl?.endsWith(
-                            "/${plugin.sourcePath}/$folder") == true)
-                    }
+                    folder != null && codexPluginSkillInstalled(
+                        installedBefore, plugin.sourcePath, folder)
                 }
                 for (skillId in missing) {
                     val installedId = localTools.installCodexPluginSkill(pluginId, skillId)
@@ -628,7 +626,7 @@ class ToolsViewModel @Inject constructor(
                     )
                 }
                 val allIds = localTools.installedSkills().filter { skill ->
-                    skill.name in detail.skills || detail.skillDirectories.values.any { folder ->
+                    detail.skillDirectories.values.any { folder ->
                         skill.sourceUrl?.endsWith("/${plugin.sourcePath}/$folder") == true
                     }
                 }.map { it.name }.distinct()
