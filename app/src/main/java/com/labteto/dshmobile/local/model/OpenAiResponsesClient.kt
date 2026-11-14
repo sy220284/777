@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.model
 
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import com.labteto.dshmobile.local.TokenPromptBreakdown
 import com.labteto.dshmobile.local.estimatePromptBreakdown
 import com.labteto.dshmobile.local.model.chatgpt.CHATGPT_RESPONSES_URL
@@ -351,6 +352,7 @@ class OpenAiResponsesClient @Inject constructor(
                 providerCode = "stream_interrupted_after_admission",
                 admissionState = LocalModelAdmissionState.ADMITTED,
                 continuationEligible = true,
+                origin = LocalModelFailureOrigin.STREAM_PARSE,
             )
         } else {
             modelPostAdmissionFailure(
@@ -646,7 +648,12 @@ class OpenAiResponsesClient @Inject constructor(
                     })
                 }
                 "input_text", "input_image", "input_file" -> add(obj)
-                else -> throw responseProtocolError("不支持的输入内容类型：${obj["type"]}")
+                else -> throw LocalModelException(
+                    code = "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                    message = "Responses API 不支持本轮输入内容类型：${obj["type"]?.jsonPrimitive?.contentOrNull?.take(48) ?: "unknown"}；请重新附加文件或切换兼容模型。",
+                    retryable = false,
+                    origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+                )
             }
         }
     }
