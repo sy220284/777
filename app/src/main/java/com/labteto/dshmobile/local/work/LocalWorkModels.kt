@@ -20,6 +20,8 @@ data class LocalGoal(
     /** Explicit acceptance, never inferred from the language used in description. */
     val artifactPaths: List<String> = emptyList(),
     val verificationCommands: List<String> = emptyList(),
+    /** Independent Git reviews explicitly required for this goal: code, security. */
+    val reviewRequirements: List<String> = emptyList(),
     /** Durable version; pausing and reactivating a goal never revives an old queued round. */
     val revision: Long = 0L,
 )
