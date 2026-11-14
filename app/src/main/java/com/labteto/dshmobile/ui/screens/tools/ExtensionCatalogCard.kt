@@ -102,7 +102,7 @@ internal fun ExtensionCatalogCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (statusLabel in setOf("已安装", "已安装部分技能", "已内置 · 按需授权")) {
+            if (statusLabel in setOf("已安装", "已安装可用技能", "已内置 · 按需授权")) {
                 Text(
                     "已安装",
                     style = DsType.small13.withReadingWeight(),
