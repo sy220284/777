@@ -65,6 +65,19 @@ class AccessibilityNodeSelectionLeaseTest {
             listOf(node(0), node(1, "新增"), reindexed)))
     }
 
+    @Test fun currentEditableFastPathRequiresSameControlAndObservedScreen() {
+        val selection = AccessibilityNodeSelectionLease()
+        val input = AccessibilityNodeSnapshot(1, "", null, null, "EditText",
+            true, true, "[10,100][500,150]", 3)
+        selection.replace(4, listOf(node(0), input))
+        org.junit.Assert.assertTrue(selection.matchesCurrentEditable(1, 4, input))
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 5, input))
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4,
+            input.copy(text = "changed")))
+        selection.invalidate()
+        org.junit.Assert.assertFalse(selection.matchesCurrentEditable(1, 4, input))
+    }
+
     @Test fun composeFieldCanMoveAfterImeLayoutWithoutLosingItsIdentity() {
         val selection = AccessibilityNodeSelectionLease()
         val input = AccessibilityNodeSnapshot(1, "", "搜索", null, "EditText",
