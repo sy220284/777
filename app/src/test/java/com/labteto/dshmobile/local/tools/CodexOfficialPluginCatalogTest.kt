@@ -30,6 +30,21 @@ class CodexOfficialPluginCatalogTest {
         assertFalse(plugins.last().offeredOnAndroid)
     }
 
+    @Test fun listsOfficialRemoteGitPluginsButDoesNotOfferAndroidBundleInstall() {
+        val plugins = parseCodexOfficialMarketplace("""
+            {"name":"openai-curated","plugins":[
+              {"name":"qodo","source":{
+                 "source":"git-subdir","url":"https://github.com/qodo-ai/qodo-skills.git",
+                 "path":"codex-packages/qodo"},
+               "policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"}}
+            ]}
+        """.trimIndent())
+        assertEquals(1, plugins.size)
+        assertEquals("git-subdir", plugins.single().sourceKind)
+        assertEquals("https://github.com/qodo-ai/qodo-skills.git", plugins.single().sourceUrl)
+        assertFalse(plugins.single().offeredOnAndroid)
+    }
+
     @Test fun dropsUnsafeOrUnsupportedPluginSources() {
         val list = parseCodexOfficialMarketplace("""
             {"name":"openai-curated","plugins":[
