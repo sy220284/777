@@ -320,9 +320,12 @@ internal fun PluginInventoryBrowser(
             com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT)
             connectedServices.firstOrNull { it.id == officialDetail?.mcpServerId }
         else null
-        val installedFromPlugin = skills.any {
+        val installedMembers = skills.filter {
             codexOfficialPluginSourceMatches(it.sourceIdentity, plugin.sourcePath)
         }
+        val installedFromPlugin = installedMembers.isNotEmpty()
+        val incompleteDependencies = installedMembers.flatMap { it.requirements }
+            .count { !it.registered }
         val verifiedDetail = codexDetails[plugin.id]
         val support = when {
             plugin.codexOnly -> ExtensionMarketState(ExtensionMarketStatus.UNSUPPORTED,
@@ -335,10 +338,13 @@ internal fun PluginInventoryBrowser(
             officialConnection == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT ->
                 ExtensionMarketState(ExtensionMarketStatus.FAILED, "服务标识冲突",
                     "已有同名 MCP 服务，但连接地址与官方插件不一致；请在连接器中核对")
+            installedFromPlugin && incompleteDependencies > 0 -> ExtensionMarketState(
+                ExtensionMarketStatus.NEEDS_SETUP, "已安装 · 依赖待处理",
+                "还有 $incompleteDependencies 项运行依赖未就绪；可在详情中检查")
             matchingService != null -> connectorMarketState(matchingService.registration, matchingService.connection)
             installedFromPlugin -> ExtensionMarketState(
-                ExtensionMarketStatus.INSTALLED, "已安装可用技能",
-                "本机技能已就绪；插件其它能力在详情中说明支持范围")
+                ExtensionMarketStatus.INSTALLED, "已安装",
+                "已安装技能；插件其它能力在详情中说明支持范围")
             verifiedDetail?.skills?.isNotEmpty() == true -> ExtensionMarketState(
                 ExtensionMarketStatus.INSTALLABLE, "可安装技能",
                 "点击了解，选择需要的技能；安装后显示其运行依赖")
