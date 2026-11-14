@@ -565,7 +565,7 @@ private fun rememberMediaSaveAction(
             scope.launch {
                 try {
                     val location = withContext(Dispatchers.IO) {
-                        com.labteto.dshmobile.local.files.LocalDownloadsPublisher(context)
+                        com.labteto.dshmobile.local.files.LocalDownloadsPublisher.owned(context)
                             .publishOwnedFile(file)
                     }
                     onResult(location, null)
