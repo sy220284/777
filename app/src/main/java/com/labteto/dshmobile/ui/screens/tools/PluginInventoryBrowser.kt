@@ -537,7 +537,14 @@ internal fun PluginInventoryBrowser(
             }
         }
     }
-    selectedRow?.let { item ->
+    selectedRow?.let { selected ->
+        // Reproject from authoritative inventory while install/OAuth updates arrive.
+        // A selected preset becomes the installed skill with the same stable ID.
+        val item = catalogue.firstOrNull { it.id == selected.id }
+            ?: if (selected.installableCurated)
+                installedSkills.firstOrNull { it.id == "skill:${selected.id.substringAfter(":")}" }
+                    ?: selected
+            else selected
         val detailLogoBytes = item.id.takeIf { it.startsWith("codex-plugin:") }
             ?.removePrefix("codex-plugin:")?.let(codexLogos::get)
         val detailBrandLogo = remember(detailLogoBytes) {
@@ -572,7 +579,13 @@ internal fun PluginInventoryBrowser(
                     (onInstallCodexPlugin != null ||
                         (oneSkill != null && !oneSkillInstalled &&
                             onInstallCodexPluginSkill != null))
-                val canConnectOfficial = officialSupported &&
+                val officialConnected = pluginDetail?.mcpServerId != null &&
+                    connectedServices.any { server ->
+                        server.id == pluginDetail.mcpServerId &&
+                            server.registration == com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED &&
+                            server.tools.isNotEmpty()
+                    }
+                val canConnectOfficial = officialSupported && !officialConnected &&
                     pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
                 val canConnectSkill = endpoint != null && onConnectSkillMcp != null
                 val hasDirectAction = canInstallPreset || canInstallCurated ||
@@ -582,6 +595,7 @@ internal fun PluginInventoryBrowser(
                         !item.installablePreset && !item.installableCurated)
                 if (hasDirectAction) SyButton(
                     text = when {
+                        loading -> "正在安装或授权…"
                         canInstallPreset || canInstallCurated -> "安装"
                         canInstallOfficial -> if (missingPluginSkills.size > 1)
                             "安装包含的 ${missingPluginSkills.size} 项技能" else "安装"
@@ -594,7 +608,6 @@ internal fun PluginInventoryBrowser(
                     enabled = !loading,
                     size = SyButtonSize.Large,
                     onClick = {
-                        selectedRow = null
                         when {
                             canInstallPreset -> onInstallPreset?.invoke(item.id.substringAfter(":"))
                             canInstallCurated -> onInstallCurated?.invoke(item.id.substringAfter(":"))
@@ -607,9 +620,18 @@ internal fun PluginInventoryBrowser(
                             canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
                                 onConnectSkillMcp?.invoke(serverId, url)
                             }
-                            onUseCapability != null && item.available -> onUseCapability(usePrompt)
-                            item.connectedService -> onManageConnections()
-                            else -> onReturnToChat()
+                            onUseCapability != null && item.available -> {
+                                selectedRow = null
+                                onUseCapability(usePrompt)
+                            }
+                            item.connectedService -> {
+                                selectedRow = null
+                                onManageConnections()
+                            }
+                            else -> {
+                                selectedRow = null
+                                onReturnToChat()
+                            }
                         }
                     },
                 )
