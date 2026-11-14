@@ -58,13 +58,15 @@ internal fun localWorkOutstandingRequiredReviews(
         // A legitimate mutation after acknowledgement needs a new review. Only
         // settled successful Work tool results count; read-only tools do not.
         val newerMutation = log.latestMatching(setOf("tool/result")) { fields ->
-            fields.reviewValue("goal_id") == goal.id &&
-                fields.reviewValue("is_error") == "false" &&
-                fields.reviewValue("side_effect") != "none"
+            val id = fields.reviewValue("id")
+            fields.reviewValue("is_error") == "false" &&
+                fields.reviewValue("side_effect") in setOf("possible", "confirmed") &&
+                id != null && log.latestMatching(setOf("tool/call")) { call ->
+                    call.reviewValue("id") == id && call.reviewValue("goal_id") == goal.id
+                }?.sequence?.let { it > accepted.sequence } == true
         }?.takeIf { it.sequence > accepted.sequence }
         if (newerMutation != null) {
-            add("独立" + if (type == "security") "安全" else "代码" +
-                "审查之后已有新的修改，请重新审查当前版本")
+            add("独立${if (type == "security") "安全" else "代码"}审查之后已有新的修改，请重新审查当前版本")
         }
     }
 }
