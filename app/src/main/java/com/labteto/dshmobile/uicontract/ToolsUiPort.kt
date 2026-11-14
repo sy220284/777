@@ -54,6 +54,7 @@ data class UiCodexPluginDetailSnapshot(
 data class UiCodexPluginSnapshot(
     val id: String, val name: String, val category: String, val sourcePath: String,
     val installPolicy: String, val authPolicy: String, val codexOnly: Boolean,
+    val sourceKind: String = "local", val sourceUrl: String? = null,
 )
 /** Read-only repository metadata; writable operations remain in the GitHub plugin approval path. */
 data class UiGitHubRepo(val fullName: String, val description: String, val privateRepo: Boolean,
@@ -88,7 +89,7 @@ interface ToolsUiPort {
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
     suspend fun readSkillDocument(id: String): String
     suspend fun curatedGitHubSkills(): List<String>
-    suspend fun codexOfficialPlugins(): List<UiCodexPluginSnapshot> = emptyList()
+    suspend fun codexOfficialPlugins(forceRefetch: Boolean = false): List<UiCodexPluginSnapshot> = emptyList()
     suspend fun codexPluginDetail(id: String): UiCodexPluginDetailSnapshot =
         error("当前市场没有 Codex 插件详情服务")
     suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
