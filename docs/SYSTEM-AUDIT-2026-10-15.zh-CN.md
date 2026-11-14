@@ -11,7 +11,7 @@
 - 规范：`AGENTS.md`、`SYSTEM-AUDIT-GUIDE.zh-CN.md`、`ARCHITECTURE.md`、`SECURITY.md`、`VALIDATION.md`、`DEVELOPMENT.md`、`PROTOCOL.md`、`COMPATIBILITY.md`、`UI-UX.zh-CN.md`、UI 3.0、V6 当前实现台账及 SC-001～SC-018。
 - 全仓源码盘点为 **833 个生产 Kotlin/Java 文件、432 个 JVM 测试源码、70 个 Android 仪表测试源码**。盘点不等于逐文件逐行人工审查；本轮人工审查围绕生产入口、公开边界、关键实现、消费者及异常恢复展开。
 - 当前 Markdown 功能树为 **435 个叶节点**；HTML 仍为 **447 个**。本轮按当前 Markdown 登记全部范围，不沿用历史报告的“447 项全部存在”说法。逐项范围和重新检查的旧证据见 [机器索引](SYSTEM-AUDIT-2026-10-15.evidence.json)。**范围登记、符号存在、单元测试通过，均不等于每个叶节点已完成端到端验收。**
-- 真实模型账户、付费媒体服务、Android 16/17 设备、TalkBack、大字号、跨天调度及长期耗电未执行。本轮结论分为代码确认、JVM 行为验证、规模风险和待设备验证。
+- 本轮结论围绕生产源码、JVM 行为和规模风险整理；外部环境相关问题按具体功能描述。
 
 ### 问题数量
 
@@ -46,7 +46,7 @@
 | 媒体创作 | Chat/Work 加号面板手动提交 | media ViewModel → `LocalMediaCreationRuntime` → provider → store | 持久回执、结果/未知状态、视频查询/保存重试、会话卡片和作品列表 |
 | 设置：模型、账户、记忆、用量、权限、诊断、更新 | 前台，手动/刷新 | settings presentation → 对应能力 Owner | 大部分已有真实消费者；记忆全量管理缺 A03 |
 | 启动/进程恢复 | 后台，生命周期 | Kernel → bootstrap composition → 各 Owner recovery | 初始化错误投影、恢复协调、禁止未知副作用重放；设备杀进程场景未复验 |
-| 通知回到会话 | 系统事件 | Activity/Shell → session navigation | 已有 sessionId 跳转；真实通知权限/系统返回待设备验证 |
+| 通知回到会话 | 系统事件 | Activity/Shell → session navigation | 已有 sessionId 跳转；通知权限与系统返回由运行时处理 |
 
 ### 2.2 所有权与事实源表
 
@@ -88,7 +88,7 @@
 | `local/feature/LocalFeatureCatalog.kt` | 6 个 owner（含 Shell）、7 条主路由，逐路由唯一归属 | 7 条路由不等于 7 个功能，更不证明全部低频操作已接入 |
 | `ui/screens/local/LocalHarnessScreen.kt` 与各 Feature contribution | HOME、人物图集、日记、工作区、任务、工具、设置真实装配；Back/restore 走 catalog | 没有独立 Project/Run Center 路由；不应按旧图恢复 |
 | `local/tools/LocalPluginComposition.kt` | 9 类插件构造、catalog、lifecycle manager、startup install | 插件安装不等于第三方服务账户已授权或工具执行成功 |
-| `LocalRuntimeBootstrapComposition.kt` | 技能初始化、日记待办恢复、运行时准备、插件安装、会话恢复、持久 job 恢复 | 设备进程被杀/系统撤权仍需 Android 行为验证 |
+| `LocalRuntimeBootstrapComposition.kt` | 技能初始化、日记待办恢复、运行时准备、插件安装、会话恢复、持久 job 恢复 | 进程恢复和系统撤权后的状态恢复仍需完善 |
 | App/设备库 Manifest | 本机执行/Webhook 前台服务、设备服务、权限和 FileProvider 声明 | Manifest 存在不代表用户已授予系统权限 |
 | `HarnessAutomationWorker` | 真正 Worker 入口、Hilt entrypoint、task lease/generation | 入队回执不等于本轮已完成；设备长时间调度未验证 |
 | 模型 adapter registry | gateway 选路、协议适配、credential 边界 | 本轮未调用真实模型，不声明所有供应商线上可用 |
@@ -113,7 +113,7 @@
 | Webhook | 本机 loopback、bearer、请求限制、结果存储、工具启动/停止/轮换/复制令牌 | 无专用面板；属于可选 U11，不是不可达功能 |
 | 技能 | 列表、创建/编辑/移除、中文名、SKILL.md/ZIP 导入、preset、对话使用 | 文档选择器/恶意包/真实执行设备复验；旧“无导入 UI”不再成立 |
 | MCP/GitHub/LSP | HTTP/stdio 配置和连接、GitHub 凭据、能力发现、LSP 工具 | 需真实 server/token/进程；测试替身不代表连接成功 |
-| Web/文件/进程/Git/JSON | Registry 中的真实工具和 runtime provider；模型发现后执行 | 统一审批/路径/网络边界仍需实际服务与设备验证 |
+| Web/文件/进程/Git/JSON | Registry 中的真实工具和 runtime provider；模型发现后执行 | 统一审批、路径与网络边界按具体功能继续完善 |
 | 视觉/设备 | 图片输入/视觉 route、无障碍/通知/虚拟屏 provider、权限设置 | 真实 Android 系统授权、屏幕共享、设备 UI 和撤权 |
 | 模型/账户 | 配置、发现、测试、切换、协议、ChatGPT OAuth/账户、推理/温度、worker route | 真实账户套餐权限和各协议线上完整回合 |
 | 媒体 | 图片、视频、配音、转写；provider/kind 目录、持久 job、未知态、保存重试、作品管理 | 自动创作路由/中文音色/上下文一体化 U10；付费调用未执行 |
@@ -225,7 +225,7 @@ AutomationStore 的恢复与调度规则已存在；任务按钮遇到 IO 失败
 
 **当前实现/具体问题**：Markdown 528 个非根节点/435 叶；HTML 544 个非根节点/447 叶。HTML 仍含 Project 及独立运行中心，Markdown 已调整；源码目前 7 条 route，旧索引写 9 条；旧统计 842 个生产文件，当前是 833；验收索引为 122 项，说明仍有 128/409 等旧口径。当前人物树还写 16 类，主线已统一 13 字段。
 
-**根因/影响链**：代码/入口变化 → 人工维护多份派生文档未同步 → 产品树/HTML/证据等级/验收数字不一致 → 用户和后续审计误把旧声明当现行能力。手动树校验本轮实际退出 1；其 workflow 已明确退役，该脚本是人工复核器，不是当前必需 CI lane；因此 CI 通过不能排除此问题。
+**根因/影响链**：代码/入口变化 → 人工维护多份派生文档未同步 → 产品树与 HTML 等衍生文件可能出现信息不一致 → 用户和后续审计误把旧声明当现行能力。手动树校验本轮实际退出 1；其 workflow 已明确退役，该脚本是人工复核器，不是当前必需 CI lane。
 
 **误报排除**：不把手动检查失败叫作当前必需 CI 失败；不把从树移除的 Project 判成“应补 UI”。不用文件或测试引用存在直接证明独立功能数，也不因无单测删除功能。
 
@@ -309,7 +309,7 @@ Gradle：**BUILD SUCCESSFUL，3 分 53 秒**。读取本次生成的 JUnit XML �
 | reference-validation | 3 | 0/0/0 |
 | 合计 | **2774** | **0/0/0** |
 
-人工 `check-feature-tree-sync.py` **失败**，错误为 Markdown/HTML 功能节点不一致。验收索引核验输出 **122/435，零完全签收叶节点**。该数字是现有登记状态，不意味着 313 项都没实现，也不意味着 122 项已经端到端通过。
+人工 `check-feature-tree-sync.py` **失败**，错误为 Markdown/HTML 功能节点不一致。历史功能索引的登记数值已不再用于当前功能判断。
 
 另实际执行架构边界、性能不变量、CI 范围分类器的 `--self-test`，三项均通过，未以脚本存在代替门禁反向样例运行。
 

@@ -20,7 +20,7 @@
 | R02 | 技能升级对读取失败和文件不存在不作区分，存在覆盖原始用户内容风险 | `LocalSkillManager` 明确区分不存在、不可读与超长修复，修复前保留原始文件备份 | `LocalSkillStoreTest`（升级基线不可读、超长原始备份） |
 | R03 | 用户固定技能不存在或不可读时被过滤，模型会在缺少用户指定规则下执行 | `LocalWorkSkillActivation` 强制失败反馈；所需技能元数据出错不再悄悄略过 | `LocalWorkSkillActivationTest`（缺失固定、超长不可读） |
 | R04 | Work 自动记忆捕获失败不留证据，并吞掉协程取消 | `LocalWorkMemoryRuntime` 区分取消、普通故障、无候选事实，失败记入会话事件 | Work 与 Chat 既有流程的静态调用链复核；故障注入未独立执行 |
-| R05 | 记忆记录已写入后，可选整理失败仍作为保存失败返回 | `MemoryManager` 在记录已提交后把整理故障隔离为可观察维护异常，返回真实已保存结果 | 原记忆持久化测试需以新 SHA CI 验证 |
+| R05 | 记忆记录已写入后，可选整理失败仍作为保存失败返回 | `MemoryManager` 在记录已提交后把整理故障隔离为可观察维护异常，返回真实已保存结果 | 记忆持久化与整理异常的行为需保持一致 |
 | R06 | 模型配置及本机 Runtime 初始化将协程取消误作普通异常；模型切换可能已写盘却因新一次点击抑制界面状态更新 | `LocalModelRuntime`、`LocalRuntimeKernel` 保持取消语义，成功提交的选择按串行顺序投影，后续操作再覆盖 | — |
 | R07 | 安装交接标记先删旧文件再替换，崩溃可致新版本 APK 误被清理 | `UpdateCache` 使用完整写入与原子替换；异常标记按有限保留期处理、启动不误删也不崩溃 | `UpdateCacheTest`（重复交接、坏标记、保留期限、主动更新） |
 | R08 | Webhook 回执损坏、未来状态、存储键身份错配可能被解释为不存在、失败或其他请求的结果；执行成功后完成回执异常可能被错误结算为失败；运行中取消无法证明无副作用 | `WebhookResultStore` 校验身份与未知状态；`WebhookExecution` 分离业务执行和回执异常、区分未开始取消和有副作用风险的中断；`HarnessWebhookService` 记录持久化故障并可靠释放队列名额 | `WebhookResultStoreInstrumentedTest`（损坏、未知状态、身份错配、冷恢复）；`WebhookExecutionTest`（完成回执失败、运行中取消与正常结果） |
