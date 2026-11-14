@@ -23,7 +23,7 @@ internal class AccessibilityNodeSelectionLease {
 
     fun requireCurrent(index: Int, windowId: Int, candidate: AccessibilityNodeSnapshot) {
         val snapshot = observed
-        check(index >= 0 && snapshot?.windowId == windowId &&
+        check(index >= 0 && snapshot?.windowId == windowId && observed === snapshot &&
             snapshot.nodes.getOrNull(index) == candidate
         ) { EXPIRED_MESSAGE }
     }
@@ -39,8 +39,8 @@ internal class AccessibilityNodeSelectionLease {
         windowId: Int,
         current: List<AccessibilityNodeSnapshot>,
     ): Int {
-        val snapshot = observed
-        check(index >= 0 && snapshot?.windowId == windowId) { EXPIRED_MESSAGE }
+        val snapshot = observed ?: throw IllegalStateException(EXPIRED_MESSAGE)
+        check(index >= 0 && snapshot.windowId == windowId) { EXPIRED_MESSAGE }
         val original = snapshot.nodes.getOrNull(index)
         check(original != null && original.editable) { EXPIRED_MESSAGE }
         if (current.getOrNull(index) == original) return index
@@ -61,6 +61,7 @@ internal class AccessibilityNodeSelectionLease {
                     it.contentDescription == original.contentDescription
             }
         }
+        check(observed === snapshot) { EXPIRED_MESSAGE }
         return candidates.singleOrNull()?.index
             ?: throw IllegalStateException(EXPIRED_MESSAGE)
     }
