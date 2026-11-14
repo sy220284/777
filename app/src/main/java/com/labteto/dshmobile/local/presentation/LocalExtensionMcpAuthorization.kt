@@ -24,6 +24,11 @@ internal suspend fun authorizeLocalExtensionMcpBatch(
 ): List<LocalExtensionMcpAuthorizationFailure> {
     // An official plugin endpoint may also be declared in its skill YAML; one
     // installation attempt must never open the same authorization twice.
+    val contradictory = requests.groupBy(LocalExtensionMcpAuthorization::serverId)
+        .filterValues { sources -> sources.map(LocalExtensionMcpAuthorization::endpoint).distinct().size > 1 }
+    require(contradictory.isEmpty()) {
+        "插件运行依赖为同一 MCP 服务标识声明了不同端点，请先核对技能来源"
+    }
     val unique = requests.distinctBy(LocalExtensionMcpAuthorization::serverId)
     val failures = mutableListOf<LocalExtensionMcpAuthorizationFailure>()
     unique.forEachIndexed { index, request ->
