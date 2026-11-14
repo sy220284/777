@@ -597,8 +597,9 @@ internal fun PluginInventoryBrowser(
                             canInstallCurated -> onInstallCurated?.invoke(item.id.substringAfter(":"))
                             canInstallOfficial -> onInstallCodexPluginSkill?.invoke(pluginId, requireNotNull(oneSkill))
                             canConnectOfficial -> onConnectCodexPlugin?.invoke(pluginId)
-                            canConnectSkill -> onConnectSkillMcp?.invoke(
-                                requireNotNull(endpoint).first, endpoint.second)
+                            canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
+                                onConnectSkillMcp?.invoke(serverId, url)
+                            }
                             onUseCapability != null && item.available -> onUseCapability(usePrompt)
                             item.connectedService -> onManageConnections()
                             else -> onReturnToChat()
