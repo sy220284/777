@@ -60,6 +60,11 @@ class LocalWorkReplyPresentationTest {
         assertEquals("运行本地任务", userFacingWorkToolAction("cordis_run"))
         assertEquals("运行本地任务", userFacingWorkToolAction("process_exec"))
         assertEquals("修改文件", userFacingWorkToolAction("edit"))
+        assertEquals("检查手机界面状态", userFacingWorkToolAction("android_find"))
+        assertEquals("点击手机界面", userFacingWorkToolAction("android_click_node"))
+        assertEquals("向手机界面输入", userFacingWorkToolAction("android_set_text_node"))
+        assertEquals("滑动虚拟屏界面", userFacingWorkToolAction("android_vscreen_swipe"))
+        assertEquals("读取虚拟屏画面", userFacingWorkToolAction("android_vscreen_screenshot"))
     }
 
     @Test fun completedStepUsesItsOriginalDeclaredActionEvenWhenNotRunning() {

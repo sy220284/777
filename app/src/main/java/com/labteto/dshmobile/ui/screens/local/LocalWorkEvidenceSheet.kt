@@ -125,6 +125,16 @@ internal fun LocalWorkEvidenceSheet(
                         color = colors.textSecondary,
                     )
                 }
+                if ((currentWork?.activeVirtualDisplays ?: 0) > 0) {
+                    item {
+                        Text(
+                            "设备操作状态：当前设备共有 ${currentWork!!.activeVirtualDisplays} 个虚拟屏资源正在使用；下方工具记录显示每次操作的实际结果。",
+                            style = DsType.small13,
+                            color = colors.textSecondary,
+                            modifier = Modifier.testTag("work_device_active_displays"),
+                        )
+                    }
+                }
                 // Running/declared calls have no completed transcript row. Preserve their real phases.
                 items(state.activities.filter { it.phase in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING) },
                     key = ::workEvidenceActivityKey) { activity ->
