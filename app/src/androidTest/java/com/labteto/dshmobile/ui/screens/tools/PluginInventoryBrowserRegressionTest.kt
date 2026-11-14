@@ -516,4 +516,38 @@ class PluginInventoryBrowserRegressionTest {
         }
     }
 
+    @Test
+    fun installedPluginSkillRecognizesPinnedOriginWhenFolderAndSkillNameDiffer() {
+        var installRequests = 0
+        val pluginId = "zoom@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "zoom", "Productivity", "plugins/zoom",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Zoom", "会议", "Zoom", "1.0",
+            listOf("general"), false, false, false,
+            skillDirectories = mapOf("general" to "skills/general"),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail),
+                    skills = listOf(com.labteto.dshmobile.local.presentation.LocalSkillUiEntry(
+                        "zoom-general", "Use Zoom", true,
+                        sourceUrl = "https://github.com/openai/plugins/tree/0123456789012345678901234567890123456789/plugins/zoom/skills/general",
+                    )),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPluginSkill = { _, _ -> installRequests++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("codex-skill-install-$pluginId-general")
+            .performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { assertEquals(0, installRequests) }
+    }
+
 }
