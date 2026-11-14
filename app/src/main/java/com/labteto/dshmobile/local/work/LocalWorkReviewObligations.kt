@@ -55,17 +55,30 @@ internal fun localWorkOutstandingRequiredReviews(
             add(if (type == "security") "当前安全审查尚待人工确认" else "当前代码审查尚待人工接纳")
             continue
         }
-        // A legitimate mutation after acknowledgement needs a new review. Only
-        // settled successful Work tool results count; read-only tools do not.
-        val newerMutation = log.latestMatching(setOf("tool/result")) { fields ->
-            val id = fields.reviewValue("id")
-            fields.reviewValue("is_error") == "false" &&
-                fields.reviewValue("side_effect") in setOf("possible", "confirmed") &&
-                id != null && log.latestMatching(setOf("tool/call")) { call ->
-                    call.reviewValue("id") == id && call.reviewValue("goal_id") == goal.id
-                }?.sequence?.let { it > accepted.sequence } == true
-        }?.takeIf { it.sequence > accepted.sequence }
-        if (newerMutation != null) {
+        // Only settled real file/process effects invalidate the reviewed bytes.
+        // Session-only progress edits (e.g. todo_write) do not change the Git snapshot.
+        // Calls that started before the review but finished later must also invalidate it.
+        var newerMutation = false
+        log.forEachOfTypesAfter(accepted.sequence, setOf("tool/result")) { event ->
+            if (newerMutation) return@forEachOfTypesAfter
+            val fields = event.data
+            if (fields.reviewValue("is_error") != "false" ||
+                fields.reviewValue("side_effect") != "possible") return@forEachOfTypesAfter
+            val id = fields.reviewValue("id") ?: return@forEachOfTypesAfter
+            val call = log.latestMatching(setOf("tool/call"),
+                beforeSequenceExclusive = event.sequence) { entry ->
+                entry.reviewValue("id") == id && entry.reviewValue("goal_id") == goal.id
+            } ?: return@forEachOfTypesAfter
+            if (call.sequence < goal.startedAtSequence) return@forEachOfTypesAfter
+            val name = call.data.reviewValue("name").orEmpty()
+            if (name !in setOf(
+                    "update_plan", "exit_plan_mode", "todo_write", "create_goal",
+                    "update_goal", "work_finding", "ask_user_question",
+                    "memory_remember", "memory_update", "memory_forget",
+                    "team_task_review", "team_task_update", "team_task_create",
+                )) newerMutation = true
+        }
+        if (newerMutation) {
             add("独立${if (type == "security") "安全" else "代码"}审查之后已有新的修改，请重新审查当前版本")
         }
     }
