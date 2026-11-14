@@ -105,7 +105,8 @@ internal fun codexOfficialPluginSourceMatches(
     pluginRoot: String,
     skillDirectory: String? = null,
 ): Boolean {
-    if (source == null || source.owner != "openai" || source.repository != "plugins" ||
+    if (source == null || !source.owner.equals("openai", ignoreCase = true) ||
+        !source.repository.equals("plugins", ignoreCase = true) ||
         !source.commit.matches(Regex("[0-9a-f]{40}"))) return false
     return if (skillDirectory == null) source.directory.startsWith("$pluginRoot/")
         else source.directory == "$pluginRoot/$skillDirectory"
