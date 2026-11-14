@@ -286,6 +286,36 @@ class WorkExperienceBootstrapTest {
     }
 
     @Test
+    fun repeatingTheSameSourceRangeIsNotAnInvestigativeSuccess() {
+        val root = Files.createTempDirectory("777-source-duplicate").toFile()
+        try {
+            val log = LocalSessionEventLogRegistry(root, Json).get("same-range")
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-read"); put("revision", 1); put("status", "active")
+            })
+            val start = log.latestSequence()
+            log.append("work/source-observed", buildJsonObject {
+                put("source", "src/Only.kt"); put("kind", "slice")
+                put("region", "lines:1-20"); put("has_next", true)
+            })
+            log.append("work/source-observed", buildJsonObject {
+                put("source", "src/Only.kt"); put("kind", "slice")
+                put("region", "lines:1-20"); put("has_next", false)
+            })
+            log.append("goal/state", buildJsonObject {
+                put("id", "goal-read"); put("revision", 2)
+                put("status", "completed"); put("startedAtSequence", start)
+            })
+            val observed = WorkExperienceBootstrap.collect(log, LocalGoal(
+                "核查重复读取", id = "goal-read", status = "completed",
+                revision = 2, startedAtSequence = start,
+            ))
+            assertEquals(0, observed.followedSourceCursors)
+            assertFalse(observed.supports("source_follow_through"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
     fun starterTemplatesClearlyDenyTheyAreVerifiedLessons() {
         val text = WorkExperienceBootstrap.catalogMarkdown()
         assertTrue(text.contains("未验证经验"))
