@@ -91,7 +91,7 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("script-1:code_mode_run", "script-1/step-1:read",
             "script-1/step-2:bash"), started)
         assertEquals(started, authorized)
-        assertEquals(listOf("script-1:code_mode_run", "script-1/step-2:bash"), approvals)
+        assertEquals(listOf("script-1/step-2:bash"), approvals) // no redundant wrapper prompt
     }
 
     @Test fun teamRevocationWhileWaitingForSharedWorkspaceLeaseCannotWrite() = runBlocking {
