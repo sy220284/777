@@ -527,6 +527,22 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
+                if (!skillsOnly && (codexLoading || codexError != null || officialPlugins.isNotEmpty())) {
+                    item(key = "codex-market-status") {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(codexError ?: if (codexLoading) "正在读取 Codex 官方插件市场"
+                                else "Codex 官方插件 · ${officialPlugins.size} 项",
+                                style = DsType.small13.withReadingWeight(),
+                                color = if (codexError != null) colors.dangerInk else colors.textSecondary,
+                                modifier = Modifier.weight(1f))
+                            if (!codexLoading && onRefreshCodex != null) {
+                                SyButton(text = "刷新目录", onClick = onRefreshCodex,
+                                    size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
+                            }
+                        }
+                    }
+                }
                 if (skillsOnly && (curatedLoading || curatedError != null || curated.isNotEmpty())) {
                     item(key = "curated-status") {
                         Row(
@@ -598,6 +614,7 @@ internal fun PluginInventoryBrowser(
                             actionText = when {
                                 installable -> "安装"
                                 item.connectedService -> "管理"
+                                item.id.startsWith("codex-plugin:") -> "了解"
                                 item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
                                     ExtensionMarketStatus.FAILED) -> "配置"
                                 else -> stringResource(
@@ -618,6 +635,7 @@ internal fun PluginInventoryBrowser(
                                     item.installableCurated && onInstallCurated != null ->
                                         onInstallCurated(item.id.substringAfter(":"))
                                     item.connectedService -> onManageConnections()
+                                    item.id.startsWith("codex-plugin:") -> selectedRow = item
                                     item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
                                         ExtensionMarketStatus.FAILED) -> selectedRow = item
                                     onUseCapability != null && item.available -> onUseCapability(usePrompt)
@@ -642,7 +660,8 @@ internal fun PluginInventoryBrowser(
                         if ((item.installablePreset && onInstallPreset != null) ||
                                              (item.installableCurated && onInstallCurated != null)) R.string.skills_install
                         else if (onUseCapability != null && item.available) R.string.plugin_use
-                        else if (item.connectedService) R.string.tools_external_services
+                        else if (item.connectedService || item.id.startsWith("codex-plugin:"))
+                            R.string.tools_external_services
                         else R.string.tools_catalog_return_chat,
                     ),
                     modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
@@ -653,7 +672,8 @@ internal fun PluginInventoryBrowser(
                         if (item.installablePreset && onInstallPreset != null) onInstallPreset(item.id.substringAfter(":"))
                                          else if (item.installableCurated && onInstallCurated != null) onInstallCurated(item.id.substringAfter(":"))
                         else if (onUseCapability != null && item.available) onUseCapability(usePrompt)
-                        else if (item.connectedService) onManageConnections() else onReturnToChat()
+                        else if (item.connectedService || item.id.startsWith("codex-plugin:"))
+                            onManageConnections() else onReturnToChat()
                     },
                 )
             },
@@ -677,6 +697,16 @@ internal fun PluginInventoryBrowser(
             if (item.marketState.advice.isNotBlank()) {
                 Text(item.marketState.advice, style = DsType.small13.withReadingWeight(),
                     color = colors.textSecondary)
+            }
+            if (item.id.startsWith("codex-plugin:")) {
+                Text("官方来源：github.com/openai/plugins", style = DsType.caption11,
+                    color = colors.textTertiary)
+                Text("Codex 插件使用官方安装器和服务授权。777 会使用本机 MCP 连接与工具审批。",
+                    style = DsType.small13, color = colors.textSecondary)
+                if (item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
+                    SyButton(text = "查看连接方式", variant = SyButtonVariant.Info,
+                        onClick = { selectedRow = null; onManageConnections() })
+                }
             }
             if (item.requirements.isNotEmpty()) {
                 Text("运行依赖", style = DsType.small13Strong.withReadingWeight(), color = colors.text)
