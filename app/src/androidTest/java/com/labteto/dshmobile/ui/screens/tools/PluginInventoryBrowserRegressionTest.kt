@@ -647,7 +647,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithTag("plugin-inventory-card-skill:research-check").performClick()
         compose.onNodeWithTag("plugin-detail-primary-action").performClick()
-        compose.onNodeWithText("已安装").assertIsDisplayed()
+        compose.onNodeWithText("使用").assertIsDisplayed()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("@skill:research-check\\n", usePrompt) }
     }
