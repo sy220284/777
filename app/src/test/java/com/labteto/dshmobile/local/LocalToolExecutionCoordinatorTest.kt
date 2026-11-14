@@ -102,6 +102,29 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("script-1/step-2:bash"), approvals) // no redundant wrapper prompt
     }
 
+    @Test fun planModeAdvertisesReadOnlyCodeModeInsteadOfHidingIt() = runBlocking {
+        val registry = ToolRegistry()
+        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            ToolResult("preview")
+        })
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
+        val selected = projection.modelSelection(
+            policy = localAgentRunPolicy(LocalUsageMode.WORK),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = true,
+            history = emptyList(),
+        )
+        assertTrue("code_mode_run" in projection.names(selected.schemas))
+        val codeMode = selected.schemas
+            .mapNotNull { it as? JsonObject }
+            .first { it.getValue("function").jsonObject.getValue("name").jsonPrimitive.content == "code_mode_run" }
+        val description = codeMode.getValue("function").jsonObject
+            .getValue("description").jsonPrimitive.content
+        assertTrue(description.contains("规划模式只允许"))
+        assertTrue(description.contains("写文件"))
+    }
+
     @Test fun planModeRunsReadOnlyCodeModeWithoutExtraPromptsAndRejectsMixedScript() = runBlocking {
         val registry = ToolRegistry()
         var reads = 0
