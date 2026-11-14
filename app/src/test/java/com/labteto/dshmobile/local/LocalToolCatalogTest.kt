@@ -12,6 +12,19 @@ import org.junit.Test
 
 class LocalToolCatalogTest {
     @Test
+    fun modelIsToldExactEditMaySkipRedundantReadAndMustRejectStaleContent() {
+        val descriptor = LocalToolCatalog.specs.single {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == "edit"
+        }.jsonObject["function"]!!.jsonObject
+        val help = descriptor["description"]!!.jsonPrimitive.content
+        assertTrue(help.contains("无需先调用 read"))
+        assertTrue(help.contains("原文仅出现一次"))
+        assertTrue(help.contains("版本过期"))
+        assertEquals(listOf("path", "old_text", "new_text"),
+            descriptor["parameters"]!!.jsonObject["required"]!!.jsonArray.map { it.jsonPrimitive.content })
+    }
+
+    @Test
     fun exposesAndroidAdaptableOfficialCapabilityFamilies() {
         val names = LocalToolCatalog.specs.mapNotNull {
             it.jsonObject["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
