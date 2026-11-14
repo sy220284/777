@@ -245,7 +245,8 @@ class PluginInventoryBrowserRegressionTest {
                 val title = compose.onNodeWithTag("plugin-inventory-title-local:android-runtime")
                     .assertIsDisplayed().getUnclippedBoundsInRoot()
                 assertTrue("Title must fit within the $widthDp dp card in $mode", title.right <= card.right)
-                assertTrue("Card must fit within available width $widthDp dp", card.width <= widthDp.dp)
+                assertTrue("Card must fit within available width $widthDp dp",
+                    card.right - card.left <= widthDp.dp)
             }
         }
     }
