@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.model
 // FEATURE_TREE: {"id":"shared.model.partial-terminal","path":"第二层｜共享运行能力 / 共享模型与路由 / 模型部分输出与终态结算","owner":"SHARED","entry":"toHistoryMessage","test":"app/src/test/java/com/labteto/dshmobile/local/model/LocalCanonicalModelCodecTest.kt#partialCompletionRoundTripsLocallyAndNeverLeaksOntoWire"}
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -411,25 +412,35 @@ internal object LocalCanonicalModelCodec {
         if (content is JsonPrimitive) {
             return content.contentOrNull?.let { listOf(LocalCanonicalContent.Text(it)) }.orEmpty()
         }
-        if (content !is JsonArray) return emptyList()
-        return content.mapNotNull { part ->
-            val obj = part as? JsonObject ?: return@mapNotNull null
-            when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+        fun invalid(index: Int, reason: String): Nothing = throw LocalModelException(
+            code = "MODEL_HISTORY_INVALID",
+            message = "历史消息第 ${index + 1} 个内容块$reason；请重新附加相关文件或恢复有效会话。",
+            retryable = false,
+            origin = LocalModelFailureOrigin.LOCAL_PREFLIGHT,
+        )
+        if (content !is JsonArray) invalid(0, "必须是文本或内容数组")
+        return content.mapIndexed { index, part ->
+            val obj = part as? JsonObject ?: invalid(index, "必须是带类型的对象")
+            when ((obj["type"] as? JsonPrimitive)?.contentOrNull) {
                 "text", "input_text", "output_text" ->
-                    obj["text"]?.jsonPrimitive?.contentOrNull?.let(LocalCanonicalContent::Text)
+                    (obj["text"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+                        ?.let(LocalCanonicalContent::Text)
+                        ?: invalid(index, "缺少有效文本")
                 "image_url", "input_image" -> {
                     val image = obj["image_url"]
                     val url = when (image) {
                         is JsonPrimitive -> image.contentOrNull
-                        is JsonObject -> image["url"]?.jsonPrimitive?.contentOrNull
+                        is JsonObject -> (image["url"] as? JsonPrimitive)?.contentOrNull
                         else -> null
                     }
-                    url?.let {
+                    url?.takeIf(String::isNotBlank)?.let {
                         LocalCanonicalContent.Image(
                             dataUrl = it,
-                            detail = (image as? JsonObject)?.get("detail")?.jsonPrimitive?.contentOrNull,
+                            detail = (image as? JsonObject)?.get("detail")?.let {
+                                (it as? JsonPrimitive)?.contentOrNull
+                            },
                         )
-                    }
+                    } ?: invalid(index, "缺少有效图片地址")
                 }
                 else -> LocalCanonicalContent.Raw(obj)
             }
