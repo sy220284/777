@@ -332,7 +332,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
     override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
     override suspend fun connectHttp(serverId: String, endpoint: String): String =
-        mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
+        mcpConnectionGate(serverId).withLock { tools.connectHttp(serverId, endpoint) }
     /** Browser OAuth and remote refresh are cancellable preparation; Keystore write and
      * connection replacement form one atomic-looking, fully restored transaction. */
     private sealed interface PreparedMcpCredential {
@@ -340,12 +340,19 @@ class LocalToolsUiFacade @Inject internal constructor(
             PreparedMcpCredential
         data class Bearer(val value: String) : PreparedMcpCredential
     }
-    private val mcpConnectionGate = kotlinx.coroutines.sync.Mutex()
+    // OAuth may wait in the browser for minutes. Serialize mutations per service,
+    // while other independent MCP services remain usable.
+    private val mcpConnectionGates =
+        java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
+    private fun mcpConnectionGate(serverId: String): kotlinx.coroutines.sync.Mutex {
+        require(serverId.matches(Regex("[A-Za-z0-9_-]{1,24}"))) { "MCP 服务标识无效" }
+        return mcpConnectionGates.computeIfAbsent(serverId) { kotlinx.coroutines.sync.Mutex() }
+    }
 
     private suspend fun switchMcpHttpConnection(
         serverId: String, endpoint: String,
         prepare: suspend () -> PreparedMcpCredential,
-    ): String = mcpConnectionGate.withLock {
+    ): String = mcpConnectionGate(serverId).withLock {
         val existing = tools.servers().firstOrNull { it.id == serverId }
         if (existing != null) {
             val uri = java.net.URI(endpoint)
@@ -399,7 +406,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun connectHttpWithCredential(
         serverId: String, endpoint: String, bearer: String,
     ): String = if (bearer.isEmpty())
-        mcpConnectionGate.withLock { tools.connectHttp(serverId, endpoint) }
+        mcpConnectionGate(serverId).withLock { tools.connectHttp(serverId, endpoint) }
     else switchMcpHttpConnection(serverId, endpoint) {
         PreparedMcpCredential.Bearer(bearer)
     }
@@ -420,25 +427,25 @@ class LocalToolsUiFacade @Inject internal constructor(
 
     override suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
         mcpOAuth.cancel(serverId)
-        return mcpConnectionGate.withLock {
+        return mcpConnectionGate(serverId).withLock {
             disconnectMcpIfConnected(serverId)
             mcpCredentials.revoke(serverId, endpoint)
         }
     }
     override suspend fun clearMcpCredential(serverId: String) {
         mcpOAuth.cancel(serverId)
-        mcpConnectionGate.withLock {
+        mcpConnectionGate(serverId).withLock {
             disconnectMcpIfConnected(serverId)
             mcpCredentials.clear(serverId)
         }
     }
     override suspend fun connectStdio(
         serverId: String, command: List<String>, workingDirectory: String?,
-    ): String = mcpConnectionGate.withLock {
+    ): String = mcpConnectionGate(serverId).withLock {
         tools.connectStdio(serverId, command, workingDirectory)
     }
     override suspend fun disconnect(serverId: String): String =
-        mcpConnectionGate.withLock { tools.disconnect(serverId) }
+        mcpConnectionGate(serverId).withLock { tools.disconnect(serverId) }
 }
 
 @dagger.Module
