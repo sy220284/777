@@ -417,8 +417,7 @@ class ToolsViewModel @Inject constructor(
                     "插件声明了 MCP 地址，但缺少服务标识"
                 }, endpoint)
         }
-        val knownServerIds = localTools.servers().mapTo(hashSetOf()) { it.id }
-        val requests = buildList {
+        val declared = buildList {
             officialRequest?.let(::add)
             localTools.installedSkills()
                 .filter { it.name in bundledSkillIds }
@@ -430,9 +429,29 @@ class ToolsViewModel @Inject constructor(
                             requirement.value, endpoint))
                     }
                 }
-        }.filterNot { it.serverId in knownServerIds }
+        }
+        val endpointConflicts = declared.groupBy { it.serverId }.filterValues { sources ->
+            sources.map { it.endpoint }.distinct().size > 1
+        }
+        require(endpointConflicts.isEmpty()) {
+            "同一 MCP 服务标识声明了不同端点，请核对插件和技能依赖来源"
+        }
+        val currentServers = localTools.servers()
+        val connectionStates = declared.distinctBy { it.serverId }.associateWith { request ->
+            com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+                currentServers, request.serverId, request.endpoint)
+        }
+        val requests = connectionStates.filterValues {
+            it == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT
+        }.keys.toList()
+        val collisions = connectionStates.filterValues {
+            it == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT
+        }.keys.map { request ->
+            com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorizationFailure(
+                request.serverId, "已有同名但目标地址不同的服务，请在连接器中处理标识冲突")
+        }
 
-        val failures = try {
+        val failures = collisions + try {
             com.labteto.dshmobile.local.presentation.authorizeLocalExtensionMcpBatch(
                 requests = requests,
                 authorize = { request ->
@@ -469,20 +488,19 @@ class ToolsViewModel @Inject constructor(
             .count { !it.registered }
         val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
             else "技能 ${installedId}"
-        val officialServer = officialDetail?.mcpServerId?.let { id ->
-            localTools.servers().firstOrNull { it.id == id }
-        }
+        val officialStatus = com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
+            localTools.servers(), officialDetail?.mcpServerId, officialDetail?.mcpUrl)
         _state.value = _state.value.copy(
             feedback = when {
                 failures.isNotEmpty() -> "${scope}已安装；${failures.size} 项服务授权未完成（" +
                     failures.joinToString("；") { "${it.serverId}：${it.message.take(140)}" } +
                     "），已成功的连接保留。可在详情继续"
-                officialServer != null &&
-                    officialServer.registration != com.labteto.dshmobile.uicontract.UiToolRegistration.REGISTERED ->
-                    "${scope}已安装，服务状态异常或连接中；请在连接器中检查"
-                officialServer != null && officialServer.tools.isEmpty() ->
-                    "${scope}已安装，服务已登记但尚无可用工具；请在连接器中检查健康状态"
-                officialDetail?.mcpUrl != null && officialServer == null ->
+                officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT ->
+                    "${scope}已安装，但 MCP 标识已由其他地址占用；请在连接器中核对"
+                officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.REGISTERED_UNREADY ->
+                    "${scope}已安装，服务已登记但尚未确认工具可用；请在连接器中检查"
+                officialDetail?.mcpUrl != null &&
+                    officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT ->
                     "${scope}已安装，服务尚未登记；请进入详情连接账号"
                 unresolved != 0 ->
                     "${scope}已安装，还有 ${unresolved} 项运行依赖需在详情中处理"
