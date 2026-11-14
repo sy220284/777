@@ -6,6 +6,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.util.UUID
 import javax.inject.Inject
@@ -42,6 +43,16 @@ private data class LocalWorkProjectRecord(
     val revision: Long = 0,
 )
 
+/** Durable intent makes a directory rename recoverable if the process dies between two commits. */
+@Serializable
+private data class LocalWorkProjectMoveJournal(
+    val version: Int = 1,
+    val projectId: String,
+    val from: String,
+    val to: String,
+    val revision: Long,
+)
+
 /**
  * Small transactional Work-owned catalog. Projects own only identity, roots and session membership:
  * no second Session database, no duplicate file owner and no second Agent execution engine.
@@ -52,7 +63,8 @@ internal class LocalWorkProjectCatalog(
     private val json: Json,
 ) {
     private val lock = Any()
-    private val mutable = MutableStateFlow(load())
+    private val moveJournal = File(file.parentFile, file.name + ".moving")
+    private val mutable = MutableStateFlow(loadAndRecoverMove())
     val snapshots = mutable.asStateFlow()
 
     fun create(name: String, root: String, requestId: String = UUID.randomUUID().toString(),
@@ -181,6 +193,165 @@ internal class LocalWorkProjectCatalog(
             if (it.id == id) it.copy(root = normalized, updatedAtMs = System.currentTimeMillis()) else it
         }))
         true
+    }
+
+
+    /**
+     * Move real workspace bytes, rather than merely changing the catalog's root pointer.
+     * The source must be an exclusive project folder, and the destination must be a new
+     * sibling or a child of another existing workspace directory (never the source itself).
+     * An atomic filesystem rename and an on-disk intent protect Git history and recovery.
+     */
+    fun moveDirectory(id: String, destination: String): Boolean = synchronized(lock) {
+        val old = mutable.value
+        val project = old.projects.firstOrNull { it.id == id } ?: error("项目不存在")
+        require(project.root != ".") { "整个工作区不能作为可移动项目文件夹" }
+        val from = movePath(project.root)
+        val to = movePath(destination)
+        val newRoot = to.relativeTo(workspace.canonicalFile.toPath()).toString()
+            .replace(File.separatorChar, '/')
+        if (project.root == newRoot) return@synchronized false
+        require(Files.isDirectory(from, LinkOption.NOFOLLOW_LINKS)) { "原项目文件夹已不存在" }
+        require(!to.startsWith(from) && !from.startsWith(to)) {
+            "项目文件夹不能移动到自身或其上级目录"
+        }
+        require(Files.isDirectory(to.parent, LinkOption.NOFOLLOW_LINKS)) {
+            "请先在工作区创建目标的上级文件夹"
+        }
+        require(!Files.exists(to, LinkOption.NOFOLLOW_LINKS)) {
+            "目标文件夹已存在，请使用重新关联已有目录"
+        }
+        require(old.projects.none { other ->
+            other.id != id && other.root != "." && (
+                other.root == project.root ||
+                    other.root.startsWith(project.root + "/") ||
+                    project.root.startsWith(other.root + "/")
+            )
+        }) { "其他项目也引用了此文件夹或其上级目录，请先调整项目关联" }
+        require(!Files.exists(moveJournal.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            "上次目录迁移尚未恢复，请重新打开项目管理"
+        }
+
+        writeMoveJournal(LocalWorkProjectMoveJournal(
+            projectId = id, from = project.root, to = newRoot, revision = old.revision,
+        ))
+        var moved = false
+        try {
+            Files.move(from, to, StandardCopyOption.ATOMIC_MOVE)
+            moved = true
+            commit(old.copy(projects = old.projects.map {
+                if (it.id == id) it.copy(
+                    root = newRoot, updatedAtMs = System.currentTimeMillis(),
+                ) else it
+            }))
+        } catch (failure: Exception) {
+            if (moved) {
+                try {
+                    check(!Files.exists(from, LinkOption.NOFOLLOW_LINKS) &&
+                        Files.isDirectory(to, LinkOption.NOFOLLOW_LINKS)) {
+                        "迁移失败后目录已被其他操作修改"
+                    }
+                    Files.move(to, from, StandardCopyOption.ATOMIC_MOVE)
+                } catch (rollback: Exception) {
+                    failure.addSuppressed(rollback)
+                    throw IllegalStateException(
+                        "项目文件夹迁移失败且回滚受阻；保留恢复记录，请重新启动后检查", failure,
+                    )
+                }
+            }
+            try {
+                Files.deleteIfExists(moveJournal.toPath())
+            } catch (cleanup: Exception) {
+                failure.addSuppressed(cleanup)
+            }
+            throw failure
+        }
+        try {
+            Files.deleteIfExists(moveJournal.toPath())
+        } catch (cleanup: Exception) {
+            throw IllegalStateException("文件夹已移动，恢复记录清理失败；下次启动会核实", cleanup)
+        }
+        true
+    }
+
+    /** Reject symlink parents even when the canonical target would still be inside the workspace. */
+    private fun movePath(raw: String): java.nio.file.Path {
+        val normalized = normalizeRootText(raw)
+        require(raw == normalized && normalized != ".") { "移动目录必须使用规范的工作区相对路径" }
+        var result = workspace.canonicalFile.toPath()
+        for (segment in normalized.split('/')) {
+            require(segment.isNotBlank() && segment != ".") { "移动目录含无效路径段" }
+            result = result.resolve(segment)
+            require(!Files.isSymbolicLink(result)) { "项目目录移动不能经过符号链接" }
+        }
+        require(result.startsWith(workspace.canonicalFile.toPath())) { "移动目录超出工作区" }
+        return result
+    }
+
+    private fun writeMoveJournal(value: LocalWorkProjectMoveJournal) {
+        val bytes = json.encodeToString(LocalWorkProjectMoveJournal.serializer(), value)
+            .toByteArray(Charsets.UTF_8)
+        file.parentFile?.let { Files.createDirectories(it.toPath()) }
+        val staged = File(file.parentFile, moveJournal.name + ".pending-" + UUID.randomUUID())
+        try {
+            FileOutputStream(staged).use { output ->
+                output.write(bytes)
+                output.fd.sync()
+            }
+            Files.move(staged.toPath(), moveJournal.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            Files.deleteIfExists(staged.toPath())
+        }
+    }
+
+    /**
+     * Resolve an interrupted move before exposing the project snapshot. No recovery code creates
+     * directories or overwrites existing bytes: ambiguous external edits remain visible errors.
+     */
+    private fun loadAndRecoverMove(): LocalWorkProjectSnapshot {
+        val snapshot = load()
+        if (!moveJournal.exists()) return snapshot
+        require(moveJournal.isFile && moveJournal.length() in 1..4096) {
+            "项目移动恢复记录无效"
+        }
+        val intent = json.decodeFromString(
+            LocalWorkProjectMoveJournal.serializer(), moveJournal.readText(Charsets.UTF_8),
+        )
+        require(intent.version == 1 && intent.projectId.matches(ID_PATTERN) &&
+            intent.from != intent.to &&
+            intent.revision >= 0 && snapshot.revision in intent.revision..(intent.revision + 1)) {
+            "项目移动恢复记录版本异常"
+        }
+        val project = snapshot.projects.firstOrNull { it.id == intent.projectId }
+            ?: error("待恢复的项目记录不存在")
+        val from = movePath(intent.from)
+        val to = movePath(intent.to)
+        require(Files.isDirectory(to.parent, LinkOption.NOFOLLOW_LINKS)) {
+            "项目移动目标的上级目录已丢失"
+        }
+        val fromExists = Files.exists(from, LinkOption.NOFOLLOW_LINKS)
+        val toExists = Files.exists(to, LinkOption.NOFOLLOW_LINKS)
+        when (project.root) {
+            intent.from -> when {
+                fromExists && !toExists -> require(Files.isDirectory(from, LinkOption.NOFOLLOW_LINKS)) {
+                    "待恢复的源文件夹已损坏"
+                }
+                !fromExists && toExists -> {
+                    require(Files.isDirectory(to, LinkOption.NOFOLLOW_LINKS)) {
+                        "待恢复的目标文件夹已损坏"
+                    }
+                    Files.move(to, from, StandardCopyOption.ATOMIC_MOVE)
+                }
+                else -> error("目录迁移恢复存在冲突；源目录与目标目录状态异常")
+            }
+            intent.to -> require(!fromExists && toExists &&
+                Files.isDirectory(to, LinkOption.NOFOLLOW_LINKS)) {
+                "项目记录已更新但目标目录不存在或与原目录冲突"
+            }
+            else -> error("目录迁移恢复记录与当前项目不匹配")
+        }
+        Files.delete(moveJournal.toPath())
+        return snapshot
     }
 
     fun move(id: String, newIndex: Int): Boolean = synchronized(lock) {
@@ -333,6 +504,7 @@ class LocalWorkProjectStore @Inject internal constructor(
     fun rename(id: String, name: String) = catalog.rename(id, name)
     fun update(id: String, name: String, root: String) = catalog.update(id, name, root)
     fun changeRoot(id: String, root: String) = catalog.changeRoot(id, root)
+    fun moveDirectory(id: String, root: String) = catalog.moveDirectory(id, root)
     fun move(id: String, newIndex: Int) = catalog.move(id, newIndex)
     fun delete(id: String) = catalog.delete(id)
     fun assign(ids: Set<String>, id: String?) = catalog.assign(ids, id)
