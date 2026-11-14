@@ -29,6 +29,14 @@ data class AccessibilityNodeSnapshot(
     val uniqueId: String? = null,
 )
 
+/** Real outcome of a single text replacement; the model sees the mapped tool receipt. */
+enum class AndroidTextInputOutcome {
+    TARGET_UNAVAILABLE,
+    ACTION_UNCONFIRMED,
+    READBACK_UNCONFIRMED,
+    VERIFIED,
+}
+
 class HarnessAccessibilityService : AccessibilityService() {
     private val nodeSelection = AccessibilityNodeSelectionLease()
 
@@ -126,12 +134,12 @@ class HarnessAccessibilityService : AccessibilityService() {
         viewId: String?,
         searchText: String?,
         value: String,
-    ): Boolean {
+    ): AndroidTextInputOutcome {
         require(listOf(nodeIndex != null, !viewId.isNullOrBlank(), !searchText.isNullOrBlank())
             .count { it } <= 1) {
             "输入目标只能选择 node、id、text 中的一种；全部留空时使用当前已聚焦输入框"
         }
-        val root = rootInActiveWindow ?: return false
+        val root = rootInActiveWindow ?: return AndroidTextInputOutcome.TARGET_UNAVAILABLE
         val target = when {
             nodeIndex != null -> nodeAt(nodeIndex, rebindEditable = true)
             !viewId.isNullOrBlank() -> requireUniqueAccessibilityTarget(
@@ -143,21 +151,21 @@ class HarnessAccessibilityService : AccessibilityService() {
             else -> root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
                 ?.takeIf { it.isVisibleToUser && it.isEditable }
                 ?: onlyVisibleEditable(root)
-        }?.takeIf { it.isVisibleToUser && it.isEditable } ?: return false
+        }?.takeIf { it.isVisibleToUser && it.isEditable } ?: return AndroidTextInputOutcome.TARGET_UNAVAILABLE
 
         val windowId = target.windowId
         val originalBounds = android.graphics.Rect().also(target::getBoundsInScreen)
         val targetId = target.viewIdResourceName
-        if (!setEditableText(target, value)) return false
+        if (!setEditableText(target, value)) return AndroidTextInputOutcome.ACTION_UNCONFIRMED
 
         // Read the same control after the framework has applied its semantics update.
         // Retry verification only, not the mutating text action.
         repeat(4) {
             kotlinx.coroutines.delay(100L)
             if (target.refresh() && target.isEditable &&
-                target.text?.toString().orEmpty() == value) return true
-            val currentRoot = rootInActiveWindow ?: return false
-            if (currentRoot.windowId != windowId) return false
+                target.text?.toString().orEmpty() == value) return AndroidTextInputOutcome.VERIFIED
+            val currentRoot = rootInActiveWindow ?: return AndroidTextInputOutcome.READBACK_UNCONFIRMED
+            if (currentRoot.windowId != windowId) return AndroidTextInputOutcome.READBACK_UNCONFIRMED
             val currentTarget = if (targetId != null) {
                 val matches = currentRoot.findAccessibilityNodeInfosByViewId(targetId)
                     .filter { it.isVisibleToUser && it.isEditable }
@@ -168,9 +176,9 @@ class HarnessAccessibilityService : AccessibilityService() {
                         android.graphics.Rect().also(focused::getBoundsInScreen) == originalBounds
                 }
             if (currentTarget?.text?.toString().orEmpty() == value && currentTarget != null)
-                return true
+                return AndroidTextInputOutcome.VERIFIED
         }
-        return false
+        return AndroidTextInputOutcome.READBACK_UNCONFIRMED
     }
 
     /** No selector is needed for a page with exactly one visible editable field. */
