@@ -46,9 +46,12 @@ jobs:
             --tests 'com.labteto.dshmobile.local.work.LocalWorkDeliveryEvidenceTest' \
             --tests 'com.labteto.dshmobile.local.work.LocalWorkIntegrationDecisionTest' \
             --tests 'com.labteto.dshmobile.local.work.LocalWorkProgressCoordinatorTest' \
+            --tests 'com.labteto.dshmobile.local.LocalWorkRuntimeContextTest' \
             --stacktrace --console=plain
       - name: 编译 Android 应用
         run: |
           ./gradlew --max-workers=2 :app:assembleDebug --stacktrace --console=plain
 
 # 复跑：非法 URI 修复、Goal 审查恢复与 Tools Hook 状态
+
+# 完整整改代码最后一次专项编译
