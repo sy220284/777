@@ -27,43 +27,65 @@ data class AccessibilityNodeSnapshot(
 )
 
 class HarnessAccessibilityService : AccessibilityService() {
+    private val nodeSelection = AccessibilityNodeSelectionLease()
+
     override fun onServiceConnected() {
+        nodeSelection.invalidate()
         current = WeakReference(this)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Node indices belong to the last inspected screen, not a permanent Android control.
+        // Any content/window/scroll/input change invalidates them before the next action.
+        val changingEvents = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED or
+            AccessibilityEvent.TYPE_VIEW_SCROLLED or
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED or
+            AccessibilityEvent.TYPE_VIEW_CLICKED
+        if (event != null && (event.eventType and changingEvents) != 0) nodeSelection.invalidate()
+    }
 
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
+        nodeSelection.invalidate()
         if (current?.get() === this) current = null
         super.onDestroy()
     }
 
     fun snapshot(maxNodes: Int = 400): List<AccessibilityNodeSnapshot> {
-        val root = rootInActiveWindow ?: return emptyList()
+        val root = rootInActiveWindow ?: run {
+            nodeSelection.invalidate()
+            return emptyList()
+        }
         val output = mutableListOf<AccessibilityNodeSnapshot>()
         val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
         queue.add(root to 0)
         while (queue.isNotEmpty() && output.size < maxNodes.coerceIn(1, 2_000)) {
             val (node, depth) = queue.removeFirst()
-            val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
-            output += AccessibilityNodeSnapshot(
-                index = output.size,
-                text = node.text?.toString(),
-                contentDescription = node.contentDescription?.toString(),
-                viewId = node.viewIdResourceName,
-                className = node.className?.toString(),
-                clickable = node.isClickable,
-                editable = node.isEditable,
-                bounds = bounds.toShortString(),
-                depth = depth,
-            )
+            output += describeNode(output.size, node, depth)
             for (index in 0 until node.childCount) {
                 node.getChild(index)?.let { queue.add(it to depth + 1) }
             }
         }
+        nodeSelection.replace(root.windowId, output)
         return output
+    }
+
+    private fun describeNode(index: Int, node: AccessibilityNodeInfo, depth: Int): AccessibilityNodeSnapshot {
+        val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
+        return AccessibilityNodeSnapshot(
+            index = index,
+            text = node.text?.toString(),
+            contentDescription = node.contentDescription?.toString(),
+            viewId = node.viewIdResourceName,
+            className = node.className?.toString(),
+            clickable = node.isClickable,
+            editable = node.isEditable,
+            bounds = bounds.toShortString(),
+            depth = depth,
+        )
     }
 
     fun clickNode(index: Int): Boolean {
@@ -194,18 +216,27 @@ class HarnessAccessibilityService : AccessibilityService() {
 
     private fun nodeAt(index: Int): AccessibilityNodeInfo? {
         if (index < 0) return null
-        val root = rootInActiveWindow ?: return null
-        val queue = ArrayDeque<AccessibilityNodeInfo>()
-        queue.add(root)
+        val root = rootInActiveWindow ?: run {
+            nodeSelection.invalidate()
+            return null
+        }
+        val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
+        queue.add(root to 0)
         var current = 0
         while (queue.isNotEmpty()) {
-            val node = queue.removeFirst()
-            if (current == index) return node
+            val (node, depth) = queue.removeFirst()
+            if (current == index) {
+                nodeSelection.requireCurrent(
+                    index, root.windowId, describeNode(current, node, depth),
+                )
+                return node
+            }
             current++
             for (childIndex in 0 until node.childCount) {
-                node.getChild(childIndex)?.let(queue::add)
+                node.getChild(childIndex)?.let { queue.add(it to depth + 1) }
             }
         }
+        nodeSelection.invalidate()
         return null
     }
 
