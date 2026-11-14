@@ -48,7 +48,8 @@ internal fun seedReusableReadOnlyGraphResults(
     val acceptedHere = mutableSetOf<String>()
     var count = 0
     // Topological fixed point also supports forward-declared dependency IDs.
-    repeat(plan.nodes.size) {
+    var remainingPasses = plan.nodes.size
+    while (remainingPasses-- > 0) {
         val before = acceptedHere.size
         plan.nodes.forEachIndexed { index, node ->
             if (node.id !in candidates || node.id in acceptedHere ||
@@ -89,7 +90,7 @@ internal fun seedReusableReadOnlyGraphResults(
             }
             acceptedHere += node.id
         }
-        if (acceptedHere.size == before) return@repeat
+        if (acceptedHere.size == before) break
     }
     return count
 }
