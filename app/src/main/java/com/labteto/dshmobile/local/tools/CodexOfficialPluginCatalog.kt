@@ -1,7 +1,6 @@
 package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.core.net.withCancellableHttpResponse
-import dagger.hilt.android.scopes.ViewModelScoped
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -67,20 +66,89 @@ internal fun parseCodexOfficialMarketplace(document: String): List<CodexOfficial
     }.distinctBy { it.id }
 }
 
+internal data class CodexOfficialPluginDetail(
+    val name: String,
+    val displayName: String,
+    val description: String,
+    val developerName: String,
+    val version: String,
+    val hasSkills: Boolean,
+    val hasMcp: Boolean,
+    val hasApp: Boolean,
+    val hasHooks: Boolean,
+)
+
+internal fun parseCodexOfficialPluginDetail(document: String): CodexOfficialPluginDetail {
+    val root = Json.parseToJsonElement(document).jsonObject
+    val name = root["name"]?.jsonPrimitive?.contentOrNull ?: error("插件清单缺少 name")
+    require(OFFICIAL_PLUGIN_ID.matches(name)) { "插件名称无效" }
+    val interfaceData = root["interface"] as? JsonObject
+    return CodexOfficialPluginDetail(
+        name = name,
+        displayName = interfaceData?.get("displayName")?.jsonPrimitive?.contentOrNull ?: name,
+        description = interfaceData?.get("shortDescription")?.jsonPrimitive?.contentOrNull
+            ?: root["description"]?.jsonPrimitive?.contentOrNull.orEmpty().take(240),
+        developerName = interfaceData?.get("developerName")?.jsonPrimitive?.contentOrNull.orEmpty(),
+        version = root["version"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        hasSkills = root["skills"] != null,
+        hasMcp = root["mcpServers"] != null,
+        hasApp = root["apps"] != null,
+        hasHooks = root["hooks"] != null,
+    )
+}
+
 @Singleton
 internal class CodexOfficialPluginCatalog @Inject constructor(
     private val http: OkHttpClient,
+    private val gitHubSkillImporter: LocalGitHubSkillImporter,
 ) {
-    private val catalogUrl = "https://raw.githubusercontent.com/openai/plugins/main/.agents/plugins/marketplace.json"
+    private val rootUrl = "https://raw.githubusercontent.com/openai/plugins/main"
+    private val catalogUrl = "$rootUrl/.agents/plugins/marketplace.json"
 
-    suspend fun list(): List<CodexOfficialPluginSummary> = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url(catalogUrl).get().build()
+    suspend fun list(): List<CodexOfficialPluginSummary> =
+        parseCodexOfficialMarketplace(fetch(catalogUrl, 1024 * 1024))
+
+    suspend fun detail(pluginId: String): CodexOfficialPluginDetail {
+        val name = pluginId.removeSuffix("@openai-curated")
+        require(OFFICIAL_PLUGIN_ID.matches(name) && pluginId == "$name@openai-curated") {
+            "Codex 插件标识不合法"
+        }
+        val details = parseCodexOfficialPluginDetail(
+            fetch("$rootUrl/plugins/$name/.codex-plugin/plugin.json", 256 * 1024),
+        )
+        require(details.name == name) { "插件清单和实际包名称不匹配" }
+        return details
+    }
+
+    suspend fun pluginSkills(pluginId: String): List<String> {
+        val detail = detail(pluginId)
+        if (!detail.hasSkills) return emptyList()
+        val url = "https://api.github.com/repos/openai/plugins/contents/plugins/${detail.name}/skills?ref=main"
+        val items = Json.parseToJsonElement(fetch(url, 512 * 1024)) as? JsonArray
+            ?: error("Codex 插件技能目录无效")
+        return items.mapNotNull { (it as? JsonObject)?.let { entry ->
+            if (entry["type"]?.jsonPrimitive?.contentOrNull != "dir") null
+            else entry["name"]?.jsonPrimitive?.contentOrNull?.takeIf(OFFICIAL_PLUGIN_ID::matches)
+        } }.distinct().sorted()
+    }
+
+    /** Downloads one explicitly selected skill; Codex app/MCP/hook bundles require separate authorization. */
+    suspend fun installPluginSkill(pluginId: String, skillId: String): String {
+        val name = pluginId.removeSuffix("@openai-curated")
+        require(skillId in pluginSkills(pluginId)) { "插件中没有该技能" }
+        return gitHubSkillImporter.install(
+            "https://github.com/openai/plugins/tree/main/plugins/$name/skills/$skillId",
+        )
+    }
+
+    private suspend fun fetch(url: String, limit: Int): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).get().build()
         withCancellableHttpResponse(http.newCall(request)) { response ->
-            require(response.isSuccessful) { "无法读取 Codex 官方插件清单（HTTP ${response.code}）" }
-            val bytes = response.body?.byteStream()?.use { it.readNBytes(1024 * 1024 + 1) }
-                ?: throw IOException("Codex 插件清单为空")
-            require(bytes.size <= 1024 * 1024) { "Codex 插件清单超出大小限制" }
-            parseCodexOfficialMarketplace(bytes.toString(Charsets.UTF_8))
+            require(response.isSuccessful) { "Codex 官方目录读取失败（HTTP ${response.code}）" }
+            val bytes = response.body?.byteStream()?.use { it.readNBytes(limit + 1) }
+                ?: throw IOException("Codex 官方目录响应为空")
+            require(bytes.size <= limit) { "Codex 官方清单超出大小限制" }
+            bytes.toString(Charsets.UTF_8)
         }
     }
 }
