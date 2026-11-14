@@ -111,6 +111,27 @@ class ToolRegistry private constructor(
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
     fun names(): List<String> = tools.snapshot().keys.toList()
+
+    /**
+     * Permit a read-only Code Mode plan to run in plan/inspect scopes. The decision is based on
+     * the live registry contracts of *every* child, never on a caller-supplied "readOnly" flag.
+     * The actual children still go through their ordinary schema, Hook and approval checks.
+     */
+    fun isReadOnlyCodeModePlan(plan: JsonObject): Boolean {
+        val steps = plan["steps"] as? JsonArray ?: return false
+        if (steps.isEmpty()) return false
+        val registered = tools.snapshot()
+        return steps.all { element ->
+            val entry = element as? JsonObject ?: return@all false
+            val name = (entry["tool"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: return@all false
+            val handler = registered[name] ?: return@all false
+            name != "code_mode_run" &&
+                handler.exposure == ToolExposure.CORE &&
+                handler.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)
+        }
+    }
+
     fun registerHook(subscription: ToolHookSubscription) = hooks.register(subscription)
     fun unregisterHook(id: String): Boolean = hooks.unregister(id)
     fun hookIds(): List<String> = hooks.ids()
@@ -217,7 +238,11 @@ class ToolRegistry private constructor(
                 executionStarted = false,
             )
         }
-        if (!context.allowMutation && tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK)) {
+        val readOnlyCodeMode = name == "code_mode_run" && isReadOnlyCodeModePlan(input)
+        if (!context.allowMutation &&
+            tool.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) &&
+            !readOnlyCodeMode
+        ) {
             return ToolInvocationResult(
                 result = ToolResult(
                     content = "当前作用域禁止执行会改变状态的工具：$name",
