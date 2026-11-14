@@ -19,6 +19,7 @@ internal fun optionalToolPromptBudgetForRoute(
     modelState: LocalModelState,
     history: List<JsonObject>,
     coreDefinitionTokens: Int = 0,
+    requestedDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
 ): Int {
     val profile = modelState.modelSelection.activeProfile
     val cachePolicy = LocalModelPresets.promptCachePolicyFor(
@@ -48,6 +49,7 @@ internal fun optionalToolPromptBudgetForRoute(
         remainingOperationalTokens = pressure.remainingOperationalTokens,
         coreDefinitionTokens = coreDefinitionTokens,
         preserveToolSurface = cachePolicy.preserveToolSurface,
+        requestedDefinitionTokens = requestedDefinitionTokens,
     )
 }
 
@@ -56,11 +58,12 @@ internal fun remainingOptionalToolDefinitionBudget(
     remainingOperationalTokens: Int,
     coreDefinitionTokens: Int,
     preserveToolSurface: Boolean,
+    requestedDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
 ): Int {
     val capacity = (remainingOperationalTokens.toLong() -
         coreDefinitionTokens.coerceAtLeast(0)).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     return minOf(
-        LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
+        requestedDefinitionTokens.coerceIn(0, LocalToolRouter.MAX_OPTIONAL_TOOL_PROMPT_TOKENS),
         if (preserveToolSurface) capacity else capacity / 4,
     )
 }
