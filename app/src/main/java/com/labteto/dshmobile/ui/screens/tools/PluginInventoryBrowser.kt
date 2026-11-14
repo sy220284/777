@@ -84,6 +84,7 @@ private data class InventoryRow(
     val available: Boolean = true,
     val modelInvocable: Boolean = true,
     val installedSkill: Boolean = false,
+    val installedPlugin: Boolean = false,
     val installablePreset: Boolean = false,
     val installableCurated: Boolean = false,
     val sourceUrl: String? = null,
@@ -130,6 +131,7 @@ internal fun PluginInventoryBrowser(
     codexDetailError: String? = null,
     onReadCodexPluginDetail: ((String) -> Unit)? = null,
     onInstallCodexPluginSkill: ((String, String) -> Unit)? = null,
+    onInstallCodexPlugin: ((String) -> Unit)? = null,
     onConnectCodexPlugin: ((String) -> Unit)? = null,
     curatedLoading: Boolean = false,
     curatedError: String? = null,
@@ -333,6 +335,7 @@ internal fun PluginInventoryBrowser(
                 "Codex 官方插件 · ${plugin.category.ifBlank { "未分类" }}" else copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = group, documentIcon = copy.documentIcon,
+            installedPlugin = installedFromPlugin || matchingService != null,
             available = false,
             sourceLabel = if (plugin.sourceKind == "local")
                 "Codex · openai/plugins · ${plugin.category}"
@@ -347,7 +350,8 @@ internal fun PluginInventoryBrowser(
             installable = item.installablePreset || item.installableCurated ||
                 item.id.startsWith("codex-plugin:"),
             connectedService = item.connectedService,
-            localPlugin = item.id.startsWith("local:"), group = item.group,
+            localPlugin = item.id.startsWith("local:") || item.installedPlugin,
+            group = item.group,
         ) && (!item.connectedService || selectedCategory != 1 ||
             connectedServices.firstOrNull { "service:${it.id}" == item.id }?.let {
                 pluginTransportMatches(it.transport, transportFilter)
@@ -639,9 +643,6 @@ internal fun PluginInventoryBrowser(
                         color = colors.textSecondary)
                 }
             }
-            Text("介绍", style = DsType.headline17.withReadingWeight(), color = colors.text)
-            Text(item.detail, style = DsType.std14.withReadingWeight(),
-                color = colors.textSecondary)
             if (item.sourceLabel.isNotBlank()) {
                 Text(item.sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
             }
@@ -664,7 +665,10 @@ internal fun PluginInventoryBrowser(
                 val details = codexDetails[pluginId]
                 when {
                     details != null -> {
-                        Text(details.description, style = DsType.small13, color = colors.textSecondary)
+                        Text("介绍", style = DsType.headline17.withReadingWeight(),
+                            color = colors.text)
+                        Text(details.description, style = DsType.std14.withReadingWeight(),
+                            color = colors.textSecondary)
                         Text("发布方：${details.developerName.ifBlank { "OpenAI / 合作开发者" }} · ${details.version}",
                             style = DsType.caption11, color = colors.textTertiary)
                         val abilities = buildList {
