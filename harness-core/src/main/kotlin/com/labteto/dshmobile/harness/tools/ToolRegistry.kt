@@ -40,6 +40,13 @@ data class ToolContext(
     val expectedRegistration: HarnessTool? = null,
     /** Execution receipt, persisted before returning to a possibly cancelled caller. */
     val onExecutionFinished: (suspend (HarnessTool, ToolResult) -> Unit)? = null,
+    /**
+     * Trusted orchestration dispatch into the application's normal tool coordinator.
+     * The parent callbacks/approval capture its own tool identity and must not be reused
+     * for child invocations. Each child gets a fresh identity, authorization and receipt.
+     * Parameters: tool name, resolved arguments, raw arguments, 1-based step number.
+     */
+    val dispatchNestedTool: (suspend (String, JsonObject, String, Int) -> Pair<ToolResult, Boolean>)? = null,
 )
 
 @kotlinx.serialization.Serializable
