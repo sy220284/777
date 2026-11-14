@@ -323,22 +323,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val replayEvidence = buildLocalRequestEvidence(logMessages, tools, nativeTools)
         val evidenceKey = snapshot.sessionId + "\u0000" + routeFingerprint
         val evidenceLogSequence = log.latestSequence()
-        val messageSurfaceSeq = evidenceSurfaces.ensure(
-            kind = LocalRequestSurfaceKind.MESSAGE,
+        val messageSurfaceSeq = evidenceSurfaces.ensureMessages(
+            log = log,
             key = evidenceKey,
             digest = replayEvidence.messageDigest,
-            currentLogSequence = evidenceLogSequence,
-        ) {
-            log.append("request/message-surface", buildJsonObject {
-                put("version", REQUEST_EVIDENCE_VERSION)
-                put("digest", replayEvidence.messageDigest)
-                put("messages", JsonArray(logMessages))
-                put(
-                    "redacted",
-                    replayEvidence.messageDigest != requestEvidence.messageDigest,
-                )
-            }).sequence
-        }
+            visibleMessages = logMessages,
+            redacted = replayEvidence.messageDigest != requestEvidence.messageDigest,
+        )
         val toolSurfaceSeq = evidenceSurfaces.ensure(
             kind = LocalRequestSurfaceKind.TOOL,
             key = evidenceKey,
@@ -712,22 +703,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     val activeLogMessages = redactModelImages(activeMessages)
                     val activeEvidence = buildLocalRequestEvidence(activeMessages, tools, nativeTools)
                     val activeReplayEvidence = buildLocalRequestEvidence(activeLogMessages, tools, nativeTools)
-                    val activeMessageSurfaceSeq = evidenceSurfaces.ensure(
-                        kind = LocalRequestSurfaceKind.MESSAGE,
+                    val activeMessageSurfaceSeq = evidenceSurfaces.ensureMessages(
+                        log = log,
                         key = evidenceKey,
                         digest = activeReplayEvidence.messageDigest,
-                        currentLogSequence = log.latestSequence(),
-                    ) {
-                        log.append("request/message-surface", buildJsonObject {
-                            put("version", REQUEST_EVIDENCE_VERSION)
-                            put("digest", activeReplayEvidence.messageDigest)
-                            put("messages", JsonArray(activeLogMessages))
-                            put(
-                                "redacted",
-                                activeReplayEvidence.messageDigest != activeEvidence.messageDigest,
-                            )
-                        }).sequence
-                    }
+                        visibleMessages = activeLogMessages,
+                        redacted = activeReplayEvidence.messageDigest != activeEvidence.messageDigest,
+                    )
                     val activeContextSurfaceSeq = evidenceSurfaces.ensure(
                         kind = LocalRequestSurfaceKind.CONTEXT,
                         key = evidenceKey,
@@ -1029,7 +1011,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
     }
 
     private companion object {
-        const val REQUEST_EVIDENCE_VERSION = 3
+        const val REQUEST_EVIDENCE_VERSION = 4
         const val PROVIDER_ATTEMPT_EVIDENCE_VERSION = 2
     }
 }

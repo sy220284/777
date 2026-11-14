@@ -17,6 +17,79 @@ class LocalRequestReconstructionTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun reconstructsVersionFourDeltaAgainstLegacySurfaceAndChecksEveryDigest() {
+        withLog("request-reconstruct-delta-v4") { log ->
+            val original = listOf(message("system", "长系统提示".repeat(300)), message("user", "起步"))
+            val firstEvidence = buildLocalRequestEvidence(original, JsonArray(emptyList()))
+            val baseline = log.append(
+                "request/message-surface",
+                encodeLocalRequestMessageSurface(original, firstEvidence.messageDigest, false).payload,
+            )
+            val messages = original + message("assistant", "第一步完成") + message("user", "继续")
+            val tools = JsonArray(emptyList())
+            val nativeTools = JsonArray(emptyList())
+            val evidence = buildLocalRequestEvidence(messages, tools, nativeTools)
+            val next = encodeLocalRequestMessageSurface(
+                messages = messages,
+                digest = evidence.messageDigest,
+                redacted = false,
+                previous = LocalRequestMessageSurfaceState(
+                    baseline.sequence, original, firstEvidence.messageDigest, 0, false,
+                ),
+            )
+            assertTrue(next.payload.containsKey("base_surface_seq"))
+            val messageSurface = log.append("request/message-surface", next.payload)
+            val toolSurface = log.append("request/tool-surface", buildJsonObject {
+                put("version", 4)
+                put("digest", evidence.resolvedToolSurfaceDigest)
+                put("schema_digest", evidence.toolSchemaDigest)
+                put("schemas", tools)
+                put("native_tools", nativeTools)
+            })
+            val contextSurface = log.append("request/context-surface", buildJsonObject {
+                put("version", 4)
+                put("digest", evidence.contextDigest)
+                put("messages", evidence.contextMessages)
+                put("redacted", false)
+            })
+            val route = "route-v4-delta"
+            val envelope = stableJsonSha256(JsonArray(listOf(
+                route, evidence.messageDigest, evidence.resolvedToolSurfaceDigest, evidence.contextDigest,
+            ).map(::JsonPrimitive)))
+            log.append("request/header", buildJsonObject {
+                put("version", 4)
+                put("request_uid", "request-delta-v4")
+                put("model", "test-model")
+                put("base_url", "https://example.invalid")
+                put("profile_id", "default")
+                put("provider", "test")
+                put("protocol", "CHAT_COMPLETIONS")
+                put("route_fingerprint", route)
+                put("message_digest", evidence.messageDigest)
+                put("context_digest", evidence.contextDigest)
+                put("tool_schema_digest", evidence.toolSchemaDigest)
+                put("resolved_tool_surface_digest", evidence.resolvedToolSurfaceDigest)
+                put("native_tool_names", nativeTools)
+                put("image_generation_enabled", false)
+                put("message_surface_digest", evidence.messageDigest)
+                put("context_surface_digest", evidence.contextDigest)
+                put("message_surface_seq", messageSurface.sequence)
+                put("tool_surface_seq", toolSurface.sequence)
+                put("context_surface_seq", contextSurface.sequence)
+                put("message_surface_redacted", false)
+                put("context_surface_redacted", false)
+                put("request_envelope_fingerprint", envelope)
+            })
+            val result = requireNotNull(reconstructLocalModelRequest(log, "request-delta-v4"))
+            assertEquals(LocalRequestReconstructionStatus.VERIFIED, result.status)
+            assertEquals(messages, result.messages)
+            assertEquals(true, result.exactMessageDigestVerified)
+            assertTrue(result.envelopeFingerprintVerified)
+            assertTrue(result.issues.isEmpty())
+        }
+    }
+
+    @Test
     fun reconstructsVersionThreeNativeToolSurfaceAndProviderAttempt() {
         withLog("request-reconstruct-v3-native") { log ->
             val messages = listOf(message("user", "画一张图"))

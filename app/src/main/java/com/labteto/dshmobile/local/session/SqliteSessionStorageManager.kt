@@ -90,6 +90,9 @@ internal class SqliteSessionStorageManager(
             }
             db.execSQL("VACUUM")
         }
+        // The V6 legacy rewrite already committed atomically. Only mark its physical
+        // reclaim complete after BOTH databases have passed checkpoint and VACUUM.
+        if (events.needsRequestVacuum()) events.finishRequestVacuum()
         return status()
         } finally { maintenance.unlock() }
     }

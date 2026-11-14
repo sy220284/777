@@ -25,6 +25,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -115,6 +116,14 @@ class LocalSessionStorageRuntime @Inject internal constructor(
             runtimeWindowMessages = LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES,
             domainCodecs = orderedCodecs,
         )
+        // Run exactly once after V5 -> V6 request compaction, outside SQLite's
+        // upgrade transaction. The existing consistency gate serializes this
+        // with live writers; a failure leaves the durable retry marker intact.
+        scope.launch {
+            if (requireNotNull(eventLogs.sqliteDatabase).needsRequestVacuum()) {
+                storageManager.compactAll()
+            }
+        }
     }
 
     internal fun previewMessages(sessionId: String, limit: Int = 12): List<com.labteto.dshmobile.local.session.LocalHarnessMessage> =
