@@ -224,7 +224,11 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
     override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
+    suspend fun importSkillStream(filename: String, input: java.io.InputStream): String =
+        withContext(Dispatchers.IO) { skillManager.importSkill(filename, input) }
     suspend fun exportSkillPackage(id: String): ByteArray = tools.exportSkillPackage(id)
+    suspend fun exportSkillPackageToFile(id: String, destination: java.io.File) =
+        withContext(Dispatchers.IO) { skillManager.exportSkillPackageToFile(id, destination) }
     suspend fun checkSkillUpdate(id: String): String? = gitHubSkillImporter.availableUpdate(id)
     suspend fun upgradeSkill(id: String, revision: String): String =
         gitHubSkillImporter.updateInstalled(id, revision)
