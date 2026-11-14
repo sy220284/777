@@ -43,16 +43,19 @@ internal class LocalTranscriptHistoryLoader(
     )
 
     override suspend fun bootstrap(sessionId: String): LocalTranscriptHistoryLoadResult? =
-        pager.bootstrap(sessionId)?.let {
-            LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
+        withContext(Dispatchers.Default) {
+            pager.bootstrap(sessionId)?.let {
+                LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
+            }
         }
 
     override suspend fun olderBatch(
         sessionId: String,
         olderMessages: List<LocalHarnessMessage>,
         startCursor: LocalTranscriptPageCursor,
-    ): LocalTranscriptHistoryLoadResult? =
+    ): LocalTranscriptHistoryLoadResult? = withContext(Dispatchers.Default) {
         pager.olderBatch(sessionId, olderMessages, startCursor)?.let {
             LocalTranscriptHistoryLoadResult(it.olderMessages, it.nextCursor, it.loadedRawMessages)
         }
+    }
 }
