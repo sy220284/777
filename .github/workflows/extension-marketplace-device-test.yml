@@ -7,6 +7,10 @@ name: 777 扩展市场 Android 交互验证
       - 'app/src/main/java/com/labteto/dshmobile/local/presentation/**'
       - 'app/src/main/java/com/labteto/dshmobile/uicontract/**'
       - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/**'
+      - 'app/src/main/java/com/labteto/dshmobile/local/tools/ipc/**'
+      - 'app/src/main/java/com/labteto/dshmobile/local/tools/LocalMcpCredentialStore.kt'
+      - 'app/src/androidTest/java/com/labteto/dshmobile/local/tools/**'
+      - 'app/src/androidTest/java/com/labteto/dshmobile/local/tools/ipc/**'
       - '.github/workflows/extension-marketplace-device-test.yml'
   workflow_dispatch:
 
@@ -36,7 +40,7 @@ jobs:
         run: |
           test -e /dev/kvm
           sudo chmod 666 /dev/kvm
-      - name: 实际运行扩展市场 Compose UI 测试
+      - name: 实际运行扩展市场、凭据、OAuth 回调与 Worker 安全设备测试
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 36
@@ -45,7 +49,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest --stacktrace --console=plain
+          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest,com.labteto.dshmobile.local.tools.LocalMcpCredentialStoreAndroidTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthCallbackAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerCallerAndroidTest --stacktrace --console=plain
       - name: 输出失败用例与断言
         if: failure()
         run: |
