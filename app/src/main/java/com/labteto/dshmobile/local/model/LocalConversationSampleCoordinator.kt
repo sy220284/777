@@ -67,6 +67,14 @@ internal fun localSessionSampleMessages(
 private fun <T> Sequence<T>.takeLastSampleContext(limit: Int): Sequence<T> =
     toList().takeLast(limit).asSequence()
 
+/** An edited message keeps its ID; freshness must compare the captured message bytes. */
+internal fun localSessionSampleContextIsCurrent(
+    sourceSessionId: String,
+    sourceMessages: List<LocalHarnessMessage>,
+    currentSessionId: String,
+    currentMessages: List<LocalHarnessMessage>,
+): Boolean = sourceSessionId == currentSessionId && sourceMessages == currentMessages
+
 @Singleton
 class LocalConversationSampleCoordinator @Inject internal constructor(
     private val stateStore: LocalRuntimeStateStore,
@@ -89,7 +97,8 @@ class LocalConversationSampleCoordinator @Inject internal constructor(
             check(!snapshot.loading && !snapshot.kernel.running &&
                 !stateStore.foregroundRunHandle.hasLiveJob() && !stateStore.sessionTransitioning
             ) { "请在当前会话空闲时采样" }
-            val lastMessageId = snapshot.messages.lastOrNull()?.id
+            val sourceMessages = snapshot.messages.toList()
+            val lastMessageId = sourceMessages.lastOrNull()?.id
             check(lastMessageId != null) { "当前会话没有可供采样的历史" }
             val profile = modelGateway.profileForRoute(
                 profileId = snapshot.modelState.modelSelection.activeProfileId,
@@ -101,7 +110,7 @@ class LocalConversationSampleCoordinator @Inject internal constructor(
                 auxiliary.complete(
                     modelAttempts = snapshot.modelState.modelAttempts,
                     profile = profile,
-                    messages = localSessionSampleMessages(snapshot.messages, prompt),
+                    messages = localSessionSampleMessages(sourceMessages, prompt),
                     eventLog = eventLog,
                     operation = "session/sample",
                 )
@@ -119,7 +128,9 @@ class LocalConversationSampleCoordinator @Inject internal constructor(
                 "采样结果为空或超过 64 KiB 限制"
             }
             val current = stateStore.state.value
-            check(current.sessionId == expectedSessionId && current.messages.lastOrNull()?.id == lastMessageId &&
+            check(localSessionSampleContextIsCurrent(
+                expectedSessionId, sourceMessages, current.sessionId, current.messages,
+            ) && current.messages.lastOrNull()?.id == lastMessageId &&
                 !current.kernel.running && !current.loading
             ) { "会话内容已变化，旧采样结果已失效" }
             eventLog.append("session/sample", buildJsonObject {

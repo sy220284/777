@@ -55,15 +55,14 @@ internal fun localWorkOutstandingRequiredReviews(
             add(if (type == "security") "当前安全审查尚待人工确认" else "当前代码审查尚待人工接纳")
             continue
         }
-        // Only settled real file/process effects invalidate the reviewed bytes.
+        // Even a failed tool can have changed file bytes before returning an error.
         // Session-only progress edits (e.g. todo_write) do not change the Git snapshot.
         // Calls that started before the review but finished later must also invalidate it.
         var newerMutation = false
         log.forEachOfTypesAfter(accepted.sequence, setOf("tool/result")) { event ->
             if (newerMutation) return@forEachOfTypesAfter
             val fields = event.data
-            if (fields.reviewValue("is_error") != "false" ||
-                fields.reviewValue("side_effect") != "possible") return@forEachOfTypesAfter
+            if (fields.reviewValue("side_effect") != "possible") return@forEachOfTypesAfter
             val id = fields.reviewValue("id") ?: return@forEachOfTypesAfter
             val call = log.latestMatching(setOf("tool/call"),
                 beforeSequenceExclusive = event.sequence) { entry ->

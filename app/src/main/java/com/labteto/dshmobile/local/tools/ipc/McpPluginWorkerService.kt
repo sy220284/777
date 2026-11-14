@@ -79,21 +79,14 @@ class McpPluginWorkerService : Service() {
                                     credential = reference
                                     reference.get()?.let(::validateBearer)
                                     val uri = java.net.URI(endpoint)
-                                    val host = requireNotNull(uri.host)
-                                    val scheme = uri.scheme?.lowercase()
-                                    val expectedPort = if (uri.port != -1) uri.port else if (scheme == "https") 443 else 80
                                     val client = http.newBuilder().followRedirects(false).followSslRedirects(false)
                                         .addInterceptor { chain ->
+                                            // Origin validation applies to *every* exchange, even without a token.
+                                            requireMcpWorkerSameOrigin(uri, chain.request().url)
                                             val bearer = reference.get()
-                                            if (bearer == null) chain.proceed(chain.request()) else {
-                                                val target = chain.request().url
-                                                require((scheme == "https" || scheme == "http" &&
-                                                    host.lowercase() in setOf("localhost", "127.0.0.1", "::1", "[::1]")) &&
-                                                    target.scheme == scheme && target.host.equals(host, true) && target.port == expectedPort) {
-                                                    "MCP 认证请求偏离已授权服务地址"
-                                                }
-                                                chain.proceed(chain.request().newBuilder().header("Authorization", "Bearer $bearer").build())
-                                            }
+                                            val checked = if (bearer == null) chain.request() else
+                                                chain.request().newBuilder().header("Authorization", "Bearer $bearer").build()
+                                            chain.proceed(checked)
                                         }.build()
                                     McpNegotiatingHttpTransport(endpoint, client, json,
                                         modernClientCapabilities = elicitationCapabilities)

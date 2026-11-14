@@ -34,6 +34,14 @@ class LocalConversationSampleCoordinatorTest {
         assertEquals(before, original)
     }
 
+    @Test fun sameMessageIdWithModifiedTextInvalidatesInFlightSample() {
+        val before = listOf(LocalHarnessMessage("stable-id", "user", "原始内容", createdAt = 1L))
+        val edited = listOf(before.single().copy(content = "修改后的内容"))
+        assertTrue(localSessionSampleContextIsCurrent("session", before, "session", before.toList()))
+        assertTrue(!localSessionSampleContextIsCurrent("session", before, "session", edited))
+        assertTrue(!localSessionSampleContextIsCurrent("session", before, "other-session", before))
+    }
+
     @Test fun individualHistoryItemIsBoundedWithoutOverwritingSource() {
         val huge = "Z".repeat(12_000)
         val source = listOf(LocalHarnessMessage("test", "user", huge, createdAt = 1L))

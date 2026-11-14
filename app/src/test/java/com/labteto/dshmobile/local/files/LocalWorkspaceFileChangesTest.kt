@@ -60,6 +60,18 @@ class LocalWorkspaceFileChangesTest {
         } finally { dir.deleteRecursively() }
     }
 
+    @Test fun replacingAChangedDirectoryWatcherRefreshesAcceptedFileNames() {
+        val root = Files.createTempDirectory("workspace-watcher-reconcile-").toFile()
+        try {
+            val child = root.resolve("nested").apply { mkdirs() }
+            val active = mapOf(root to setOf("old.txt"), child to setOf("*"))
+            val next = mapOf(root to setOf("new.txt"))
+            assertEquals(setOf(root, child), workspaceWatchersToReplace(active, next))
+            assertTrue(workspaceWatchersToReplace(next, next).isEmpty())
+            assertTrue(workspaceWatchersToReplace(emptyMap(), next).isEmpty())
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun rootWatchReceivesAnyDirectChildAndBoundsResourceCount() {
         val dir = Files.createTempDirectory("workspace-observer-root-").toFile()
         try {
