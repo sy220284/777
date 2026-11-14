@@ -232,10 +232,12 @@ class LocalToolsUiFacade @Inject internal constructor(
         com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
     override suspend fun curatedGitHubSkills() = gitHubSkillImporter.curatedSkills()
-    override suspend fun codexOfficialPlugins() = codexOfficialPlugins.list().map { item ->
+    override suspend fun codexOfficialPlugins(forceRefetch: Boolean) =
+        codexOfficialPlugins.list(forceRefetch).map { item ->
         com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
             item.id, item.name, item.category, item.sourcePath,
             item.installPolicy, item.authPolicy, item.codexOnly,
+            item.sourceKind, item.sourceUrl,
         )
     }
     override suspend fun codexPluginDetail(id: String):
