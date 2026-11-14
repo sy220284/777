@@ -44,6 +44,7 @@ class LocalWorkTaskGraphPlanTest {
         })
         log.append("taskgraph/node-accepted", buildJsonObject {
             put("graph_execution_id", "execution"); put("node_id", plan.nodes[node].id)
+            put("goal_fingerprint", plan.value.getValue("goal_fingerprint"))
             put("node_version", plan.nodeVersion(plan.nodes[node])); put("job_id", "job-$node")
             put("result_sequence", result.sequence); put("output_version", workflowVersion(output))
             put("files", plan.fileVersions(temporary.root, node))
@@ -77,6 +78,74 @@ class LocalWorkTaskGraphPlanTest {
         assertEquals(listOf("b"), executed)
         assertTrue(results.all { it.succeeded })
         log.close()
+    }
+
+    @Test fun readOnlyReplanReusesProvenNodeAcrossRestartWithoutReexecuting() {
+        val path = File(temporary.root, "replan-borrow.jsonl")
+        var log = LocalSessionEventLog(path, Json)
+        val old = plan()
+        val initialOutput = "第一次研究的已核实结果"
+        log.append("taskgraph/start", buildJsonObject {
+            put("graph_id", "original-graph"); put("graph_execution_id", "execution")
+            put("goal_fingerprint", "goal-v1"); put("plan", old.value)
+        })
+        accept(log, old, 0, initialOutput)
+        val revisedValue = JsonObject(old.value.toMutableMap().apply {
+            put("nodes", buildJsonArray {
+                add(buildJsonObject {
+                    put("node_id", "a"); put("task", "研究")
+                    put("depends_on", buildJsonArray {})
+                })
+                add(buildJsonObject {
+                    put("node_id", "b"); put("task", "核验新增线索")
+                    put("depends_on", buildJsonArray { add(JsonPrimitive("a")) })
+                })
+            })
+            put("reuses_graph_id", JsonPrimitive("original-graph"))
+            put("reuses_graph_execution_id", JsonPrimitive("execution"))
+        })
+        val revised = LocalWorkTaskGraphPlan(revisedValue)
+        log.append("taskgraph/start", buildJsonObject {
+            put("graph_id", "revised-graph"); put("graph_execution_id", "revised-execution")
+            put("goal_fingerprint", "goal-v1"); put("plan", revised.value)
+        })
+        assertEquals(1, seedReusableReadOnlyGraphResults(
+            log, temporary.root, "revised-graph", "revised-execution", "goal-v1", revised))
+        assertEquals(setOf("a"), revised.recoveredResults(log, "revised-execution", temporary.root).keys)
+        assertEquals(initialOutput,
+            revised.recoveredResults(log, "revised-execution", temporary.root).getValue("a").output)
+        log.close()
+        log = LocalSessionEventLog(path, Json)
+        try {
+            assertEquals(0, seedReusableReadOnlyGraphResults(
+                log, temporary.root, "revised-graph", "revised-execution", "goal-v1", revised))
+            assertEquals(initialOutput,
+                revised.recoveredResults(log, "revised-execution", temporary.root).getValue("a").output)
+        } finally { log.close() }
+    }
+
+    @Test fun changedReadOnlyInputRejectsBorrowedTaskGraphResult() {
+        val input = File(temporary.root, "research.txt").apply { writeText("before") }
+        val old = plan(input = "research.txt")
+        val log = LocalSessionEventLog(File(temporary.root, "replan-input.jsonl"), Json)
+        try {
+            log.append("taskgraph/start", buildJsonObject {
+                put("graph_id", "old"); put("graph_execution_id", "execution")
+                put("goal_fingerprint", "goal-v1"); put("plan", old.value)
+            })
+            accept(log, old, 0, "data")
+            input.writeText("after")
+            val revised = LocalWorkTaskGraphPlan(JsonObject(old.value.toMutableMap().apply {
+                put("reuses_graph_id", JsonPrimitive("old"))
+                put("reuses_graph_execution_id", JsonPrimitive("execution"))
+                put("nodes", buildJsonArray {
+                    add(buildJsonObject { put("node_id", "a"); put("task", "研究"); put("depends_on", buildJsonArray {}) })
+                    add(buildJsonObject { put("node_id", "b"); put("task", "新的验证"); put("depends_on", buildJsonArray { add(JsonPrimitive("a")) } })
+                })
+            }))
+            assertEquals(0, seedReusableReadOnlyGraphResults(
+                log, temporary.root, "new", "new-execution", "goal-v1", revised))
+        } finally { log.close() }
     }
 
     @Test fun changedTargetOrInputFileInvalidatesAcceptedResult() {
