@@ -574,6 +574,18 @@ internal fun PluginInventoryBrowser(
                         codexPluginSkillInstalled(skills, officialRoot, path)
                 }
                 val oneSkillInstalled = oneSkill == null || oneSkill !in missingPluginSkills
+                val installedBundleRequirements = if (officialRoot == null) emptyList() else
+                    skills.filter { skill ->
+                        pluginDetail?.skillDirectories?.values.orEmpty().any { folder ->
+                            codexOfficialPluginSourceMatches(
+                                skill.sourceIdentity, officialRoot, folder)
+                        }
+                    }.flatMap { it.requirements }
+                val missingBundleAccount = installedBundleRequirements.any { requirement ->
+                    !requirement.registered && requirement.type.equals("mcp", ignoreCase = true) &&
+                        connectedServices.none { it.id == requirement.value } &&
+                        skillMcpHttpsEndpoint(requirement) != null
+                }
                 val knownUnreadySkillServer = item.requirements.any { requirement ->
                     !requirement.registered && requirement.type.equals("mcp", ignoreCase = true) &&
                         connectedServices.any { server -> server.id == requirement.value }
@@ -604,6 +616,9 @@ internal fun PluginInventoryBrowser(
                 val canConnectOfficial = officialSupported && !officialRegistered &&
                     pluginDetail?.mcpUrl != null && onConnectCodexPlugin != null
                 val canConnectSkill = endpoint != null && onConnectSkillMcp != null
+                val canResumeBundleSetup = officialSupported && pluginDetail != null &&
+                    missingPluginSkills.isEmpty() && missingBundleAccount &&
+                    onInstallCodexPlugin != null
                 val canInspectSkill = knownUnreadySkillServer && item.installedSkill
                 val canUseOfficial = officialSupported && item.installedPlugin &&
                     pluginDetail?.samplePrompts?.isNotEmpty() == true &&
@@ -612,7 +627,7 @@ internal fun PluginInventoryBrowser(
                     !pluginDetail.hasHooks && onUseCapability != null
                 val hasDirectAction = canInstallPreset || canInstallCurated ||
                     canInstallOfficial || canConnectOfficial || canInspectOfficial ||
-                    canConnectSkill || canInspectSkill || canUseOfficial ||
+                    canResumeBundleSetup || canConnectSkill || canInspectSkill || canUseOfficial ||
                     (onUseCapability != null && item.available) || item.connectedService ||
                     (!item.id.startsWith("codex-plugin:") &&
                         !item.installablePreset && !item.installableCurated)
@@ -623,6 +638,7 @@ internal fun PluginInventoryBrowser(
                         canInstallOfficial -> if (missingPluginSkills.size > 1)
                             "安装包含的 ${missingPluginSkills.size} 项技能" else "安装"
                         canConnectOfficial || canConnectSkill -> "连接并授权"
+                        canResumeBundleSetup -> "继续完成授权"
                         canInspectOfficial || canInspectSkill -> "检查连接"
                         canUseOfficial -> "使用"
                         item.installedSkill || (onUseCapability != null && item.available) -> "使用"
@@ -642,6 +658,7 @@ internal fun PluginInventoryBrowser(
                                     onInstallCodexPluginSkill?.invoke(pluginId, oneSkill)
                             }
                             canConnectOfficial -> onConnectCodexPlugin?.invoke(pluginId)
+                            canResumeBundleSetup -> onInstallCodexPlugin?.invoke(pluginId)
                             canInspectOfficial || canInspectSkill -> {
                                 selectedRow = null
                                 onManageConnections()
