@@ -125,6 +125,18 @@ internal object LocalWorkInvestigationRuntime {
         if (events.isEmpty()) return ""
         val lastFindings = linkedMapOf<String, JsonObject>()
         val recentSources = linkedMapOf<String, JsonObject>()
+        // Important findings outlive the bounded recent-tool display window.
+        // Stream only finding events through the indexed event ledger, retaining
+        // the latest revision of each item including explicit rejection.
+        if (goalId.isNotBlank()) {
+            log.forEachOfTypesAfter(-1L, setOf(FINDING_EVENT)) { event ->
+                val value = event.data
+                val id = value.text("finding_id")
+                if (value.text("goal_id") == goalId && id.isNotBlank()) {
+                    lastFindings[id] = value
+                }
+            }
+        }
         events.forEach { event ->
             val value = event.data
             if (event.type == FINDING_EVENT) {
