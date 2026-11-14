@@ -635,6 +635,40 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
+    fun installedSkillWithKnownMcpWithoutToolsOpensHealthInsteadOfOauth() {
+        var connectedManagerOpens = 0
+        var authAttempts = 0
+        val required = com.labteto.dshmobile.uicontract.UiSkillRequirement(
+            type = "mcp", value = "figma", description = "设计服务",
+            registered = false, transport = "http", url = "https://mcp.figma.com/mcp",
+        )
+        val known = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
+            "figma", "http", "https://mcp.figma.com/mcp", emptyList(),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), skillsOnly = true,
+                    skills = listOf(com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+                        "figma-use", "设计", true, requirements = listOf(required),
+                    )),
+                    connectedServices = listOf(known),
+                    onBack = {}, onReturnToChat = {},
+                    onManageConnections = { connectedManagerOpens++ },
+                    onConnectSkillMcp = { _, _ -> authAttempts++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:figma-use")
+            .performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals(1, connectedManagerOpens)
+            assertEquals(0, authAttempts)
+        }
+    }
+
+    @Test
     fun codexPluginWithMultipleSkillsInstallsAsOneBundleFromDetail() {
         var installedPlugin: String? = null
         val pluginId = "sample@openai-curated"
