@@ -14,7 +14,7 @@ import java.util.zip.ZipOutputStream
 
 /**
  * Exports an installed skill as an import-compatible ZIP without executing its contents.
- * Follows LocalSkillPackageImporter size/path budgets and rejects filesystem links.
+ * Uses streaming ZIP output and rejects unsafe paths and filesystem links.
  */
 internal class LocalSkillPackageExporter(private val workspace: LocalWorkspace) {
     fun export(id: String): ByteArray = ByteArrayOutputStream().also { exportToStream(id, it) }.toByteArray()
@@ -44,10 +44,9 @@ internal class LocalSkillPackageExporter(private val workspace: LocalWorkspace) 
         val files = paths.filter { path ->
             require(!Files.isSymbolicLink(path)) { "技能目录含符号链接，拒绝打包" }
             val relative = root.toPath().relativize(path).toString().replace(File.separatorChar, '/')
-            require(relative.length <= 512 && relative.count { it == '/' } <= 16 &&
-                (relative.isEmpty() || relative.split('/').all {
-                    it.isNotBlank() && it != "." && it != ".."
-                })) { "技能包路径格式无效" }
+            require(relative.isEmpty() || relative.split('/').all {
+                it.isNotBlank() && it != "." && it != ".."
+            }) { "技能包路径格式无效" }
             when {
                 Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS) -> false
                 Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) -> true
