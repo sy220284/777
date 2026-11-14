@@ -621,7 +621,7 @@ internal fun PluginInventoryBrowser(
                     text = when {
                         canInstallPreset || canInstallCurated -> "安装"
                         canInstallOfficial -> if (missingPluginSkills.size > 1)
-                            "安装插件 · ${missingPluginSkills.size} 项技能" else "安装"
+                            "安装包含的 ${missingPluginSkills.size} 项技能" else "安装"
                         canConnectOfficial || canConnectSkill -> "连接并授权"
                         item.installedSkill || (onUseCapability != null && item.available) -> "使用"
                         item.connectedService -> "管理连接"
@@ -754,8 +754,24 @@ internal fun PluginInventoryBrowser(
                             style = DsType.small13, color = colors.textSecondary)
                         if (details.skills.isNotEmpty() &&
                             item.marketState.status != ExtensionMarketStatus.UNSUPPORTED) {
-                            Text("可直接安装的技能", style = DsType.std14Strong, color = colors.text)
-                            details.skills.forEach { skill ->
+                            var childSkillsExpanded by remember(pluginId) { mutableStateOf(false) }
+                            Surface(
+                                modifier = Modifier.fillMaxWidth().testTag("codex-plugin-skills-summary"),
+                                color = colors.materialL4,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                onClick = { childSkillsExpanded = !childSkillsExpanded },
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("包含技能 · ${details.skills.size} 项",
+                                        style = DsType.std14Strong, color = colors.text)
+                                    Icon(FeatherIcons.ChevronDown,
+                                        contentDescription = "展开技能目录",
+                                        tint = colors.textSecondary)
+                                }
+                            }
+                            if (childSkillsExpanded) details.skills.forEach { skill ->
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Text(skill, modifier = Modifier.weight(1f),
                                         style = DsType.small13, color = colors.text)
