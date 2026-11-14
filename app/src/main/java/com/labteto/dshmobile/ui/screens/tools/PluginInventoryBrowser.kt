@@ -288,13 +288,27 @@ internal fun PluginInventoryBrowser(
             "productivity", "communication", "finance" -> ExtensionGroup.OFFICE
             else -> ExtensionGroup.GENERAL
         }
+        val matchingService = connectedServices.firstOrNull {
+            it.id == plugin.name || it.id == codexDetails[plugin.id]?.mcpServerId
+        }
+        val installedFromPlugin = skills.any {
+            it.sourceUrl?.contains("/plugins/${plugin.name}/skills/") == true
+        }
         val support = when {
             plugin.codexOnly -> ExtensionMarketState(ExtensionMarketStatus.UNSUPPORTED,
                 "Codex 专属", "该插件要求 Codex 产品环境；777 当前无法直接启用")
             plugin.installPolicy == "NOT_AVAILABLE" -> ExtensionMarketState(
                 ExtensionMarketStatus.UNSUPPORTED, "官方暂不可安装")
+            plugin.sourceKind != "local" -> ExtensionMarketState(
+                ExtensionMarketStatus.UNSUPPORTED, "第三方 Git 来源",
+                "Codex 使用 Git 插件安装器部署此插件；777 可以单独导入公开技能目录")
+            matchingService != null -> connectorMarketState(matchingService.registration, matchingService.connection)
+            installedFromPlugin -> ExtensionMarketState(
+                ExtensionMarketStatus.NEEDS_SETUP, "已装技能 · 其余待连接",
+                "已安装此插件内的技能，MCP 与应用连接需要单独授权")
             else -> ExtensionMarketState(ExtensionMarketStatus.NEEDS_SETUP,
-                "需要连接", "官方授权策略：" + if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "安装时授权")
+                "需要连接", "官方授权策略：" +
+                    if (plugin.authPolicy == "ON_USE") "首次使用时授权" else "安装时授权")
         }
         InventoryRow("codex-plugin:" + plugin.id,
             if (copy.title == "本地插件") plugin.name else copy.title,
@@ -302,7 +316,10 @@ internal fun PluginInventoryBrowser(
                 "Codex 官方插件 · ${plugin.category.ifBlank { "未分类" }}" else copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = group, documentIcon = copy.documentIcon,
-            available = false, sourceLabel = "Codex · openai/plugins · ${plugin.category}",
+            available = false,
+            sourceLabel = if (plugin.sourceKind == "local")
+                "Codex · openai/plugins · ${plugin.category}"
+            else "Codex · ${plugin.sourceKind} · 第三方仓库",
             marketState = support)
     }
     val catalogue = local + connected + installedSkills + availablePresets + curated + officialPlugins
@@ -719,8 +736,12 @@ internal fun PluginInventoryBrowser(
             }
             if (item.id.startsWith("codex-plugin:")) {
                 val pluginId = item.id.removePrefix("codex-plugin:")
-                Text("官方来源：github.com/openai/plugins", style = DsType.caption11,
-                    color = colors.textTertiary)
+                Text(
+                    if (codexPlugins.firstOrNull { it.id == pluginId }?.sourceKind == "local")
+                        "官方来源：github.com/openai/plugins"
+                    else "官方目录收录的第三方仓库：${codexPlugins.firstOrNull { it.id == pluginId }?.sourceUrl.orEmpty()}",
+                    style = DsType.caption11, color = colors.textTertiary,
+                )
                 val details = codexDetails[pluginId]
                 when {
                     details != null -> {
