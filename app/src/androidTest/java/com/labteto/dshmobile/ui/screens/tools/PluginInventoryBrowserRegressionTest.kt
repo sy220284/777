@@ -669,6 +669,52 @@ class PluginInventoryBrowserRegressionTest {
     }
 
     @Test
+    fun installedBundleResumesOnlyRemainingAccountAuthorization() {
+        var resumed = 0
+        var reinstalledSingle = 0
+        val pluginId = "design@openai-curated"
+        val plugin = com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
+            pluginId, "design", "Creativity", "plugins/design",
+            "AVAILABLE", "ON_INSTALL", false,
+        )
+        val detail = com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
+            pluginId, "Design", "设计插件", "OpenAI", "1.0",
+            listOf("create"), false, false, false,
+            skillDirectories = mapOf("create" to "skills/create"),
+        )
+        val installed = com.labteto.dshmobile.uicontract.UiSkillSnapshot(
+            "create-local", "设计", true,
+            sourceIdentity = com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                "openai", "plugins", "0123456789012345678901234567890123456789",
+                "plugins/design/skills/create",
+            ),
+            requirements = listOf(com.labteto.dshmobile.uicontract.UiSkillRequirement(
+                "mcp", "design-mcp", "设计平台登录", false, "http",
+                url = "https://design.example.com/mcp",
+            )),
+        )
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(), codexPlugins = listOf(plugin),
+                    codexDetails = mapOf(pluginId to detail), skills = listOf(installed),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    onInstallCodexPlugin = { resumed++ },
+                    onInstallCodexPluginSkill = { _, _ -> reinstalledSingle++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("继续完成授权").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-detail-primary-action").performClick()
+        compose.runOnIdle {
+            assertEquals(1, resumed)
+            assertEquals(0, reinstalledSingle)
+        }
+    }
+
+    @Test
     fun codexPluginWithMultipleSkillsInstallsAsOneBundleFromDetail() {
         var installedPlugin: String? = null
         val pluginId = "sample@openai-curated"
