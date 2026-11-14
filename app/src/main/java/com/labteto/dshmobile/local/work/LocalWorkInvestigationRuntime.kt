@@ -128,7 +128,9 @@ internal object LocalWorkInvestigationRuntime {
     /** Dynamic facts are injected into the *next* model request, not durable model history. */
     fun context(log: LocalSessionEventLog, goalId: String, sourceMessageId: String?): String {
         val events = scoped(log, goalId, sourceMessageId)
-        if (events.isEmpty()) return ""
+        // A Goal can retain older findings after its newest 320 events are
+        // unrelated. Only Goal-less per-turn context may return immediately.
+        if (events.isEmpty() && goalId.isBlank()) return ""
         val lastFindings = linkedMapOf<String, JsonObject>()
         val recentSources = linkedMapOf<String, JsonObject>()
         // Important findings outlive the bounded recent-tool display window.
