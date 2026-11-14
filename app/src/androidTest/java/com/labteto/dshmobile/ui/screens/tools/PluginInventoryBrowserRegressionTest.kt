@@ -509,7 +509,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
             .performScrollTo().performClick()
-        compose.onNodeWithText("可直接安装的技能").assertIsDisplayed()
+        compose.onNodeWithText("包含技能 · 1 项").assertIsDisplayed()
         compose.onNodeWithTag("plugin-detail-primary-action").performClick()
         compose.runOnIdle {
             assertEquals(pluginId to "figma-use", selectedSkill)
@@ -551,6 +551,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
             .performScrollTo().performClick()
+        compose.onNodeWithTag("codex-plugin-skills-summary").performClick()
         compose.onNodeWithTag("codex-skill-install-$pluginId-general")
             .performScrollTo().assertIsNotEnabled()
         compose.runOnIdle { assertEquals(0, installRequests) }
@@ -619,7 +620,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-inventory-card-codex-plugin:$pluginId")
             .performScrollTo().performClick()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed()
-        compose.onNodeWithText("安装插件 · 2 项技能").assertIsDisplayed().performClick()
+        compose.onNodeWithText("安装包含的 2 项技能").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(pluginId, installedPlugin) }
     }
 
