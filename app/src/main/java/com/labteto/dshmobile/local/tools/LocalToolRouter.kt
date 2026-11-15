@@ -36,14 +36,21 @@ internal object LocalToolRouter {
         val normalized = taskContext.lowercase()
         if (normalized.isBlank()) return emptyList()
 
+        // Large registries repeat common intent terms across providers. Match each unique
+        // term against this task once, without truncating the user's actual requirement.
+        val matchedTerms = HashMap<String, Boolean>()
+        fun matches(term: String): Boolean = matchedTerms.getOrPut(term.lowercase()) {
+            hasExplicitIntentTerm(normalized, term)
+        }
+
         // New plugin/MCP tools participate automatically through their registered metadata.
         // Order by task relevance, never by an arbitrary fixed number of optional tools.
         return tools.asSequence()
             .filter(::isOptional)
             .mapNotNull { tool ->
-                val exactName = hasExplicitIntentTerm(normalized, tool.name)
+                val exactName = matches(tool.name)
                 val keywordHits = tool.metadata.discoveryKeywords.count { keyword ->
-                    hasExplicitIntentTerm(normalized, keyword)
+                    matches(keyword)
                 }
                 // A broad family label ("网络", "智能体", "会话") must not implicitly activate
                 // every optional tool in that category. Explicit discovery still searches family.
