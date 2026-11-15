@@ -110,7 +110,7 @@ class LocalWorkToolSurfaceFocusTest {
         access = ToolAccess.READ_ONLY,
         approvalPolicy = ToolApprovalPolicy.NEVER,
         exposure = ToolExposure.OPTIONAL,
-        metadata = ToolMetadata(family = "MCP"),
+        metadata = ToolMetadata(family = "MCP", discoveryKeywords = setOf("状态", "查询")),
         executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
     )
 
