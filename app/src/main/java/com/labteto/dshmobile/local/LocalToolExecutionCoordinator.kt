@@ -364,7 +364,7 @@ internal class LocalToolExecutionCoordinator(
             if (alreadyBuiltIn.isNotEmpty()) appendLine(
                 "内置工具可直接调用：" + alreadyBuiltIn.joinToString(", "))
             if (exactNames != null) appendLine(
-                "已按 select: 将本轮可选工具聚焦到指定名称；其它工具仍可重新选择，已装入的可直接使用。")
+                "已按 select: 将本轮可选工具聚焦到指定名称；其它工具仍可重新选择，实际进入模型工具表后可直接使用。")
             if (unavailableNames.isNotEmpty()) appendLine(
                 "指定但未能加载：" + unavailableNames.joinToString(", ") + "（未注册、被关闭或不是可选扩展；不会改用相似工具）"
             )
@@ -372,7 +372,7 @@ internal class LocalToolExecutionCoordinator(
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
                 if (tool.name in projected) {
-                    append(if (tool.name in previouslyEnabled) " [已加载]" else " [下一步可用]")
+                    append(if (tool.name in previouslyEnabled) " [已选候选]" else " [下一步候选]")
                 }
                 selection.omittedReasons[tool.name]?.let { reason ->
                     append(" [当前未装入：").append(reason).append("]")
