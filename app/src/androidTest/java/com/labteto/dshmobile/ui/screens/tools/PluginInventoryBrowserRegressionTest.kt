@@ -242,7 +242,7 @@ class PluginInventoryBrowserRegressionTest {
                 }
                 val card = compose.onNodeWithTag("plugin-inventory-card-local:android-runtime")
                     .assertIsDisplayed().getUnclippedBoundsInRoot()
-                val title = compose.onNodeWithTag("plugin-inventory-title-local:android-runtime")
+                val title = compose.onNodeWithTag("plugin-inventory-title-local:android-runtime", useUnmergedTree = true)
                     .assertIsDisplayed().getUnclippedBoundsInRoot()
                 assertTrue("Title must fit within the $widthDp dp card in $mode", title.right <= card.right)
                 assertTrue("Card must fit within available width $widthDp dp",
@@ -735,12 +735,12 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("plugin-inventory-card-skill:figma-use").assertIsDisplayed()
-        compose.onNodeWithText("需要授权 · Figma 设计服务").assertDoesNotExist()
+        compose.onNodeWithText("待连接或检查 · Figma 设计服务").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-skill:figma-use").performClick()
         compose.onNodeWithTag("skill-dependency-summary").assertIsDisplayed()
-        compose.onNodeWithText("需要授权 · Figma 设计服务").assertDoesNotExist()
+        compose.onNodeWithText("待连接或检查 · Figma 设计服务").assertDoesNotExist()
         compose.onNodeWithTag("skill-dependency-summary").performClick()
-        compose.onNodeWithText("需要授权 · Figma 设计服务").assertIsDisplayed()
+        compose.onNodeWithText("待连接或检查 · Figma 设计服务").assertIsDisplayed()
         compose.onNodeWithTag("plugin-detail-primary-action").performClick()
         compose.runOnIdle {
             assertEquals("figma" to "https://mcp.figma.com/mcp", authorized)
