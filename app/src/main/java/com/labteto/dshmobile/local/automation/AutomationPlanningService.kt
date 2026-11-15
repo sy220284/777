@@ -243,7 +243,7 @@ internal fun parseAutomationPlan(
     } else null
     fun windowMinute(key: String, message: String): Int {
         val minute = task.long(key) ?: error("缺少$message")
-        require(minute in 0L until 24L * 60L) { "$message无效" }
+        require(minute in 0L until 24L * 60L) { "${message}无效" }
         return minute.toInt()
     }
     val windowStart = if (scheduleType == AutomationScheduleType.WINDOW)
