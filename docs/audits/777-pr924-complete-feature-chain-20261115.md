@@ -40,3 +40,17 @@
 本次修改在工作区中统一准备、审计并集中提交到 PR 分支。已在本地对全仓调用关系审计产物进行完整性/边界断言，结果通过。新增和扩展的真实应用 JVM 回归覆盖上述四类根因。合入本次集中变更后，以**最终 HEAD** 的架构扫描、app 与 harness-core JVM 单测、Android 编译、Chat/Work Android 设备交互、市场插件和本地会话迁移 6 类 CI 回执为准；CI 通过也不替代特定设备的真实厂商权限和第三方模型服务测试。
 
 依据：仓库 `docs/ARCHITECTURE.md`、`docs/SYSTEM-AUDIT-GUIDE.zh-CN.md`、`docs/UI-UX.zh-CN.md`；Android [后台任务限制](https://developer.android.com/develop/background-work/services/fgs/changes) 与 [NotificationListenerService](https://developer.android.com/reference/android/service/notification/NotificationListenerService)；Kotlin [Coroutine cancellation](https://kotlinlang.org/docs/cancellation-and-timeouts.html)。
+
+## 本轮继续优化：文件分页、调查续接及 Work 工具焦点（2026-11-15）
+
+在原先全仓调用关系与六项 CI 基线基础上，发现并统一修正三组实际跨模块障碍：
+
+- `glob/list_files/grep` 已提供可继续调用的 `cursor`，Work 调查上下文却只解析 `next_cursor`，导致有未读页面时不产生后续待办。文件工具在原参数提示后新增 `next_cursor`；Work 只从分页提示读取游标，末页清除继续建议。测试直接把真实工作区的跨页输出送入 Work 证据投影。
+- `list_files` 对显式深度静默截断为 8，`glob/grep` 的递归遍历上限固定为 32；改为支持真实深层目录，保留沙箱、分页、单页时间、输出大小控制。测试覆盖 36 层目录和已有 400 项以上分页。
+- 自然语言“继续在本地完成”被当作新任务，清除 Work 中用户主动 `select:` 的精确工具选择；同时 GitHub 意图只认少数固定“继续”短语。共享中立续接判断，使原任务继续保留工具选择，明确新任务则恢复自动发现。保留每次真实工具审批与模型工具冻结检查。
+
+另将已受“最近五个来源、最多四条发现”约束的调查摘要取消最后 2400 字符的无提示截断，避免摘要中后部发现被裁掉。此节记录代码层变更；整体通过状态以本组新提交 HEAD 的六项 CI 和真实运行回执为准。
+
+同源解析补充：归档工具的无下一页标记 `next_cursor=none` 后接英文分号或方括号时，也应视为完成；修正游标值词法边界并加入两种结尾回归。本地 Kotlin 规则验证覆盖 8 组游标及误匹配样例，全部通过。
+
+同源审计补充：Work 的 GitHub 来源身份此前只使用仓库/路径/分支，`fetch_pr` 和 `fetch_pr_file_patch` 的 `pr_number` 未进入事实键；同仓库不同 PR（甚至不同 PR 中同路径补丁）会合并为同一份来源。现以仓库 + PR 编号建立独立资源身份，完整来源键同时纳入 `pr_number` / `issue_number`，界面展示可区分 `owner/repo#PR924` 与 `owner/repo#PR925`。测试覆盖 PR 文档、同路径补丁、调查进度与身份去重。

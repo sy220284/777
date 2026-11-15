@@ -414,7 +414,7 @@ class LocalWorkspace(
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
         val matcher = globRegex(pattern.replace('\\', '/'))
-        return discoverPage(directory, MAX_SCAN_DEPTH, cursor, "glob", "未找到匹配文件", pattern) { file ->
+        return discoverPage(directory, Int.MAX_VALUE, cursor, "glob", "未找到匹配文件", pattern) { file ->
             file.takeIf { it.isFile && isInsideWorkspace(it) }
                 ?.relativeTo(directory)?.invariantSeparatorsPath
                 ?.takeIf(matcher::matches)
@@ -425,7 +425,8 @@ class LocalWorkspace(
     fun list(relativePath: String = ".", depth: Int = 3, cursor: Int = 0): String {
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
-        return discoverPage(directory, depth.coerceIn(1, 8), cursor, "list_files", "目录为空", "") { file ->
+        require(depth >= 1) { "目录扫描深度必须大于零" }
+        return discoverPage(directory, depth, cursor, "list_files", "目录为空", "") { file ->
             file.takeIf { it != directory && isInsideWorkspace(it) }?.let {
                 val suffix = if (it.isDirectory) "/" else " (${it.length()} B)"
                 displayPath(it) + suffix
@@ -473,7 +474,7 @@ class LocalWorkspace(
             } else rows.joinToString("\n"))
             if (nextCursor != null) {
                 append("\n[目录扫描未完：再次调用 $toolName，保持路径、匹配条件与深度不变，")
-                append("传入 cursor=$nextCursor 继续；目录发生增删时请从头扫描]")
+                append("传入 cursor=$nextCursor 继续；next_cursor=$nextCursor；目录发生增删时请从头扫描]")
             }
         }
     }
@@ -501,7 +502,7 @@ class LocalWorkspace(
         val scanKey = listOf("search", directory.path, regex.toString(), query).joinToString("\u0000")
         val iterator = if (directory.isFile) {
             scanPageIterator(directory, 0, scanKey, resumeEntry)
-        } else scanPageIterator(directory, MAX_SCAN_DEPTH, scanKey, resumeEntry)
+        } else scanPageIterator(directory, Int.MAX_VALUE, scanKey, resumeEntry)
         val matches = mutableListOf<String>()
         val warnings = mutableListOf<String>()
         var outputChars = 0
@@ -580,7 +581,7 @@ class LocalWorkspace(
             if (nextCursor != null) {
                 append("\n[搜索未完成：再次调用 grep，保持 query/path/regex 不变并传入 cursor=\"")
                 append(nextCursor)
-                append("\" 继续；如文件发生增删，请从头搜索]")
+                append("\" 继续；next_cursor=$nextCursor；如文件发生增删，请从头搜索]")
             }
         }
     }

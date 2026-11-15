@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -109,6 +110,40 @@ class LocalWorkInvestigationRuntimeTest {
             val context = LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
             assertFalse(context.contains("【仍有未读完的材料】"))
             assertTrue(context.contains("src/Agent.kt"))
+        } finally { log.close() }
+    }
+
+    @Test fun pagedLocalDiscoveryKeepsWorkRunningUntilGlobAndGrepActuallyFinish() {
+        val log = log()
+        try {
+            val filesRoot = files.newFolder("paged-glob")
+            repeat(405) { i ->
+                File(filesRoot, "entry-" + i.toString().padStart(4, '0') + ".txt")
+                    .writeText("ordinary")
+            }
+            val workspace = LocalWorkspace(filesRoot)
+            val first = workspace.glob("*.txt")
+            assertTrue(first.contains("next_cursor="))
+            observe(log, "glob-start", "glob", ".", 1, first)
+            assertTrue(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("【仍有未读完的材料】"))
+            val cursor = Regex("""cursor=(\d+)""").find(first)!!.groupValues[1].toInt()
+            observe(log, "glob-end", "glob", ".", 1, workspace.glob("*.txt", cursor = cursor))
+            assertFalse(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("【仍有未读完的材料】"))
+
+            val grepRoot = files.newFolder("paged-grep")
+            File(grepRoot, "rows.txt").writeText((1..250).joinToString("\n") { "needle $it" })
+            val grep = LocalWorkspace(grepRoot)
+            val firstHits = grep.search("needle")
+            assertTrue(firstHits.contains("next_cursor="))
+            observe(log, "grep-start", "grep", "rows.txt", 1, firstHits)
+            assertTrue(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("【仍有未读完的材料】"))
+            val lineCursor = Regex("""cursor="([^"]+)"""").find(firstHits)!!.groupValues[1]
+            observe(log, "grep-end", "grep", "rows.txt", 1, grep.search("needle", cursor = lineCursor))
+            assertFalse(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("【仍有未读完的材料】"))
         } finally { log.close() }
     }
 
@@ -282,6 +317,41 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun differentPullRequestsAndPatchesInOneRepoKeepDistinctSourceIdentities() {
+        val log = log()
+        try {
+            fun record(name: String, id: String, pr: Int, path: String? = null) {
+                val call = log.append("tool/call", buildJsonObject {
+                    put("id", id); put("name", name)
+                })
+                val result = log.append("tool/result", buildJsonObject {
+                    put("id", id); put("is_error", false)
+                })
+                LocalWorkInvestigationRuntime.observe(
+                    log, "pr-goal", "turn-a", id, name,
+                    buildJsonObject {
+                        put("repo_full_name", "owner/repo")
+                        put("pr_number", pr)
+                        path?.let { put("path", it) }
+                    }, call.sequence, result.sequence, "same source excerpt", false,
+                )
+            }
+            record("mcp__GitHub__fetch_pr", "pr-924", 924)
+            val first = LocalWorkInvestigationRuntime.progressIdentity(log, "pr-goal")
+            record("mcp__GitHub__fetch_pr", "pr-925", 925)
+            assertFalse(first == LocalWorkInvestigationRuntime.progressIdentity(log, "pr-goal"))
+            record("mcp__GitHub__fetch_pr_file_patch", "patch-924", 924, "src/main.kt")
+            record("mcp__GitHub__fetch_pr_file_patch", "patch-925", 925, "src/main.kt")
+            val observations = log.eventsOfTypesAfter(-1L, setOf("work/source-observed"))
+            assertEquals(4, observations.size)
+            assertEquals(4, observations.map { it.data["source_key"] }.toSet().size)
+            assertTrue(observations[0].data.toString().contains("owner/repo#PR924"))
+            assertTrue(observations[1].data.toString().contains("owner/repo#PR925"))
+            assertTrue(observations[2].data.toString().contains("owner/repo#PR924/src/main.kt"))
+            assertTrue(observations[3].data.toString().contains("owner/repo#PR925/src/main.kt"))
+        } finally { log.close() }
+    }
+
     @Test fun longGitRefsAndQueryVariantsRetainIndependentSourceIdentities() {
         val log = log()
         try {
@@ -341,6 +411,8 @@ class LocalWorkInvestigationRuntimeTest {
                 LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")
                     .contains("【仍有未读完的材料】"))
             record("archive-list-b", "archive_list", listing, "next_cursor=none；全部结束")
+            record("archive-list-ascii", "archive_list", listing, "next_cursor=none; complete")
+            record("archive-list-bracket", "archive_list", listing, "next_cursor=none] complete")
             val memberFirst = buildJsonObject {
                 put("path", "sources.zip"); put("member", "src/Engine.kt")
                 put("start_char", 0); put("max_chars", 100)
@@ -363,6 +435,10 @@ class LocalWorkInvestigationRuntimeTest {
             val results = log.eventsOfTypesAfter(-1L, setOf("work/source-observed"))
             val finishedList = results.single { it.data["source_call_id"].toString().contains("archive-list-b") }
             assertTrue(finishedList.data["has_next"].toString() == "false")
+            assertTrue(results.single { it.data["source_call_id"].toString().contains("archive-list-ascii") }
+                .data["has_next"].toString() == "false")
+            assertTrue(results.single { it.data["source_call_id"].toString().contains("archive-list-bracket") }
+                .data["has_next"].toString() == "false")
             val finishedChunk = results.single { it.data["source_call_id"].toString().contains("chunk-b") }
             assertTrue(finishedChunk.data["has_next"].toString() == "false")
             assertFalse(LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")

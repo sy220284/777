@@ -89,6 +89,18 @@ class LocalWorkToolSurfaceFocusTest {
             assertFalse("mcp_pinned_status" in secondNames)
             assertFalse("mcp_pinned_status" in binding.enabledOptionalTools)
 
+            binding.runHandle.modelHistory.append(buildJsonObject {
+                put("role", "user")
+                put("content", "继续在本地完成")
+            })
+            runtime.prepare(binding, "继续在本地完成")
+            val resumedNames = LocalToolSchemaProjection(registry, executor).names(
+                runtime.schemas(policy, binding),
+            )
+            assertTrue(binding.enabledOptionalTools.exactFocus)
+            assertTrue("mcp_selected_lookup" in resumedNames)
+            assertFalse("mcp_pinned_status" in resumedNames)
+
             // User supplies a genuinely new task: the existing priority cursor releases
             // the old exact focus, and the pinned tool is eligible again.
             binding.runHandle.modelHistory.append(buildJsonObject {

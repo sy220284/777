@@ -54,7 +54,10 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
     @Volatile private var lastTask: String? = null
 
     @Synchronized fun isNewTask(task: String): Boolean {
-        if (task == lastTask) return false
+        if (task == lastTask ||
+            (lastTask != null && LocalToolCapabilityIntent.isContinuationTaskRequest(task))) {
+            return false
+        }
         lastTask = task
         return true
     }

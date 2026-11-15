@@ -21,12 +21,12 @@ internal data class LocalToolCapabilityIntent(
             // Do not resurrect credentials and tool schemas from unrelated old tasks.
             val current = githubIntentSignal(input)
             val recent = if (current == null &&
-                input.trim().lowercase() in CONTINUATION_COMMANDS
+                isContinuationTaskRequest(input)
             ) {
                 // Continue the latest substantive user task. A non-GitHub request
                 // must stop older GitHub mentions from resurrecting tool schemas.
                 meaningfulUserInputs(history)
-                    .firstOrNull { it.trim().lowercase() !in CONTINUATION_COMMANDS }
+                    .firstOrNull { !isContinuationTaskRequest(it) }
                     ?.let(::githubIntentSignal)
             } else null
             return LocalToolCapabilityIntent(
@@ -79,6 +79,27 @@ internal data class LocalToolCapabilityIntent(
             return null
         }
 
+        /** The Work tool focus and provider selection share one task-boundary rule.
+         * A neutral follow-up continues the current task; an instruction such as
+         * "继续修改本地页面" names distinct work and starts a new task.
+         */
+        internal fun isContinuationTaskRequest(text: String): Boolean {
+            val normalized = text.trim().lowercase()
+                .replace(Regex("""[\s,，。！!；;:：]+"""), "")
+            if (normalized in CONTINUATION_COMMANDS) return true
+            val prefix = listOf("接下来继续", "继续", "接着")
+                .firstOrNull { normalized.startsWith(it) } ?: return false
+            val tail = normalized.removePrefix(prefix)
+            return tail.matches(NEUTRAL_CONTINUATION_TAIL) ||
+                tail.matches(PREVIOUS_PLAN_CONTINUATION_TAIL)
+        }
+
+        private val NEUTRAL_CONTINUATION_TAIL = Regex(
+            """^(?:在本地)?(?:完成|做完|处理|推进|执行|进行)?(?:剩余|余下|未完成的)?(?:工作|任务|步骤|部分|问题)?$"""
+        )
+        private val PREVIOUS_PLAN_CONTINUATION_TAIL = Regex(
+            """^(?:按|按照)(?:原|之前|此前|上面|上述)(?:的)?(?:要求|方案)(?:全部)?(?:完成|执行|处理|继续)?$"""
+        )
         private val CONTINUATION_COMMANDS = setOf(
             "继续", "继续吧", "继续执行", "继续处理", "接着", "接着做", "接着来", "接着处理",
         )

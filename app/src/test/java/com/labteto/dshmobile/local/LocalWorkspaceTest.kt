@@ -513,6 +513,18 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun deeplyNestedFilesRemainDiscoverableWithoutSilentDepthClamping() {
+        var nested = root.resolve("deep")
+        repeat(36) { nested = nested.resolve("layer").apply { mkdirs() } }
+        val file = nested.resolve("target.txt").apply { writeText("needle-below-32") }
+        val path = file.relativeTo(root).invariantSeparatorsPath
+        assertTrue(workspace.glob("**/target.txt").contains(path))
+        assertTrue(workspace.search("needle-below-32").contains(path))
+        assertTrue(workspace.list("deep", depth = 40).contains(path))
+        assertThrows(IllegalArgumentException::class.java) { workspace.list("deep", depth = 0) }
+    }
+
+    @Test
     fun globAndListCanPagePastLegacyFourHundredResultLimit() {
         val directory = root.resolve("many")
         directory.mkdirs()
@@ -521,10 +533,12 @@ class LocalWorkspaceTest {
         }
         val firstList = workspace.list("many")
         assertTrue(firstList.contains("目录扫描未完"))
+        assertTrue(firstList.contains("next_cursor="))
         val listCursor = Regex("""cursor=(\d+)""").find(firstList)!!.groupValues[1].toInt()
         assertTrue(workspace.list("many", cursor = listCursor).contains("item-0414.txt"))
         val firstGlob = workspace.glob("*.txt", "many")
         assertTrue(firstGlob.contains("目录扫描未完"))
+        assertTrue(firstGlob.contains("next_cursor="))
         val globCursor = Regex("""cursor=(\d+)""").find(firstGlob)!!.groupValues[1].toInt()
         assertTrue(workspace.glob("*.txt", "many", cursor = globCursor).contains("item-0414.txt"))
     }
@@ -563,6 +577,7 @@ class LocalWorkspaceTest {
         root.resolve("rows.txt").writeText(text)
         val first = workspace.search("needle")
         assertTrue(first.contains("搜索未完成"))
+        assertTrue(first.contains("next_cursor="))
         val cursor = Regex("""cursor="([^"]+)"""").find(first)!!.groupValues[1]
         val second = workspace.search("needle", cursor = cursor)
         assertTrue(second.contains("rows.txt:250: needle row 250"))

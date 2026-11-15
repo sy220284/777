@@ -25,6 +25,9 @@ class LocalToolCapabilityIntentTest {
         )
 
         assertTrue(followUp.requestsGitHub)
+        assertTrue(LocalToolCapabilityIntent.from("继续在本地完成", history).requestsGitHub)
+        assertTrue(LocalToolCapabilityIntent.from("接着完成剩余工作", history).requestsGitHub)
+        assertFalse(LocalToolCapabilityIntent.from("继续修改本地页面", history).requestsGitHub)
         assertFalse(unrelated.requestsGitHub)
         assertFalse(LocalToolCapabilityIntent.from(
             "继续",

@@ -40,16 +40,18 @@ internal object LocalWorkInvestigationRuntime {
     private fun sourceName(name: String, args: JsonObject): String {
         val path = args.text("path").ifBlank { args.text("file_path") }
         val repo = args.text("repository_full_name").ifBlank { args.text("repo_full_name") }
+        val prNumber = args.text("pr_number")
+        val resource = if (repo.isNotBlank() && prNumber.isNotBlank()) "$repo#PR$prNumber" else repo
         val ref = args.text("ref")
         val url = args.text("url").substringBefore('?').substringBefore('#')
         val value = when {
             name == "tool_output_read" -> "结果回执:" + args.text("call_id")
             name == "archive_read" && path.isNotBlank() -> path + "!" + args.text("member")
-            repo.isNotBlank() && path.isNotBlank() ->
-                if (ref.isBlank()) "$repo/$path" else "$repo@$ref/$path"
+            resource.isNotBlank() && path.isNotBlank() ->
+                if (ref.isBlank()) "$resource/$path" else "$resource@$ref/$path"
             path.isNotBlank() -> path
             url.isNotBlank() -> url
-            repo.isNotBlank() -> repo
+            resource.isNotBlank() -> resource
             else -> name
         }
         val visible = value.replace("\n", " ")
@@ -85,6 +87,7 @@ internal object LocalWorkInvestigationRuntime {
         listOf("tool", toolName, "repo", args.text("repository_full_name"),
             args.text("repo_full_name"), "path", args.text("path"), args.text("file_path"),
             "ref", args.text("ref"), "url", args.text("url"), "call", args.text("call_id"),
+            "pr_number", args.text("pr_number"), "issue_number", args.text("issue_number"),
             "query", args.text("query"), "pattern", args.text("pattern"),
             "member", args.text("member"), "prefix", args.text("prefix"))
             .joinToString("\u0000")
@@ -98,11 +101,19 @@ internal object LocalWorkInvestigationRuntime {
         // Archive and chunk tools put machine-readable pagination facts in the
         // first two header lines. Inspecting only the tail of a 40k-character
         // archive page misses its cursor; matching source text is also unsafe.
-        val metadata = if (name in setOf("archive_list", "archive_read", "read_chunk")) {
-            output.lineSequence().take(2).joinToString(" ")
-        } else output.takeLast(1_200)
+        val metadata = when (name) {
+            "archive_list", "archive_read", "read_chunk" ->
+                output.lineSequence().take(2).joinToString(" ")
+            // Local file tools append a dedicated pagination line. Only that line
+            // can report a cursor; file contents may also contain these field names.
+            "grep", "glob", "list_files" ->
+                output.lineSequence().lastOrNull()?.takeIf {
+                    it.startsWith("[搜索未完成") || it.startsWith("[目录扫描未完")
+                }.orEmpty()
+            else -> output.takeLast(1_200)
+        }
         if (metadata.contains("complete=true", ignoreCase = true)) return false
-        return Regex("""(?i)(next_start_line|next_start_char|next_char|next_byte|next_cursor|next_offset)\s*[:=]\s*["']?([^\s,}；]+)""")
+        return Regex("""(?i)(next_start_line|next_start_char|next_char|next_byte|next_cursor|next_offset)\s*[:=]\s*["']?([^\s,}\]；;]+)""")
             .findAll(metadata)
             .any { match ->
                 val value = match.groupValues[2].trim('"', '\'').lowercase()
@@ -197,7 +208,9 @@ internal object LocalWorkInvestigationRuntime {
         // Earlier pages must not keep requesting a cursor after a later page finished.
         val latestBySource = linkedMapOf<String, JsonObject>()
         recentSources.values.forEach { value ->
-            if (value.text("kind") != "search") latestBySource[value.sourceIdentityOrLegacy()] = value
+            // Search pages can be incomplete too; the newest page determines whether
+            // a cursor is still pending, exactly as for document reads.
+            latestBySource[value.sourceIdentityOrLegacy()] = value
         }
         val pendingReads = latestBySource.values.filter { it.text("has_next") == "true" }.takeLast(2)
         if (findings.isEmpty() && sources.isEmpty()) return ""
@@ -214,7 +227,11 @@ internal object LocalWorkInvestigationRuntime {
                 appendLine("【仍有未读完的材料】")
                 pendingReads.forEach { value ->
                     append("- ").append(value.text("source")).append(" [")
-                        .append(value.text("region")).appendLine("]：优先使用来源工具返回的下一页游标继续读取。")
+                        .append(value.text("region")).appendLine(if (value.text("kind") == "search") {
+                            "]：使用来源工具返回的下一页游标继续检索。"
+                        } else {
+                            "]：优先使用来源工具返回的下一页游标继续读取。"
+                        })
                 }
             }
             if (sources.isNotEmpty() && sources.all { it.text("kind") == "search" }) {
@@ -231,7 +248,7 @@ internal object LocalWorkInvestigationRuntime {
             append("发现可能改变任务结论的异常时，优先用现有工具补读、交叉核查并更新线索；")
             append("在原授权内调整 todo/plan，必要时修订已有任务图。")
             append("根据真实变化向用户自然解释重要发现，避免逐条播报工具调用。")
-        }.take(2_400)
+        }
     }
 
     /**
