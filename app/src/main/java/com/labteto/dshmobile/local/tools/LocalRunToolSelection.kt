@@ -28,7 +28,10 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
         omittedReasons[name]?.let { it.contains("Token") || it.contains("预算") } == true
     }
 
-    @Synchronized fun finishCapacityCheck() { awaitingCapacityCheck.clear() }
+    @Synchronized fun finishCapacityCheck() {
+        awaitingCapacityCheck.clear()
+        pendingForNextStep.clear()
+    }
 
     @Synchronized fun requestForNextStep(name: String): Boolean {
         if (exactFocus && name !in this) return false
@@ -45,7 +48,8 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
         super.clear()
         super.addAll(promoted)
         super.addAll(remaining)
-        pendingForNextStep.clear()
+        // Keep priority until the request's final, post-compaction tool surface
+        // is frozen. Re-projection may otherwise restore pinned/default tools ahead.
     }
 
     /** The task cursor and its model-visible selection share this run's ownership. */
