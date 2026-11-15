@@ -103,7 +103,10 @@ class LocalWorkspace(
             block()
         } finally {
             synchronized(directoryNameSnapshots) { directoryNameSnapshots.clear() }
-            synchronized(searchCursors) { searchCursors.clear() }
+            synchronized(searchCursors) {
+                searchCursors.clear()
+                searchTickets.clear()
+            }
         }
     }
     // Retain only the small traversal frontier between consecutive tool pages. On a
@@ -674,6 +677,9 @@ class LocalWorkspace(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SearchCursor>?): Boolean =
             size > 4
     }
+    // Cancelling/refreshing a query invalidates scans still running outside the shared lock.
+    private val searchTickets = HashMap<String, Long>()
+    private var nextSearchTicket = 0L
 
     /**
      * Search results are materialized once per fresh query and paged in relevance order.
@@ -683,12 +689,25 @@ class LocalWorkspace(
         val needle = query.trim()
         require(needle.isNotEmpty() && needle.length <= 128 &&
             offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
-        // Never hold the shared cursor lock across an unbounded filesystem traversal:
-        // another query, cancellation or file-browser request must stay responsive.
-        val firstPage = if (offset == 0) SearchCursor(rankedWorkspaceFileNames(needle), pageSize) else null
+        // Never hold the shared cursor lock across filesystem traversal. A per-query
+        // ticket prevents an older, cancelled scan from replacing a newer snapshot.
+        val ticket = if (offset == 0) synchronized(searchCursors) {
+            searchCursors.remove(needle)
+            (++nextSearchTicket).also { searchTickets[needle] = it }
+        } else null
+        val firstPage = if (ticket != null) try {
+            SearchCursor(rankedWorkspaceFileNames(needle), pageSize)
+        } catch (failure: Throwable) {
+            synchronized(searchCursors) {
+                if (searchTickets[needle] == ticket) searchTickets.remove(needle)
+            }
+            throw failure
+        } else null
         return synchronized(searchCursors) {
-            val cursor = if (firstPage != null) firstPage.also {
-                searchCursors[needle] = it
+            val cursor = if (firstPage != null) {
+                require(searchTickets[needle] == ticket) { "搜索已更新，请以当前关键词重新查询" }
+                searchTickets.remove(needle)
+                firstPage.also { searchCursors[needle] = it }
             } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
             require(cursor.pageSize == pageSize && cursor.nextPage == offset) {
                 "搜索游标已失效，请重新搜索"
@@ -710,7 +729,9 @@ class LocalWorkspace(
     }
 
     fun stopWorkspaceSearch(query: String): Boolean = synchronized(searchCursors) {
-        searchCursors.remove(query.trim()) != null
+        val needle = query.trim()
+        val stoppedActiveScan = searchTickets.remove(needle) != null
+        searchCursors.remove(needle) != null || stoppedActiveScan
     }
 
     /**
