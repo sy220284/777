@@ -29,3 +29,7 @@
 ## 统一状态读取
 
 `read(UiAppServerRead)` 将 Chat、Work、Session、Agent、Automation、Settings、Capabilities 的已有快照组成一套查询协议。每次只访问对应功能的状态 Owner；`Capabilities` 复用实时 `ToolRegistry` 的目录/检索结果，按 limit 限制数据量。客户端可搭配 `notices` 收到状态变化后针对性刷新，不建立新的全局影子状态或重复持久化。
+
+## 文件与附件边界
+
+新增 `AppServerUiPort.files` 与 `AppServerUiPort.attachments`。工作区目录、搜索、预览、下载发布由已存在的 `FilesUiPort / LocalSessionFilesRuntime` 执行；用户明确选择的手机附件经 `AttachmentUiPort` 的会话身份验证导入。旧的同类 UI 调用统一转向上述契约，端口移除运行中已具备能力的“默认不支持”实现。

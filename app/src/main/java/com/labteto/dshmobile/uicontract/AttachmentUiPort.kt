@@ -39,6 +39,5 @@ sealed interface UiAttachmentInspectionReceipt {
 /** URI comes from an explicit platform selection. Import never sends or grants a tool capability. */
 interface AttachmentUiPort {
     suspend fun import(command: ImportUiAttachmentCommand): UiAttachmentReceipt
-    suspend fun inspect(command: InspectUiAttachmentCommand): UiAttachmentInspectionReceipt =
-        UiAttachmentInspectionReceipt.Rejected(UiCommandRejection.UNSUPPORTED)
+    suspend fun inspect(command: InspectUiAttachmentCommand): UiAttachmentInspectionReceipt
 }

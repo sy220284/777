@@ -30,7 +30,8 @@ tools_ui = read(tool_ui)
 
 features = ("SHELL", "CHAT", "WORK", "AUTOMATION", "TOOLS", "SETTINGS")
 commands = ("Chat", "Work", "Session", "Agent", "Automation", "Tools", "Settings")
-endpoints = ("chat", "work", "session", "agents", "automation", "tools", "settings", "workRead")
+endpoints = ("chat", "work", "session", "agents", "automation", "tools", "settings", "workRead",
+             "files", "attachments")
 assert all(re.search(r"\b" + name + r"\b", catalog) for name in features)
 assert all(re.search(r"\b" + name + r"\b", api) for name in features)
 assert "LocalFeatureCatalog.modules.map" in implementation, "App Server must use the one FeatureCatalog"
@@ -56,6 +57,8 @@ assert "localTools.discoverCapabilities(query, Int.MAX_VALUE)" in read(source / 
 assert "appServer.tools" in read(source / "ui/screens/tools/ToolsScreen.kt")
 assert "appServer.automation" in read(source / "ui/screens/tasks/TasksViewModel.kt")
 assert "appServer.agents" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
+assert "appServer.files" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
+assert "appServer.attachments.import" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 
 # All actual UI contracts are inspected; potential unused ports are reported, never deleted from names alone.
 kotlin = list(source.rglob("*.kt"))
@@ -72,7 +75,8 @@ for path in sorted(contracts.glob("*.kt")):
 names = [entry["name"] for entry in ui_contracts]
 assert len(names) == len(set(names)), "Duplicate UI contract interface declaration"
 assert all(name in names for name in ("AppServerUiPort", "ChatUiPort", "WorkConversationUiPort",
-    "SessionUiPort", "AutomationUiPort", "ToolsManagementUiPort", "SettingsUiPort", "WorkAgentUiPort"))
+    "SessionUiPort", "AutomationUiPort", "ToolsManagementUiPort", "SettingsUiPort", "WorkAgentUiPort",
+    "FilesUiPort", "AttachmentUiPort"))
 out = root / "build/app-server-audit"
 out.mkdir(parents=True, exist_ok=True)
 (out / "interface-inventory.json").write_text(json.dumps({

@@ -343,7 +343,22 @@ class LocalHarnessViewModel @Inject constructor(
         }
         return deleted
     }
-    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
+    /** Session identity is validated again by the Attachment Owner after Android file import. */
+    suspend fun importAttachment(uri: Uri): LocalImportedAttachment {
+        val identity = appServer.session.snapshot().identity
+            ?: error("当前会话正在切换，请重新选择附件")
+        return when (val receipt = appServer.attachments.import(
+            com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand(identity, uri.toString())
+        )) {
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Imported -> receipt.attachment
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Rejected ->
+                error("附件导入被拒绝：" + receipt.reason)
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed ->
+                error(receipt.message ?: "附件导入失败")
+            com.labteto.dshmobile.uicontract.UiAttachmentReceipt.GrantRevoked ->
+                error("文件访问权限已失效，请重新选择附件")
+        }
+    }
     internal suspend fun remoteGitBranchesForUi(repository: String) =
         toolsUi.remoteGitBranchesForUi(repository)
     internal suspend fun compareLocalGitForUi(repository: String, includeUntracked: Boolean) =
