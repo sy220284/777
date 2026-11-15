@@ -122,8 +122,9 @@ internal fun DeviceCapabilitiesCard(
             hint = if (state.notificationAccessGranted && !state.notifications)
                 stringResource(R.string.permission_setup_reconnect_hint)
             else stringResource(R.string.advanced_notification_access_hint),
-            actionLabel = stringResource(R.string.advanced_enable_notifications),
-            onAction = viewModel::openNotificationAccessSettings,
+            actionLabel = stringResource(if (state.notificationAccessGranted)
+                R.string.permission_setup_rebind_notification else R.string.advanced_enable_notifications),
+            onAction = viewModel::repairNotificationAccess,
         )
         state.postingNotifications?.let { enabled ->
             CapabilityRow(
