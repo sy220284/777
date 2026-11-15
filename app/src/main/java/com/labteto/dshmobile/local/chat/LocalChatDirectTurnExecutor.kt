@@ -264,15 +264,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 snapshot.modelState.baseUrl,
                 snapshot.modelState.model,
             )
-            if (
-                hasLocalImageRefs(durableRequestMessages) &&
-                imageCapabilities.state(
-                    snapshot.modelState.baseUrl,
-                    snapshot.modelState.model,
-                ) == LocalImageCapability.UNSUPPORTED
-            ) {
-                error("当前模型不支持图片理解，请切换支持图片的模型后重试。")
-            }
+            requireChatImageInputSupported(durableRequestMessages, selectedMode)
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = durableRequestMessages,
                 workspaceRoot = File(sessionStorage.files.workspace.path),
