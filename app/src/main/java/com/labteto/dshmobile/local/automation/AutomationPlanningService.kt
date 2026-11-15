@@ -69,12 +69,7 @@ class AutomationPlanningService @Inject constructor(
     internal suspend fun plan(input: String): AutomationPlanDraft {
         val context = runtime.planningContext()
         validateContext(context)
-        val request = input
-            .removePrefix("@角色事件规划")
-            .trim()
-            .take(2_000)
-            .takeIf(String::isNotBlank)
-            ?: error("先告诉我什么时候、让角色做什么")
+        val request = automationPlanningUserRequest(input)
         val now = System.currentTimeMillis()
         val reply = complete(
             context = context,
@@ -184,6 +179,11 @@ class AutomationPlanningService @Inject constructor(
             .ifBlank { "暂无可用聊天记录" }
 }
 
+internal fun automationPlanningUserRequest(input: String): String =
+    input.removePrefix("@角色事件规划").trim()
+        .takeIf(String::isNotBlank)
+        ?: error("先告诉我什么时候、让角色做什么")
+
 internal fun parseAutomationPlan(
     raw: String,
     json: Json,
@@ -202,7 +202,7 @@ internal fun parseAutomationPlan(
 ): AutomationPlanDraft {
     val root = json.parseToJsonElement(extractPlannerJson(raw)).jsonObject
     val task = root["task"]?.jsonObject ?: root
-    val prompt = task.string("prompt").take(2_000).takeIf(String::isNotBlank)
+    val prompt = task.string("prompt").takeIf(String::isNotBlank)
         ?: error("事件内容为空")
     val scheduleType = runCatching {
         AutomationScheduleType.valueOf(task.string("scheduleType").uppercase())

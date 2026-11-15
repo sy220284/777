@@ -112,7 +112,7 @@ internal class LocalWorkProgressCoordinator(
         reviewRequirements: List<String> = emptyList(),
     ): String = commitWorkMutation {
         require(description.isNotBlank()) { "目标不能为空" }
-        val goal = LocalGoal(description.trim().take(2_000), id = java.util.UUID.randomUUID().toString(),
+        val goal = LocalGoal(description.trim(), id = java.util.UUID.randomUUID().toString(),
             revision = 1L,
             artifactPaths = artifactPaths.distinct().onEach { path ->
                 require(path.isNotBlank() && !path.startsWith("/") && !path.contains('\\') &&

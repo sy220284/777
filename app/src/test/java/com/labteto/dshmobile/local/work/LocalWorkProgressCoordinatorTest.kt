@@ -317,8 +317,11 @@ class LocalWorkProgressCoordinatorTest {
 
         coordinator.createGoal("g".repeat(3000))
         coordinator.updateGoal("completed", "n".repeat(3000))
-        assertEquals(2000, state.value.work.goal?.description?.length)
-        assertEquals(2000, state.value.work.goal?.note?.length)
+        assertEquals(3000, state.value.work.goal?.description?.length)
+        assertEquals(3000, state.value.work.goal?.note?.length)
+        val restored = projectWorkSessionControls(LocalWorkState(), log.snapshot())
+        assertEquals("g".repeat(3000), restored.goal?.description)
+        assertEquals("n".repeat(3000), restored.goal?.note)
         coordinator.updateGoal("paused", null)
         assertNull(state.value.work.goal?.note)
     }
