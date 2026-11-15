@@ -87,6 +87,8 @@ internal object LocalToolRouter {
         val schemas: JsonArray,
         val omittedReasons: Map<String, String>,
         val compactedNames: Set<String>,
+        /** Capacity omissions are typed; execution/recovery never parse display text. */
+        val budgetOmittedNames: Set<String> = emptySet(),
     )
 
     fun visibleSchemas(
@@ -117,6 +119,7 @@ internal object LocalToolRouter {
         val optionalSchemas = ArrayList<JsonElement>()
         val omitted = linkedMapOf<String, String>()
         val compacted = linkedSetOf<String>()
+        val budgetOmitted = linkedSetOf<String>()
         for (name in enabledOptional) {
             val tool = optionalByName[name] ?: continue // Missing tools remain absent on purpose.
             // A valid, large MCP/plug-in schema is not an admission error merely because
@@ -125,6 +128,7 @@ internal object LocalToolRouter {
             // complete registered schema.
             val original = tool.schema
             if (remainingTokens <= 0) {
+                budgetOmitted += name
                 omitted[name] = "本轮可选工具定义预算已用尽；按精确名称重新选择可优先装入"
                 continue
             }
@@ -135,6 +139,7 @@ internal object LocalToolRouter {
             } else original
             val selectedCost = estimateModelTokens(reduced.toString())
             if (selectedCost > MAX_OPTIONAL_SCHEMA_TOKENS || selectedCost > remainingTokens) {
+                budgetOmitted += name
                 omitted[name] = "工具参数定义需要约 $selectedCost Token，当前可用 $remainingTokens；已尝试精简说明文本"
                 continue
             }
@@ -145,7 +150,7 @@ internal object LocalToolRouter {
 
         // The core surface remains byte-for-byte stable for cache continuity.
         return ToolSchemaSelection(JsonArray(core.map(HarnessTool::schema) + optionalSchemas),
-            omitted, compacted)
+            omitted, compacted, budgetOmitted)
     }
 
     private fun compactDescriptiveAnnotations(value: JsonElement, propertyNames: Boolean = false): JsonElement =
