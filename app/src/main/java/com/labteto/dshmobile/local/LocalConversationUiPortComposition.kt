@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.chat.LocalChatExecutionPort
 import com.labteto.dshmobile.local.chat.chatBranchInfoIndex
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.presentation.projectTranscriptHistoryMessage
 import com.labteto.dshmobile.local.uiBindingIdentity
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.send.LocalSendFeedbackState
@@ -385,15 +386,14 @@ internal class LocalConversationMessageProjectionCache {
         val branchIndex = branches?.let(::chatBranchInfoIndex).orEmpty()
         val projected = state.messages.map { message ->
             val info = branchIndex[message.id]
-            UiMessageSnapshot(message.id, when (message.role) {
-                "user" -> UiMessageRole.USER
-                "assistant", "progress" -> UiMessageRole.ASSISTANT
-                "tool" -> UiMessageRole.TOOL
-                else -> UiMessageRole.SYSTEM
-            }, message.content, message.createdAt,
-                if (message.role == "user") com.labteto.dshmobile.local.chat.editableChatUserText(message) else null,
-                info?.let { com.labteto.dshmobile.uicontract.UiMessageBranch(it.index, it.count) },
-                message.proactive, message.role == "progress")
+            projectTranscriptHistoryMessage(
+                message,
+                editableText = if (message.role == "user")
+                    com.labteto.dshmobile.local.chat.editableChatUserText(message) else null,
+                branch = info?.let {
+                    com.labteto.dshmobile.uicontract.UiMessageBranch(it.index, it.count)
+                },
+            )
         }
         sessionId = state.sessionId
         usageMode = state.usageMode

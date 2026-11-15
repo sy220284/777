@@ -83,15 +83,56 @@ class LocalSessionUiFacade @Inject constructor(
     }
 }
 
-/** Only semantic presentation fields cross into any UI pack; Session metadata stays in the Owner. */
-internal fun projectTranscriptHistoryMessage(message: LocalHarnessMessage): UiMessageSnapshot =
-    UiMessageSnapshot(message.id, when (message.role) {
-        "user" -> UiMessageRole.USER
-        "assistant", "progress" -> UiMessageRole.ASSISTANT
-        "tool" -> UiMessageRole.TOOL
-        else -> UiMessageRole.SYSTEM
-    }, message.content, message.createdAt, proactive = message.proactive,
-        progressive = message.role == "progress")
+/** One owner-to-UI projection for both historic pages and live Chat/Work snapshots. */
+internal fun projectTranscriptHistoryMessage(
+    message: LocalHarnessMessage,
+    editableText: String? = null,
+    branch: com.labteto.dshmobile.uicontract.UiMessageBranch? = null,
+): UiMessageSnapshot =
+    UiMessageSnapshot(
+        id = message.id,
+        role = when (message.role) {
+            "user" -> UiMessageRole.USER
+            "assistant", "progress" -> UiMessageRole.ASSISTANT
+            "tool" -> UiMessageRole.TOOL
+            else -> UiMessageRole.SYSTEM
+        },
+        text = message.content,
+        createdAt = message.createdAt,
+        editableText = editableText,
+        branch = branch,
+        proactive = message.proactive,
+        progressive = message.role == "progress",
+        speakerId = message.speakerId,
+        speakerName = message.speakerName,
+        tool = if (message.toolName != null || message.toolIsError != null ||
+            message.toolErrorCode != null || message.toolCallId != null ||
+            message.toolExecutionId != null || message.toolDeclaredAt != null ||
+            message.toolDeclaredSequence != null)
+            com.labteto.dshmobile.uicontract.UiMessageToolState(
+                message.toolName, message.toolIsError, message.toolErrorCode,
+                message.toolCallId, message.toolExecutionId,
+                message.toolDeclaredAt, message.toolDeclaredSequence)
+        else null,
+        blocks = message.blocks.map { block ->
+            when (block) {
+                is com.labteto.dshmobile.local.session.LocalMessageBlock.Text ->
+                    com.labteto.dshmobile.uicontract.UiMessageContentBlock.Text(block.text)
+                is com.labteto.dshmobile.local.session.LocalMessageBlock.Image ->
+                    com.labteto.dshmobile.uicontract.UiMessageContentBlock.Image(
+                        block.relativePath, block.mediaType, block.name, block.bytes,
+                        block.attachmentId, block.width, block.height,
+                        com.labteto.dshmobile.uicontract.UiMessageMediaSource.valueOf(block.source.name))
+                is com.labteto.dshmobile.local.session.LocalMessageBlock.File ->
+                    com.labteto.dshmobile.uicontract.UiMessageContentBlock.File(
+                        block.relativePath, block.mediaType, block.name, block.bytes,
+                        block.attachmentId,
+                        com.labteto.dshmobile.uicontract.UiMessageMediaSource.valueOf(block.source.name))
+                is com.labteto.dshmobile.local.session.LocalMessageBlock.Unknown ->
+                    com.labteto.dshmobile.uicontract.UiMessageContentBlock.Unknown(block.kind, block.payload)
+            }
+        },
+    )
 
 
 @dagger.Module

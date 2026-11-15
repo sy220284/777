@@ -17,6 +17,45 @@ data class UiMcpServerSnapshot(
     val connection: UiToolConnection = UiToolConnection.HEALTH_UNCHECKED,
     val authorization: UiToolAuthorization = UiToolAuthorization.REQUIRED_PER_CALL,
 )
+/** The UI can identify a declared service by ID and public target, but health and
+ * individual tool authorization still belong to the Tool owner. */
+enum class UiMcpDeclaredConnection { ABSENT, TARGET_CONFLICT, REGISTERED_UNREADY, TOOLS_REGISTERED }
+
+/** Use the same display-target semantics as the MCP registry; never treat an ID
+ * collision or a zero-tool service as proof that the declared plugin works. */
+fun uiMcpDeclaredConnection(
+    servers: List<UiMcpServerSnapshot>, serverId: String?, endpoint: String?,
+): UiMcpDeclaredConnection {
+    if (serverId.isNullOrBlank()) return UiMcpDeclaredConnection.ABSENT
+    val server = servers.firstOrNull { it.id == serverId }
+        ?: return UiMcpDeclaredConnection.ABSENT
+    if (endpoint.isNullOrBlank() || !server.transport.equals("http", ignoreCase = true))
+        return UiMcpDeclaredConnection.TARGET_CONFLICT
+    fun displayIdentity(value: String): String? = runCatching {
+        val uri = java.net.URI(value)
+        val scheme = uri.scheme?.lowercase()
+        val host = uri.host?.lowercase()
+        if (scheme !in setOf("https", "http") || host.isNullOrBlank() ||
+            uri.rawUserInfo != null || uri.rawFragment != null) null
+        else java.net.URI(
+            scheme, null, host, uri.port,
+            uri.path?.ifBlank { "/" } ?: "/", null, null,
+        ).toString()
+    }.getOrNull()
+    if (displayIdentity(server.target) == null ||
+        displayIdentity(server.target) != displayIdentity(endpoint))
+        return UiMcpDeclaredConnection.TARGET_CONFLICT
+    // The MCP owner deliberately removes query strings from display targets.
+    // Without a tenant-scoped identity receipt this UI may not claim a match.
+    if (java.net.URI(endpoint).rawQuery != null)
+        return UiMcpDeclaredConnection.REGISTERED_UNREADY
+    return if (server.registration == UiToolRegistration.REGISTERED &&
+        server.connection == UiToolConnection.HEALTH_UNCHECKED &&
+        server.tools.isNotEmpty())
+        UiMcpDeclaredConnection.TOOLS_REGISTERED
+    else UiMcpDeclaredConnection.REGISTERED_UNREADY
+}
+
 /** Ordered MCP Owner events are hints to invalidate cached health, never call permission. */
 data class UiMcpLifecycleEvent(
     val sequence: Long, val serverId: String, val connection: UiToolConnection?,
@@ -42,9 +81,14 @@ data class UiSkillRequirement(
     val type: String, val value: String, val description: String = "", val registered: Boolean = false,
     val transport: String? = null, val url: String? = null, val command: String? = null,
 )
+/** Verified immutable GitHub installation receipt. UI must never infer ownership from URL substrings. */
+data class UiSkillSourceIdentity(
+    val owner: String, val repository: String, val commit: String, val directory: String,
+)
 data class UiSkillSnapshot(val name: String, val description: String, val modelInvocable: Boolean,
     val displayName: String = name, val sourceUrl: String? = null, val sourceWarning: String? = null,
-    val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList())
+    val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList(),
+    val sourceIdentity: UiSkillSourceIdentity? = null)
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
 data class UiCodexPluginDetailSnapshot(
     val id: String, val displayName: String, val description: String,
@@ -113,6 +157,31 @@ interface ToolsUiPort {
     suspend fun disconnect(serverId: String): String
     suspend fun configureGitHub(token: String)
     suspend fun clearGitHub()
+}
+
+/** Full management surface consumed by the Tools feature UI.
+ * The Compose ViewModel depends on this contract, never the runtime facade implementation. */
+interface ToolsManagementUiPort : ToolsUiPort {
+    fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit>
+    suspend fun agentBackendStatus(): String
+    suspend fun probeAgentBackend(): String
+    suspend fun configureAgentBackend(
+        host: String, port: Int, pin: String, token: String, consent: Boolean,
+    )
+    suspend fun revokeAgentBackend()
+    suspend fun checkSkillUpdate(id: String): String?
+    suspend fun upgradeSkill(id: String, revision: String): String
+    suspend fun rollbackSkill(id: String): String
+    suspend fun codexPluginLogo(id: String): ByteArray?
+    suspend fun installCuratedSkill(id: String): String
+    suspend fun importSkillStream(filename: String, input: java.io.InputStream): String
+    suspend fun exportSkillPackageToFile(id: String, destination: java.io.File)
+    suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String
+    suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String
+    fun cancelMcpLogin(serverId: String)
+    suspend fun refreshMcpLogin(serverId: String, endpoint: String): String
+    suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean
+    suspend fun clearMcpCredential(serverId: String)
 }
 
 sealed interface ToolsUiCommand {

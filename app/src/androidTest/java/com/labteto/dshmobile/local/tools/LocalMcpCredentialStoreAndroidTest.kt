@@ -81,6 +81,54 @@ class LocalMcpCredentialStoreAndroidTest {
         }
     }
 
+    @Test fun failedOAuthConnectionRestoresPreviousEncryptedCredential() = runBlocking {
+        withCredentialStore { store, preferences, id ->
+            val endpoint = "https://mcp.example.com/tenant/mcp"
+            store.save(id, endpoint, "original-access-token")
+            val grant = LocalMcpOAuthCredential(
+                "https://issuer.example.com", "client",
+                "https://issuer.example.com/token", endpoint,
+                accessToken = "replacement-access-token", refreshToken = "replacement-refresh",
+                expiresAt = System.currentTimeMillis() + 60_000,
+            )
+            val receipt = store.rotateOAuth(id, endpoint, grant)
+            assertEquals("replacement-access-token", store.forEndpoint(id, endpoint))
+            store.rollbackCredentialRotation(id, receipt)
+            assertEquals("original-access-token", store.forEndpoint(id, endpoint))
+            val persisted = preferences.data.first().asMap().values.joinToString(",")
+            assertFalse(persisted.contains("replacement-access-token"))
+            assertFalse(persisted.contains("original-access-token"))
+        }
+    }
+
+    @Test fun failedOAuthRollbackNeverOverwritesNewerCredentialChange() = runBlocking {
+        withCredentialStore { store, _, id ->
+            val endpoint = "https://mcp.example.com/mcp"
+            store.save(id, endpoint, "old-token")
+            val receipt = store.rotateOAuth(id, endpoint, LocalMcpOAuthCredential(
+                "https://issuer.example.com", "client",
+                "https://issuer.example.com/token", endpoint,
+                accessToken = "rotated-token", expiresAt = System.currentTimeMillis() + 60_000,
+            ))
+            store.save(id, endpoint, "newer-authorized-token")
+            assertTrue(runCatching { store.rollbackCredentialRotation(id, receipt) }.isFailure)
+            assertEquals("newer-authorized-token", store.forEndpoint(id, endpoint))
+        }
+    }
+
+    @Test fun manualBearerRotationSharesTheSameSafeRecoveryPath() = runBlocking {
+        withCredentialStore { store, _, id ->
+            val endpoint = "https://mcp.example.com/mcp"
+            store.save(id, endpoint, "original-bearer")
+            val rotation = store.rotateBearer(id, endpoint, "replacement-bearer")
+            assertEquals("replacement-bearer", store.forEndpoint(id, endpoint))
+            store.rollbackCredentialRotation(id, rotation)
+            assertEquals("original-bearer", store.forEndpoint(id, endpoint))
+            assertTrue(runCatching { store.rotateBearer(id, endpoint, "invalid bearer") }.isFailure)
+            assertEquals("original-bearer", store.forEndpoint(id, endpoint))
+        }
+    }
+
     private suspend fun withCredentialStore(
         block: suspend (LocalMcpCredentialStore,
             androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>,

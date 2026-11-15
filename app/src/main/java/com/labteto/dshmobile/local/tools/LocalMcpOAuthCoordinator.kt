@@ -29,10 +29,13 @@ internal class LocalMcpOAuthCoordinator @Inject constructor(
     private val pending = ConcurrentHashMap<String, Job>()
     fun cancel(serverId: String) { pending[serverId]?.cancel() }
 
-    suspend fun authorize(serverId: String, endpoint: String, suppliedClientId: String? = null) {
+    /** Stage an OAuth grant in memory; the connection owner commits it only when switching. */
+    suspend fun authorize(
+        serverId: String, endpoint: String, suppliedClientId: String? = null,
+    ): LocalMcpOAuthCredential {
         val job = currentCoroutineContext().job
         check(pending.putIfAbsent(serverId, job) == null) { "该服务已有进行中的登录" }
-        try {
+        return try {
             val protocol = credentials.oauthProtocol
             val hint = credentials.challenge(serverId, endpoint)
             val info = protocol.discover(endpoint, hint?.first, hint?.second)
@@ -53,7 +56,7 @@ internal class LocalMcpOAuthCoordinator @Inject constructor(
                 val code = LocalMcpOAuthProtocol.validateCallback(callback, state, info.issuer, info.issuerInResponseRequired)
                 val credential = protocol.exchange(info, clientId, listener.redirectUri, verifier, code)
                 currentCoroutineContext().ensureActive()
-                credentials.saveOAuth(serverId, endpoint, credential)
+                credential
             }
         } finally { pending.remove(serverId, job) }
     }

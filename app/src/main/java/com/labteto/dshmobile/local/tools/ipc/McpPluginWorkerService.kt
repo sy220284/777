@@ -57,6 +57,9 @@ class McpPluginWorkerService : Service() {
     private val http = createMcpWorkerHttpClient()
     private val incoming = Messenger(object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(message: Message) {
+            // Messenger Binder handles can be forwarded. Require the host app's real caller UID,
+            // then enforce the existing per-transport reply-Binder identity for each request.
+            if (message.sendingUid != applicationInfo.uid) return
             if (message.what !in setOf(McpWorkerWire.OPEN, McpWorkerWire.REQUEST,
                     McpWorkerWire.CLOSE, McpWorkerWire.UPDATE_AUTH)) return
             val sender = message.replyTo ?: return

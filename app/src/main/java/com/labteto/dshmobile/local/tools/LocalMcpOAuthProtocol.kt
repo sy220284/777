@@ -210,6 +210,8 @@ internal class LocalMcpOAuthProtocol @Inject constructor(http: OkHttpClient) {
             require(values["state"] == state) { "MCP 授权回调状态不匹配" }
             val actual = values["iss"]
             require((actual != null || !requireIssuer) && (actual == null || actual == issuer)) { "MCP 授权回调服务器身份不匹配" }
+            if (values["error"] == "access_denied")
+                throw kotlinx.coroutines.CancellationException("用户拒绝 MCP 授权；现有技能和连接保持不变")
             require(values["error"] == null) { "MCP 授权未获同意，请返回后重试。" }
             return values["code"]?.takeIf(String::isNotBlank) ?: throw LocalMcpOAuthFailure()
         }
