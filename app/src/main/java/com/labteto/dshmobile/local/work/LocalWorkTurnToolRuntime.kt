@@ -85,6 +85,13 @@ internal class LocalWorkTurnToolRuntime(
         input: String,
     ) {
         val history = binding.runHandle.modelHistory.snapshot()
+        // Establish the user-task boundary before next-step tool demand can arrive.
+        // Waiting until the first schema projection can discard a queued tool.
+        LocalToolCapabilityIntent.latestUserInput(history)?.takeIf(String::isNotBlank)?.let { activeTask ->
+            if (binding.enabledOptionalTools.isNewTask(activeTask)) {
+                binding.enabledOptionalTools.beginNewTask()
+            }
+        }
         val task = effectiveWorkCapabilityTask(
             input, binding.continuationParentRunId, history,
             binding.workState.snapshot().goal?.description,
