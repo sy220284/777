@@ -5,6 +5,35 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolPromptBudgetPolicyTest {
+
+    @Test
+    fun newlyDiscoveredPluginToolsReallocateOptionalBudgetWithoutOverflow() {
+        // A plugin can register more core declarations between turns. Their footprint
+        // must be deducted before optional tool schemas are exposed to the model.
+        val beforeRegistration = remainingOptionalToolDefinitionBudget(
+            remainingOperationalTokens = 30_000,
+            coreDefinitionTokens = 3_000,
+            preserveToolSurface = true,
+            requestedDefinitionTokens = 24_000,
+        )
+        val afterRegistration = remainingOptionalToolDefinitionBudget(
+            remainingOperationalTokens = 30_000,
+            coreDefinitionTokens = 14_000,
+            preserveToolSurface = true,
+            requestedDefinitionTokens = 24_000,
+        )
+        val afterHistoryPressure = remainingOptionalToolDefinitionBudget(
+            remainingOperationalTokens = 30_000,
+            coreDefinitionTokens = 14_000,
+            preserveToolSurface = false,
+            requestedDefinitionTokens = 24_000,
+        )
+        assertEquals(24_000, beforeRegistration)
+        assertEquals(16_000, afterRegistration)
+        assertEquals(4_000, afterHistoryPressure)
+        assertTrue(afterHistoryPressure < afterRegistration)
+    }
+
     @Test
     fun optionalToolsNeverExceedActualCapacityAfterCoreSchemas() {
         for (remaining in listOf(0, 128, 8_000, 16_000, 24_000, 100_000)) {
