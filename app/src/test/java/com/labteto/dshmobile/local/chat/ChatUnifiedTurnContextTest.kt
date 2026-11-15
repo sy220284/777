@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
