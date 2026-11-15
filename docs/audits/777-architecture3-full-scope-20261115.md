@@ -212,7 +212,7 @@ Session EventLog 为历史和恢复唯一持久源，分页/检查点/投影从�
 
 ### 12.2 被误当作“保护”而妨碍正常任务的限制
 
-- **显式技能硬截断**：原先读到完整规则后只发送最前 18,000 字符，且发送前另外固定拒绝超过 24,000 字符。两项与所选模型的实际容量不一致，用户选择的技能尾部规则可能遗漏。现把完整显式技能作为本轮输入，保留真实模型上下文容量、API 错误和请求恢复机制；自动附加的其他固定技能仍按预览预算提供分页查阅，避免无关文档一次挤占上下文。
+- **显式技能硬截断**：原先读到完整规则后只发送最前 18,000 字符，且发送前另外固定拒绝超过 24,000 字符。两项与所选模型的实际容量不一致，用户选择的技能尾部规则可能遗漏。现把完整显式技能作为本轮输入，保留真实模型上下文容量、API 错误和请求恢复机制；用户在当前任务主动固定的其他技能也完整加载；未选中的已安装技能仍按目录发现。完整规则是否适合当前请求交由模型真实上下文预算判断。
 - **过宽工具关键词**：原 Android 工具每个均匹配“手机、应用、界面、通知、剪贴板、虚拟屏”；MCP、Runtime、Automation 也存在工具族共享宽泛关键词。导致一次语义命中预选整组工具，消耗真实模型工具定义预算，后续需要再发现所需工具。现改为由工具注册来源维护逐操作匹配词，能力目录与显式名称查找依然可找到全部工具。
 - **任务身份晚于工具表创建**：Work 第一次实际生成工具表时仍可能认作新任务而清掉下一步候选。当前在 `prepare` 取得真实用户任务后确立该边界，再执行工具预选；同一任务中的临时续跑不再覆盖用户/Agent 的显式选择。
 - **报告状态与执行事实混淆**：已注册、已选候选、下一步可用、实际已进入模型工具表和真实执行成功分别由各自事实证明。候选提示不能提前报告已执行或已授权；已注册工具仍可在下一步用精确选择加载。
@@ -230,3 +230,30 @@ Session EventLog 为历史和恢复唯一持久源，分页/检查点/投影从�
 - 新增或更新：`LocalWorkToolSurfaceFocusTest`、`LocalWorkSkillActivationTest`、`LocalWorkPromptContextTest`、`AndroidDevicePluginTest`、`AutomationToolContractTest`、`AndroidRuntimePluginTest`、`McpToolBridgePluginTest`。
 - 全仓静态审计仍由 `.github/workflows` 的架构 3.0 CI 和 `tools/audit/scan-callgraph.py` 自动生成逐文件证据；最终 Android 编译、JVM 用例和模拟器路径以 PR 当前 HEAD 的对应 CI 回执判定。
 - 审计只将已改生产代码列为“完成修改”。通过 CI 是功能回归证据，涉及具体机型权限、供应商模型实际窗口与长时间后台执行仍需对应真实设备/服务环境回执。
+
+## 十三、全链路审计追加：任务中段能力、编排结果与固定技能
+
+本节记录 PR #924 之后追加的**真实源码修改**；实现位置、回归用例和验收依据一一对应，避免仅在文档承诺改善。
+
+| 用户操作路径 | 已证实的旧阻碍 | 本轮实现 | 可检验回归 |
+|---|---|---|---|
+| 长需求 → 意图识别 → 工具预选 | `LocalToolRouter.relevantOptionalToolNames` 仅搜索输入首尾各 6000 字符，忽略长需求中段的明确工具指令 | 对当轮完整输入匹配注册工具名称及每个工具自行声明的关键词，并沿用已注册工具与模型工具预算；调用授权不变 | `LocalToolRouterTest.longTaskIntentRecognizesExplicitToolsInTheMiddleWithoutSilentSlicing` |
+| 明确选择 → 多个扩展工具 → 模型工具表 | `select:` 先以固定 128 个名称限额拒绝任务，实际工具定义预算尚未计算 | 允许完整选择名称集，去重后交给实际注册/曝光/模型定义预算决定可用范围；未装入工具仍给出可见提示与后续加载办法 | `LocalToolRouterTest.exactCapabilitySelectionSupportsLargeBatchesWithoutTruncation`（180 项） |
+| 用户固定技能 → 本轮模型上下文 | 附加固定技能受到额外 18000 字符总额分配，多个长技能被静默替换成加载提示 | 用户明确固定的所有技能按顺序完整注入；未选中的技能只提供检索目录，真正容量由模型请求层判定 | `LocalWorkSkillActivationTest.twoLongPinnedSkillsKeepTheirCompleteRulesWithoutSilentCharacterBudget`、`explicitSkillAndOtherPinsStayCompleteWithoutDoubleLoading` |
+| 工具编排 → 前序大结果 → 提取具体字段 → 下步执行 | Code Mode 对前序整个结果固定限制 128000 字符、字段固定限制 8192 字符，导致大文档里的小 ID 和合理长文本无法传递 | 先读取持久结构化结果并提取目标字段，再以整个展开后的子工具参数预算校验。子工具仍由 ToolRegistry 校验参数、权限和执行回执 | `CodeModePluginTest.largeDurableDocumentCanPassOnlyTheRequestedSmallField`、`longSelectedFieldFlowsToNextToolUnderActualExpandedArgumentBudget` |
+| 编排预检 → 临时结果 → 写操作 | 新增延迟参数预检后，旧测试使用未声明真实入参的工具桩，先被参数预检阻断，掩盖临时结果隔离测试本意 | 修正测试工具的完整 JSON 参数契约，明确验证临时结果仍不得传递给下步写操作 | `CodeModePluginTest.ephemeralResultCannotFlowIntoLaterMutation` |
+
+### 功能运行冲突与使用体验判定
+
+- **注册与模型曝光**：任何已注册扩展都有可发现入口；当轮实际曝光受模型容量约束，且 Code Mode 只能使用冻结工具表中的真实注册工具，防止模型凭名称越权调用。这一边界属于真实执行合同。
+- **编排与审批**：编排只是顺序调度，子工具仍独立产生回执；只读失败可以有明确的部分完成状态，写操作与未知副作用在确认前不会自动复试。这能避免用户被虚假的“执行完成”误导。
+- **任务和技能**：用户选中的内容应优先完整交付到模型；固定字符配额会吞掉必要规则，应按所选模型的实际容量与用户本轮任务匹配。
+- **Android 权限与后台**：已授权和监听器已连接是两种事实。Android 官方 `NotificationListenerService` 文档明确允许在连接恢复前请求 `requestRebind`；持久自动任务使用 `WorkManager` 的可重建调度。保留 Android 平台权限与前台服务规定。
+- **跨域责任**：Shell 负责导航；Chat 管理对话；Work 管理目标、步骤、工具与成果；Automation 负责排程并通过原 Chat/Work Port 调用；Tools 管理注册和执行；Settings 展示权威配置。这与架构 3.0 一致，减少重复状态源及旁路。
+
+### 证据来源与验收原则
+
+- 仓库权威文档：`docs/ARCHITECTURE.md`、`docs/SYSTEM-AUDIT-GUIDE.zh-CN.md`、`docs/UI-UX.zh-CN.md`；全仓调用关系由 `tools/audit/scan-callgraph.py` 的 CI 构建产物判定。
+- Android 官方规范：[NotificationListenerService](https://developer.android.com/reference/android/service/notification/NotificationListenerService)；[持久后台任务与 WorkManager](https://developer.android.com/develop/background-work/background-tasks/persistent)。
+- Kotlin 官方规范：[协程取消与异常](https://kotlinlang.org/docs/exception-handling.html)。
+- 回归以**最后一次提交 HEAD** 的实际 GitHub Actions 结果判定，不以测试新增数量、之前某个 SHA 的通过状态或静态扫描代替 Android 设备验收。
