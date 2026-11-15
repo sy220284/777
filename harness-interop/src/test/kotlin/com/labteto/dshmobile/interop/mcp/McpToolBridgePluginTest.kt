@@ -120,6 +120,10 @@ class McpToolBridgePluginTest {
         try {
             plugin.connectHttpFromUi(registry.context, "selftest", "https://example.com/mcp")
             assertEquals(listOf("mcp_selftest_echo"), plugin.serverSnapshots().single().tools)
+            val remoteKeywords = requireNotNull(registry.context.tools.get("mcp_selftest_echo"))
+                .metadata.discoveryKeywords
+            assertTrue("mcp_selftest_echo" in remoteKeywords)
+            assertFalse("仅提到 MCP 不应预选全部远端工具", "mcp" in remoteKeywords)
             val result = registry.context.tools.execute("mcp_selftest_echo",
                 buildJsonObject { }, context = ToolContext(approval = { true }))
             assertFalse(result.isError)
