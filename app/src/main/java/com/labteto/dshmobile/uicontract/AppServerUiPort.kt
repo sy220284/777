@@ -28,6 +28,27 @@ sealed interface UiAppServerReply {
     data class Settings(val receipt: SettingsUiReceipt) : UiAppServerReply
 }
 
+/** Typed query envelope: one App Server entry for state reads, same owner-issued snapshots. */
+sealed interface UiAppServerRead {
+    data object Chat : UiAppServerRead
+    data object Work : UiAppServerRead
+    data object Sessions : UiAppServerRead
+    data object Agents : UiAppServerRead
+    data object Automations : UiAppServerRead
+    data object Settings : UiAppServerRead
+    /** Null query lists registered capabilities, nonblank query uses live discovery ranking. */
+    data class Capabilities(val query: String? = null, val limit: Int = 50) : UiAppServerRead
+}
+sealed interface UiAppServerState {
+    data class Chat(val snapshot: ChatSceneSnapshot) : UiAppServerState
+    data class Work(val snapshot: WorkConversationSceneSnapshot) : UiAppServerState
+    data class Sessions(val snapshot: UiSessionsSnapshot) : UiAppServerState
+    data class Agents(val snapshot: UiWorkTeamSnapshot) : UiAppServerState
+    data class Automations(val snapshot: UiAutomationSnapshot) : UiAppServerState
+    data class Settings(val snapshot: UiSettingsSnapshot) : UiAppServerState
+    data class Capabilities(val registered: List<UiToolCapabilitySnapshot>) : UiAppServerState
+}
+
 /** Single in-process Android client endpoint. The exposed ports are the one existing owners. */
 interface AppServerUiPort {
     val chat: ChatUiPort
@@ -39,6 +60,8 @@ interface AppServerUiPort {
     val settings: SettingsUiPort
     val workRead: WorkReadUiPort
     fun manifest(): UiAppServerManifest
+    /** Read one Feature owner without activating any unrelated owner. */
+    fun read(query: UiAppServerRead): UiAppServerState
     /** Notifications invalidate owner snapshots; no shadow EventLog or global sequence is created. */
     val notices: Flow<UiAppServerNotice>
     suspend fun submit(command: UiAppServerCommand): UiAppServerReply

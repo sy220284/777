@@ -25,3 +25,7 @@
 ### 审核边界
 
 接口库存的静态引用只定位审计候选，是否冗余还须以装配、实际运行和迁移历史核验。此入口集中的是客户端访问方式；各 Feature 继续拥有单一写入权和独立的恢复事实。
+
+## 统一状态读取
+
+`read(UiAppServerRead)` 将 Chat、Work、Session、Agent、Automation、Settings、Capabilities 的已有快照组成一套查询协议。每次只访问对应功能的状态 Owner；`Capabilities` 复用实时 `ToolRegistry` 的目录/检索结果，按 limit 限制数据量。客户端可搭配 `notices` 收到状态变化后针对性刷新，不建立新的全局影子状态或重复持久化。

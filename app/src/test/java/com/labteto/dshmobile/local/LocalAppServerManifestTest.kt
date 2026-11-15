@@ -33,9 +33,60 @@ import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.UiAppServerCommand
 import com.labteto.dshmobile.uicontract.UiAppServerReply
+import com.labteto.dshmobile.uicontract.UiAppServerRead
+import com.labteto.dshmobile.uicontract.UiAppServerState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import org.junit.Assert.assertThrows
 
 class LocalAppServerManifestTest {
+
+    @Test fun typedReadQueriesOnlyActivateRequestedOwner() {
+        val activated = mutableListOf<String>()
+        val invoked = mutableListOf<String>()
+        val settingsSnapshot = UiSettingsSnapshot(model = "test-model")
+        val settings = Proxy.newProxyInstance(
+            SettingsUiPort::class.java.classLoader, arrayOf(SettingsUiPort::class.java)
+        ) { _, method, _ ->
+            invoked += "settings." + method.name
+            when (method.name) {
+                "getInitialState" -> settingsSnapshot
+                else -> error("Unexpected Settings method: " + method.name)
+            }
+        } as SettingsUiPort
+        val tools = Proxy.newProxyInstance(
+            ToolsManagementUiPort::class.java.classLoader, arrayOf(ToolsManagementUiPort::class.java)
+        ) { _, method, args ->
+            invoked += "tools." + method.name
+            when (method.name) {
+                "capabilityCatalogue" -> emptyList<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot>()
+                "discoverCapabilities" -> emptyList<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot>()
+                else -> error("Unexpected Tools method: " + method.name)
+            }
+        } as ToolsManagementUiPort
+        val server = LocalAppServer(
+            chatOwner = Provider { error("Chat owner accessed by another Feature") },
+            workOwner = Provider { error("Work owner accessed by another Feature") },
+            sessionOwner = Provider { error("Session owner accessed by another Feature") },
+            agentOwner = Provider { error("Agent owner accessed by another Feature") },
+            automationOwner = Provider { error("Automation owner accessed by another Feature") },
+            toolsOwner = Provider { activated += "tools"; tools },
+            settingsOwner = Provider { activated += "settings"; settings },
+            workReadOwner = Provider { error("Work Read owner accessed by another Feature") },
+        )
+        assertEquals(UiAppServerState.Settings(settingsSnapshot), server.read(UiAppServerRead.Settings))
+        assertEquals(listOf("settings"), activated)
+        assertEquals(listOf("settings.getInitialState"), invoked)
+        assertEquals(UiAppServerState.Capabilities(emptyList()), server.read(
+            UiAppServerRead.Capabilities("android", 10),
+        ))
+        assertEquals(listOf("settings", "tools"), activated)
+        assertEquals(listOf("settings.getInitialState", "tools.discoverCapabilities"), invoked)
+        assertThrows(IllegalArgumentException::class.java) {
+            server.read(UiAppServerRead.Capabilities("android", 0))
+        }
+        assertEquals(2, activated.size)
+    }
+
 
     @Test fun allCommandsDelegateToOneExactOwnerWithoutStartingOtherFeatures() = runBlocking {
         val activated = mutableListOf<String>()

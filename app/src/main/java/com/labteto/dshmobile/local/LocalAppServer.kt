@@ -14,6 +14,8 @@ import com.labteto.dshmobile.uicontract.UiAppServerManifest
 import com.labteto.dshmobile.uicontract.UiAppServerNotice
 import com.labteto.dshmobile.uicontract.UiAppServerCommand
 import com.labteto.dshmobile.uicontract.UiAppServerReply
+import com.labteto.dshmobile.uicontract.UiAppServerRead
+import com.labteto.dshmobile.uicontract.UiAppServerState
 import com.labteto.dshmobile.uicontract.WorkAgentUiPort
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
@@ -66,6 +68,21 @@ internal class LocalAppServer @Inject constructor(
     override val workRead: WorkReadUiPort get() = workReadOwner.get()
 
     override fun manifest(): UiAppServerManifest = localAppServerManifest()
+
+    override fun read(query: UiAppServerRead): UiAppServerState = when (query) {
+        UiAppServerRead.Chat -> UiAppServerState.Chat(chat.snapshot())
+        UiAppServerRead.Work -> UiAppServerState.Work(work.snapshot())
+        UiAppServerRead.Sessions -> UiAppServerState.Sessions(session.snapshot())
+        UiAppServerRead.Agents -> UiAppServerState.Agents(agents.snapshot())
+        UiAppServerRead.Automations -> UiAppServerState.Automations(automation.snapshot())
+        UiAppServerRead.Settings -> UiAppServerState.Settings(settings.initialState)
+        is UiAppServerRead.Capabilities -> {
+            require(query.limit > 0) { "能力目录读取数量须大于零" }
+            val matches = if (query.query.isNullOrBlank()) tools.capabilityCatalogue()
+                else tools.discoverCapabilities(query.query, query.limit)
+            UiAppServerState.Capabilities(matches.take(query.limit))
+        }
+    }
 
     /** Subscribing, not constructing the client, activates change streams of the owners. */
     override val notices: Flow<UiAppServerNotice> = flow {
