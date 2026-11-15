@@ -469,7 +469,10 @@ internal class LocalWorkAgentTurnExecutor(
                                 investigationContext + reusableDiscoveryContext) +
                             estimateModelTokens(workPromptContext.skill)
                     var historyCompacted = false
-                    if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
+                    val recoveryNeedsBudget = binding.enabledOptionalTools
+                        .hasBudgetOmittedRecoveryCandidate(preliminarySelection.omittedReasons)
+                    if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep) ||
+                        recoveryNeedsBudget) {
                         LocalWorkSummarySettings.attach(context)
                         val extra = productContextTokens + estimateModelTokens(preliminarySelection.schemas.toString())
                         if (LocalWorkSummarySettings.state.value) {
@@ -524,6 +527,9 @@ internal class LocalWorkAgentTurnExecutor(
                         workTurnToolRuntime.selectSchemas(runPolicy, binding)
                     } else preliminarySelection
                     workTurnToolRuntime.recordSchemaAdmission(binding, finalSelection)
+                    // One recovery-driven compaction attempt per rejected model step.
+                    // Further calls must not spin on the same unobtainable capacity.
+                    binding.enabledOptionalTools.finishCapacityCheck()
                     val advertisedTools = runToolSurface.next(finalSelection.schemas)
                     latestAcceptedSamplingRevision = observedSteer
                     val tools = modelToolStepSurface.capture(
