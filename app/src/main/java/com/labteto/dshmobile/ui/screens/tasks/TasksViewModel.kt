@@ -16,6 +16,7 @@ import com.labteto.dshmobile.uicontract.UiAutomationSchedule
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED, PAUSED, RESUMED, OPERATION_FAILED, OPERATION_REJECTED }
 enum class PlannerUiError { SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
@@ -68,15 +70,17 @@ class TasksViewModel @Inject constructor(
 
     fun refresh() = viewModelScope.launch {
         mutableState.update { it.copy(loading = true) }
-        val result = runTaskManagementOperation({ AutomationUiReceipt.Applied() }, {
-            automation.snapshot().tasks
-        })
-        mutableState.update { it.copy(
-            tasks = result.tasks ?: it.tasks,
-            loading = false,
-            managementFailed = result.failed,
-            managementError = result.failureMessage,
-        ) }
+        try {
+            val snapshot = withContext(Dispatchers.IO) { automation.snapshot() }
+            mutableState.update { it.copy(tasks = snapshot.tasks, loading = false,
+                managementFailed = false, managementError = null) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            AppLog.failure("TaskScheduling", "refresh_tasks", failure)
+            mutableState.update { it.copy(loading = false, managementFailed = true,
+                managementError = failure.message) }
+        }
         observeTasks()
     }
 
@@ -98,9 +102,9 @@ class TasksViewModel @Inject constructor(
                     managementFailed = result.failed,
                     managementError = result.failureMessage,
                     notice = when {
+                        result.accepted -> success
                         result.failed -> TasksNotice.OPERATION_FAILED
-                        !result.accepted -> TasksNotice.OPERATION_REJECTED
-                        else -> success
+                        else -> TasksNotice.OPERATION_REJECTED
                     },
                 ) }
             } finally {
@@ -172,7 +176,7 @@ class TasksViewModel @Inject constructor(
                     managementFailed = result.failed,
                     managementError = result.failureMessage,
                 ) }
-                onComplete(result.accepted && !result.failed)
+                onComplete(result.accepted)
             } finally {
                 mutableState.update { it.copy(savingEditor = false) }
             }
@@ -214,7 +218,7 @@ class TasksViewModel @Inject constructor(
                     managementFailed = result.failed,
                     managementError = result.failureMessage,
                 ) }
-                onComplete(result.accepted && !result.failed)
+                onComplete(result.accepted)
             } finally {
                 mutableState.update { it.copy(busyIds = it.busyIds - task.id) }
             }

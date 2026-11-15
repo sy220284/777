@@ -110,3 +110,14 @@ CI 回归复核：此前一次执行的 3569 项 JVM 测试中有 2 项失败，
 其中 Hilt `WorkReadUiPort` 重复绑定已在 `b0f00409` 消除：保留 Work Feature 中唯一 `@Binds`，删除组合根重复的 `@Provides`。固定快照通过证明此前 Dagger 编译失败已修复。本节记录的独立快照验收不覆盖后续对 Automation UI 的提交；最终 PR 交付仍以清理临时工作流后当前 HEAD 的六项标准 GitHub Actions 完成结果为准。
 
 用于本次证据补采的临时工作流已从 PR 分支退出，避免将一次性验证路径留作常驻生产配置。
+
+## 自动任务 Feature 入口与任务回执一体化（2026-11-15）
+
+基于 `docs/ARCHITECTURE.md` 和功能树逐条追踪了“任务列表／手工创建／编辑／角色事件规划／交互策略／暂停恢复／立即运行 → 校验和身份 → 调度与落库 → 回执 → UI”。
+
+- **统一入口和真实所有者**：`TasksViewModel` 通过 `AutomationUiPort` 读取快照并提交 `AutomationUiCommand`；角色事件规划改用 `AutomationUiPort.planAndSave`，复用其中的会话身份、代次检查和调度器。移除无消费者的 `LocalAutomationPlanningFacade`，避免规划、权限和持久化再分第二条 UI 写入链。
+- **操作失败信息回传**：`LocalAutomationUiPortComposition` 明确拒绝空任务和非 Chat 策略编辑；调度器的实际异常通过 `Failed` 回执传出，保留取消语义和真实日志。UI 把过期会话、代次冲突、缺失任务和执行失败分别显示，不再把未知失败折成通用 `false`。
+- **副作用受理与读取分开**：`runTaskManagementOperation` 对每个用户指令最多提交一次，并在收到真实 `Applied` 后独立刷新列表。若操作已受理但列表刷新失败，回执仍保持已受理，UI 提示刷新问题；创建/编辑界面按实际受理结果关闭，避免重复建立自动任务。纯刷新直接调用只读 `snapshot`，不再构造虚拟成功回执。
+- **运行时回归**：`AutomationPlannerUiControllerTest` 覆盖单次规划提交、过期任务拒绝和真实失败原因；`TaskManagementOperationTest` 覆盖遗失回执不重放、操作拒绝、受理后列表刷新失败以及取消传播。已有 Android 设备互动、插件和持久化回归由 CI 对最新 HEAD 执行。
+
+安全与恢复仍由当前 Automation Task Store 代次、Session Owner、系统调度器和真实设备授权负责。UI 持有加载/提示状态，不新增任务事实源、定时任务或第二套队列。最新 CI 的完成状态以对应源提交实际工作流回执为准。

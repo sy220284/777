@@ -44,7 +44,9 @@ internal suspend fun runTaskManagementOperation(
     catch (error: Exception) {
         AppLog.failure("TaskScheduling", "refresh_after_management", error)
         failed = true
-        if (message == null) message = error.message
+        if (receipt is AutomationUiReceipt.Applied) {
+            message = "任务操作已受理，但列表刷新失败：${error.message ?: "请重试刷新"}"
+        } else if (message == null) message = error.message
         null
     }
     TaskManagementResult(receipt is AutomationUiReceipt.Applied, failed, tasks, message)
