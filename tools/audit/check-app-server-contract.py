@@ -98,6 +98,9 @@ for path in sorted(contracts.glob("*.kt")):
                              "consumer_count": len(consumers), "consumers": consumers})
 names = [entry["name"] for entry in ui_contracts]
 assert len(names) == len(set(names)), "Duplicate UI contract interface declaration"
+unused_ports = [entry for entry in ui_contracts
+                if entry["name"].endswith("UiPort") and entry["consumer_count"] == 0]
+assert not unused_ports, "Unconnected public UI ports: " + ", ".join(row["name"] for row in unused_ports)
 assert all(name in names for name in ("AppServerUiPort", "ChatUiPort", "WorkConversationUiPort",
     "SessionUiPort", "AutomationUiPort", "ToolsManagementUiPort", "SettingsUiPort", "WorkAgentUiPort",
     "FilesUiPort", "AttachmentUiPort", "UiQueuedUserPort", "MediaUiPort", "UsageUiPort",

@@ -41,3 +41,7 @@
 ## 媒体、记忆、计费与用量
 
 App Server 还通过惰性注入公开 `media / memory / pricing / usage` 四个原有功能接口。媒体与记忆的类型化指令通过 `UiAppServerCommand.Media / Memory` 传入原 Owner 并返回原操作回执；用量与官方价格通过 `read(Usage/Pricing)` 查询原始只读快照。Work/Chat 的媒体创作和用量显示已从具体运行类改为 App Server 接入。
+
+## 未连接接口清理
+
+全量 UI 声明及消费引用盘点确认，`ConversationReadingUiPort`、`ConversationShellUiPort`、`HostPreferencesUiPort`、`ModelPerformanceUiPort`、`ConversationReasoningUiPort` 只有类型定义，没有实际功能 Owner、UI 消费者和业务调用。对应四份声明文件已删除，避免未来出现表面上存在、实际上没有可执行能力的重复入口。CI 接口盘点增加 `UiPort` 实际消费者非空检查，防止同类空接口重新积累；此检查基于引用关系筛查候选，运行中的接口仍以编译和设备验证为准。
