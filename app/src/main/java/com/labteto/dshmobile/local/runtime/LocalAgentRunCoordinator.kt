@@ -387,6 +387,7 @@ internal class LocalAgentRunCoordinator(
         }
         if (status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()) {
             val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
+                ?: return recoveryContextFailure(runId, route)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
@@ -401,6 +402,7 @@ internal class LocalAgentRunCoordinator(
 
         if (kind != LocalAgentRunKind.FOREGROUND) {
             val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
+                ?: return recoveryContextFailure(runId, route)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
@@ -446,6 +448,7 @@ internal class LocalAgentRunCoordinator(
             ?: inputEvidence["input"]?.jsonPrimitive?.contentOrNull
             ?: ""
         val continuationPrompt = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
+            ?: return recoveryContextFailure(runId, route)
         val continuation = QueuedAgentInput(
             id = "run-recovery:$runId",
             content = continuationPrompt,
@@ -454,25 +457,35 @@ internal class LocalAgentRunCoordinator(
         return LocalAgentRunRecoveryDecision(runId = runId, queuedInput = continuation, route = route)
     }
 
+    private fun recoveryContextFailure(
+        runId: String,
+        route: LocalAgentRunRouteIdentity?,
+    ): LocalAgentRunRecoveryDecision = LocalAgentRunRecoveryDecision(
+        runId = runId,
+        blockedReason = "恢复上下文生成失败，已保留上次任务与执行记录；请检查诊断信息后手动继续。",
+        blockedCode = "RECOVERY_CONTEXT_FAILED",
+        route = route,
+    )
+
     private fun recoveryContinuationPrompt(
         log: LocalSessionEventLog,
         usageMode: LocalUsageMode?,
         contextPolicy: LocalAgentRunRecoveryContextPolicy?,
-    ): String {
+    ): String? {
         val policy = contextPolicy ?: return RECOVERY_CONTINUATION_PROMPT
-        val modelHistory = log.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)
-            ?.let { event -> ModelHistoryCheckpointCodec().decode(event.data) }
-            .orEmpty()
         return runCatching {
+            val modelHistory = log.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)
+                ?.let { event -> ModelHistoryCheckpointCodec().decode(event.data) }
+                .orEmpty()
             policy.decorate(
                 LocalAgentRunRecoveryContextInput(
                     usageMode = usageMode,
                     modelHistory = modelHistory,
                     basePrompt = RECOVERY_CONTINUATION_PROMPT,
                 ),
-            )
+            ).takeIf(String::isNotBlank) ?: error("工作恢复上下文为空")
         }.onFailure { AppLog.failure("AgentRecovery", "decorate_recovery_prompt", it) }
-            .getOrDefault(RECOVERY_CONTINUATION_PROMPT)
+            .getOrNull()
     }
     fun markRecoveryQueued(
         sessionId: String,
@@ -560,7 +573,7 @@ internal class LocalAgentRunCoordinator(
                 toolCallCount?.let { put("tool_call_count", it) }
                 completionReason?.let { put("completion_reason", it) }
                 sideEffect?.takeIf(String::isNotBlank)?.let { put("side_effect", it) }
-                answer?.let { put("answer", it.take(MAX_RECOVERY_OUTPUT_CHARS)) }
+                answer?.let { put("answer", it) }
                 reason?.takeIf(String::isNotBlank)?.let { put("reason", it.take(2_000)) }
             },
         )
@@ -665,7 +678,6 @@ internal class LocalAgentRunCoordinator(
         if (kind == LocalAgentRunKind.SUBAGENT) "child:${agentId ?: runId}" else kind.name.lowercase()
 
     private companion object {
-        const val MAX_RECOVERY_OUTPUT_CHARS = 20_000
         const val RECOVERY_CONTINUATION_PROMPT =
             "继续执行上次因系统中断而停止的任务。先核对已有结果，再从安全位置继续；不要重复已完成且可能产生副作用的操作。"
     }

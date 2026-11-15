@@ -17,6 +17,7 @@ import com.labteto.dshmobile.local.runtime.LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCheckpointStatus
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryContextPolicy
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import java.io.File
@@ -244,6 +245,27 @@ class LocalAgentRunCoordinatorTest {
             assertEquals("已经完成的后台结果", decision!!.completedOutput)
             assertNull(decision.queuedInput)
             assertNull(decision.blockedReason)
+        }
+    }
+
+    @Test
+    fun completeAutomationOutputSurvivesRecoveryWithoutTwentyThousandCharacterCutoff() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8,
+                input = "生成完整成果", memoryInput = "生成完整成果",
+                kind = LocalAgentRunKind.AUTOMATION,
+            )
+            val longAnswer = "完整报告内容".repeat(5_000)
+            coordinator.recordEvent(context, AgentEvent.TurnCompleted(context.runId, 2, longAnswer))
+            val checkpoint = requireNotNull(log.latest(LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT))
+            assertEquals(longAnswer, checkpoint.data["answer"]?.toString()?.trim('"'))
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val decision = requireNotNull(cold.recoveryDecision(
+                "s1", SessionRepairResult(), LocalAgentRunKind.AUTOMATION))
+            assertEquals(longAnswer, decision.completedOutput)
         }
     }
 
@@ -675,6 +697,27 @@ class LocalAgentRunCoordinatorTest {
             val cold = LocalAgentRunCoordinator(eventLogFor = { log })
             val recovered = requireNotNull(cold.recoveryDecision("s1", SessionRepairResult()))
             assertEquals(memory, recovered.queuedInput?.memoryInput)
+        }
+    }
+
+    @Test
+    fun invalidWorkRecoveryContextBlocksResumeInsteadOfFallingBackToGenericInstruction() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8,
+                input = "复杂工作原始指令", memoryInput = "复杂工作原始指令",
+            )
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val broken = LocalAgentRunRecoveryContextPolicy {
+                error("模型历史损坏：无法恢复可信上下文")
+            }
+            val result = requireNotNull(cold.recoveryDecision(
+                "s1", SessionRepairResult(), contextPolicy = broken))
+            assertEquals("RECOVERY_CONTEXT_FAILED", result.blockedCode)
+            assertNull(result.queuedInput)
         }
     }
 
