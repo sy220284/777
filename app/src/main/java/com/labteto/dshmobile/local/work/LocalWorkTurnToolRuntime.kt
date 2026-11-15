@@ -5,6 +5,7 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolAccess
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
 import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
@@ -58,6 +59,22 @@ internal class LocalWorkTurnToolRuntime(
     private val workspaceRoot: java.io.File? = null,
 ) {
     internal fun captureBindings(schemas: JsonArray) = registry.captureBindings(schemas)
+
+    /**
+     * Selection only: never executes an unexposed tool or grants permission.
+     * Explicit focus, current registry, network switches and plan scope stay authoritative.
+     */
+    internal fun prepareUnexposedForNextStep(
+        binding: LocalWorkRunBinding,
+        name: String,
+    ): Boolean {
+        val tool = registry.get(name) ?: return false
+        if (tool.exposure != ToolExposure.OPTIONAL ||
+            !execution.isNetworkSearchPermitted(name) ||
+            (binding.state.value.work.planMode &&
+                !LocalToolPolicy.allowedInPlan(name, tool.access))) return false
+        return binding.enabledOptionalTools.requestForNextStep(name)
+    }
     internal fun clear(binding: LocalWorkRunBinding) {
         execution.clearTurnCapabilities(binding.enabledOptionalTools)
         binding.enabledOptionalTools.resetTask()
@@ -142,6 +159,9 @@ internal class LocalWorkTurnToolRuntime(
                 binding.enabledOptionalTools.addAll(priority)
                 binding.enabledOptionalTools.addAll(previous)
             }
+            // An unexposed call from the previous model step outranks heuristic pins.
+            // It will still be omitted if the actual provider context cannot fit its schema.
+            binding.enabledOptionalTools.applyRequestedPriority()
             binding.enabledOptionalTools.toSet()
         }
         val selection = schemas.modelSelection(
