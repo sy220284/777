@@ -198,18 +198,21 @@ internal object LocalToolRouter {
         tools: List<HarnessTool>,
         query: String,
         limit: Int = Int.MAX_VALUE,
+        includeCore: Boolean = false,
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
         // Index vocabulary from the live registry once, then examine the full query.
         // Irrelevant long-form text does not multiply scoring work by the catalog size.
         // Unlike head/tail sampling, explicit capabilities in the middle are preserved.
-        val optionalTools = tools.filter(::isOptional)
+        val searchableTools = tools.filter {
+            isOptional(it) || (includeCore && it.exposure == ToolExposure.CORE)
+        }
         val vocabulary = HashSet<String>()
         fun index(value: String) {
             capabilitySearchTerms(value.lowercase(), splitIdentifierParts = true).forEach(vocabulary::add)
         }
-        optionalTools.forEach { tool ->
+        searchableTools.forEach { tool ->
             index(tool.name)
             index(tool.metadata.family)
             tool.metadata.discoveryKeywords.forEach(::index)
@@ -220,7 +223,7 @@ internal object LocalToolRouter {
         val terms = capabilitySearchTerms(normalized)
             .filterTo(linkedSetOf()) { it in vocabulary }
         val scored = mutableListOf<Pair<HarnessTool, Int>>()
-        for (tool in optionalTools) {
+        for (tool in searchableTools) {
             val name = tool.name.lowercase()
             val family = tool.metadata.family.lowercase()
             val keywords = tool.metadata.discoveryKeywords.map(String::lowercase)

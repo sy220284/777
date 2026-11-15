@@ -318,6 +318,9 @@ internal class LocalToolExecutionCoordinator(
                         "本轮已移除之前加载的可选扩展；所有内置 CORE 工具仍可按原策略直接调用。")
                 }.trimEnd()
             }
+            // A fuzzy match on a CORE tool is a successful discovery; nothing needs loading.
+            if (alreadyBuiltIn.isNotEmpty()) return "已找到内置工具，可直接调用：" +
+                alreadyBuiltIn.joinToString(", ") + "；执行依旧按当前权限与工具策略校验。"
             // Don't bounce the user back to guess an internal capability name.
             return "实时工具表没有精确匹配的扩展能力。请勿猜测调用不存在的工具，也不必因此放弃任务。\n" +
                 "在允许联网与写入的 Work 中，可先用 web_search / GitHub 查找可复用实现，" +

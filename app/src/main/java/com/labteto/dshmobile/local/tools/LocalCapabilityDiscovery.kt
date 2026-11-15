@@ -14,6 +14,7 @@ internal object LocalCapabilityDiscovery {
         val optional: List<HarnessTool>,
         val core: List<String>,
         val unavailable: List<String>,
+        val ranked: List<HarnessTool>,
     )
 
     fun resolve(registered: List<HarnessTool>, query: String, limit: Int = Int.MAX_VALUE): Resolution {
@@ -21,14 +22,17 @@ internal object LocalCapabilityDiscovery {
         val exact = LocalToolRouter.exactSelection(query)
         val available = registered.filter { it.exposure != ToolExposure.INTERNAL }
         val byName = available.associateBy(HarnessTool::name)
-        val core = exact.orEmpty().filter { byName[it]?.exposure == ToolExposure.CORE }
-        val optional = if (exact == null) {
-            LocalToolRouter.search(available, query, limit)
+        val ranked = if (exact == null) {
+            LocalToolRouter.search(available, query, limit, includeCore = true)
         } else {
-            exact.mapNotNull(byName::get).filter(LocalToolRouter::isOptional).take(limit)
+            exact.mapNotNull(byName::get).take(limit)
         }
-        val matchedNames = (core + optional.map(HarnessTool::name)).toSet()
-        return Resolution(exact, optional, core, exact.orEmpty().filterNot(matchedNames::contains))
+        val core = ranked.filter { it.exposure == ToolExposure.CORE }.map(HarnessTool::name)
+        val optional = ranked.filter(LocalToolRouter::isOptional)
+        val matchedNames = ranked.map(HarnessTool::name).toSet()
+        return Resolution(
+            exact, optional, core, exact.orEmpty().filterNot(matchedNames::contains), ranked,
+        )
     }
 
     fun catalogue(registered: List<HarnessTool>): List<LocalToolCatalogueEntry> =
@@ -47,7 +51,7 @@ internal object LocalCapabilityDiscovery {
         if (LocalToolRouter.isInventoryRequest(query)) return catalogue(registered).take(limit)
         val resolution = resolve(registered, query, limit)
         val byName = catalogue(registered).associateBy(LocalToolCatalogueEntry::name)
-        return (resolution.core + resolution.optional.map(HarnessTool::name))
+        return resolution.ranked.map(HarnessTool::name)
             .distinct().take(limit).mapNotNull(byName::get)
     }
 

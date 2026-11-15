@@ -22,6 +22,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolRouterTest {
+    @Test fun coreToolsAreSearchableWithoutAddingOptionalDefinitions() {
+        val registered = listOf(
+            tool("read", "读取文件", ToolExposure.CORE, "文件"),
+            tool("write", "写文件", ToolExposure.CORE, "文件"),
+            tool("screen_reader", "读取安卓屏幕", ToolExposure.OPTIONAL, "Android", setOf("屏幕")),
+        )
+        val result = LocalCapabilityDiscovery.resolve(registered, "read")
+        assertEquals(listOf("read"), result.core)
+        assertTrue(result.optional.isEmpty())
+        assertEquals(listOf("read"),
+            LocalCapabilityDiscovery.searchCatalogue(registered, "read", 12).map { it.name })
+        assertEquals(listOf("read", "write"),
+            LocalCapabilityDiscovery.catalogue(registered)
+                .filter { it.access.isNotBlank() && it.name != "screen_reader" }.map { it.name })
+    }
+
     @Test fun modelAndUiUseOneCapabilityMatcherAndDirectory() {
         val registered = listOf(
             tool("read", "文件读取", ToolExposure.CORE, "文件"),
