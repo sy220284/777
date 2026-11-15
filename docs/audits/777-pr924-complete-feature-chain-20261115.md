@@ -56,3 +56,33 @@
 同源审计补充：Work 的 GitHub 来源身份此前只使用仓库/路径/分支，`fetch_pr` 和 `fetch_pr_file_patch` 的 `pr_number` 未进入事实键；同仓库不同 PR（甚至不同 PR 中同路径补丁）会合并为同一份来源。现以仓库 + PR 编号建立独立资源身份，完整来源键同时纳入 `pr_number` / `issue_number`，界面展示可区分 `owner/repo#PR924` 与 `owner/repo#PR925`。测试覆盖 PR 文档、同路径补丁、调查进度与身份去重。
 
 CI 回归复核：此前一次执行的 3569 项 JVM 测试中有 2 项失败，已定位到 Work 的 `prepare()` 在保留精确工具选择后，又调用共享工具预激活重排并清除 `exactFocus`；现在对仍处于用户精确选择状态的 Work 任务直接沿用原模型工具集，仅新任务触发重新预激活。归档游标字符边界测试从带状态事件记录的综合用例中独立，直接测试纯解析行为，消除回归测试对无关事件写入顺序的依赖。
+
+
+## 基于 PR #924 完整快照的纵向复核与结构性修复（2026-11-15）
+
+### 固定证据与验收方式
+
+- 本轮以 PR 的 `84b364b47dd926f8bb78ecdd7f64f985a3598bb2` 提交为原始快照，借助仅执行一次的 GitHub Actions `git ls-files` 导出、在本地展开，完整覆盖 **2,339 个受跟踪文件**。导出流程已清理，避免后续持续运行。
+- 本地实际执行 `tools/audit/scan-callgraph.py`、`.github/scripts/check-local-architecture-boundaries.py`、`.github/scripts/check-local-performance-invariants.py`、`git diff --check`。首次静态扫描统计：生产源码 **1,152**、测试源码 **719**、显式导入 **5,454**、调用候选 **6,564**；显式 import 环 **0**，四条跨 Feature 引用走 Automation 调用 Chat/Work 发布的 Port；边界与性能规则 **PASS**。静态扫描仅证明依赖边界，不把调用候选当作执行成功。
+- PR 分支并行提交会触发 workflow `cancel-in-progress`，因此固定 `fb8cb6c3b2d2505f81f50a15211574445d70deeb` 另起独立验收 run **43708938236**，含全部应用和核心 JVM 单测、Android 调试和测试包编译，以及 Android 36 上 Chat/Work、SQLite 会话迁移、插件市场/凭据/OAuth/Worker 四项验证任务。此验收作业无“新提交即取消”设置，临时流程创建后已删除，后续状态以实际工作流回执为准。
+
+### 功能链路与所有权复核
+
+| 产品域 | 已按源码复查的完整路径 | 变更或保留结论 |
+| --- | --- | --- |
+| Shell/Settings | 路由/权限入口 → Feature Port → Android 授权状态与服务连接事实 → 界面状态 | 启动路由、用户授权及监听连接保持各自的单一事实源；真实系统许可与用户明确同意仍作为执行边界 |
+| Chat | 用户输入、附件、角色/群聊 → Turn Owner → Model/Tool → Session EventLog → 消息、任务与回显 | 多模态意图沿用完整文本；身份/历史数据和消息完成事实由 Session 管理，避免根据显示文案重建状态 |
+| Work | 创建目标/细纲/待办 → ToolRegistry → 工具审批与执行 → Goal/Session EventLog → 检查点、进度和结果 | 修复长目标截断、文件搜索不完整、跨 PR 证据混同、长任务冷恢复输入丢失、检查点重复存储、完成结果截断、恢复错误静默替换等问题 |
+| Automation | 用户明确确认计划 → 解析事件与执行提示 → Scheduler/Worker → 持久结果/回执 | 完整保留用户事件要求和模型生成的执行提示；保留明确授权、系统实际调度边界和重放副作用核验；未创建任何新的定时任务 |
+| Tools/扩展 | 注册契约 → 工具发现、模型可见表 → 实际参数验证与授权 → 原始工具结果 → Work 证据 | GitHub PR、PR patch、Diff、Issue、Commit、Blob、Git 文件读取得到不同的事实身份；访问权限/参数契约仍由原注册表执行 |
+| Shared Files/Session/Model | 本地工作区/历史检索 → 完整遍历、关联排序、游标续查 → 保存/读取 → UI 进度 | 消除工作区搜索固定五万扫描、五秒与一万匹配的误判；明确限量查询使用有界堆；改为搜索快照+页游标，并阻断过期查询覆盖新结果 |
+
+### 根因、修改点和防回归
+
+1. **来源身份漏维度**：`local/work/LocalWorkInvestigationRuntime.kt` 的来源分类此前缺 GitHub Diff、Commit、PR Patch、Issue、Blob 等实际读取工具，对身份缺少 Commit SHA / Blob SHA / 比较基线等字段。补充来源键和界面上可区分的标签，保持已有 `#PR924` 展示形式；`LocalWorkInvestigationRuntimeTest` 复查不同 PR 的同路径补丁不会合并。
+2. **长任务冷恢复丢内容、日志反复膨胀**：`local/runtime/LocalAgentRunCoordinator.kt` 的原始工作说明只保存前 8,000 字符，并在每次检查点重复写入。调整为 `agent/run-input` 一次性保存完整任务/记忆输入，版本 3 的运行检查点仅保存实际进度；历史版本按原记录恢复，缺失新版本输入时明确报告 `RECOVERY_INPUT_MISSING`，防止猜测下一步。`LocalAgentRunCoordinatorTest` 覆盖超过原阈值的任务、跨进程恢复、缺失输入。
+3. **后台完成结果与恢复上下文被替换**：完成文本此前 `take(20_000)`，丢掉后半成果；恢复上下文创建失败还会退回通用指令继续。现在终局回执保存完整结果，恢复上下文异常报告 `RECOVERY_CONTEXT_FAILED` 并保留原工作，测试包括长结果与故障注入。
+4. **文件浏览器搜索称“已完成”却遗漏结果**：`local/files/LocalWorkspace.kt` 原文件名搜索最多扫描 50,000 项、5 秒，并将最多 10,000 条结果作为最终全量。改为遍历可访问工作区真实文件，再统一相关性排序和稳定分页；明确限量列表使用 `PriorityQueue` 保留 Top-K，避免全量留存；使用同查询世代 ticket 避免旧扫描覆盖刷新结果、允许取消挂起查询。新增 `LocalWorkspaceTest` 10,024 文件、128 条一页的完整结果/唯一性/末页回归。
+5. **目标与定时事件规则静默截断**：`LocalWorkProgressCoordinator.createGoal`、`resolveWorkGoalUpdate` 取消 2,000 字符丢失；`AutomationPlanningService` 在传给模型之前与解析模型输出之后都不截断事件内容。对长目标、事件提示和持久回放增加断言，用户要求与执行规则保持字面一致。
+
+**边界原则**：改动针对合法任务的可达性、完整性、事实一致性、执行效率；文件工作区范围、模型真实上下文预算、设备/插件授权、跨项目隔离、外部写入审批与未确定副作用的人工核验仍保留。验收应核对原始源码提交、真实单测与设备回执；不得把静态调用图、工具返回的部分页面或原工作流被取消的状态写成运行通过。
