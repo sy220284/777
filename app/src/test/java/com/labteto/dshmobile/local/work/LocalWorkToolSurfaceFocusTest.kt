@@ -199,7 +199,7 @@ class LocalWorkToolSurfaceFocusTest {
         selection.add("mcp_pinned_status")
         assertTrue(selection.requestForNextStep("mcp_later_lookup"))
         assertTrue(selection.hasBudgetOmittedRecoveryCandidate(
-            mapOf("mcp_later_lookup" to "工具定义需要约 118 Token，当前可用 73")))
+            setOf("mcp_later_lookup")))
         // Internal heuristic reordering must not erase the upcoming recovery.
         selection.clear()
         selection.add("mcp_pinned_status")
@@ -213,13 +213,13 @@ class LocalWorkToolSurfaceFocusTest {
         assertEquals(listOf("mcp_later_lookup", "mcp_pinned_status"), selection.toList())
         selection.finishCapacityCheck()
         assertFalse(selection.hasBudgetOmittedRecoveryCandidate(
-            mapOf("mcp_later_lookup" to "本轮工具预算不足")))
+            setOf("mcp_later_lookup")))
         selection.markExactFocus()
         assertFalse(selection.requestForNextStep("mcp_excluded"))
         assertTrue(selection.requestForNextStep("mcp_later_lookup"))
         selection.beginNewTask()
         assertFalse(selection.hasBudgetOmittedRecoveryCandidate(
-            mapOf("mcp_later_lookup" to "本轮工具预算不足")))
+            setOf("mcp_later_lookup")))
     }
 
     @Test fun runToolSelectionReplacesRedundantPriorityCursorAndRestoresOnReset() {
