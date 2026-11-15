@@ -104,6 +104,40 @@ class LocalWorkToolSurfaceFocusTest {
         }
     }
 
+    @Test fun exactCoreOnlySelectRemovesOptionalToolsAndNormalSearchPreservesFocus() {
+        val registry = ToolRegistry().apply {
+            register(optional("mcp_pinned_status"))
+            register(optional("mcp_selected_lookup"))
+            register(HarnessTool(
+                name = "read",
+                schema = functionToolSchema("read", "Read-only built-in"),
+                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata(family = "内置"),
+                executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+            ))
+        }
+        val focus = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
+        val coordinator = LocalToolExecutionCoordinator(
+            registry = registry,
+            currentSessionId = { "focus-session" },
+            planMode = { false },
+            requestApproval = { _, _, _ -> true },
+            enabledOptionalTools = focus,
+        )
+        coordinator.searchCapabilities("select:mcp_selected_lookup", focus)
+        assertTrue(focus.exactFocus)
+        coordinator.searchCapabilities("状态", focus)
+        assertTrue("ordinary discovery should not remove explicit focus", focus.exactFocus)
+        assertTrue("mcp_selected_lookup" in focus)
+        coordinator.searchCapabilities("select:read", focus)
+        assertTrue("core-only exact selection must retain its focus", focus.exactFocus)
+        assertTrue("core-only selection must remove earlier optional schemas", focus.isEmpty())
+        focus.beginNewTask()
+        assertFalse(focus.exactFocus)
+    }
+
     private fun optional(name: String) = HarnessTool(
         name = name,
         schema = functionToolSchema(name, "Read data"),
