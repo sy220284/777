@@ -461,6 +461,8 @@ class SettingsViewModel @Inject constructor(
     fun openNotificationAccessSettings() =
         deviceCapabilitiesController.openNotificationAccessSettings()
 
+    fun repairNotificationAccess() = deviceCapabilitiesController.repairNotificationAccess()
+
     fun openAppNotificationSettings() = deviceCapabilitiesController.openAppNotificationSettings()
 
 }
