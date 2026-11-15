@@ -1077,9 +1077,9 @@ private fun StandaloneAgentRow(
                     try {
                         val result = onOperation(agent.id, operation, message)
                         detail = result.message
-                        if (result.success) toast.second(result.message)
+                        if (result.accepted) toast.second(result.message)
                         else toast.second("操作未完成：" + result.message)
-                        if (result.success && operation == UiWorkAgentOperation.SEND_MESSAGE) draft = ""
+                        if (result.accepted && operation == UiWorkAgentOperation.SEND_MESSAGE) draft = ""
                     } finally { busy = false }
                 }
             }
