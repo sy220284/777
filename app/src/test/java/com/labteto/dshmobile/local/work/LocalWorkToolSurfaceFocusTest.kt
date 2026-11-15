@@ -205,6 +205,12 @@ class LocalWorkToolSurfaceFocusTest {
         selection.add("mcp_pinned_status")
         selection.applyRequestedPriority()
         assertEquals(listOf("mcp_later_lookup", "mcp_pinned_status"), selection.toList())
+        // A compaction pass causes the tool surface to be recomputed from real
+        // history. Simulate automatic pin selection occurring again beforehand.
+        selection.clear()
+        selection.addAll(listOf("mcp_pinned_status", "mcp_later_lookup"))
+        selection.applyRequestedPriority()
+        assertEquals(listOf("mcp_later_lookup", "mcp_pinned_status"), selection.toList())
         selection.finishCapacityCheck()
         assertFalse(selection.hasBudgetOmittedRecoveryCandidate(
             mapOf("mcp_later_lookup" to "本轮工具预算不足")))
