@@ -137,11 +137,12 @@ internal class LocalToolExecutionCoordinator(
             }
         } else false
         val selected = target ?: enabledOptionalTools
-        // Put the current user's concrete request ahead of older contextual hints.
-        // Registered tools are looked up on every run, so newly installed MCP tools need no catalog patch.
-        if (enableGitHub) enableGitHubConnectorTools(selected)
-        enableTaskRelevantOptionalTools(input, selected)
-        prepareWorkTurnCapabilities(intent.context, enableGitHub, selected, prioritizeTask = false)
+        // The old path selected current tools, then searched the four earlier user
+        // requests again. It recreated irrelevant tools in every Work request and
+        // enlarged the model schema surface. GitHub's recent-session authorization
+        // signal is checked above, but optional tool selection owns only this task.
+        // Explicit capability_search selections remain available within the run.
+        prepareWorkTurnCapabilities(input, enableGitHub, selected, prioritizeTask = true)
     }
 
     fun prepareWorkTurnCapabilities(
