@@ -117,11 +117,6 @@ internal object LocalFeatureExecutionPortModule {
 
     @Provides
     @Singleton
-    fun provideWorkReadUiPort(runtime: com.labteto.dshmobile.local.work.LocalWorkRuntime):
-        com.labteto.dshmobile.uicontract.WorkReadUiPort = runtime
-
-    @Provides
-    @Singleton
     fun provideWorkAgentUiPort(composition: LocalWorkComposition): com.labteto.dshmobile.uicontract.WorkAgentUiPort = composition.agentUi
 
     @Provides
