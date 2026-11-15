@@ -30,6 +30,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpToolBridgePluginTest {
+    @Test
+    fun genericMcpIntentPreselectsOnlyReadOnlyServerDiscovery() = runBlocking {
+        val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json)
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            val names = listOf("mcp_http_connect", "mcp_stdio_connect",
+                "mcp_server_list", "mcp_lifecycle_events", "mcp_reconnect",
+                "mcp_disconnect")
+            fun selected(term: String) = names.filter { name ->
+                term in requireNotNull(registry.context.tools.get(name))
+                    .metadata.discoveryKeywords
+            }
+            assertEquals(listOf("mcp_server_list"), selected("mcp"))
+            assertEquals(listOf("mcp_reconnect"), selected("重连MCP"))
+            assertEquals(listOf("mcp_disconnect"), selected("断开MCP"))
+        } finally {
+            plugin.uninstall(registry.context)
+        }
+    }
+
     @Test fun resourceOnlyAndFullToolCapacityUseOneConnection() = runBlocking {
         for (toolCount in listOf(0, 128)) {
             var connections = 0
