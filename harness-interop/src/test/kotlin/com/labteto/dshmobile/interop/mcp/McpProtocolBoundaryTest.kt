@@ -21,6 +21,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpProtocolBoundaryTest {
+    @Test fun protocolNegotiationFailureExplainsHowToFixTheServer() {
+        val outcome = mcpExtensionFailure("local", McpProtocolNegotiationException(), connecting = true)
+        assertEquals("MCP_PROTOCOL_NEGOTIATION_FAILED", outcome.errorCode)
+        assertTrue(outcome.content.contains("initialize"))
+        assertTrue(outcome.content.contains("protocolVersion"))
+    }
+
     @Test
     fun paginatedToolsCarryCursorAndIncludeEveryPage() = runTest {
         val cursors = mutableListOf<String?>()
