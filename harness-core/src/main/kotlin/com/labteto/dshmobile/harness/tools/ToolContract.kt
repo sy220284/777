@@ -16,6 +16,9 @@ enum class ToolExposure {
 /** Shared workspace participation is independent of permission and batch parallelism. */
 enum class ToolWorkspaceAccess { NONE, READ, WRITE }
 
+/** System capabilities are prerequisites, never permission grants. */
+enum class ToolDeviceRequirement { ACCESSIBILITY, NOTIFICATION_ACCESS }
+
 data class ToolMetadata(
     val family: String,
     val discoveryKeywords: Set<String> = emptySet(),
@@ -28,6 +31,8 @@ data class ToolMetadata(
     val finishesOnCancellation: Boolean = false,
     /** Files/processes of the selected execution environment; device/accounts remain host-owned. */
     val environmentBound: Boolean = false,
+    /** Machine-readable Android prerequisites shared by tools and task readiness UI. */
+    val requiredDeviceCapabilities: Set<ToolDeviceRequirement> = emptySet(),
 ) {
     init {
         require(family.isNotBlank()) { "工具能力族不能为空" }
