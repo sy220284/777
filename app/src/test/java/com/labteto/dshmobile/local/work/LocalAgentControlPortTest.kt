@@ -13,6 +13,20 @@ class LocalAgentControlPortTest {
             LocalSubagentHistoryMode.INHERIT_PARENT else LocalSubagentHistoryMode.ISOLATED,
     )
 
+    @Test fun persistentChildAndTeamUseTheSameLaunchRequestContract() {
+        val pinned = com.labteto.dshmobile.local.agent.LocalSubagentCapabilities()
+        val child = LocalPersistentAgentLaunchRequest(
+            task = "review", instructions = "", model = null, maxSteps = 5,
+            parentToolCallId = "call", backendCapabilities = pinned,
+        )
+        assertEquals(false, child.teamManaged)
+        val team = child.copy(requestedJobId = "job-team-1", teamManaged = true, forkParentHistory = true)
+        assertEquals("job-team-1", team.requestedJobId)
+        assertTrue(runCatching { child.copy(teamManaged = true) }.isFailure)
+        assertTrue(runCatching { child.copy(allowMutation = true) }.isFailure)
+        assertTrue(runCatching { child.copy(maxSteps = 0) }.isFailure)
+    }
+
     @Test fun typedCommandDistinguishesThreeExecutionLifecycles() {
         assertEquals(LocalAgentDispatchKind.READONLY_BACKGROUND,
             request(LocalAgentDispatchKind.READONLY_BACKGROUND).kind)

@@ -559,3 +559,16 @@ Feature、Shared Capability 和 Runtime Kernel 继续保持既定所有权、依
 ### 2026-10-09 审计机制收口
 
 存储层由 `RecoveringDocumentFile` 保留待恢复状态，`DurableFileCommit` 定义可靠提交顺序，`JournalDocumentFile` 维护有界 WAL 与缓存；领域继续拥有变更编解码和归约。上下文放置与压缩机制共享，Chat/Work 摘要内容和完整技能规则由 Feature 解释。团队使用独立事件 codec 与纯 reducer；命令副作用仍只有 `LocalAgentTeamRuntime` 所有者。Work 智能体操作、后台执行及邮箱恢复从组合根移入对应服务。运行中心完整历史使用已有 EventLog 游标，无新增持久事实库。
+
+
+## 18. 统一智能体运行、客户端契约与高级功能入口（PR #924）
+
+本机 Harness 是执行服务；Compose 是消费端。采用与 Codex App Server 的 Thread / Turn / Item 对应的 Session / Work Run / EventLog 语义；这是一组本地公开 Feature Port，不另建 socket 服务、任务账本或后台代理进程。
+
+- **唯一执行**：普通前台子智能体、普通持久子智能体、Fork 与 Team 成员复用 `LocalSubagentRunner` / `LocalPersistentJobRecoveryCoordinator`。持久子智能体与团队成员从 `LocalAgentSpawnController.startPersistent` 接收同一请求契约；Team 仅提供成员身份、任务板、消息路由和成员准入要求。
+- **唯一 Agent 控制**：`LocalWorkAgentControlRuntime` 由 Work Composition 创建一次。模型工具经 `LocalAgentControlPlane` 调用，UI 经 `LocalWorkAgentController` 调用，复用同一个 `LocalAgentControlPort`。原始 Job ID、Session owner、成员关联及 checkpoint 是真实身份；UI 仅持有快照和操作回执。
+- **唯一 UI 契约**：`WorkAgentUiPort` 发布 `UiWorkTeamSnapshot`（含 Team 与独立 Child 列表），`WorkTeamUiCommand` 是同一组类型化控制命令。旧 `WorkTeamUiPort` 仅为编译时别名，未保留第二实现。现行 V6 页面只经 `LocalWorkFeatureUiActions.agentAction` 调用该契约；Team 独有的成员和任务规则仍由 Team Owner 处理。
+- **统一展示**：工作模式的“智能体协作”入口由 `LocalAgentTeamUiState.withJobs` 从现有 Job 列表投影普通子智能体，Team 成员由 Team EventLog 派生。没有新增可写 UI 事实库。单独子智能体可查看、发消息、暂停、继续、关闭；Team 保留任务板与消息处理。
+- **高级功能按需**：日常 Work 使用单 Agent，要求独立调查时使用 Subagent，确需多成员及任务依赖时使用 Team；不让普通任务为没有运行的团队持续占用模型工具表。MCP、技能、LSP、Android 设备仍通过原 `ToolRegistry` 发现与审批，不通过 UI 获得额外权限。
+
+验收优先级：P0 持久 Job 共用启动、身份/权限/取消与恢复；P1 Work/UI Agent 契约、设备与工具曝光；P2 旧接口和展示适配清理。以本 PR 最新 HEAD 的 JVM、Android 编译/设备、插件、SQLite 和架构门禁为实际完成依据。

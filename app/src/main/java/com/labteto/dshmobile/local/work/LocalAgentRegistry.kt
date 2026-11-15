@@ -89,9 +89,8 @@ internal class LocalAgentRegistry(private val jobs: LocalJobManager) {
     /** Existing list format is preserved; Team members remain visible but not controllable here. */
     fun list(sessionId: String): String {
         require(sessionId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
-        val agents = jobs.agentRegistrations(sessionId).map { registration ->
-            "${registration.info.id} [${registration.info.status}] " +
-                registration.info.label.removePrefix("子代理：")
+        val agents = snapshots(sessionId).map { agent ->
+            "${agent.id} [${agent.status}] " + agent.label
         }
         return if (agents.isEmpty()) "没有后台代理" else agents.joinToString("\n")
     }
