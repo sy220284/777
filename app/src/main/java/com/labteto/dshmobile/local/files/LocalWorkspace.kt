@@ -10,6 +10,8 @@ import java.io.FileOutputStream
 import java.io.Reader
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.util.PriorityQueue
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.ArrayDeque
@@ -681,11 +683,12 @@ class LocalWorkspace(
         val needle = query.trim()
         require(needle.isNotEmpty() && needle.length <= 128 &&
             offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
+        // Never hold the shared cursor lock across an unbounded filesystem traversal:
+        // another query, cancellation or file-browser request must stay responsive.
+        val firstPage = if (offset == 0) SearchCursor(rankedWorkspaceFileNames(needle), pageSize) else null
         return synchronized(searchCursors) {
-            val cursor = if (offset == 0) {
-                SearchCursor(searchWorkspaceFileNames(needle, limit = 10_000), pageSize).also {
-                    searchCursors[needle] = it
-                }
+            val cursor = if (firstPage != null) firstPage.also {
+                searchCursors[needle] = it
             } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
             require(cursor.pageSize == pageSize && cursor.nextPage == offset) {
                 "搜索游标已失效，请重新搜索"
@@ -710,23 +713,48 @@ class LocalWorkspace(
         searchCursors.remove(query.trim()) != null
     }
 
-    /** Match and rank bounded filesystem entries, preserving complete filename-first results. */
+    /**
+     * Match filenames across the complete workspace. DirectoryStream-backed walking avoids
+     * materializing every sibling in a large folder; it never follows symbolic links.
+     * Full UI search sorts all real matches once, then pages that immutable result set.
+     * Callers requesting a limited list use a bounded top-K heap while scanning the SAME
+     * complete tree; neither mode reports a partial scan as "no more results".
+     */
+    private fun rankedWorkspaceFileNames(needle: String, limit: Int? = null): List<LocalWorkspaceFile> {
+        val rank = compareByDescending<Pair<Int, LocalWorkspaceFile>> { it.first }
+            .thenBy { it.second.path }
+        val matches = if (limit == null) ArrayList<Pair<Int, LocalWorkspaceFile>>() else null
+        val top = limit?.let {
+            PriorityQueue<Pair<Int, LocalWorkspaceFile>>(minOf(it, 512), rank.reversed())
+        }
+        Files.walk(canonicalRoot.toPath()).use { walked ->
+            val paths = walked.iterator()
+            while (paths.hasNext()) {
+                val path = paths.next()
+                if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) continue
+                val file = path.toFile()
+                if (!isInsideWorkspace(file)) continue
+                val relative = file.relativeTo(canonicalRoot).invariantSeparatorsPath
+                val score = scoreWorkspaceFileMatch(needle, relative) ?: continue
+                val match = score to LocalWorkspaceFile(relative, file.length(), file.lastModified())
+                if (top == null) {
+                    matches!!.add(match)
+                } else if (top.size < limit!!) {
+                    top.add(match)
+                } else if (rank.compare(match, top.peek()) < 0) {
+                    top.poll()
+                    top.add(match)
+                }
+            }
+        }
+        return (matches ?: top!!.toList()).sortedWith(rank).map { it.second }
+    }
+
     fun searchWorkspaceFileNames(query: String, limit: Int = 500): List<LocalWorkspaceFile> {
         val needle = query.trim()
         require(needle.isNotBlank() && needle.length <= 128) { "搜索关键词不能为空且最多 128 字" }
-        val top = limit.coerceIn(1, 10_000)
-        return safeWalk(canonicalRoot, maxVisited = 50_000, maxMillis = 5_000L)
-            .filter { it.isFile && isInsideWorkspace(it) }
-            .mapNotNull { file ->
-                val path = file.relativeTo(canonicalRoot).invariantSeparatorsPath
-                val score = scoreWorkspaceFileMatch(needle, path) ?: return@mapNotNull null
-                score to LocalWorkspaceFile(path, file.length(), file.lastModified())
-            }
-            .sortedWith(compareByDescending<Pair<Int, LocalWorkspaceFile>> { it.first }
-                .thenBy { it.second.path })
-            .take(top)
-            .map { it.second }
-            .toList()
+        require(limit > 0) { "搜索结果数量必须大于零" }
+        return rankedWorkspaceFileNames(needle, limit)
     }
 
     /** Snapshot real files for explicit global search without exposing raw File handles. */

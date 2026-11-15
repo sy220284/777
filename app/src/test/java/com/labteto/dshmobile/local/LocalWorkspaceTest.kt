@@ -231,6 +231,26 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun fileBrowserSearchPagesPastTenThousandMatchesWithoutSilentlyLosingResults() {
+        val folder = root.resolve("任务/大型文档目录").apply { mkdirs() }
+        repeat(10_024) { index ->
+            Files.createFile(folder.resolve("报告-${index.toString().padStart(5, '0')}.md").toPath())
+        }
+        val results = mutableSetOf<String>()
+        var offset: Int? = 0
+        while (offset != null) {
+            val page = workspace.searchWorkspacePage("报告", offset, 128)
+            assertTrue(page.files.size <= 128)
+            assertTrue(page.files.all { results.add(it.path) })
+            offset = page.nextOffset
+        }
+        assertEquals(10_024, results.size)
+        assertTrue("最后一页必须包含旧上限后的文件", results.any { it.endsWith("报告-10023.md") })
+        // An explicit small result limit bounds memory while still scanning all filenames.
+        assertEquals(3, workspace.searchWorkspaceFileNames("报告", 3).size)
+    }
+
+    @Test
     fun browserFuzzyPaginationKeepsRankingAndNoDuplicates() {
         workspace.write("功能/ModelContextProvider.kt", "x")
         workspace.write("功能/ModuleControlPlan.kt", "x")
