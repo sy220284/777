@@ -208,7 +208,7 @@ internal object LocalWorkInvestigationRuntime {
      * forget an early unsafe write in a long-running turn.
      */
     fun recoveredReadOnlyFailure(log: LocalSessionEventLog): Boolean {
-        val start = log.latestMatching(setOf("turn/start"))?.sequence ?: return false
+        val start = log.latestMatching(setOf("turn/start")) { true }?.sequence ?: return false
         var hadFailure = false
         var unsafeFailure = false
         var recoveredAfterLastFailure = false
