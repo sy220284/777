@@ -23,7 +23,7 @@ import org.junit.Test
 class LocalToolRouterTest {
     @Test
     fun exactCapabilitySelectionSupportsLargeBatchesWithoutTruncation() {
-        val selected = (1..32).map { "mcp_demo_tool$it" }
+        val selected = (1..180).map { "mcp_demo_tool$it" }
         assertEquals(selected, LocalToolRouter.exactSelection("select:" + selected.joinToString(",")))
         assertEquals(selected, LocalToolRouter.exactSelection(
             "select:" + (selected + selected.first()).joinToString(",")
@@ -151,6 +151,18 @@ class LocalToolRouterTest {
         assertTrue(LocalToolRouter.relevantOptionalToolNames(
             tools, "请检查 github_lookup_result 的日志",
         ).isEmpty())
+    }
+
+    @Test
+    fun longTaskIntentRecognizesExplicitToolsInTheMiddleWithoutSilentSlicing() {
+        val tools = listOf(
+            tool("middle_tool", "中间任务工具", ToolExposure.OPTIONAL, "测试", setOf("middle-keyword")),
+            tool("unrelated_tool", "无关任务工具", ToolExposure.OPTIONAL, "测试", setOf("other-keyword")),
+        )
+        val context = "开始说明 " + "无关文字".repeat(3_000) +
+            " 请使用 middle-keyword 完成这一项 " +
+            "继续说明".repeat(3_000) + " 结束"
+        assertEquals(listOf("middle_tool"), LocalToolRouter.relevantOptionalToolNames(tools, context))
     }
 
     @Test

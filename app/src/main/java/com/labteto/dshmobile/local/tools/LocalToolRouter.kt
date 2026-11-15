@@ -31,9 +31,9 @@ internal object LocalToolRouter {
         tools: List<HarnessTool>,
         taskContext: String,
     ): List<String> {
-        val normalized = (if (taskContext.length <= MAX_TASK_CONTEXT_CHARS) taskContext
-            else taskContext.take(MAX_TASK_CONTEXT_CHARS / 2) + "\n" +
-                taskContext.takeLast(MAX_TASK_CONTEXT_CHARS / 2)).lowercase()
+        // Search the entire actual task. Previous head/tail slicing silently ignored
+        // an explicit tool name placed in the middle of a long specification.
+        val normalized = taskContext.lowercase()
         if (normalized.isBlank()) return emptyList()
 
         // New plugin/MCP tools participate automatically through their registered metadata.
@@ -172,15 +172,13 @@ internal object LocalToolRouter {
      * This never infers additional capabilities from descriptions or old task text.
      * The execution coordinator still enforces the current registry, schema budget and approval.
      */
-    private const val MAX_EXACT_SELECTION_NAMES = 128
-
     fun exactSelection(query: String): List<String>? {
         val command = query.trim()
         if (!command.startsWith("select:", ignoreCase = true)) return null
         val names = command.substringAfter(':').split(',', '，').map(String::trim)
-        require(names.isNotEmpty() && names.size <= MAX_EXACT_SELECTION_NAMES && names.all {
+        require(names.isNotEmpty() && names.all {
             it.matches(Regex("[A-Za-z][A-Za-z0-9_-]{0,127}"))
-        }) { "精确工具选择格式：select:工具名1,工具名2（最多 $MAX_EXACT_SELECTION_NAMES 个）" }
+        }) { "精确工具选择格式：select:工具名1,工具名2" }
         return names.distinct()
     }
 
@@ -327,6 +325,5 @@ internal object LocalToolRouter {
     private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
-    private const val MAX_TASK_CONTEXT_CHARS = 12_000
     private const val MAX_CAPABILITY_QUERY_EDGE_CHARS = 4_096
 }
