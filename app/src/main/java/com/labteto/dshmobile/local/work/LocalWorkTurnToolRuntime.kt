@@ -24,6 +24,7 @@ import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.isParallelSafeReadTool
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -33,6 +34,20 @@ import kotlinx.serialization.json.put
  * Shared tool execution keeps registry/error semantics; Work owns optional capability activation,
  * plan-mode visibility and user approval against the run binding.
  */
+/** Cold Work continuation must restore the user's task, not infer new tools from the
+ * synthetic resume command. Use the canonical model history, or the durable Goal
+ * if compaction removed the original user message.
+ */
+internal fun effectiveWorkCapabilityTask(
+    input: String,
+    continuationParentRunId: String?,
+    history: List<JsonObject>,
+    goalDescription: String?,
+): String = if (continuationParentRunId == null) input else
+    LocalToolCapabilityIntent.latestUserInput(history)
+        ?: goalDescription?.takeIf(String::isNotBlank)
+        ?: input
+
 internal class LocalWorkTurnToolRuntime(
     private val registry: ToolRegistry,
     private val execution: LocalToolExecutionCoordinator,
@@ -52,8 +67,12 @@ internal class LocalWorkTurnToolRuntime(
         input: String,
     ) {
         val history = binding.runHandle.modelHistory.snapshot()
+        val task = effectiveWorkCapabilityTask(
+            input, binding.continuationParentRunId, history,
+            binding.workState.snapshot().goal?.description,
+        )
         execution.prepareWorkTurnCapabilities(
-            input = input,
+            input = task,
             history = history,
             gitHubConfigured = githubConfigured,
             target = binding.enabledOptionalTools,

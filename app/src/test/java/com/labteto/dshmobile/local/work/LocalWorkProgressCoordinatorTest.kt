@@ -28,6 +28,65 @@ class LocalWorkProgressCoordinatorTest {
 
     private fun eventLog(file: File) = LocalSessionEventLog(file, Json).also(logs::add)
 
+
+    @Test
+    fun repeatedPlanTodoAndGoalCommandsDoNotCreateFakeDurableProgress() {
+        val state = MutableStateFlow(LocalWorkRunState(sessionId = "same-task"))
+        val log = eventLog(File(temporary.root, "same-task.jsonl"))
+        var writes = 0
+        val commands = LocalWorkProgressCoordinator(localWorkRunStatePort(state), log) { writes++ }
+        val plan = buildJsonObject {
+            put("items", JsonArray(listOf(JsonPrimitive("读取代码"), JsonPrimitive("验证结果"))))
+        }
+        val todos = buildJsonObject {
+            put("items", JsonArray(listOf(buildJsonObject {
+                put("content", "核实真实回执")
+                put("status", "pending")
+            })))
+        }
+        commands.updatePlan(plan)
+        commands.updateTodos(todos)
+        commands.createGoal("验证用户任务")
+        val actualGoal = requireNotNull(state.value.work.goal)
+        val sequence = log.latestSequence()
+        val eventCount = log.snapshot().size
+        assertEquals(3, writes)
+
+        assertEquals("计划未变化", commands.updatePlan(plan))
+        assertEquals("任务清单未变化", commands.updateTodos(todos))
+        assertEquals("目标状态未变化：active", commands.updateGoal("active", null))
+        assertEquals(sequence, log.latestSequence())
+        assertEquals(eventCount, log.snapshot().size)
+        assertEquals(3, writes)
+        assertEquals(actualGoal, state.value.work.goal)
+
+        val restored = projectWorkSessionControls(LocalWorkState(), log.snapshot())
+        assertEquals(state.value.work.plan, restored.plan)
+        assertEquals(state.value.work.todos, restored.todos)
+        assertEquals(state.value.work.goal, restored.goal)
+    }
+
+    @Test
+    fun resumedWorkSelectsRealTaskOrDurableGoalWithoutInterpretingResumeText() {
+        val userTask = buildJsonObject {
+            put("role", "user")
+            put("content", "核查 GitHub PR 923 及其测试")
+        }
+        val internalResume = buildJsonObject {
+            put("role", "system")
+            put("content", INTERNAL_WORK_CONTINUATION_PROMPT)
+        }
+        assertEquals("当前新任务", effectiveWorkCapabilityTask(
+            "当前新任务", null, listOf(userTask), "旧目标",
+        ))
+        assertEquals("核查 GitHub PR 923 及其测试", effectiveWorkCapabilityTask(
+            "恢复同一工作任务", "run-1", listOf(userTask, internalResume), "旧目标",
+        ))
+        assertEquals("已持久化目标", effectiveWorkCapabilityTask(
+            "恢复同一工作任务", "run-1", listOf(internalResume), "已持久化目标",
+        ))
+    }
+
     @Test
     fun pausedAndReactivatedGoalCannotReviveItsOldDurableContinuation() {
         val state = MutableStateFlow(LocalWorkRunState(sessionId = "revision"))

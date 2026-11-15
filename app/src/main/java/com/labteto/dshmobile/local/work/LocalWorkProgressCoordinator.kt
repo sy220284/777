@@ -54,6 +54,8 @@ internal class LocalWorkProgressCoordinator(
             "计划包含 ${items.size} 项，超过当前 ${MAX_WORK_PLAN_ITEMS} 项的持久化上限；未修改原计划，请合并步骤后重试"
         }
         val normalized = items
+        // A repeated plan does not create another user-task fact.
+        if (state.snapshot().plan == normalized) return@commitWorkMutation "计划未变化"
         eventLog.append("plan/state", buildJsonObject {
             put("items", JsonArray(normalized.map { item -> JsonPrimitive(item) }))
         })
@@ -88,6 +90,8 @@ internal class LocalWorkProgressCoordinator(
             }
             LocalTodoItem(content, status)
         }
+        // An identical full-list replacement is not real task progress.
+        if (state.snapshot().todos == items) return@commitWorkMutation "任务清单未变化"
         eventLog.append("todo/state", buildJsonObject {
             put("items", JsonArray(items.map { item ->
                 buildJsonObject {
@@ -158,6 +162,9 @@ internal class LocalWorkProgressCoordinator(
     ): String = commitWorkMutation {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
         val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog, workspaceRoot, executingToolId)
+        // Goal revision and event count must describe actual transitions. A duplicate
+        // goal/state event poisons later proof that this Run authored every revision.
+        if (state.snapshot().goal == updated) return@commitWorkMutation "目标状态未变化：$status"
         val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, updated, workspaceRoot, executingToolId) else null
         eventLog.append("goal/state", buildJsonObject {
             workGoalEvent(updated).forEach { (key, value) -> put(key, value) }
