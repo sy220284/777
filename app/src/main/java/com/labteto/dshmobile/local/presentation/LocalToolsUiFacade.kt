@@ -192,6 +192,12 @@ class LocalToolsUiFacade @Inject internal constructor(
     override fun capabilityCatalogue() = tools.capabilityCatalogue().map {
         com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(it.name, it.family, it.access, it.approval, it.requirements, it.parameterSchema)
     }
+    override fun discoverCapabilities(query: String, limit: Int) =
+        tools.discoverCapabilities(query, limit).map {
+            com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(
+                it.name, it.family, it.access, it.approval, it.requirements, it.parameterSchema,
+            )
+        }
     override fun validateCapabilityDraft(
         name: String, expectedSchema: kotlinx.serialization.json.JsonObject, argumentsJson: String,
     ): com.labteto.dshmobile.uicontract.UiToolDraftValidation =

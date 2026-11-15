@@ -12,6 +12,7 @@ import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
+import com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
@@ -21,6 +22,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolRouterTest {
+    @Test fun modelAndUiUseOneCapabilityMatcherAndDirectory() {
+        val registered = listOf(
+            tool("read", "文件读取", ToolExposure.CORE, "文件"),
+            tool("web_search", "网页搜索", ToolExposure.OPTIONAL, "网络", setOf("联网", "网页搜索")),
+            tool("team_spawn", "创建智能体团队", ToolExposure.OPTIONAL, "智能体", setOf("创建团队")),
+        )
+        val model = LocalCapabilityDiscovery.resolve(registered, "创建团队")
+        val ui = LocalCapabilityDiscovery.searchCatalogue(registered, "创建团队", 50)
+        assertEquals(model.optional.map { it.name }, ui.map { it.name })
+        assertEquals(listOf("read", "team_spawn"),
+            LocalCapabilityDiscovery.resolve(registered, "select:read,team_spawn").let {
+                it.core + it.optional.map { tool -> tool.name }
+            })
+        assertEquals(3, LocalCapabilityDiscovery.catalogue(registered).size)
+        assertTrue(LocalCapabilityDiscovery.resolve(registered, "select:missing").unavailable.contains("missing"))
+    }
+
+
     @Test
     fun exactCapabilitySelectionSupportsLargeBatchesWithoutTruncation() {
         val selected = (1..180).map { "mcp_demo_tool$it" }

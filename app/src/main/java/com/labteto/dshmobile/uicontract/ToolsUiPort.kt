@@ -122,6 +122,8 @@ interface ToolsUiPort {
     suspend fun checkServerHealth(serverId: String): UiMcpHealth = UiMcpHealth.UNSUPPORTED
     suspend fun githubConfigured(): Boolean
     fun capabilityCatalogue(): List<UiToolCapabilitySnapshot>
+    /** Pure discovery: identical live ToolRegistry and ranking as model capability_search. */
+    fun discoverCapabilities(query: String, limit: Int = 50): List<UiToolCapabilitySnapshot>
     /** Revalidate against current registry registration; NEVER executes or authorizes tools. */
     fun validateCapabilityDraft(
         name: String, expectedSchema: kotlinx.serialization.json.JsonObject,

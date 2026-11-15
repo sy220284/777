@@ -26,6 +26,8 @@ internal interface LocalToolsManagementPort {
     fun activeToolHookIds(): List<String> = emptyList()
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry>
+    /** Same live-registry ranking and exact-select contract as model capability_search. */
+    fun discoverCapabilities(query: String, limit: Int): List<LocalToolCatalogueEntry>
     /** Task-only hint from registered tool contracts; does not grant permission. */
     fun requiredDeviceCapabilitiesForTask(task: String): Set<com.labteto.dshmobile.harness.tools.ToolDeviceRequirement> = emptySet()
     fun validateCapabilityDraft(

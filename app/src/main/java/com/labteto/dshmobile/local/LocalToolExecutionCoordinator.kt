@@ -294,17 +294,11 @@ internal class LocalToolExecutionCoordinator(
             return LocalToolRouter.capabilityDirectory(registered,
                 synchronized(target) { target.toSet() }, blocked)
         }
-        val exactNames = LocalToolRouter.exactSelection(query)
-        val alreadyBuiltIn = exactNames.orEmpty().filter { name ->
-            tools.any { it.name == name && it.exposure == com.labteto.dshmobile.harness.tools.ToolExposure.CORE }
-        }
-        val matches = if (exactNames == null) LocalToolRouter.search(tools, query)
-            else exactNames.mapNotNull { name ->
-                tools.firstOrNull { it.name == name && LocalToolRouter.isOptional(it) }
-            }
-        val unavailableNames = exactNames.orEmpty().filter { name ->
-            name !in alreadyBuiltIn && matches.none { it.name == name }
-        }
+        val discovery = com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery.resolve(tools, query)
+        val exactNames = discovery.exactNames
+        val alreadyBuiltIn = discovery.core
+        val matches = discovery.optional
+        val unavailableNames = discovery.unavailable
         if (matches.isEmpty()) {
             if (exactNames != null) {
                 // Selecting only CORE tools is still an exact focus: clear prior OPTIONAL

@@ -460,33 +460,20 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
     override fun requiredDeviceCapabilitiesForTask(task: String):
         Set<com.labteto.dshmobile.harness.tools.ToolDeviceRequirement> {
-        if (task.isBlank()) return emptySet()
-        val candidates = registry.names().mapNotNull(registry::get)
-            .filter { it.metadata.requiredDeviceCapabilities.isNotEmpty() }
-        val byName = candidates.associateBy { it.name }
-        // Read the live tool metadata that already drives model capability selection.
-        // UI needs a hint only; ToolRegistry and Android remain authorization owners.
-        return com.labteto.dshmobile.local.tools.LocalToolRouter
-            .relevantOptionalToolNames(candidates, task)
-            .asSequence()
-            .mapNotNull(byName::get)
-            .flatMap { it.metadata.requiredDeviceCapabilities.asSequence() }
-            .toSet()
+        return com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery.deviceHints(
+            registry.names().mapNotNull(registry::get), task,
+        )
     }
 
     override fun capabilityCatalogue(): List<com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry> =
-        registry.names().sorted().mapNotNull { name ->
-            registry.get(name)?.takeUnless {
-                it.exposure == com.labteto.dshmobile.harness.tools.ToolExposure.INTERNAL
-            }?.let { tool ->
-                com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry(
-                    tool.name, tool.metadata.family, tool.access.name, tool.approvalPolicy.name,
-                    tool.metadata.requirements,
-                    (tool.schema["function"] as kotlinx.serialization.json.JsonObject)["parameters"]
-                        as kotlinx.serialization.json.JsonObject,
-                )
-            }
-        }
+        com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery.catalogue(
+            registry.names().mapNotNull(registry::get),
+        )
+
+    override fun discoverCapabilities(query: String, limit: Int): List<com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry> =
+        com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery.searchCatalogue(
+            registry.names().mapNotNull(registry::get), query, limit,
+        )
 
     override fun validateCapabilityDraft(
         name: String, expectedSchema: kotlinx.serialization.json.JsonObject, argumentsJson: String,
