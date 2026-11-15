@@ -7,6 +7,7 @@ package com.labteto.dshmobile.local.tools
  * The live ToolRegistry and per-call permissions remain authoritative for execution.
  */
 internal class LocalRunToolSelection : LinkedHashSet<String>() {
+    @Volatile
     var exactFocus: Boolean = false
         private set
 
