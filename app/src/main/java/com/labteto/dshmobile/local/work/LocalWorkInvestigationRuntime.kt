@@ -199,29 +199,34 @@ internal object LocalWorkInvestigationRuntime {
     }
 
     /**
-     * A failed read may be followed by another successful read after recovery.
-     * All failed tools in the current turn must be known, read-only and settled.
-     * Unknown or write-like effects are still rejected by the existing Goal
-     * recovery ledger; this signal only removes the overly broad failure veto.
+     * A settled non-mutating failure must not permanently veto a progressing Goal.
+     * Use the tool executor's side-effect facts, not source-discovery tool names:
+     * parameter rejections, hidden tools and benign command errors may be recovered
+     * by a later successful call. Any uncertain effect still blocks follow-through.
+     *
+     * Scan the entire current turn; a bounded recent-event window can otherwise
+     * forget an early unsafe write in a long-running turn.
      */
     fun recoveredReadOnlyFailure(log: LocalSessionEventLog): Boolean {
-        val window = log.pageBeforeChronological(limit = WINDOW)
-        val turnStart = window.lastOrNull { it.type == "turn/start" }?.sequence ?: return false
-        val results = window.filter { it.type == "tool/result" && it.sequence > turnStart }
-        val failures = results.filter { it.data.text("is_error") == "true" }
-        if (failures.isEmpty()) return false
-        if (failures.any { result ->
-                result.data.text("side_effect") != "none" ||
-                    result.data.text("error_code") == "TOOL_OUTCOME_UNKNOWN" ||
-                    sourceKind(result.data.text("name")) == null
-            }) return false
-        val lastFailure = failures.maxOf { it.sequence }
-        return results.any { result ->
-            result.sequence > lastFailure &&
-                result.data.text("is_error") == "false" &&
-                result.data.text("side_effect") == "none" &&
-                sourceKind(result.data.text("name")) != null
+        val start = log.latestMatching(setOf("turn/start"))?.sequence ?: return false
+        var hadFailure = false
+        var unsafeFailure = false
+        var recoveredAfterLastFailure = false
+        log.forEachAfter(start) { event ->
+            if (event.type != "tool/result") return@forEachAfter
+            when (event.data.text("is_error")) {
+                "true" -> {
+                    hadFailure = true
+                    recoveredAfterLastFailure = false
+                    if (event.data.text("side_effect") != "none" ||
+                        event.data.text("error_code") == "TOOL_OUTCOME_UNKNOWN") {
+                        unsafeFailure = true
+                    }
+                }
+                "false" -> if (hadFailure) recoveredAfterLastFailure = true
+            }
         }
+        return hadFailure && !unsafeFailure && recoveredAfterLastFailure
     }
 
     /**
