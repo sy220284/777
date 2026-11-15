@@ -4,14 +4,14 @@ package com.labteto.dshmobile.ui.screens.settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import com.labteto.dshmobile.ui.shenyan.SyMenu
 import com.labteto.dshmobile.ui.shenyan.SyValueRow
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 
 @Composable
 internal fun AgentWorkerModelSettingRow(
-    local: LocalHarnessSettingsState,
+    local: UiSettingsSnapshot,
     onSelect: (String?) -> Unit,
 ) {
     val selectedWorker = local.modelSelection.workerProfile

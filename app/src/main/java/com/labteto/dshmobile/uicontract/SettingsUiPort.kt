@@ -50,6 +50,7 @@ interface SettingsUiPort {
     val chatStyleGuardBuiltInPhrases: List<String>
     val approvalMode: StateFlow<LocalApprovalMode>
     fun memoryContext(): LocalSettingsMemoryContext
+    fun executionPolicySummary(): UiExecutionPolicySnapshot
     fun configureApprovalMode(mode: LocalApprovalMode)
     suspend fun refreshChatGpt()
     suspend fun connectChatGpt(existingAccountId: String? = null, requestPlanConsent: Boolean = false)

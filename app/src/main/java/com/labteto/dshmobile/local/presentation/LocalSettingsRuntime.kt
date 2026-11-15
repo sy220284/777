@@ -101,7 +101,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun stageLegacySessionRestore(archive: java.io.InputStream) =
         sessionStorage.stageLegacyRestoreStorage(archive)
     /** Read the current effective policy each time; never cache a stale grant or expose secrets. */
-    internal fun executionPolicySummary(): UiExecutionPolicySnapshot {
+    override fun executionPolicySummary(): UiExecutionPolicySnapshot {
         val policy = executionPolicy.current()
         val names = mapOf(
             "network.enabled" to "网络访问开关",

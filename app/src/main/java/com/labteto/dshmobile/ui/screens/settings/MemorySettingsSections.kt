@@ -67,7 +67,7 @@ import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelCapability
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -93,7 +93,7 @@ import kotlinx.serialization.json.contentOrNull
 
 @Composable
 internal fun MemoryOverviewCard(
-    local: LocalHarnessSettingsState,
+    local: UiSettingsSnapshot,
 ) {
     AppSettingsSection {
         AppSettingsRow(null, stringResource(R.string.advanced_auto_recall),
@@ -123,7 +123,7 @@ private fun MemoryKind.matchesFilter(filter: MemoryFilter): Boolean = when (filt
 
 @Composable
 internal fun LocalMemorySettingsCard(
-    local: LocalHarnessSettingsState,
+    local: UiSettingsSnapshot,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {

@@ -21,9 +21,8 @@ import com.labteto.dshmobile.local.model.DeepSeekPricingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
-import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
 import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
@@ -50,10 +49,11 @@ import kotlinx.coroutines.withContext
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
-    private val localHarness: LocalSettingsRuntime,
+    private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     private val settingsData: LocalSettingsDataFacade,
     @ApplicationContext context: Context,
 ) : ViewModel() {
+    private val localHarness get() = appServer.settings
 
     private val appContext = context.applicationContext
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
@@ -68,11 +68,11 @@ class SettingsViewModel @Inject constructor(
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
-    val localHarnessState: StateFlow<LocalHarnessSettingsState> = localHarness.nativeState
+    val localHarnessState: StateFlow<UiSettingsSnapshot> = localHarness.state
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = localHarness.nativeInitialState,
+            initialValue = localHarness.initialState,
         )
     val chatGptState: StateFlow<ChatGptUiState> = localHarness.chatGptState
     val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
