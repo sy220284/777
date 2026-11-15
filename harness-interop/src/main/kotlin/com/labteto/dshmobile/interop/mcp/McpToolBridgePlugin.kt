@@ -63,12 +63,15 @@ internal fun mcpExtensionFailure(serverId: String, error: Exception, connecting:
             else -> "MCP_HTTP_FAILED"
         }
         error is McpRpcException && error.code == -32601 -> "MCP_METHOD_NOT_SUPPORTED"
+        error is McpProtocolNegotiationException -> "MCP_PROTOCOL_NEGOTIATION_FAILED"
         error is IOException -> "MCP_TRANSPORT_FAILED"
         else -> if (connecting) "MCP_CONNECT_FAILED" else "MCP_REMOTE_CALL_FAILED"
     }
     val hint = when (code) {
         "MCP_CONNECTION_BUSY" -> "服务正在重连，请等待当前操作结束后再查看连接状态。"
         "MCP_METHOD_NOT_SUPPORTED" -> "此 MCP 服务未实现请求的方法；请检查资源或工具能力声明，其他已注册方法仍可使用。"
+        "MCP_PROTOCOL_NEGOTIATION_FAILED" ->
+            "检查 MCP 服务端 initialize 返回的 protocolVersion，需与客户端请求版本一致；修改后重新连接。"
         "MCP_NOT_CONNECTED" -> "服务已断开，请先连接 MCP 服务并重新发现可用工具。"
         "MCP_AUTH_REQUIRED" -> "核实 MCP 服务认证信息和访问权限，并重新建立连接。"
         "MCP_ENDPOINT_UNAVAILABLE" -> "核实 MCP 端点和协议；先断开再使用正确地址连接。"
