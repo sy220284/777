@@ -641,6 +641,27 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun newWorkTaskPreparesOnlyRelevantToolDefinitionsInsteadOfEarlierRequests() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("team_create_member", ToolAccess.AGENT_CONTROL,
+                ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "团队", keywords = setOf("创建团队")) { ToolResult("ok") })
+            register(tool("local_render", ToolAccess.READ_ONLY,
+                ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "界面", keywords = setOf("渲染界面")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        val history = listOf(buildJsonObject {
+            put("role", "user")
+            put("content", "创建团队")
+        })
+        coordinator.prepareWorkTurnCapabilities("渲染界面", history, { false })
+        val selected = coordinator.enabledOptionalSnapshot()
+        assertTrue("local_render" in selected)
+        assertFalse("team_create_member" in selected)
+    }
+
+    @Test
     fun pinnedGitHubIsLoadedAcrossTurnsAndNeverBypassesCredentialGate() = runBlocking {
         val registry = ToolRegistry().apply {
             register(tool("github_list_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
