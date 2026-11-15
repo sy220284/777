@@ -122,7 +122,7 @@ internal object LocalToolRouter {
             .filter { it.exposure == ToolExposure.OPTIONAL }
             .associateBy(HarnessTool::name)
 
-        var remainingTokens = maxOptionalDefinitionTokens.coerceIn(0, MAX_OPTIONAL_TOOL_PROMPT_TOKENS)
+        var remainingTokens = maxOptionalDefinitionTokens.coerceAtLeast(0)
         val optionalSchemas = ArrayList<JsonElement>()
         val omitted = linkedMapOf<String, String>()
         val compacted = linkedSetOf<String>()
@@ -141,11 +141,11 @@ internal object LocalToolRouter {
             }
 
             val originalCost = estimateModelTokens(original.toString())
-            val reduced = if (originalCost > minOf(remainingTokens, MAX_OPTIONAL_SCHEMA_TOKENS)) {
+            val reduced = if (originalCost > remainingTokens) {
                 compactDescriptiveAnnotations(original)
             } else original
             val selectedCost = estimateModelTokens(reduced.toString())
-            if (selectedCost > MAX_OPTIONAL_SCHEMA_TOKENS || selectedCost > remainingTokens) {
+            if (selectedCost > remainingTokens) {
                 budgetOmitted += name
                 omitted[name] = "工具参数定义需要约 $selectedCost Token，当前可用 $remainingTokens；已尝试精简说明文本"
                 continue
@@ -367,8 +367,6 @@ internal object LocalToolRouter {
         description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
 
     internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 16_000
-    internal const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 24_000
-    private const val MAX_OPTIONAL_SCHEMA_TOKENS = 24_000
     private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480

@@ -32,10 +32,7 @@ internal object McpWorkerWire {
 
 /** Only a fixed category crosses the worker IPC. Never forward server error bodies. */
 internal fun mcpWorkerSafeFailureCode(failure: Exception): String {
-    val detail = failure.message.orEmpty()
-    val negotiationFailure = detail.contains("MCP") &&
-        (detail.contains("协商到不支持的版本") ||
-            detail.contains("initialize 缺少 protocolVersion"))
-    return if (negotiationFailure) "MCP_PROTOCOL_NEGOTIATION_FAILED"
+    return if (failure is com.labteto.dshmobile.interop.mcp.McpProtocolNegotiationException)
+        "MCP_PROTOCOL_NEGOTIATION_FAILED"
         else failure.javaClass.simpleName
 }

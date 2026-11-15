@@ -70,7 +70,7 @@ internal class LocalWorkAgentController(
                         agentControl.teamReassignTask(sessionId, command.taskId, command.expectedRevision, command.newMemberId)
                     is com.labteto.dshmobile.uicontract.WorkTeamUiCommand.InspectAgent -> {
                         requireStandaloneAgent(sessionId, command.agentId)
-                        agentControl.inspect(sessionId, command.agentId)
+                        agentControl.output(sessionId, command.agentId)
                     }
                     is com.labteto.dshmobile.uicontract.WorkTeamUiCommand.SendAgentMessage -> {
                         requireStandaloneAgent(sessionId, command.agentId)

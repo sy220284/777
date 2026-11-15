@@ -696,7 +696,9 @@ class LocalWorkspace(
             (++nextSearchTicket).also { searchTickets[needle] = it }
         } else null
         val firstPage = if (ticket != null) try {
-            SearchCursor(rankedWorkspaceFileNames(needle), pageSize)
+            SearchCursor(rankedWorkspaceFileNames(needle, isCurrent = {
+                synchronized(searchCursors) { searchTickets[needle] == ticket }
+            }), pageSize)
         } catch (failure: Throwable) {
             synchronized(searchCursors) {
                 if (searchTickets[needle] == ticket) searchTickets.remove(needle)
@@ -741,7 +743,17 @@ class LocalWorkspace(
      * Callers requesting a limited list use a bounded top-K heap while scanning the SAME
      * complete tree; neither mode reports a partial scan as "no more results".
      */
-    private fun rankedWorkspaceFileNames(needle: String, limit: Int? = null): List<LocalWorkspaceFile> {
+    private fun rankedWorkspaceFileNames(
+        needle: String,
+        limit: Int? = null,
+        isCurrent: () -> Boolean = { true },
+    ): List<LocalWorkspaceFile> {
+        fun checkActive() {
+            if (Thread.currentThread().isInterrupted)
+                throw java.io.InterruptedIOException("文件搜索已取消")
+            if (!isCurrent()) throw java.util.concurrent.CancellationException("文件搜索已停止或被新查询替换")
+        }
+        checkActive()
         val rank = compareByDescending<Pair<Int, LocalWorkspaceFile>> { it.first }
             .thenBy { it.second.path }
         val matches = if (limit == null) ArrayList<Pair<Int, LocalWorkspaceFile>>() else null
@@ -750,7 +762,9 @@ class LocalWorkspace(
         }
         Files.walk(canonicalRoot.toPath()).use { walked ->
             val paths = walked.iterator()
-            while (paths.hasNext()) {
+            while (true) {
+                checkActive()
+                if (!paths.hasNext()) break
                 val path = paths.next()
                 if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) continue
                 val file = path.toFile()
@@ -768,6 +782,7 @@ class LocalWorkspace(
                 }
             }
         }
+        checkActive()
         return (matches ?: top!!.toList()).sortedWith(rank).map { it.second }
     }
 

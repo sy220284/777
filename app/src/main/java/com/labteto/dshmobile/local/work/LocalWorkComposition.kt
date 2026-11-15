@@ -411,6 +411,8 @@ internal class LocalWorkComposition @Inject constructor(
     internal val agentUi: LocalWorkAgentController by lazy {
         LocalWorkAgentController(runtimeStateStore, agentControlPort, teamUiProjection)
     }
+    internal fun agentOutput(sessionId: String, agentId: String): String =
+        agentControlPort.output(sessionId, agentId)
     private val teamLifecycle by lazy { LocalWorkTeamLifecycle(runtimeStateStore, agentTeams, persistentJobs, teamUiProjection, scope) }
 
     init { teamLifecycle }

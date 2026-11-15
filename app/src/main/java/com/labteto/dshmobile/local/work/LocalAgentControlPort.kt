@@ -103,6 +103,8 @@ internal interface LocalAgentControlPort {
      * authorizes control over another session or an unrelated background process.
      */
     fun inspect(sessionId: String, agentId: String): String
+    /** Complete committed result, read from the same durable checkpoint used for recovery. */
+    fun output(sessionId: String, agentId: String): String
     /** Bounded cancellation-aware long poll for changes to one owned Agent. */
     suspend fun watch(sessionId: String, agentId: String, afterCursor: String, maxWaitMs: Int): String
     /** Stop this Activation without deleting the resumable Agent identity/Inbox. */
@@ -199,6 +201,8 @@ internal class LocalWorkAgentControlRuntime(
 
     override fun inspect(sessionId: String, agentId: String): String =
         lifecycle.inspect(sessionId, agentId)
+    override fun output(sessionId: String, agentId: String): String =
+        persistentJobs.agentOutput(sessionId, agentId)
 
     override suspend fun watch(
         sessionId: String,

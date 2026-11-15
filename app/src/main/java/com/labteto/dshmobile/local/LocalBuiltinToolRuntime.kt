@@ -322,7 +322,12 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 LocalShellTool.execute(args, workspace, jobs, boundSessionId)
             }
             "job_list" -> jobs.list(boundSessionId)
-            "job_output" -> jobs.output(args.string("job_id"), boundSessionId)
+            "job_output" -> {
+                val id = args.string("job_id")
+                if (jobs.agentRegistrations(boundSessionId).any { it.info.id == id })
+                    work.get().agentOutput(boundSessionId, id)
+                else jobs.output(id, boundSessionId)
+            }
             "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
             "web_search" -> {
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()

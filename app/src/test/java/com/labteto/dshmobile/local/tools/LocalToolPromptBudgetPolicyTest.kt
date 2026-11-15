@@ -5,6 +5,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolPromptBudgetPolicyTest {
+    @Test fun explicitSelectionUsesRealCapacityAboveTheOldDefinitionCeiling() {
+        assertEquals(80_000, remainingOptionalToolDefinitionBudget(
+            212_000, 12_000, true, requestedDefinitionTokens = 80_000))
+        assertEquals(50_000, remainingOptionalToolDefinitionBudget(
+            212_000, 12_000, false, requestedDefinitionTokens = 80_000))
+    }
 
     @Test
     fun newlyDiscoveredPluginToolsReallocateOptionalBudgetWithoutOverflow() {

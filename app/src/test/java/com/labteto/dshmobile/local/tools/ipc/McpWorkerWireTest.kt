@@ -23,10 +23,12 @@ class McpWorkerWireTest {
     }
 
     @Test fun protocolNegotiationFailureUsesSafeCategoryWithoutLeakingDetails() {
-        val failure = IllegalArgumentException(
-            "MCP stdio 服务端协商到不支持的版本：2024-11-05；请求版本：2026-07-28；secret=do-not-leak")
+        val failure = com.labteto.dshmobile.interop.mcp.McpProtocolNegotiationException()
         assertTrue(mcpWorkerSafeFailureCode(failure) == "MCP_PROTOCOL_NEGOTIATION_FAILED")
         assertTrue(mcpWorkerSafeFailureCode(IllegalArgumentException("unrelated")) == "IllegalArgumentException")
+        assertTrue(mcpWorkerSafeFailureCode(IllegalArgumentException(
+            "服务返回正文包含 MCP initialize 缺少 protocolVersion；secret=do-not-leak")) ==
+            "IllegalArgumentException")
     }
 
     @Test fun transportHasNoAutomaticCallReplayAndUsesOnlyPrivateWorkerProcess() {

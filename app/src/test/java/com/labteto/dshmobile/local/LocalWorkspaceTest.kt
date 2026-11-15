@@ -17,6 +17,19 @@ import org.junit.Before
 import org.junit.Test
 
 class LocalWorkspaceTest {
+    @Test fun interruptedFilenameSearchStopsAndAllowsFreshSearch() {
+        workspace.write("命中.txt", "内容")
+        try {
+            Thread.currentThread().interrupt()
+            assertThrows(java.io.InterruptedIOException::class.java) {
+                workspace.searchWorkspacePage("命中")
+            }
+        } finally {
+            Thread.interrupted()
+        }
+        assertEquals(listOf("命中.txt"), workspace.searchWorkspacePage("命中").files.map { it.path })
+    }
+
     @Test
     fun projectDirectoryMutationWaitsForExistingWorkspaceWriterGate() {
         val entered = CountDownLatch(1)

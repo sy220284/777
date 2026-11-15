@@ -1,131 +1,165 @@
-# PR #924：架构 3.0 全功能与端到端链路复核
+# PR924 固定快照独立审计与功能链路修复
 
-## 代码与证据基线
+## 审计结论与范围
 
-审计对象为 `sy220284/777`、PR #924，起始 HEAD `586d9e534da8fcc8fd127c2271afe402d1315c8c`。本地分析已读取该 HEAD 对应 GitHub Actions 的全仓 `callgraph.json` 和 `callgraph.md`，并逐段核查相关生产源码与测试。单次静态调用关系扫描覆盖 2,337 个受版本控制的文件，其中生产源码 1,152、测试 719、支撑源码 81、非代码资源 385；识别静态 import 边 5,452 条、词法调用候选 6,558 条。显式 import 强连通环为 0；4 条跨产品 Feature 边指向 Automation 调用 Chat/Work 公开 Port；112 条所谓未解析导入均是 Android 构建生成的 R / BuildConfig。271 个静态无显式引用候选需结合 Android Manifest、依赖注入、反射与 Kotlin 顶层函数判断，不能直接删除。该 HEAD 的 6 项 CI 在调整前已全部通过。
+PR924 的主要调整方向合理：业务状态回到各自 Feature、工具执行继续经过同一注册表、UI 通过公开契约消费能力、会话事件承担持久事实、长输入和审批内容完整传递。这些调整改善了功能实现本身。
 
-## 功能链路反向审核
+起始快照仍存在七项确认问题：目录搜索遗漏基础工具、分页限额误报工具不可用、工具定义固定额度误拒合法契约、搜索取消未进入遍历、后台恢复记录裁剪、结果入口误读状态摘要，以及 MCP 错误类别依赖中文报错匹配。对应实现和回归已在本地修正。
 
-| 域 | 入口 → 执行责任 → 完成事实 → UI 反馈 | 主要验收与结论 |
-|---|---|---|
-| Shell | 启动/导航/通知 → FeatureCatalog / Navigation Port → 当前会话与路由投影 | Shell 仅切页面，恢复由 Session/Feature Owner 执行。检查新会话、模式切换、Back 与冷启动状态；未发现需新建第二套任务状态的证据 |
-| Chat | 输入/附件/群聊/重发/主动消息 → Chat Turn Owner → Session EventLog → 消息与人物连续性 | 会话内串行执行、排队和取消原有契约保留。发现模型历史中多模态消息的文本未参与下一轮工具意图识别，修正跨 Chat/Work 使用的用户输入投影 |
-| Work | Goal/计划/工具/技能/长文档/归档 → Work Run → ToolRegistry → EventLog/Goal → 运行进度 | 已有工具聚焦与 Code Mode 改造继续保留；新增修复多模态任务意图、长分支来源证据冲突、ZIP 内成员身份与读完后的游标误报 |
-| Automation | 用户明确建立计划 → Scheduler/Worker → Chat/Work Port → 持久结算与通知 | 现有代次/恢复/人工授权链路与跨 Feature Port 相符。普通“任务”内容仍不会自动创建定时任务；保留 Android 16 后台任务额度边界 |
-| Tools | 能力注册 → 任务预选/精确选择 → 冻结模型工具表 → 子工具授权执行 → 回执 | 新增 `read_chunk` 明确 `complete`/`next_byte`；此前已解除 128 个工具名固定拒绝及 18k 技能截断，保留模型真实上下文预算和逐工具审批 |
-| Settings/设备权限 | 按需入口 → Android 实时授权/服务连接探测 → 状态投影 → 缺失权限恢复 | 无障碍权限与通知访问的“授权”和“已连接”分离；系统授权和监听器 rebind 依官方 API。未发现以 UI 文本替代系统实际授权的入口 |
-| 共享 Session/Memory/Model | Session Owner/索引、历史与回放；模型路由、资源与用量单一账本 | 跨会话历史搜索此前扫描最多 64 个授权会话却没有 `cursor`，用户无法找后续内容；新增有权限隔离的稳定分页并保证游标不泄露其他项目会话 ID |
+本报告区分源码审计、JVM 行为验证、Android 测试代码编译与设备实测。当前宿主缺少 Landlock 和 KVM，进程隔离相关八项测试失败、Android 设备交互未执行；整套验证未达到全部通过。具体事实见末节。
 
-## 本次集中修改的根因与实现
+- 仓库：`sy220284/777`；目标 PR：`#924`。
+- 固定审计快照：`8a2792e2b5303eac78a811044e728fd052fc9cac`。
+- 对照 main：`06455974df58e2a2f5642586949b0e1ce6d454cf`。
+- 原 PR 差异：205 个文件，增加 4,918 行，删除 2,685 行。
+- 首次审计分支：`audit/pr924-independent`；提交整合分支：`audit/pr924-submit`。修复整合到 PR 原分支，保持 PR 开放。
+- 首次审计结束前远端 PR 已推进到 `760bdd3954abe8e7617aa8bef3021b348d12567c`；本报告与测试结论仅覆盖固定快照及本轮本地修改，未将其他会话的新增提交混入。
+- 权威依据：`AGENTS.md`、`ARCHITECTURE.md`、`SYSTEM-AUDIT-GUIDE.zh-CN.md`、`SECURITY.md`、`PROTOCOL.md`、`COMPATIBILITY.md`、`VALIDATION.md`、`UI-UX.zh-CN.md`、`DEVELOPMENT.md`、`SHARED-AUDIT-CONCLUSIONS.zh-CN.md`。
 
-1. **跨会话搜索的“前 64 条即结束”**：原 `session_search` 只检查每轮前 64 个允许的会话，提示缩小搜索却没有操作入口。新增可续查 `cursor`，按稳定会话 ID 遍历全部**当前项目/会话链**中的授权会话；`next_cursor` 只包含授权会话 ID。摘要使用一次索引而不在每个条目中重复线性查找。测试覆盖 130 个会话、后段命中和跨项目隔离。
-2. **多模态任务意图丢失**：原 `LocalToolCapabilityIntent` 只读取字符串 `content`，对“文字 + 附件”的 `JsonArray` 会错误退回上一个任务，可能预选旧 GitHub/MCP 工具。统一读取 `text/input_text` 块；仅媒体消息也保留新任务边界。测试涵盖当前新任务排除旧 GitHub，以及多模态“继续”任务。
-3. **调查证据错误合并**：来源显示名将 Git 引用截断为 48 字符、整段显示截断为 160 字符；此前还以该显示名当作证据身份。增加基于原始仓库/完整引用/路径/URL/归档成员等字段的来源键，界面预览与身份分离；已有事件记录可通过旧显示名继续读取。测试覆盖共享长前缀的不同 Git 分支。
-4. **文件末尾仍反复提示继续**：`read_chunk` 无论是否已到 EOF 都打印 `next_byte`；调查投影又将任何 `next_cursor`（包括 `none`）视作未完成。现在字节页明确标注 `complete=true/false`，从同一次文件句柄读取总长与字节页，末尾页（包括恰好填满的最后一页）直接标记 `complete=true`；调查只在存在有效游标且未完成时提示续读。归档清单/成员阅读也纳入调查覆盖，归档成员与普通文件分开计入进度。测试覆盖归档清单跨页与结束、分块读准确 EOF、归档成员结束，以及文件大小恰好是页长整数倍的情况。
+## 系统入口、所有权、契约与装配核查
 
-## 集中验收范围与全仓结论
+| 功能 | 实际入口与公开契约 | 状态、执行与持久化所有者 | 纵向与横向核查结果 |
+|---|---|---|---|
+| 启动与导航 | Application → `LocalRuntimeKernel` / Feature Host | Kernel 管启动和进程 scope；`LocalFeatureCatalog` 唯一分配路由 | Kernel 未接管每条业务执行；通知继续定位 Manifest 启动组件 |
+| 聊天、人物与群聊 | Conversation UI Port → Chat 发送、队列和人物 Owner | Chat 解释领域状态；Session 保存事件与历史 | 队列、编辑、重发、切换和取消复用原链；被删 UI 适配未形成新的执行通道 |
+| 工作任务与计划 | Work UI / 内置工具 → Work Run / Goal / Interaction | Work 拥有计划、目标、问题与审批；Session 保存批准事实 | 长计划、长问题、全部选项完整进入展示、批准和后续执行；空方案不会进入等待态 |
+| 工具发现与目录 | `capability_search` / Tools 公开目录查询契约 → `LocalCapabilityDiscovery` | 实时 ToolRegistry 是可用目录来源；选择状态归当前运行 | 目录契约与模型预选共用匹配器；修复 CORE 搜索遗漏及限额误报；未把新增接口写成页面已接入 |
+| 工具调用与编排 | 冻结模型工具表 → 执行协调器 / Code Mode → Registry | Registry 统一校验、审批和调用；工具回执保存真实执行事实 | 单调用和批量调用保持同一曝光边界；静态参数在前置写入前校验，动态引用解析后再次验证 |
+| 模型与上下文 | Model 路由、请求准备、历史压缩与预算投影 | 路由身份、凭据、用量和资源由原共享能力拥有 | 保留提供方真实容量和取消契约；去除额外 24,000 Token 工具定义硬上限 |
+| 技能 | 显式选择 / 固定技能 → 当前模型步骤规则 | Skill Store 保存文档；Work 解释用户选择 | 原快照已取消技能正文静默截断；当前规则不再通过重复历史消息拼接 |
+| 独立助手与团队 | Agent UI Port / 模型控制 → 同一 Agent Control Port | Job 保存身份、邮箱和运行状态；Team 管成员与任务板 | 持久启动、控制、消息和恢复复用原 Owner；本轮统一完整结果读取 |
+| 后台恢复与结果 | Job 恢复 → 子任务 history checkpoint → 新 Activation | 恢复协调器与 Session 原检查点 | 新 v3 保留全部已选工具与最终结果；读取结果按准确 Job ID 查询同一检查点 |
+| 自动任务 | Tasks UI / 规划入口 → `AutomationUiPort` → Scheduler | Automation 统一调度、代次与持久结算 | 已受理与刷新失败分开；列表读取失败不会再次提交创建；取消和失败通过真实回执传播 |
+| 会话、排队消息与历史 | Session UI / 编辑队列 / 分页与搜索 Port | Session EventLog、事务索引与可见投影 | 增量编辑与删除进入分页、恢复和 SQLite 可见索引；授权会话搜索有可续查游标 |
+| 工作区与归档 | 文件 UI / 文件工具 → Workspace / Archive Reader | 工作区路径与文件读写边界；搜索缓存为派生状态 | 保留完整目录扫描和准确 EOF；本轮把停止与协程取消传入遍历，关闭目录流 |
+| 附件与存储 | 导入、事件事务 → Asset 索引和 Session 数据库 | Session 事务提交事件与附件引用 | 提取无状态索引解除互相导入；原事务边界与历史数据恢复继续保留 |
+| 记忆、调查与改进 | Memory / Finding / Improvement 当前入口 | 原 Memory Store 与 Session 来源事件 | 撤回线索同步退出工作上下文、重规划与改进档案；显示预览不承担来源身份 |
+| 插件、MCP 与账号 | Tools UI / 插件注册 → MCP / 凭据 Owner | 原连接、授权、生命周期和 Registry | 连接与工具注册分开判断；本轮用错误类型贯通自有协议校验和隔离进程回执 |
+| Android 权限与通知 | 设置 / 任务提示 → 系统权限与真实服务探测 | Android 系统授权、无障碍和通知监听服务 | 授权与连接分开；已授权未绑定时请求 rebind；未把打开设置视作完成 |
 
-- **静态扫描覆盖率**：已核对仓库权威文档与 2,337 个版本控制文件的编译依赖候选及模块分布；CI 产物的实际 checkout 提交为 `e7b2aeae7c572e8841c24df771c9ac7519bbd13d`（PR 触发的合并测试提交），与 PR 源分支 SHA 不同。该图提供架构边界和调用关系候选，运行行为以源码/回归结果校正。
-- **Feature/Shared 所有权**：Chat、Work、Automation 通过各自 Port 协作；Tools/Session/Model 事实源不另设副本；Shell 仅负责导航与展示。四个跨 Feature 引用均为提供方的对外边界，静态 import 环为 0。实际并发和恢复状态另以 JVM/设备回归为依据。
-- **完整操作链**：发送/队列/取消、目标/待办/计划/工具、权限/审批、自动任务/Worker、会话/记忆/历史、MCP/扩展工具、模型请求/结果、文件/归档/编辑、UI/恢复均按“入口→授权→单一 Owner→持久事实→前台状态→失败恢复”检查；本轮直接修改的四个根因均增加跨入口测试。
-- **原有保护边界**：会话范围隔离、文件工作区范围、外部操作审批、身份冻结与未知副作用对账保留；普通合法任务通过明确分页和实时事实校验继续完成。
-- **回归口径**：工具契约与 JVM/Android UI/SQLite 六类 CI 必须对应本次最终 HEAD；不同设备厂商权限及第三方真实服务的运行结果以该设备或账号实际授权为准。
+以上矩阵记录当前源码与关联测试的核查范围。真实服务账号、特定厂商后台行为、触屏与实际外部副作用仍需要对应环境的执行回执。
 
-## 真实保护与用户体验权衡
+## 确认问题与根因修复
 
-应保留真实身份、权限、审批、模型请求冻结表、持久 EventLog、Session 租约、未知副作用的人工对账和 Android 官方前台/后台调度规则。待移除的是影响合法操作的隐藏常量、无后续动作的错误提示、用显示文本作为事实身份的做法、静默截断以及重复状态所有者。本轮修改不增加定时任务、子代理或云端数据存储。
+问题共七项：高 1 项，中高 3 项，中 3 项。
 
-## 验收口径
+### 1. 【中】能力目录有基础工具，搜索结果却没有
 
-本次修改在工作区中统一准备、审计并集中提交到 PR 分支。已在本地对全仓调用关系审计产物进行完整性/边界断言，结果通过。新增和扩展的真实应用 JVM 回归覆盖上述四类根因。合入本次集中变更后，以**最终 HEAD** 的架构扫描、app 与 harness-core JVM 单测、Android 编译、Chat/Work Android 设备交互、市场插件和本地会话迁移 6 类 CI 回执为准；CI 通过也不替代特定设备的真实厂商权限和第三方模型服务测试。
+`LocalCapabilityDiscovery.catalogue` 包含 CORE 和 OPTIONAL；原搜索复用了只搜索 OPTIONAL 的模型扩展匹配器。公开查询契约按 `read` 或“读取文件”查找时，基础能力从结果中消失。调用核实表明当前 Tools 主界面尚未消费 `discoverCapabilities`，所以此项属于契约缺口，未将它描述为已上线工具名搜索页面的体验故障。当前页面继续按插件、技能和连接器组织。
 
-依据：仓库 `docs/ARCHITECTURE.md`、`docs/SYSTEM-AUDIT-GUIDE.zh-CN.md`、`docs/UI-UX.zh-CN.md`；Android [后台任务限制](https://developer.android.com/develop/background-work/services/fgs/changes) 与 [NotificationListenerService](https://developer.android.com/reference/android/service/notification/NotificationListenerService)；Kotlin [Coroutine cancellation](https://kotlinlang.org/docs/cancellation-and-timeouts.html)。
+修复在同一个匹配器增加目录搜索范围，UI 包含 CORE，模型隐式预选继续只选择 OPTIONAL，INTERNAL 始终排除。没有另建目录、匹配规则或执行注册表。
 
-## 本轮继续优化：文件分页、调查续接及 Work 工具焦点（2026-11-15）
+证据：`LocalToolRouterTest.uiCapabilitySearchFindsCoreToolsWithoutExposingInternalTools`。
 
-在原先全仓调用关系与六项 CI 基线基础上，发现并统一修正三组实际跨模块障碍：
+### 2. 【中】展示限额被误当作能力不可用
 
-- `glob/list_files/grep` 已提供可继续调用的 `cursor`，Work 调查上下文却只解析 `next_cursor`，导致有未读页面时不产生后续待办。文件工具在原参数提示后新增 `next_cursor`；Work 只从分页提示读取游标，末页清除继续建议。测试直接把真实工作区的跨页输出送入 Work 证据投影。
-- `list_files` 对显式深度静默截断为 8，`glob/grep` 的递归遍历上限固定为 32；改为支持真实深层目录，保留沙箱、分页、单页时间、输出大小控制。测试覆盖 36 层目录和已有 400 项以上分页。
-- 自然语言“继续在本地完成”被当作新任务，清除 Work 中用户主动 `select:` 的精确工具选择；同时 GitHub 意图只认少数固定“继续”短语。共享中立续接判断，使原任务继续保留工具选择，明确新任务则恢复自动发现。保留每次真实工具审批与模型工具冻结检查。
+精确选择多个工具、搜索结果只展示一项时，原实现用被截短的命中列表推导 `unavailable`，把其他已注册工具误报为不可用。
 
-另将已受“最近五个来源、最多四条发现”约束的调查摘要取消最后 2400 字符的无提示截断，避免摘要中后部发现被裁掉。此节记录代码层变更；整体通过状态以本组新提交 HEAD 的六项 CI 和真实运行回执为准。
+修复从完整实时名称索引判断注册可用性；`limit` 只控制返回范围。模型执行仍独立消费真实注册、预算与授权事实。
 
-同源解析补充：归档工具的无下一页标记 `next_cursor=none` 后接英文分号或方括号时，也应视为完成；修正游标值词法边界并加入两种结尾回归。本地 Kotlin 规则验证覆盖 8 组游标及误匹配样例，全部通过。
+证据：`LocalToolRouterTest.exactDiscoveryLimitDoesNotLabelRegisteredToolsUnavailable`。
 
-同源审计补充：Work 的 GitHub 来源身份此前只使用仓库/路径/分支，`fetch_pr` 和 `fetch_pr_file_patch` 的 `pr_number` 未进入事实键；同仓库不同 PR（甚至不同 PR 中同路径补丁）会合并为同一份来源。现以仓库 + PR 编号建立独立资源身份，完整来源键同时纳入 `pr_number` / `issue_number`，界面展示可区分 `owner/repo#PR924` 与 `owner/repo#PR925`。测试覆盖 PR 文档、同路径补丁、调查进度与身份去重。
+### 3. 【中高】请求预算充足，仍被固定工具定义额度拒绝
 
-CI 回归复核：此前一次执行的 3569 项 JVM 测试中有 2 项失败，已定位到 Work 的 `prepare()` 在保留精确工具选择后，又调用共享工具预激活重排并清除 `exactFocus`；现在对仍处于用户精确选择状态的 Work 任务直接沿用原模型工具集，仅新任务触发重新预激活。归档游标字符边界测试从带状态事件记录的综合用例中独立，直接测试纯解析行为，消除回归测试对无关事件写入顺序的依赖。
+路由预算和工具筛选各自又设置 24,000 Token 上限。合法的大参数枚举契约、用户明确选择的较多工具，即使得到更大请求预算，仍会被省略；上下文压缩无法改变这一硬编码天花板。
 
+修复移除这两个重复上限，工具筛选消费调用方实际授予的定义预算；原上下文容量计算、基础工具成本扣除、缓存策略和预算不足的结构化回执继续生效。默认选取预算保持原配置，明确请求可按路由剩余容量扩大。
 
-## 基于 PR #924 完整快照的纵向复核与结构性修复（2026-11-15）
+测试将大型契约真正注册进 ToolRegistry 后再筛选；并覆盖实际预算不足仍返回省略原因。
 
-### 固定证据与验收方式
+证据：`registeredSchemaCanUseTheCapacityGrantedByTheModelBudget`、`explicitSelectionUsesRealCapacityAboveTheOldDefinitionCeiling`。
 
-- 本轮以 PR 的 `84b364b47dd926f8bb78ecdd7f64f985a3598bb2` 提交为原始快照，借助仅执行一次的 GitHub Actions `git ls-files` 导出、在本地展开，完整覆盖 **2,339 个受跟踪文件**。导出流程已清理，避免后续持续运行。
-- 本地实际执行 `tools/audit/scan-callgraph.py`、`.github/scripts/check-local-architecture-boundaries.py`、`.github/scripts/check-local-performance-invariants.py`、`git diff --check`。首次静态扫描统计：生产源码 **1,152**、测试源码 **719**、显式导入 **5,454**、调用候选 **6,564**；显式 import 环 **0**，四条跨 Feature 引用走 Automation 调用 Chat/Work 发布的 Port；边界与性能规则 **PASS**。静态扫描仅证明依赖边界，不把调用候选当作执行成功。
-- PR 分支并行提交会触发 workflow `cancel-in-progress`，因此固定 `fb8cb6c3b2d2505f81f50a15211574445d70deeb` 另起独立验收 run **43708938236**，含全部应用和核心 JVM 单测、Android 调试和测试包编译，以及 Android 36 上 Chat/Work、SQLite 会话迁移、插件市场/凭据/OAuth/Worker 四项验证任务。此验收作业无“新提交即取消”设置，临时流程创建后已删除，后续状态以实际工作流回执为准。
+### 4. 【中高】关闭搜索后，后台仍遍历目录
 
-### 功能链路与所有权复核
+原搜索票据只在扫描结束时核验，UI 的 IO 协程也没有把取消传到同步扫描。完整扫描解除旧数量上限后，这个缺口会让用户取消的搜索继续消耗资源。
 
-| 产品域 | 已按源码复查的完整路径 | 变更或保留结论 |
-| --- | --- | --- |
-| Shell/Settings | 路由/权限入口 → Feature Port → Android 授权状态与服务连接事实 → 界面状态 | 启动路由、用户授权及监听连接保持各自的单一事实源；真实系统许可与用户明确同意仍作为执行边界 |
-| Chat | 用户输入、附件、角色/群聊 → Turn Owner → Model/Tool → Session EventLog → 消息、任务与回显 | 多模态意图沿用完整文本；身份/历史数据和消息完成事实由 Session 管理，避免根据显示文案重建状态 |
-| Work | 创建目标/细纲/待办 → ToolRegistry → 工具审批与执行 → Goal/Session EventLog → 检查点、进度和结果 | 修复长目标截断、文件搜索不完整、跨 PR 证据混同、长任务冷恢复输入丢失、检查点重复存储、完成结果截断、恢复错误静默替换等问题 |
-| Automation | 用户明确确认计划 → 解析事件与执行提示 → Scheduler/Worker → 持久结果/回执 | 完整保留用户事件要求和模型生成的执行提示；保留明确授权、系统实际调度边界和重放副作用核验；未创建任何新的定时任务 |
-| Tools/扩展 | 注册契约 → 工具发现、模型可见表 → 实际参数验证与授权 → 原始工具结果 → Work 证据 | GitHub PR、PR patch、Diff、Issue、Commit、Blob、Git 文件读取得到不同的事实身份；访问权限/参数契约仍由原注册表执行 |
-| Shared Files/Session/Model | 本地工作区/历史检索 → 完整遍历、关联排序、游标续查 → 保存/读取 → UI 进度 | 消除工作区搜索固定五万扫描、五秒与一万匹配的误判；明确限量查询使用有界堆；改为搜索快照+页游标，并阻断过期查询覆盖新结果 |
+修复采用 `runInterruptible`，遍历检查线程中断和原查询票据；停止、替换或取消时退出并由 `use` 关闭目录流。查询失败清理自己的票据，不覆盖更新查询的状态。完整遍历、匹配排序和分页能力继续保留。
 
-### 根因、修改点和防回归
+证据：`LocalWorkspaceTest.interruptedFilenameSearchStopsAndAllowsFreshSearch`，并回归原完整搜索、分页与目录变更测试。
 
-1. **来源身份漏维度**：`local/work/LocalWorkInvestigationRuntime.kt` 的来源分类此前缺 GitHub Diff、Commit、PR Patch、Issue、Blob 等实际读取工具，对身份缺少 Commit SHA / Blob SHA / 比较基线等字段。补充来源键和界面上可区分的标签，保持已有 `#PR924` 展示形式；`LocalWorkInvestigationRuntimeTest` 复查不同 PR 的同路径补丁不会合并。
-2. **长任务冷恢复丢内容、日志反复膨胀**：`local/runtime/LocalAgentRunCoordinator.kt` 的原始工作说明只保存前 8,000 字符，并在每次检查点重复写入。调整为 `agent/run-input` 一次性保存完整任务/记忆输入，版本 3 的运行检查点仅保存实际进度；历史版本按原记录恢复，缺失新版本输入时明确报告 `RECOVERY_INPUT_MISSING`，防止猜测下一步。`LocalAgentRunCoordinatorTest` 覆盖超过原阈值的任务、跨进程恢复、缺失输入。
-3. **后台完成结果与恢复上下文被替换**：完成文本此前 `take(20_000)`，丢掉后半成果；恢复上下文创建失败还会退回通用指令继续。现在终局回执保存完整结果，恢复上下文异常报告 `RECOVERY_CONTEXT_FAILED` 并保留原工作，测试包括长结果与故障注入。
-4. **文件浏览器搜索称“已完成”却遗漏结果**：`local/files/LocalWorkspace.kt` 原文件名搜索最多扫描 50,000 项、5 秒，并将最多 10,000 条结果作为最终全量。改为遍历可访问工作区真实文件，再统一相关性排序和稳定分页；明确限量列表使用 `PriorityQueue` 保留 Top-K，避免全量留存；使用同查询世代 ticket 避免旧扫描覆盖刷新结果、允许取消挂起查询。新增 `LocalWorkspaceTest` 10,024 文件、128 条一页的完整结果/唯一性/末页回归。
-5. **目标与定时事件规则静默截断**：`LocalWorkProgressCoordinator.createGoal`、`resolveWorkGoalUpdate` 取消 2,000 字符丢失；`AutomationPlanningService` 在传给模型之前与解析模型输出之后都不截断事件内容。对长目标、事件提示和持久回放增加断言，用户要求与执行规则保持字面一致。
+### 5. 【高】后台恢复记录仍裁剪真实任务内容
 
-**边界原则**：改动针对合法任务的可达性、完整性、事实一致性、执行效率；文件工作区范围、模型真实上下文预算、设备/插件授权、跨项目隔离、外部写入审批与未确定副作用的人工核验仍保留。验收应核对原始源码提交、真实单测与设备回执；不得把静态调用图、工具返回的部分页面或原工作流被取消的状态写成运行通过。
+原子任务 checkpoint 写入时只保留 48 个工具名、最终结果末 65,536 字符。前台放开工具数量后，重启恢复仍会改变已选工具集合；长结果也会丢失开头。
 
+将原 checkpoint 升至 v3，完整保存选择集合和最终结果；继续读取原 v1/v2 记录，原格式的约束隔离在兼容读取中。恢复后的工具仍经过原作用域、allowlist、Team 授权和模型工具表准入，未扩大权限。
 
-### 调度语义补查：消除误执行时间（追加）
+证据：`LocalSubagentContinuationTest.recoveryPreservesCompleteSelectedToolSetAndTerminalResult`，覆盖 180 项工具与超过旧结果长度的正文；原兼容、邮箱认领与终态校验测试继续通过。
 
-在 `AutomationPlanningService.parseAutomationPlan` 中，发现 ONCE/DAILY/WEEKLY/MONTHLY/INTERVAL 的 `firstRunAtMillis` 缺失时会自动变成当前时间加一分钟，过去时刻也会被 `coerceAtLeast` 强制挪到一分钟后；INTERVAL 的间隔缺失、SILENCE 的沉默时长缺失均可能未经用户选择而设为 60 分钟，WINDOW 的大整数转 `Int` 还可能溢出成合法分钟数。此类隐式纠正会改变任务的真实执行时刻和频率。
+### 6. 【中高】结果读取入口仍拿状态摘要当成果
 
-现按安排类型逐项验证：固定日历触发必须有明确且有效的未来时间；间隔与沉默触发时长必须有明确的分钟数并符合支持范围；时间窗先校验原始 Long 的 0–1439 范围再转换为 Int。触发条件不完整时返回具体错误，保持上游计划原文供用户修正，避免凭空创建错误时间的事件。回归包括五种缺首次运行时间/过期时间、间隔缺失或不足、沉默时长缺失或不足、窗口超大整数溢出和正常窗口。
+Job 的内存输出是有界进度投影，持久摘要另有 8,192 字符裁剪；独立助手 UI 原先读取的 inspect 又只展示前 1,500 字符。即使运行记录保存了全文，团队、模型和独立助手仍读到不同长度的摘要。
 
+新增无状态 `readLocalAgentOutput`，在原 Job 所有权校验后按准确 Job ID 读取原 Session checkpoint。团队结果、独立助手“查看结果”及 Agent 的 `job_output` 共用该读取逻辑。正常进度继续使用 Job 摘要，活跃轮次不会把上轮结果显示为本轮完成。终态缺少可靠结果时返回明确错误；旧格式达到裁剪长度的记录明确标注历史节选。
 
-### 检查点识别与真实用户意图（本轮补查）
+完整成果继续保存于原检查点，未新增结果文件库、状态同步器或第二套 Job 账本。
 
-此前工具预选通过检查用户文本是否含有 `<work-checkpoint>`、`<compacted-summary>`、`<chat-continuity>` 决定跳过消息。用户提供代码、日志或文档时正常引用这些标签，会被误认作系统历史压缩块，导致最新需求丢失、旧工具意图重新生效。现改为直接消费已有 `LocalContextCheckpointEnvelope` 的可信来源字段（包含旧版来源标记），仅跳过实际由系统生成的检查点。保持原始用户文字及多模态内容完整；新增可信 Work/Chat 检查点、旧 GitHub 任务与真实用户标签引用的对照测试。来源归属仍为 Context/Model 既有契约，不新增自制标记表或额外运行状态。
+证据：`LocalAgentOutputReaderTest` 的完整长结果重开读取、其他 Job 隔离、终态缺结果及新 Activation 进度读取。
 
-### 最终独立快照验收及临时工作流清理
+### 7. 【中】MCP 协商错误靠报错文字分类
 
-固定快照 `2d9fd9b4916c4b45d5c2b13c9ae0eb8c941927bf` 的独立验收工作流 [43711158185](https://github.com/sy220284/777/actions/runs/43711158185) 已返回四组 `completed/success`：
-- 完整核心库、MCP、设备能力及 App JVM 单测，Android 测试包和调试 APK；
-- Android 36 SQLite 会话迁移与搜索；
-- Android 36 Chat/Work、设备权限及 Agent 团队交互；
-- Android 36 扩展市场、凭据与授权回调交互。
+原 worker 检查异常消息是否包含特定中文短句。异常措辞变化会丢失类别；普通错误正文包含相同短句又可能被误分类。
 
-其中 Hilt `WorkReadUiPort` 重复绑定已在 `b0f00409` 消除：保留 Work Feature 中唯一 `@Binds`，删除组合根重复的 `@Provides`。固定快照通过证明此前 Dagger 编译失败已修复。本节记录的独立快照验收不覆盖后续对 Automation UI 的提交；最终 PR 交付仍以清理临时工作流后当前 HEAD 的六项标准 GitHub Actions 完成结果为准。
+在自有协议校验处产生 `McpProtocolNegotiationException`，worker 仅根据类型发送稳定代码，外层沿原 IPC 还原类型。真实 RPC、传输和其他错误保持各自类别，远端正文不参与本地错误类别决策。
 
-用于本次证据补采的临时工作流已从 PR 分支退出，避免将一次性验证路径留作常驻生产配置。
+证据：`McpWorkerWireTest.protocolNegotiationFailureUsesSafeCategoryWithoutLeakingDetails` 以及 MCP 协议版本校验回归。
 
-## 自动任务 Feature 入口与任务回执一体化（2026-11-15）
+## 调整方向与约束的独立判断
 
-基于 `docs/ARCHITECTURE.md` 和功能树逐条追踪了“任务列表／手工创建／编辑／角色事件规划／交互策略／暂停恢复／立即运行 → 校验和身份 → 调度与落库 → 回执 → UI”。
+- **应继续的方向**：明确所有者、统一真实入口和回执、内容完整持久化、可继续分页、让取消贯穿执行、由真实注册与请求容量决定能力准入。
+- **本次最关键的公共短板**：完整事实与预览混用。同类问题同时出现在恢复、结果展示和目录可用性判断；修复应位于原事实边界，调用方统一读取。
+- **合理保留的约束**：用户授权、跨会话归属、真实提供方协议、工作区边界、未知副作用对账、失效运行的提交栅栏、Android 系统权限和资源预算。它们承担真实隔离与正确性职责。
+- **本轮消除的障碍**：重复硬额度、静默裁剪、无消费者的错误状态推导、取消只改变界面、通过人类报错文案决定运行类别。
+- **修复顺序**：先保证持久记录完整，再统一结果消费；先区分注册状态与展示范围，再调整模型预算；最后验证取消、兼容、UI 与关联功能。
+- **复用的审计规律**：SC-001 全入口闭环、SC-002 多入口汇聚和 SC-003 生产端与消费端对账。未为本轮另建治理门禁或重复规则体系。
 
-- **统一入口和真实所有者**：`TasksViewModel` 通过 `AutomationUiPort` 读取快照并提交 `AutomationUiCommand`；角色事件规划改用 `AutomationUiPort.planAndSave`，复用其中的会话身份、代次检查和调度器。移除无消费者的 `LocalAutomationPlanningFacade`，避免规划、权限和持久化再分第二条 UI 写入链。
-- **操作失败信息回传**：`LocalAutomationUiPortComposition` 明确拒绝空任务和非 Chat 策略编辑；调度器的实际异常通过 `Failed` 回执传出，保留取消语义和真实日志。UI 把过期会话、代次冲突、缺失任务和执行失败分别显示，不再把未知失败折成通用 `false`。
-- **副作用受理与读取分开**：`runTaskManagementOperation` 对每个用户指令最多提交一次，并在收到真实 `Applied` 后独立刷新列表。若操作已受理但列表刷新失败，回执仍保持已受理，UI 提示刷新问题；创建/编辑界面按实际受理结果关闭，避免重复建立自动任务。纯刷新直接调用只读 `snapshot`，不再构造虚拟成功回执。
-- **运行时回归**：`AutomationPlannerUiControllerTest` 覆盖单次规划提交、过期任务拒绝和真实失败原因；`TaskManagementOperationTest` 覆盖遗失回执不重放、操作拒绝、受理后列表刷新失败以及取消传播。已有 Android 设备互动、插件和持久化回归由 CI 对最新 HEAD 执行。
+## 实际验证结果
 
-安全与恢复仍由当前 Automation Task Store 代次、Session Owner、系统调度器和真实设备授权负责。UI 持有加载/提示状态，不新增任务事实源、定时任务或第二套队列。最新 CI 的完成状态以对应源提交实际工作流回执为准。
+本地工具和离线依赖取自默认分支成功运行 `43560520369` 的开发工具链 Artifact，组件校验通过。构建采用 JDK 27、Gradle 9.8.1、单 worker 和进程内 Kotlin 编译；首次并行构建 daemon 退出后，已释放下载临时文件并按宿主资源重新执行。未修改项目测试断言来绕过环境失败。
 
-## Work 规划审批与用户提问保真（2026-11-15）
+| 模块 | 测试数 | 通过 | 失败 |
+|---|---:|---:|---:|
+| app | 3,608 | 3,608 | 0 |
+| harness-core | 395 | 395 | 0 |
+| harness-interop | 98 | 98 | 0 |
+| harness-device-android | 35 | 35 | 0 |
+| core | 27 | 27 | 0 |
+| reference-validation | 5 | 5 | 0 |
+| harness-runtime-android | 48 | 40 | 8 |
 
-完整审批链：`exit_plan_mode` 提交完整计划 → `LocalInteractionCoordinator.awaitQuestion` → `LocalPlanReviewCard` 展示与复制 → 用户批准 → `plan/approved` 与 `WorkState.plan` 同步保存 → 后续执行读取已批准版本。
+合计执行 4,216 项测试：4,208 项通过、8 项失败、0 项跳过。最终修改后的应用 3,608 项、MCP 98 项测试和 `:app:compileDebugAndroidTestKotlin` 再次回归通过；同轮 Gradle 返回 `BUILD SUCCESSFUL`。设备交互未在本地执行：宿主没有 `/dev/kvm`，未把测试代码编译写成触屏实测，也未把被远端新提交取消的快照 CI 写成绿色。
 
-本轮去除计划审批文本前 8,000 字符和批准记录前 20 条的无提示裁剪。审批页显示的完整计划与实际批准、事件落盘和执行状态中的计划保持一致。普通 `ask_user_question` 同样完整转发问题与全部选项至既有 UI，删除 2,000 字和 6 选项的静默裁剪；真实输入有效性仍由既有工具参数契约负责。
+进程层失败清单：
 
-新增 `LocalWorkPlanModeCoordinatorTest.longPlanApprovalShowsEveryCharacterAndPersistsAllSteps`（40 步、超过 8,000 字）及 `LocalWorkBuiltinToolRuntimeTest.longQuestionAndAllChoicesReachApprovalUiWithoutSilentTruncation`（长问题、12 个选项）。这些改动使用现有 Work/Interaction/Session Owner，未新增审批账本或第二类任务执行器。
+1. `AgentTlsBackendTest.tlsToolEffectWritesOnlyTheServerWorkspaceAfterHostApproval`
+2. `AgentWorkspaceEnvironmentTest.nativeProcessReturnsRealExitCodeAndRemoteWorkingDirectory`
+3. `AgentWorkspaceEnvironmentTest.twoRemoteActivationsCannotBothEditTheSameObservedVersion`
+4. `AgentWorkspaceEnvironmentTest.defaultRemoteTerminalUsesAvailableShellAndPreservesExitReceipt`
+5. `AgentWorkspaceEnvironmentTest.editingAnExecutablePreservesItsExecutionPermission`
+6. `AgentWorkspaceEnvironmentTest.fileEffectsAndFreshObservationBelongToTheRemoteRoot`
+7. `AgentWorkspaceEnvironmentTest.anUnobservedRemoteWriteCannotOverwriteExistingFile`
+8. `AgentWorkspaceEnvironmentTest.anObservedRemoteWriteMustNotOverwriteAnotherAgentsCommit`
+
+文件操作错误包含 `PROCESS_ISOLATION_UNAVAILABLE: [Errno 38] Landlock ABI unavailable`；进程退出码为 125，TLS 用例因实际文件未写入失败。独立探测 `libc.syscall(444, 0, 0, 1)` 返回 `-1 / errno 38`，确认当前执行宿主不提供所需 Landlock ABI。本轮没有修改失败所在的运行层源码；相关 `AgentWorkspaceEnvironment.kt` 与 `process_sandbox.py` 相对成功工具链基线 `52f5b710` 无源码差异。复验需要支持该隔离能力的 Linux 宿主；本轮没有关闭隔离、跳过这八项或将它们计为通过。
+
+静态核查：架构 3.0 边界、运行性能约束、UI 模块、设计系统、Android 安全、通知展示、构建基线、Kotlin 风险模式、测试质量与 `git diff --check` 已执行通过。全仓扫描覆盖所有受跟踪文件，显式 import 环为 0；静态候选仅用于调用关系复核，不作为无消费者代码的自动删除依据。
+
+回归通过与失败均以本地实际输出和 XML 回执为准。当前代码审计和修复已形成可复核结果；完整运行放行仍需上述进程隔离与设备环境回执。
+
+## 外部契约参考
+
+- [Kotlin runInterruptible](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/run-interruptible.html)：将协程取消传播为阻塞代码的线程中断。
+- [Kotlin cancellation](https://kotlinlang.org/docs/cancellation-and-timeouts.html)：取消需要执行边界配合。
+- [Java Files.walk](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/file/Files.html)：目录遍历与流资源关闭。
+
+- [MCP 2025-03-26 生命周期](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-03-26/basic/lifecycle.mdx)：Legacy 适配沿原已支持版本校验；现代 HTTP 仍由现有 SDK 处理当前协议。
+
+## 提交时的并行改动整合
+
+用户要求提交修复后，重新读取远端 PR，整合基线推进到 `e9a567eba074f6cf8ded533a7a05e811549f1967`；此前已对 `453c1e51` 组合版本完成应用/MCP 与 Android 测试代码编译回归。
+
+- 保留远端新增的 `AppServerUiPort`、按需 Feature 装配、统一命令/状态读取及实际 UI 接入；保留按需 Schema 投影与旧团队接口别名清理。
+- 远端已补充 CORE 搜索和统一排序；合并时保留其 `Resolution.ranked`，本轮只补充完整目录可用性判断，避免展示限额误报。
+- 保留双方回归用例，继续验证 INTERNAL 不进入目录及大型契约按实际预算筛选。
+- 上文“目录查询暂无页面消费者”描述固定审计快照；提交基线已经由 Tools 页面实际消费该契约，本轮整合保留这一接入。
+- 在原 `android-capability-contract.yml` 增加运行层、core 与 reference-validation 测试，覆盖完整 JVM 模块及 Landlock 进程隔离路径。复用原 GitHub Actions Linux 验证环境，不关闭隔离，不新增定时任务。
+- 本地整合后重新运行应用/MCP 单测、Android 测试代码编译、架构与统一入口契约检查；发布提交的 GitHub Checks 是宿主隔离和设备验证的独立回执。

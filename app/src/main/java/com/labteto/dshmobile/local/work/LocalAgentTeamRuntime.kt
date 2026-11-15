@@ -713,7 +713,7 @@ internal class LocalAgentTeamRuntime(
     internal fun outputForUi(sessionId: String, memberId: String, expectedJobId: String): String = synchronized(commandLock) {
         val member = project(sessionId).members.singleOrNull { it.id == memberId && it.jobId == expectedJobId }
             ?: error("TEAM_MEMBER_EXPIRED：助手执行身份已改变")
-        jobs.output(member.jobId, sessionId)
+        readLocalAgentOutput(eventLogFor(sessionId), LocalAgentRegistry(jobs).resolveOwned(sessionId, member.jobId))
     }
 
     internal fun sendUiMessage(

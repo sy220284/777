@@ -21,6 +21,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpProtocolBoundaryTest {
+    @Test fun invalidNegotiatedVersionsUseTheTypedSafeFailure() {
+        requireMcpProtocolVersion(JsonPrimitive("supported-version"), "supported-version")
+        for (actual in listOf(null, JsonPrimitive(42), JsonPrimitive(""),
+                JsonPrimitive("unsupported-version; secret=do-not-leak"), JsonObject(emptyMap()))) {
+            val error = assertThrows(McpProtocolNegotiationException::class.java) {
+                requireMcpProtocolVersion(actual, "supported-version")
+            }
+            assertTrue(!error.message.orEmpty().contains("secret"))
+        }
+    }
+
     @Test fun protocolNegotiationFailureExplainsHowToFixTheServer() {
         val outcome = mcpExtensionFailure("local", McpProtocolNegotiationException(), connecting = true)
         assertEquals("MCP_PROTOCOL_NEGOTIATION_FAILED", outcome.errorCode)

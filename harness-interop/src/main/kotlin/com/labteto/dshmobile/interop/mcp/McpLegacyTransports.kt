@@ -95,11 +95,7 @@ class McpLegacyStreamableHttpTransport(
         val response = post(payload, includeProtocol = false)
         val result = response.body["result"]?.jsonObject
             ?: error("MCP 旧协议 initialize 缺少 result")
-        val negotiated = result["protocolVersion"]?.jsonPrimitive?.content
-            ?: error("MCP 旧协议 initialize 缺少 protocolVersion")
-        require(negotiated == LEGACY_MCP_PROTOCOL_VERSION) {
-            "MCP 服务端协商到不支持的版本：$negotiated"
-        }
+        requireMcpProtocolVersion(result["protocolVersion"], LEGACY_MCP_PROTOCOL_VERSION)
         sessionId = response.sessionId
         postNotification("notifications/initialized")
         initialized = true
@@ -207,12 +203,8 @@ class McpLegacyHttpSseTransport(
                 })
             },
         )
-        val negotiated = response["result"]?.jsonObject
-            ?.get("protocolVersion")?.jsonPrimitive?.content
-            ?: error("MCP SSE initialize 缺少 protocolVersion")
-        require(negotiated == LEGACY_SSE_MCP_PROTOCOL_VERSION) {
-            "MCP SSE 服务端协商到不支持的版本：$negotiated"
-        }
+        requireMcpProtocolVersion(response["result"]?.jsonObject?.get("protocolVersion"),
+            LEGACY_SSE_MCP_PROTOCOL_VERSION)
         rawNotification("notifications/initialized")
         initialized = true
     }
@@ -473,12 +465,7 @@ class McpLegacyStdioTransport(
                 })
             },
         )
-        val negotiated = response["result"]?.jsonObject
-            ?.get("protocolVersion")?.jsonPrimitive?.content
-            ?: error("MCP stdio initialize 缺少 protocolVersion")
-        require(negotiated == protocolVersion) {
-            "MCP stdio 服务端协商到不支持的版本：$negotiated；请求版本：$protocolVersion"
-        }
+        requireMcpProtocolVersion(response["result"]?.jsonObject?.get("protocolVersion"), protocolVersion)
         writeMessage(
             buildJsonObject {
                 put("jsonrpc", "2.0")

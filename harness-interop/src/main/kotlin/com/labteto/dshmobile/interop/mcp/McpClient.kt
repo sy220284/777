@@ -27,6 +27,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -72,6 +73,12 @@ class McpRpcException(val code: Int) : IllegalStateException("MCP RPC 错误（$
 /** Safe error identity from an isolated worker; server response details are not exposed. */
 class McpProtocolNegotiationException :
     IllegalStateException("MCP initialize 协议版本协商失败")
+
+/** Transport-independent version admission; remote text never defines the local error category. */
+internal fun requireMcpProtocolVersion(actual: kotlinx.serialization.json.JsonElement?, expected: String) {
+    val version = (actual as? JsonPrimitive)?.takeIf { it.isString }?.content
+    if (version != expected) throw McpProtocolNegotiationException()
+}
 
 data class McpToolDefinition(
     val name: String,

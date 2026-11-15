@@ -40,8 +40,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       # Shared capability contracts run first. A failing fast core/MCP test must not wait
       # behind the full Android application test suite on every corrective commit.
-      - name: 共享运行时、MCP 互操作与设备能力单元测试
-        run: ./gradlew --max-workers=2 :harness-core:test :harness-interop:test :harness-device-android:testDebugUnitTest --stacktrace --console=plain
+      - name: 共享运行时、进程隔离、MCP 与设备能力完整单元测试
+        run: ./gradlew --max-workers=2 :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :reference-validation:test --stacktrace --console=plain
       - name: 应用 JVM 单元测试
         run: ./gradlew --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain
       - name: 编译 Android 界面测试代码

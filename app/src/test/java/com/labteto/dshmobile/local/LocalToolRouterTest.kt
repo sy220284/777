@@ -38,6 +38,58 @@ class LocalToolRouterTest {
                 .filter { it.access.isNotBlank() && it.name != "screen_reader" }.map { it.name })
     }
 
+    @Test fun registeredSchemaCanUseTheCapacityGrantedByTheModelBudget() {
+        val large = tool("large_contract", "大型工具契约", ToolExposure.OPTIONAL, "扩展",
+            setOf("大型契约")).let { tool ->
+            val function = tool.schema["function"]!!.jsonObject
+            tool.copy(schema = kotlinx.serialization.json.JsonObject(tool.schema + ("function" to
+                kotlinx.serialization.json.JsonObject(function + ("parameters" to buildJsonObject {
+                    put("type", "object")
+                    put("properties", buildJsonObject {
+                        put("value", buildJsonObject {
+                            put("type", "string")
+                            put("enum", kotlinx.serialization.json.JsonArray((1..800).map {
+                                kotlinx.serialization.json.JsonPrimitive("value$it" + "x".repeat(200))
+                            }))
+                        })
+                    })
+                })))))
+        }
+        val registry = com.labteto.dshmobile.harness.tools.ToolRegistry()
+        registry.register(large)
+        val registered = requireNotNull(registry.get(large.name))
+        val tokens = estimateModelTokens(registered.schema.toString())
+        assertTrue(tokens > 24_000)
+        assertEquals(listOf("large_contract"), names(LocalToolRouter.selectSchemas(
+            listOf(registered), setOf("large_contract"), tokens + 100).schemas))
+        assertTrue("large_contract" in LocalToolRouter.selectSchemas(
+            listOf(registered), setOf("large_contract"), 1).budgetOmittedNames)
+    }
+
+    @Test fun uiCapabilitySearchFindsCoreToolsWithoutExposingInternalTools() {
+        val registered = listOf(
+            tool("read", "读取文件", ToolExposure.CORE, "文件"),
+            tool("private_read", "读取文件", ToolExposure.INTERNAL, "文件"),
+            tool("web_search", "网页搜索", ToolExposure.OPTIONAL, "网络"),
+        )
+        assertEquals(listOf("read"),
+            LocalCapabilityDiscovery.searchCatalogue(registered, "读取文件", 50).map { it.name })
+        assertEquals(listOf("read"),
+            LocalCapabilityDiscovery.searchCatalogue(registered, "read", 50).map { it.name })
+        // Model admission still selects optional tools only; CORE is already exposed.
+        assertTrue(LocalCapabilityDiscovery.resolve(registered, "读取文件").optional.isEmpty())
+    }
+
+    @Test fun exactDiscoveryLimitDoesNotLabelRegisteredToolsUnavailable() {
+        val registered = listOf(
+            tool("first_tool", "第一工具", ToolExposure.OPTIONAL, "扩展"),
+            tool("second_tool", "第二工具", ToolExposure.OPTIONAL, "扩展"),
+        )
+        val result = LocalCapabilityDiscovery.resolve(registered, "select:first_tool,second_tool,missing", 1)
+        assertEquals(listOf("first_tool"), result.optional.map { it.name })
+        assertEquals(listOf("missing"), result.unavailable)
+    }
+
     @Test fun modelAndUiUseOneCapabilityMatcherAndDirectory() {
         val registered = listOf(
             tool("read", "文件读取", ToolExposure.CORE, "文件"),

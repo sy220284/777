@@ -1096,7 +1096,7 @@ private fun StandaloneAgentRow(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                SyButton(text = "查看", enabled = !busy, onClick = { perform(UiWorkAgentOperation.INSPECT) },
+                SyButton(text = "查看结果", enabled = !busy, onClick = { perform(UiWorkAgentOperation.INSPECT) },
                     variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                 if (agent.status == "running") {
                     SyButton(text = "暂停", enabled = !busy && agent.continuable,

@@ -569,6 +569,7 @@ Feature、Shared Capability 和 Runtime Kernel 继续保持既定所有权、依
 - **唯一 Agent 控制**：`LocalWorkAgentControlRuntime` 由 Work Composition 创建一次。模型工具经 `LocalAgentControlPlane` 调用，UI 经 `LocalWorkAgentController` 调用，复用同一个 `LocalAgentControlPort`。原始 Job ID、Session owner、成员关联及 checkpoint 是真实身份；UI 仅持有快照和操作回执。
 - **唯一 UI 契约**：`WorkAgentUiPort` 发布 `UiWorkTeamSnapshot`（含 Team 与独立 Child 列表），`WorkTeamUiCommand` 是同一组类型化控制命令。旧 `WorkTeamUiPort` 仅为编译时别名，未保留第二实现。现行 V6 页面只经 `LocalWorkFeatureUiActions.agentAction` 调用该契约；Team 独有的成员和任务规则仍由 Team Owner 处理。
 - **统一展示**：工作模式的“智能体协作”入口由 `LocalAgentTeamUiState.withJobs` 从现有 Job 列表投影普通子智能体，Team 成员由 Team EventLog 派生。没有新增可写 UI 事实库。单独子智能体可查看、发消息、暂停、继续、关闭；Team 保留任务板与消息处理。
+- **完整恢复与结果**：子任务 history checkpoint v3 完整保存已选工具和最终结果，读取继续支持 v1/v2。Job 输出是有界状态摘要；团队、独立助手与 Agent 的 `job_output` 在校验原 Job 所有权后，通过同一无状态结果投影读取 Session 原检查点。活跃轮次显示当前进度，终态缺少结果事实时明确报错。
 - **高级功能按需**：日常 Work 使用单 Agent，要求独立调查时使用 Subagent，确需多成员及任务依赖时使用 Team；不让普通任务为没有运行的团队持续占用模型工具表。MCP、技能、LSP、Android 设备仍通过原 `ToolRegistry` 发现与审批，不通过 UI 获得额外权限。
 
 验收优先级：P0 持久 Job 共用启动、身份/权限/取消与恢复；P1 Work/UI Agent 契约、设备与工具曝光；P2 旧接口和展示适配清理。以本 PR 最新 HEAD 的 JVM、Android 编译/设备、插件、SQLite 和架构门禁为实际完成依据。

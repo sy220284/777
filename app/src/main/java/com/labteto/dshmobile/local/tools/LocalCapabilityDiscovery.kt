@@ -29,10 +29,7 @@ internal object LocalCapabilityDiscovery {
         }
         val core = ranked.filter { it.exposure == ToolExposure.CORE }.map(HarnessTool::name)
         val optional = ranked.filter(LocalToolRouter::isOptional)
-        val matchedNames = ranked.map(HarnessTool::name).toSet()
-        return Resolution(
-            exact, optional, core, exact.orEmpty().filterNot(matchedNames::contains), ranked,
-        )
+        return Resolution(exact, optional, core, exact.orEmpty().filterNot(byName::containsKey), ranked)
     }
 
     /** Project only the selected tools: large MCP registries should not materialize every schema per query. */
