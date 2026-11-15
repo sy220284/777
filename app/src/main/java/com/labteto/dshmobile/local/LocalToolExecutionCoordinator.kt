@@ -310,14 +310,14 @@ internal class LocalToolExecutionCoordinator(
                     if (target is LocalRunToolSelection) target.markExactFocus()
                 }
                 return buildString {
-                if (alreadyBuiltIn.isNotEmpty()) appendLine(
-                    "以下是内置工具，无需加载即可直接调用：" + alreadyBuiltIn.joinToString(", "))
-                if (unavailableNames.isNotEmpty()) appendLine(
-                    "指定工具当前无法加载：" + unavailableNames.joinToString(", "))
-                if (unavailableNames.isNotEmpty()) append(
-                    "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
-                if (alreadyBuiltIn.isNotEmpty()) append(
-                    "本轮已移除之前加载的可选扩展；所有内置 CORE 工具仍可按原策略直接调用。")
+                    if (alreadyBuiltIn.isNotEmpty()) appendLine(
+                        "以下是内置工具，无需加载即可直接调用：" + alreadyBuiltIn.joinToString(", "))
+                    if (unavailableNames.isNotEmpty()) appendLine(
+                        "指定工具当前无法加载：" + unavailableNames.joinToString(", "))
+                    if (unavailableNames.isNotEmpty()) append(
+                        "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
+                    if (alreadyBuiltIn.isNotEmpty()) append(
+                        "本轮已移除之前加载的可选扩展；所有内置 CORE 工具仍可按原策略直接调用。")
                 }.trimEnd()
             }
             // Don't bounce the user back to guess an internal capability name.

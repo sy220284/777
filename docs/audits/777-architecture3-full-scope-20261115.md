@@ -130,7 +130,22 @@ Session EventLog 为历史和恢复唯一持久源，分页/检查点/投影从�
 
 每项按“当前源代码 → 真实入口与调用者 → 单一事实 Owner → 影响/风险 → 修改 → 负向复核 → JVM/Android/设备验证 → 收敛记录”执行。对于跨文件修改，要检查所有调用方与恢复路径，不能只通过局部单测判完成。
 
-## 七、最终验收边界
+## 七、已落实的职责整合（本 PR 的实际代码变更）
+
+| 实际改动 | 先前问题 | 修改后单一责任 |
+|---|---|---|
+| 工具精确聚焦 | `select:` 之后 Work 后续步骤把固定插件、MCP、团队工具重新加回工具表 | `LocalRunToolSelection` 随 Work Run 持有选择与任务变化；显式选择一直有效到新任务，工具注册、授权仍归共享 Tool Registry |
+| 重复优先级管理 | `LocalWorkToolPriority` 独立保存任务变化，旁边又有工具集合保存聚焦状态 | 合并到 `LocalRunToolSelection`，删除旧独立类和重复测试文件，并保留原任务切换断言 |
+| 内置工具精确选择 | 仅选择 CORE 工具时旧 OPTIONAL 扩展残留 | 清空可选工具集合，完整保留实际 CORE 固有暴露，确保提示与模型下一步工具表一致 |
+| 主聊天会话采样 | UI 直接注入模型内部 `LocalConversationSampleCoordinator` | `LocalSessionUiFacade` 承接只读会话采样，UI 只调用 Feature 边界 |
+| 工具配置界面 | Tools 和主聊天页面直接注入网络搜索配置状态 | `ToolsManagementUiPort → LocalToolsUiFacade → LocalNetworkSearchSettings`；两个 UI 共享同一配置事实而无需自己注入 Store |
+| 审批模式界面 | 主聊天页面直接注入 `LocalApprovalPreferences` | `SettingsUiPort` 投影同一审批权威状态；实际审批执行仍由 Work/Tool Owner 核对 |
+| 静态审计分类 | 扫描器误把共享 Tool Capability 当作跨产品 Feature，引入 32 条噪声 | 分类按产品所有权识别，保留所有原始边与逐文件证据，缩小实际复核候选 |
+| UI 架构校验 | UI 直连协调器可被普通编译忽略 | 使用现有 3.0 边界、性能检查加入 PR 的全仓审计工作流，发现问题后修复源码而非放宽规则 |
+
+该表只记录本 PR 确实变更的代码。以上结果和下述验收应以 PR 最终 SHA 的实际 CI 回执为准；六组静态环和其他业务流程仍按照上一节的证据门槛进一步核实。
+
+## 八、最终验收边界
 
 1. **逻辑**：六大 Feature 有唯一业务归属；UI、通知、后台、自动化入口汇入相同业务合同；无已证明的平行可写状态源和错误工具表重建。
 2. **可靠性**：任务被取消、切换 Session、被系统杀进程、网络中断或工具副作用未知时，始终能复原有证据的最终结果或明确的待处理状态。
