@@ -96,12 +96,18 @@ internal class LocalWorkTurnToolRuntime(
             input, binding.continuationParentRunId, history,
             binding.workState.snapshot().goal?.description,
         )
-        execution.prepareWorkTurnCapabilities(
-            input = task,
-            history = history,
-            gitHubConfigured = githubConfigured,
-            target = binding.enabledOptionalTools,
-        )
+        // A user's explicit capability_search(select:...) is the authoritative
+        // model-visible surface for this task. Re-running heuristic preactivation
+        // would clear its exact-focus flag while rearranging optional tools.
+        // A genuinely new task calls beginNewTask() above and re-enables discovery.
+        if (!binding.enabledOptionalTools.exactFocus) {
+            execution.prepareWorkTurnCapabilities(
+                input = task,
+                history = history,
+                gitHubConfigured = githubConfigured,
+                target = binding.enabledOptionalTools,
+            )
+        }
     }
 
     internal fun schemas(

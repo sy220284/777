@@ -112,7 +112,7 @@ internal object LocalWorkInvestigationRuntime {
     private fun JsonObject.sourceIdentityOrLegacy(): String =
         text("source_key").ifBlank { text("source") }
 
-    private fun hasContinuationMarker(name: String, output: String): Boolean {
+    internal fun hasContinuationMarker(name: String, output: String): Boolean {
         if (name !in partialTools && name !in searchTools && name != "mcp__GitHub__fetch_file") return false
         // Archive and chunk tools put machine-readable pagination facts in the
         // first two header lines. Inspecting only the tail of a 40k-character

@@ -435,6 +435,21 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun archiveCursorTerminatorParsingIsPureAndDoesNotDependOnEventLogState() {
+        assertTrue(LocalWorkInvestigationRuntime.hasContinuationMarker(
+            "archive_list", "next_cursor=40; more",
+        ))
+        assertFalse(LocalWorkInvestigationRuntime.hasContinuationMarker(
+            "archive_list", "next_cursor=none; complete",
+        ))
+        assertFalse(LocalWorkInvestigationRuntime.hasContinuationMarker(
+            "archive_list", "next_cursor=none] complete",
+        ))
+        assertFalse(LocalWorkInvestigationRuntime.hasContinuationMarker(
+            "archive_list", "next_cursor=null；已完成",
+        ))
+    }
+
     @Test fun archivePagesAndByteReadsOnlyRequestContinuationWhileReallyIncomplete() {
         val log = log()
         try {
@@ -450,8 +465,6 @@ class LocalWorkInvestigationRuntimeTest {
                 LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")
                     .contains("【仍有未读完的材料】"))
             record("archive-list-b", "archive_list", listing, "next_cursor=none；全部结束")
-            record("archive-list-ascii", "archive_list", listing, "next_cursor=none; complete")
-            record("archive-list-bracket", "archive_list", listing, "next_cursor=none] complete")
             val memberFirst = buildJsonObject {
                 put("path", "sources.zip"); put("member", "src/Engine.kt")
                 put("start_char", 0); put("max_chars", 100)
@@ -474,10 +487,6 @@ class LocalWorkInvestigationRuntimeTest {
             val results = log.eventsOfTypesAfter(-1L, setOf("work/source-observed"))
             val finishedList = results.single { it.data["source_call_id"].toString().contains("archive-list-b") }
             assertTrue(finishedList.data["has_next"].toString() == "false")
-            assertTrue(results.single { it.data["source_call_id"].toString().contains("archive-list-ascii") }
-                .data["has_next"].toString() == "false")
-            assertTrue(results.single { it.data["source_call_id"].toString().contains("archive-list-bracket") }
-                .data["has_next"].toString() == "false")
             val finishedChunk = results.single { it.data["source_call_id"].toString().contains("chunk-b") }
             assertTrue(finishedChunk.data["has_next"].toString() == "false")
             assertFalse(LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")
