@@ -132,8 +132,11 @@ internal class LocalAppServer @Inject constructor(
                 add(tools.networkSearchEnabled.map { UiAppServerNotice(UiAppServerFeature.TOOLS) })
                 add(tools.deepSeekSearchPreferred.map { UiAppServerNotice(UiAppServerFeature.TOOLS) })
             }
-            if (UiAppServerFeature.SETTINGS in features)
+            if (UiAppServerFeature.SETTINGS in features) {
                 add(settings.state.map { UiAppServerNotice(UiAppServerFeature.SETTINGS) })
+                add(usage.revision.map { UiAppServerNotice(UiAppServerFeature.SETTINGS) })
+                add(pricing.snapshots.map { UiAppServerNotice(UiAppServerFeature.SETTINGS) })
+            }
         }
         if (selected.isNotEmpty()) emitAll(merge(*selected.toTypedArray()))
     }

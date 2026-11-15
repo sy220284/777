@@ -66,6 +66,9 @@ assert "appServer.media" in read(source / "ui/screens/local/LocalHarnessViewMode
 assert "appServer.usage" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.memory" in read(source / "ui/screens/settings/SettingsViewModel.kt")
 assert "appServer.pricing" in read(source / "ui/screens/settings/SettingsViewModel.kt")
+assert "usage.revision.map" in implementation and "pricing.snapshots.map" in implementation, (
+    "Settings notifications must reflect Usage and Pricing owner changes"
+)
 media_contract = read(contracts / "MediaUiPort.kt")
 for prohibited in (
     "Boolean = false", "UiMediaAsset? = null",

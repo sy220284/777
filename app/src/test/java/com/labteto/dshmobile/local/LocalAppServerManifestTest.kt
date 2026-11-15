@@ -46,8 +46,69 @@ import org.junit.Assert.assertThrows
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
+import com.labteto.dshmobile.uicontract.UsageUiPort
+import com.labteto.dshmobile.uicontract.PricingUiPort
+import com.labteto.dshmobile.uicontract.UiProviderPricingSnapshot
 
 class LocalAppServerManifestTest {
+    @Test fun settingsSubscriptionIncludesModelUsageAndPricingOwnerChanges() = runBlocking {
+        val subscribed = mutableListOf<String>()
+        val settings = java.lang.reflect.Proxy.newProxyInstance(
+            SettingsUiPort::class.java.classLoader, arrayOf(SettingsUiPort::class.java)
+        ) { _, method, _ ->
+            subscribed += "settings." + method.name
+            when (method.name) {
+                "getState" -> flowOf(UiSettingsSnapshot())
+                else -> error("unexpected settings lookup " + method.name)
+            }
+        } as SettingsUiPort
+        val usage = java.lang.reflect.Proxy.newProxyInstance(
+            UsageUiPort::class.java.classLoader, arrayOf(UsageUiPort::class.java)
+        ) { _, method, _ ->
+            subscribed += "usage." + method.name
+            when (method.name) {
+                "getRevision" -> MutableStateFlow(3L)
+                else -> error("unexpected usage lookup " + method.name)
+            }
+        } as UsageUiPort
+        val pricing = java.lang.reflect.Proxy.newProxyInstance(
+            PricingUiPort::class.java.classLoader, arrayOf(PricingUiPort::class.java)
+        ) { _, method, _ ->
+            subscribed += "pricing." + method.name
+            when (method.name) {
+                "getSnapshots" -> flowOf(UiProviderPricingSnapshot())
+                else -> error("unexpected pricing lookup " + method.name)
+            }
+        } as PricingUiPort
+        val server = LocalAppServer(
+            chatOwner = Provider { error("Unexpected Chat") },
+            workOwner = Provider { error("Unexpected Work") },
+            sessionOwner = Provider { error("Unexpected Session") },
+            agentOwner = Provider { error("Unexpected Agents") },
+            automationOwner = Provider { error("Unexpected Automation") },
+            toolsOwner = Provider { error("Unexpected Tools") },
+            settingsOwner = Provider { settings },
+            filesOwner = Provider { error("Unexpected Files") },
+            attachmentsOwner = Provider { error("Unexpected Attachments") },
+            queuedUserOwner = Provider { error("Unexpected Queue") },
+            mediaOwner = Provider { error("Unexpected Media") },
+            usageOwner = Provider { usage },
+            memoryOwner = Provider { error("Unexpected Memory") },
+            pricingOwner = Provider { pricing },
+            workReadOwner = Provider { error("Unexpected WorkRead") },
+        )
+        val notices = server.noticesFor(setOf(UiAppServerFeature.SETTINGS))
+        assertTrue(subscribed.isEmpty())
+        assertEquals(3, notices.take(3).toList().size)
+        assertEquals(
+            setOf("settings.getState", "usage.getRevision", "pricing.getSnapshots"),
+            subscribed.toSet(),
+        )
+    }
+
+
     @Test fun mediaCommandsAreDelegatedWithoutStartingUnrelatedFeatures() = runBlocking {
         val called = mutableListOf<String>()
         val mediaPort = java.lang.reflect.Proxy.newProxyInstance(
