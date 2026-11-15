@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.ensureActive
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,12 +32,12 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
     private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
-) : com.labteto.dshmobile.uicontract.ToolsUiPort {
-    suspend fun agentBackendStatus(): String = agentBackends.status()
-    suspend fun probeAgentBackend(): String = agentBackends.probe()
-    suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
+) : com.labteto.dshmobile.uicontract.ToolsManagementUiPort {
+    override suspend fun agentBackendStatus(): String = agentBackends.status()
+    override suspend fun probeAgentBackend(): String = agentBackends.probe()
+    override suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
         agentBackends.configure(host, port, pin, token, consent)
-    suspend fun revokeAgentBackend() = agentBackends.revoke()
+    override suspend fun revokeAgentBackend() = agentBackends.revoke()
 
     override fun serverChanges(): kotlinx.coroutines.flow.Flow<Unit> = tools.serverChanges()
 
@@ -207,12 +208,16 @@ class LocalToolsUiFacade @Inject internal constructor(
         return hasMcpTools to hasThirdPartyPlugin
     }
     /** Refresh the existing skill inventory when the real on-device skill files change. */
-    fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
+    override fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit> = skillManager.changes()
     override suspend fun installedSkills() = withContext(Dispatchers.IO) {
         val connected = servers()
         val registeredTools = tools.capabilityCatalogue().map { it.name }.toSet()
         tools.installedSkills().map { item ->
-            val result = runCatching { gitHubSkillImporter.installedSourceLink(item.name) }
+            val result = runCatching { gitHubSkillImporter.installedSourceIdentity(item.name) }
+            val sourceIdentity = result.getOrNull()?.let { (source, commit) ->
+                com.labteto.dshmobile.uicontract.UiSkillSourceIdentity(
+                    source.owner, source.repository, commit, source.directory)
+            }
             result.exceptionOrNull()?.let { failure ->
                 com.labteto.dshmobile.observability.AppLog.warn(
                     "SkillOrigin", "技能来源证据无效：${item.name}", failure,
@@ -226,8 +231,11 @@ class LocalToolsUiFacade @Inject internal constructor(
             }
             com.labteto.dshmobile.uicontract.UiSkillSnapshot(
                 item.name, item.description, item.modelInvocable, item.displayName,
-                sourceUrl = result.getOrNull(),
+                sourceUrl = sourceIdentity?.let {
+                    "https://github.com/${it.owner}/${it.repository}/tree/${it.commit}/${it.directory}"
+                },
                 sourceWarning = if (result.isFailure) "技能来源记录校验失败，请检查或重新安装此技能" else null,
+                sourceIdentity = sourceIdentity,
                 rollbackAvailable = gitHubSkillImporter.canRollback(item.name),
                 requirements = dependencyResult.getOrNull()?.map { requirement ->
                     val registered = when (requirement.type.lowercase()) {
@@ -262,7 +270,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         )
     }
     /** Publisher-provided plugin logo, loaded through the catalog owner. */
-    suspend fun codexPluginLogo(id: String): ByteArray? = codexOfficialPlugins.officialLogo(id)
+    override suspend fun codexPluginLogo(id: String): ByteArray? = codexOfficialPlugins.officialLogo(id)
 
     override suspend fun codexPluginDetail(id: String):
         com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot {
@@ -289,7 +297,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         return "已完成 MCP 授权并连接：${endpoint.serverId}"
     }
     /** The feature owns source validation; UI passes only the name from a visible catalog row. */
-    suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
+    override suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
         com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
     )
     override suspend fun installGitHubSkill(link: String) = gitHubSkillImporter.install(link)
@@ -297,7 +305,7 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =
         tools.createSkill(id, displayName, description, instructions)
     override suspend fun importSkill(filename: String, bytes: ByteArray) = tools.importSkill(filename, bytes)
-    suspend fun importSkillStream(filename: String, input: java.io.InputStream): String =
+    override suspend fun importSkillStream(filename: String, input: java.io.InputStream): String =
         withContext(Dispatchers.IO) {
             val owner = kotlinx.coroutines.currentCoroutineContext()
             val stream = object : java.io.FilterInputStream(input) {
@@ -313,60 +321,140 @@ class LocalToolsUiFacade @Inject internal constructor(
             skillManager.importSkill(filename, stream) { owner.ensureActive() }
         }
     suspend fun exportSkillPackage(id: String): ByteArray = tools.exportSkillPackage(id)
-    suspend fun exportSkillPackageToFile(id: String, destination: java.io.File) =
+    override suspend fun exportSkillPackageToFile(id: String, destination: java.io.File) =
         withContext(Dispatchers.IO) { skillManager.exportSkillPackageToFile(id, destination) }
-    suspend fun checkSkillUpdate(id: String): String? = gitHubSkillImporter.availableUpdate(id)
-    suspend fun upgradeSkill(id: String, revision: String): String =
+    override suspend fun checkSkillUpdate(id: String): String? = gitHubSkillImporter.availableUpdate(id)
+    override suspend fun upgradeSkill(id: String, revision: String): String =
         gitHubSkillImporter.updateInstalled(id, revision)
-    suspend fun rollbackSkill(id: String): String = gitHubSkillImporter.rollback(id)
+    override suspend fun rollbackSkill(id: String): String = gitHubSkillImporter.rollback(id)
     override suspend fun removeSkill(id: String) = tools.removeSkill(id)
     override suspend fun readSkillDocument(id: String) = tools.readSkillDocument(id)
     override suspend fun updateSkillDocument(id: String, document: String) = tools.updateSkillDocument(id, document)
     override suspend fun setSkillModelInvocable(id: String, enabled: Boolean) = tools.setSkillModelInvocable(id, enabled)
-    override suspend fun connectHttp(serverId: String, endpoint: String) = tools.connectHttp(serverId, endpoint)
-    suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String {
-        if (bearer.isNotEmpty()) {
-            disconnectMcpIfConnected(serverId)
-            mcpCredentials.save(serverId, endpoint, bearer)
-        }
-        return tools.connectHttp(serverId, endpoint)
+    override suspend fun connectHttp(serverId: String, endpoint: String): String =
+        mcpConnectionGate(serverId).withLock { tools.connectHttp(serverId, endpoint) }
+    /** Browser OAuth and remote refresh are cancellable preparation; Keystore write and
+     * connection replacement form one atomic-looking, fully restored transaction. */
+    private sealed interface PreparedMcpCredential {
+        data class OAuth(val value: com.labteto.dshmobile.local.tools.LocalMcpOAuthCredential) :
+            PreparedMcpCredential
+        data class Bearer(val value: String) : PreparedMcpCredential
     }
+    // OAuth may wait in the browser for minutes. Serialize mutations per service,
+    // while other independent MCP services remain usable.
+    private val mcpConnectionGates =
+        java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
+    private fun mcpConnectionGate(serverId: String): kotlinx.coroutines.sync.Mutex {
+        require(serverId.matches(Regex("[A-Za-z0-9_-]{1,24}"))) { "MCP 服务标识无效" }
+        return mcpConnectionGates.computeIfAbsent(serverId) { kotlinx.coroutines.sync.Mutex() }
+    }
+
+    private suspend fun switchMcpHttpConnection(
+        serverId: String, endpoint: String,
+        prepare: suspend () -> PreparedMcpCredential,
+    ): String = mcpConnectionGate(serverId).withLock {
+        val existing = tools.servers().firstOrNull { it.id == serverId }
+        if (existing != null) {
+            val uri = java.net.URI(endpoint)
+            val advertised = java.net.URI(uri.scheme, null, uri.host, uri.port,
+                uri.path?.ifBlank { "/" } ?: "/", null, null).toString()
+            require(existing.transport == "http" && existing.target == advertised) {
+                "服务标识已被不同连接占用；请先在连接器中管理原服务"
+            }
+        }
+        val prepared = prepare()
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        val afterPreparation = tools.servers().firstOrNull { it.id == serverId }
+        check(existing?.id == afterPreparation?.id &&
+            existing?.transport == afterPreparation?.transport &&
+            existing?.target == afterPreparation?.target &&
+            existing?.lifecycle == afterPreparation?.lifecycle) {
+            "MCP 连接在授权期间已变化，请根据最新连接状态重试"
+        }
+        // DataStore writes can suspend. Once committed, either publish a live connection
+        // or restore both the old encrypted credential and its previous registration.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            val rotation = when (prepared) {
+                is PreparedMcpCredential.OAuth ->
+                    mcpCredentials.rotateOAuth(serverId, endpoint, prepared.value)
+                is PreparedMcpCredential.Bearer ->
+                    mcpCredentials.rotateBearer(serverId, endpoint, prepared.value)
+            }
+            try {
+                if (existing != null) tools.disconnect(serverId)
+                tools.connectHttp(serverId, endpoint)
+            } catch (failure: Throwable) {
+                val restoreError = try {
+                    if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
+                    mcpCredentials.rollbackCredentialRotation(serverId, rotation)
+                    if (existing != null) tools.connectHttp(serverId, endpoint)
+                    null
+                } catch (error: Throwable) {
+                    error
+                }
+                if (restoreError != null) {
+                    val error = IllegalStateException(
+                        "MCP 连接切换失败，且恢复原服务失败：${restoreError.message}", failure)
+                    error.addSuppressed(restoreError)
+                    throw error
+                }
+                throw failure
+            }
+        }
+    }
+
+    override suspend fun connectHttpWithCredential(
+        serverId: String, endpoint: String, bearer: String,
+    ): String = if (bearer.isEmpty())
+        mcpConnectionGate(serverId).withLock { tools.connectHttp(serverId, endpoint) }
+    else switchMcpHttpConnection(serverId, endpoint) {
+        PreparedMcpCredential.Bearer(bearer)
+    }
+
     private suspend fun disconnectMcpIfConnected(serverId: String) {
         if (tools.servers().any { it.id == serverId }) tools.disconnect(serverId)
     }
-    suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?) {
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        disconnectMcpIfConnected(serverId)
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        mcpOAuth.authorize(serverId, endpoint, clientId)
-        kotlinx.coroutines.currentCoroutineContext().ensureActive()
-        tools.connectHttp(serverId, endpoint)
-    }
-    fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
-    suspend fun refreshMcpLogin(serverId: String, endpoint: String) {
-        disconnectMcpIfConnected(serverId)
-        mcpCredentials.refresh(serverId, endpoint)
-        tools.connectHttp(serverId, endpoint)
-    }
-    suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
+
+    override suspend fun loginMcp(serverId: String, endpoint: String, clientId: String?): String =
+        switchMcpHttpConnection(serverId, endpoint) {
+            PreparedMcpCredential.OAuth(mcpOAuth.authorize(serverId, endpoint, clientId))
+        }
+    override fun cancelMcpLogin(serverId: String) = mcpOAuth.cancel(serverId)
+    override suspend fun refreshMcpLogin(serverId: String, endpoint: String): String =
+        switchMcpHttpConnection(serverId, endpoint) {
+            PreparedMcpCredential.OAuth(mcpCredentials.stageOAuthRefresh(serverId, endpoint))
+        }
+
+    override suspend fun revokeMcpLogin(serverId: String, endpoint: String): Boolean {
         mcpOAuth.cancel(serverId)
-        disconnectMcpIfConnected(serverId)
-        return mcpCredentials.revoke(serverId, endpoint)
+        return mcpConnectionGate(serverId).withLock {
+            disconnectMcpIfConnected(serverId)
+            mcpCredentials.revoke(serverId, endpoint)
+        }
     }
-    suspend fun clearMcpCredential(serverId: String) {
+    override suspend fun clearMcpCredential(serverId: String) {
         mcpOAuth.cancel(serverId)
-        disconnectMcpIfConnected(serverId)
-        mcpCredentials.clear(serverId)
+        mcpConnectionGate(serverId).withLock {
+            disconnectMcpIfConnected(serverId)
+            mcpCredentials.clear(serverId)
+        }
     }
-    override suspend fun connectStdio(serverId: String, command: List<String>, workingDirectory: String?) =
+    override suspend fun connectStdio(
+        serverId: String, command: List<String>, workingDirectory: String?,
+    ): String = mcpConnectionGate(serverId).withLock {
         tools.connectStdio(serverId, command, workingDirectory)
-    override suspend fun disconnect(serverId: String) = tools.disconnect(serverId)
+    }
+    override suspend fun disconnect(serverId: String): String =
+        mcpConnectionGate(serverId).withLock { tools.disconnect(serverId) }
 }
 
 @dagger.Module
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
 internal abstract class LocalToolsUiBindings {
     @dagger.Binds abstract fun bindToolsUiPort(facade: LocalToolsUiFacade): com.labteto.dshmobile.uicontract.ToolsUiPort
+    @dagger.Binds abstract fun bindToolsManagementUiPort(facade: LocalToolsUiFacade):
+        com.labteto.dshmobile.uicontract.ToolsManagementUiPort
+
 }
 
 /** Read-only Git comparison receipt; process/runtime objects stay behind the UI facade. */

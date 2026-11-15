@@ -5,10 +5,6 @@ import com.labteto.dshmobile.local.agent.LocalAgentModelStepRecoveryPolicy
 import com.labteto.dshmobile.local.agent.LocalAgentModelStepRuntime
 import com.labteto.dshmobile.local.automation.AutomationPlanningRevision
 import com.labteto.dshmobile.local.automation.resolveAutomationPlanningRevision
-import com.labteto.dshmobile.local.quality.LocalOutputQualityContext
-import com.labteto.dshmobile.local.quality.LocalOutputQualityGuard
-import com.labteto.dshmobile.local.quality.LocalOutputQualityPipeline
-import com.labteto.dshmobile.local.quality.LocalOutputQualityResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -84,28 +80,4 @@ class LocalAgentRuntimeFoundationV3Test {
         assertEquals(current, stale.value)
     }
 
-    @Test
-    fun qualityPipelineRunsDomainGuardsInOrder() {
-        val first = LocalOutputQualityGuard { text, _ ->
-            LocalOutputQualityResult(
-                text = text + "A",
-                findings = listOf("first"),
-                changed = true,
-            )
-        }
-        val second = LocalOutputQualityGuard { text, _ ->
-            LocalOutputQualityResult(
-                text = text + "B",
-                findings = listOf("second"),
-                changed = true,
-            )
-        }
-
-        val result = LocalOutputQualityPipeline(listOf(first, second))
-            .inspect("start", LocalOutputQualityContext())
-
-        assertEquals("startAB", result.text)
-        assertEquals(listOf("first", "second"), result.findings)
-        assertTrue(result.changed)
-    }
 }

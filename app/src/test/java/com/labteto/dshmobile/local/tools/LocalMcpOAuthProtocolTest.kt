@@ -32,6 +32,10 @@ class LocalMcpOAuthProtocolTest {
             LocalMcpOAuthProtocol.validateCallback(params + ("error" to "access_denied"),
                 "expected", "https://wrong.example", false)
         }
+        assertThrows(kotlinx.coroutines.CancellationException::class.java) {
+            LocalMcpOAuthProtocol.validateCallback(params + ("error" to "access_denied"),
+                "expected", "https://issuer.example", true)
+        }
     }
     @Test fun issuerDiscoveryKeepsSpecifiedOAuthAndOidcOrder() {
         assertEquals(listOf(

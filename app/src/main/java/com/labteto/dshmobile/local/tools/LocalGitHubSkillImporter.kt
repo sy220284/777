@@ -249,6 +249,10 @@ internal class LocalGitHubSkillImporter @Inject constructor(
         skills.rollbackSkill(id)
     }
 
+    /** Expose the validated receipt fields, not a URL guessed by the presentation layer. */
+    fun installedSourceIdentity(id: String): Pair<PublicGitHubSkillLocation, String>? =
+        skills.githubSourceEvidence(id)?.let(::parseGitHubSkillUpdateSource)
+
     fun installedSourceLink(id: String): String? =
         skills.githubSourceEvidence(id)?.let(::parseGitHubSkillSourceLink)
 
