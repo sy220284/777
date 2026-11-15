@@ -98,3 +98,15 @@ CI 回归复核：此前一次执行的 3569 项 JVM 测试中有 2 项失败，
 ### 检查点识别与真实用户意图（本轮补查）
 
 此前工具预选通过检查用户文本是否含有 `<work-checkpoint>`、`<compacted-summary>`、`<chat-continuity>` 决定跳过消息。用户提供代码、日志或文档时正常引用这些标签，会被误认作系统历史压缩块，导致最新需求丢失、旧工具意图重新生效。现改为直接消费已有 `LocalContextCheckpointEnvelope` 的可信来源字段（包含旧版来源标记），仅跳过实际由系统生成的检查点。保持原始用户文字及多模态内容完整；新增可信 Work/Chat 检查点、旧 GitHub 任务与真实用户标签引用的对照测试。来源归属仍为 Context/Model 既有契约，不新增自制标记表或额外运行状态。
+
+### 最终独立快照验收及临时工作流清理
+
+固定快照 `2d9fd9b4916c4b45d5c2b13c9ae0eb8c941927bf` 的独立验收工作流 [43711158185](https://github.com/sy220284/777/actions/runs/43711158185) 已返回四组 `completed/success`：
+- 完整核心库、MCP、设备能力及 App JVM 单测，Android 测试包和调试 APK；
+- Android 36 SQLite 会话迁移与搜索；
+- Android 36 Chat/Work、设备权限及 Agent 团队交互；
+- Android 36 扩展市场、凭据与授权回调交互。
+
+其中 Hilt `WorkReadUiPort` 重复绑定已在 `b0f00409` 消除：保留 Work Feature 中唯一 `@Binds`，删除组合根重复的 `@Provides`。固定快照通过证明此前 Dagger 编译失败已修复。本节记录的独立快照验收不覆盖后续对 Automation UI 的提交；最终 PR 交付仍以清理临时工作流后当前 HEAD 的六项标准 GitHub Actions 完成结果为准。
+
+用于本次证据补采的临时工作流已从 PR 分支退出，避免将一次性验证路径留作常驻生产配置。
