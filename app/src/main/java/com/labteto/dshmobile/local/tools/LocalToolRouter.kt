@@ -232,7 +232,7 @@ internal object LocalToolRouter {
             for (term in terms) {
                 val match = when {
                     name == term -> 10_000
-                    name.split('_', '-').any { it == term } -> 2_000
+                    name.split('_', '-').any { it == term && term != "tool" } -> 2_000
                     keywords.any { it == term } -> 1_200
                     family == term -> 800
                     hasExplicitIntentTerm(name, term) -> 600

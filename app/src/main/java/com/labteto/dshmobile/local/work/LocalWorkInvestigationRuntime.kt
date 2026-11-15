@@ -102,7 +102,7 @@ internal object LocalWorkInvestigationRuntime {
             output.lineSequence().take(2).joinToString(" ")
         } else output.takeLast(1_200)
         if (metadata.contains("complete=true", ignoreCase = true)) return false
-        return Regex("""(?i)(next_start_line|next_start_char|next_byte|next_cursor|next_offset)\s*[:=]\s*["']?([^\s,}；]+)""")
+        return Regex("""(?i)(next_start_line|next_start_char|next_char|next_byte|next_cursor|next_offset)\s*[:=]\s*["']?([^\s,}；]+)""")
             .findAll(metadata)
             .any { match ->
                 val value = match.groupValues[2].trim('"', '\'').lowercase()
