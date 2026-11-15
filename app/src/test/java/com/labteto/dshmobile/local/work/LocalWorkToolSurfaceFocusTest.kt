@@ -175,13 +175,16 @@ class LocalWorkToolSurfaceFocusTest {
             })
             val policy = localAgentRunPolicy(LocalUsageMode.WORK)
             runtime.prepare(binding, "查询当前系统能力")
+            // The first model step admits the user task before any model-emitted tool call.
+            val first = runtime.schemas(policy, binding)
+            assertTrue("mcp_later_lookup" !in LocalToolSchemaProjection(registry, executor).names(first))
             assertTrue(runtime.prepareUnexposedForNextStep(binding, "mcp_later_lookup"))
             assertFalse(runtime.prepareUnexposedForNextStep(binding, "does_not_exist"))
-            assertEquals("mcp_later_lookup", binding.enabledOptionalTools.toList().let {
-                // Queued demand is a *future* selection, never a mutation of the frozen table.
-                runtime.schemas(policy, binding)
-                binding.enabledOptionalTools.first()
-            })
+            // The rejected tool cannot enter the already frozen step; it is prioritized
+            // only when the following model step projects its new schema surface.
+            val second = runtime.schemas(policy, binding)
+            assertTrue("mcp_later_lookup" in LocalToolSchemaProjection(registry, executor).names(second))
+            assertEquals("mcp_later_lookup", binding.enabledOptionalTools.first())
             executor.searchCapabilities("select:mcp_pinned_status", binding.enabledOptionalTools)
             assertFalse(runtime.prepareUnexposedForNextStep(binding, "mcp_later_lookup"))
             assertTrue(runtime.prepareUnexposedForNextStep(binding, "mcp_pinned_status"))
