@@ -105,7 +105,6 @@ data class ChatSceneSnapshot(
     val error: String?,
     val group: UiChatGroupSummary? = null,
     val livePreview: UiStreamingReplyPreview? = null,
-    val correctionUndo: UiPersonaCorrectionUndo? = null,
 )
 
 sealed interface ChatUiCommand {
