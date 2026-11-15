@@ -423,15 +423,17 @@ if not snapshot_cursor_contract(session_storage):
         "Session persistence must capture durable projection cursors before materializing mutable Feature state"
     )
 
-agent_inbox_persistence_path = (
-    "app/src/main/java/com/labteto/dshmobile/local/agent/LocalAgentInboxPersistence.kt"
+session_inbox_contract_path = (
+    "app/src/main/java/com/labteto/dshmobile/local/session/LocalSessionTranscriptProjection.kt"
 )
-agent_inbox_persistence = all_local_sources.get(agent_inbox_persistence_path, "")
-if 'LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"' not in agent_inbox_persistence:
-    violations.append("LocalAgentInboxPersistence must own the canonical durable inbox event type")
+session_inbox_contract = all_local_sources.get(session_inbox_contract_path, "")
+if 'LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"' not in session_inbox_contract:
+    violations.append("Shared Session must own the canonical durable inbox event discriminator")
+if 'LOCAL_QUEUED_USER_TIMELINE_ACTION = "queued-user-timeline"' not in session_inbox_contract:
+    violations.append("Shared Session must own the durable queued-user transcript action discriminator")
 
 for path, source in all_local_sources.items():
-    if path != agent_inbox_persistence_path and '"agent/inbox/spliced"' in source:
+    if path != session_inbox_contract_path and '"agent/inbox/spliced"' in source:
         violations.append(
             f"{path} hard-codes the durable Agent inbox event type; use LOCAL_AGENT_INBOX_EVENT_TYPE"
         )

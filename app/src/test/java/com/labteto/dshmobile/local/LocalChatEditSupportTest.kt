@@ -14,7 +14,7 @@ import com.labteto.dshmobile.local.chat.syncChatBranchState
 import com.labteto.dshmobile.local.chat.upsertChatBranchNode
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.chat.decodeChatBranchStateEvent
 import com.labteto.dshmobile.local.session.LocalHarnessMessage

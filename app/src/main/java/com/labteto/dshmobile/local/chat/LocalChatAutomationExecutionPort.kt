@@ -2,7 +2,7 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.local.runtime.LocalExecutionStatus
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease
 import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry

@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local.agent
 
+import com.labteto.dshmobile.local.session.LOCAL_QUEUED_USER_TIMELINE_ACTION
+
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
+
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.session.LocalHarnessMessage

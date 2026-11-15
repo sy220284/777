@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local.agent
 
+import com.labteto.dshmobile.local.session.LOCAL_QUEUED_USER_TIMELINE_ACTION
+
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
+
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
@@ -17,7 +21,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 /** Queue and visible timeline are committed in one EventLog record while queue CAS owns admission. */
-internal const val LOCAL_QUEUED_USER_TIMELINE_ACTION = "queued-user-timeline"
 
 internal data class LocalQueuedUserTimelineUpdate(
     val messages: List<LocalHarnessMessage>,

@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.agent.DEFAULT_AGENT_CONTINUATION_POLICY
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import java.io.File
 import java.security.MessageDigest

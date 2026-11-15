@@ -15,7 +15,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
-internal const val LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"
 private const val LOCAL_AGENT_INBOX_STATE_VERSION = 1
 
 internal fun encodeLocalAgentInboxEvent(

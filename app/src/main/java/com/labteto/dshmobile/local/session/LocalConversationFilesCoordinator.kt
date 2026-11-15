@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 

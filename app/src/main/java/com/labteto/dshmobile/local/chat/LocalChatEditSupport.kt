@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult

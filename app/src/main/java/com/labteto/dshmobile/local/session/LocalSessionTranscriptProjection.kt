@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
-import com.labteto.dshmobile.local.agent.LOCAL_QUEUED_USER_TIMELINE_ACTION
 import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.observability.AppLog
@@ -11,6 +9,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
+
+/** The durable Session event discriminators are shared facts: Agent writes queue
+ * payloads, while Session owns their exact wire identity for replay and paging.
+ */
+internal const val LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"
+internal const val LOCAL_QUEUED_USER_TIMELINE_ACTION = "queued-user-timeline"
 
 /** Shared durable event contract for visible Chat checkpoints (never model history). */
 internal const val CHAT_STREAM_CHECKPOINT_EVENT = "chat/stream-checkpoint"

@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
-import com.labteto.dshmobile.local.agent.LOCAL_QUEUED_USER_TIMELINE_ACTION
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive

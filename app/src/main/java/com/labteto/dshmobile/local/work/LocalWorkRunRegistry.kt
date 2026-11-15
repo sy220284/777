@@ -8,7 +8,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceSnapshot
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 import com.labteto.dshmobile.local.jobs.syncForegroundJobs
