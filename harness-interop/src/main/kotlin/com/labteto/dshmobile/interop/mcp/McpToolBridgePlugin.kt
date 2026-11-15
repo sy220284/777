@@ -372,7 +372,7 @@ class McpToolBridgePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "MCP",
-                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = mcpDiscoveryKeywordsFor("mcp_http_connect"),
                     requirements = listOf("目标 MCP HTTP/HTTPS 服务必须可访问"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -411,7 +411,7 @@ class McpToolBridgePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "MCP",
-                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = mcpDiscoveryKeywordsFor("mcp_stdio_connect"),
                     requirements = listOf("目标 stdio 命令必须已安装且工作目录位于 Harness 工作区内"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -440,7 +440,7 @@ class McpToolBridgePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "MCP",
-                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = mcpDiscoveryKeywordsFor("mcp_server_list"),
                     requirements = emptyList(),
                 ),
                 executor = HarnessToolExecutor { _, _, _ ->
@@ -464,7 +464,7 @@ class McpToolBridgePlugin(
                 approvalPolicy = ToolApprovalPolicy.NEVER,
                 timeoutMillis = CONNECT_TIMEOUT_MILLIS,
                 exposure = ToolExposure.OPTIONAL,
-                metadata = ToolMetadata(family = "MCP", discoveryKeywords = MCP_DISCOVERY_KEYWORDS),
+                metadata = ToolMetadata(family = "MCP", discoveryKeywords = mcpDiscoveryKeywordsFor("mcp_lifecycle_events")),
                 executor = HarnessToolExecutor { _, input, _ ->
                     val expected = input.optional("incarnation")
                     val after = input["after_sequence"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: -1L
@@ -516,7 +516,7 @@ class McpToolBridgePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "MCP",
-                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = mcpDiscoveryKeywordsFor("mcp_reconnect"),
                     requirements = listOf("已有连接记录；必须人工批准重新连接"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -548,7 +548,7 @@ class McpToolBridgePlugin(
                 exposure = ToolExposure.OPTIONAL,
                 metadata = ToolMetadata(
                     family = "MCP",
-                    discoveryKeywords = MCP_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = mcpDiscoveryKeywordsFor("mcp_disconnect"),
                     requirements = listOf("目标 MCP 服务必须已连接"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -792,8 +792,10 @@ class McpToolBridgePlugin(
                             exposure = ToolExposure.OPTIONAL,
                             metadata = ToolMetadata(
                                 family = "MCP",
-                                discoveryKeywords = MCP_DISCOVERY_KEYWORDS + setOf(
-                                    serverId.take(MAX_DISCOVERY_KEYWORD_CHARS),
+                                // Remote tool intent comes from its own operation name.
+                                // Matching only "MCP" or the server ID must not preselect
+                                // every tool on a large connected server.
+                                discoveryKeywords = setOf(
                                     definition.name.take(MAX_DISCOVERY_KEYWORD_CHARS),
                                 ),
                                 requirements = listOf("MCP 服务 $serverId 必须保持连接"),
@@ -1144,9 +1146,18 @@ class McpToolBridgePlugin(
         const val REMOTE_TOOL_TIMEOUT_MILLIS = 65_000L
         const val MAX_COMMAND_ARGS = 32
         const val MAX_COMMAND_ARG_LENGTH = 4_096
-        val MCP_DISCOVERY_KEYWORDS = setOf(
-            "mcp", "外部工具", "服务", "连接", "扩展", "工具桥接", "http", "stdio",
-        )
+        // Management operations are individually discoverable. Generic "MCP"
+        // starts at the read-only server list; explicit connect/disconnect language
+        // selects the corresponding operation without inflating remote tool schemas.
+        fun mcpDiscoveryKeywordsFor(name: String): Set<String> = when (name) {
+            "mcp_http_connect" -> setOf("连接MCP", "连接MCP服务", "HTTP MCP", "添加MCP服务")
+            "mcp_stdio_connect" -> setOf("本地MCP", "stdio MCP", "连接本地MCP", "启动MCP服务")
+            "mcp_server_list" -> setOf("mcp", "MCP状态", "MCP服务列表", "查看MCP服务")
+            "mcp_lifecycle_events" -> setOf("MCP连接事件", "MCP状态变化")
+            "mcp_reconnect" -> setOf("重连MCP", "恢复MCP连接")
+            "mcp_disconnect" -> setOf("断开MCP", "断开MCP连接")
+            else -> setOf(name)
+        }
         val MANAGEMENT_TOOLS = listOf(
             "mcp_http_connect",
             "mcp_stdio_connect",
