@@ -25,6 +25,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -139,6 +140,55 @@ class LocalWorkToolSurfaceFocusTest {
         focus.beginNewTask()
         assertFalse(focus.exactFocus)
         assertFalse("新任务应恢复工具发现", focus.isPreparedForContinuation())
+    }
+
+    @Test fun unexposedOptionalIsPrioritizedOnlyInLaterModelStep() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(optional("mcp_pinned_status"))
+            register(optional("mcp_later_lookup"))
+        }
+        val executor = LocalToolExecutionCoordinator(
+            registry = registry,
+            currentSessionId = { "focus-session" },
+            planMode = { false },
+            requestApproval = { _, _, _ -> true },
+            pinnedConnectorIds = { listOf("pinned") },
+        )
+        val runtime = LocalWorkTurnToolRuntime(
+            registry, executor, LocalToolSchemaProjection(registry, executor),
+            approvals(), githubConfigured = { false },
+        )
+        val log = LocalSessionEventLog(File(files.newFolder(), "next-step-events.jsonl"), Json)
+        val binding = LocalWorkRunBinding(
+            sessionId = "focus-session",
+            initialState = LocalHarnessState(
+                sessionId = "focus-session", usageMode = LocalUsageMode.WORK,
+            ).toLocalWorkRunState(),
+            sessionBase = LocalHarnessSession(id = "focus-session", usageMode = LocalUsageMode.WORK),
+            runHandle = LocalAgentRunHandle(initialSessionId = "focus-session", maxPendingInputs = 8),
+            eventLog = log,
+        )
+        try {
+            binding.runHandle.modelHistory.append(buildJsonObject {
+                put("role", "user")
+                put("content", "查询当前系统能力")
+            })
+            val policy = localAgentRunPolicy(LocalUsageMode.WORK)
+            runtime.prepare(binding, "查询当前系统能力")
+            assertTrue(runtime.prepareUnexposedForNextStep(binding, "mcp_later_lookup"))
+            assertFalse(runtime.prepareUnexposedForNextStep(binding, "does_not_exist"))
+            assertEquals("mcp_later_lookup", binding.enabledOptionalTools.toList().let {
+                // Queued demand is a *future* selection, never a mutation of the frozen table.
+                runtime.schemas(policy, binding)
+                binding.enabledOptionalTools.first()
+            })
+            executor.searchCapabilities("select:mcp_pinned_status", binding.enabledOptionalTools)
+            assertFalse(runtime.prepareUnexposedForNextStep(binding, "mcp_later_lookup"))
+            assertTrue(runtime.prepareUnexposedForNextStep(binding, "mcp_pinned_status"))
+            assertEquals(listOf("mcp_pinned_status"), binding.enabledOptionalTools.toList())
+        } finally {
+            log.close()
+        }
     }
 
     @Test fun runToolSelectionReplacesRedundantPriorityCursorAndRestoresOnReset() {
