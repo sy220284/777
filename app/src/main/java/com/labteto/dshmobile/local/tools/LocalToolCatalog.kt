@@ -206,7 +206,7 @@ object LocalToolCatalog {
                 put("items", buildJsonObject {
                     put("type", "string")
                     put("description", "用户明确要求独立审查时选择 code 或 security")
-                    put("enum", buildJsonArray { add("code"); add("security") })
+                    put("enum", buildJsonArray { add(JsonPrimitive("code")); add(JsonPrimitive("security")) })
                 })
             },
         ), listOf("description", "artifact_paths", "verification_commands")))
@@ -216,7 +216,8 @@ object LocalToolCatalog {
                 put("type", "string")
                 put("description", "active、paused、completed 或 blocked")
                 put("enum", buildJsonArray {
-                    add("active"); add("paused"); add("completed"); add("blocked")
+                    add(JsonPrimitive("active")); add(JsonPrimitive("paused"))
+                    add(JsonPrimitive("completed")); add(JsonPrimitive("blocked"))
                 })
             },
             "note" to string("状态说明"),
