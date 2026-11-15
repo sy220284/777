@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -63,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
 import com.labteto.dshmobile.local.network.requiresAndroid17LocalNetworkPermission
@@ -223,6 +226,11 @@ class ToolsViewModel @Inject constructor(
 
     fun setNetworkSearchEnabled(enabled: Boolean) = localTools.setNetworkSearchEnabled(enabled)
     fun setDeepSeekSearchPreferred(enabled: Boolean) = localTools.setDeepSeekSearchPreferred(enabled)
+
+    /** Reads the same live registry and query ranking as Agent capability_search. */
+    fun discoverCapabilities(query: String): List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot> =
+        if (query.isBlank()) localTools.capabilityCatalogue()
+        else localTools.discoverCapabilities(query, Int.MAX_VALUE)
     private val operationGate = ToolsOperationGate()
     private val requestedCodexLogos = mutableSetOf<String>()
     private var mcpLoginJob: kotlinx.coroutines.Job? = null
@@ -1231,6 +1239,8 @@ fun ToolsScreen(
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var showConnectorSettings by rememberSaveable { mutableStateOf(false) }
+    var showToolDirectory by rememberSaveable { mutableStateOf(false) }
+    var toolDirectoryQuery by rememberSaveable { mutableStateOf("") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
     // Single page with three tabs. The registered tool catalogue is not user-facing.
     var selectedTab by rememberSaveable(startAtPlugins, startAtSkills) {
@@ -1435,6 +1445,46 @@ fun ToolsScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                     AgentBackendSettings(viewModel)
+                                    SyButton(
+                                        text = if (showToolDirectory) "收起实时工具目录" else "查看实时工具目录",
+                                        onClick = { showToolDirectory = !showToolDirectory },
+                                        variant = SyButtonVariant.Ghost,
+                                        modifier = Modifier.fillMaxWidth().testTag("tool-directory-toggle"),
+                                    )
+                                    if (showToolDirectory) {
+                                        SySearchField(
+                                            value = toolDirectoryQuery,
+                                            onValueChange = { toolDirectoryQuery = it },
+                                            placeholder = "按工具名称或能力搜索",
+                                            modifier = Modifier.fillMaxWidth().testTag("tool-directory-search"),
+                                        )
+                                        val discovered = remember(
+                                            toolDirectoryQuery, state.servers, state.skills,
+                                            state.localPlugins, networkSearchEnabled,
+                                        ) { viewModel.discoverCapabilities(toolDirectoryQuery) }
+                                        Text(
+                                            "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",
+                                            style = DsType.caption11.withReadingWeight(),
+                                            color = colors.textSecondary,
+                                        )
+                                        LazyColumn(
+                                            modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp)
+                                                .testTag("tool-directory-results"),
+                                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                                        ) {
+                                            items(discovered, key = { it.name }) { capability ->
+                                                ToolCapabilityRow(
+                                                    title = capability.name,
+                                                    status = capability.family + " · " + capability.access,
+                                                    state = StateDotState.Idle,
+                                                    icon = SyEntryIcons.Tools,
+                                                    onClick = onUseCapability?.let { handoff -> {
+                                                        handoff("请使用 " + capability.name + " 工具完成当前工作，核验调用与执行回执。")
+                                                    } },
+                                                )
+                                            }
+                                        }
+                                    }
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                                         Text(
                                             stringResource(R.string.cap_center_settings_group),
