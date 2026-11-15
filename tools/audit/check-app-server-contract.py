@@ -45,7 +45,7 @@ for name in endpoints:
         read(source / "ui/screens/tools/ToolsScreen.kt") +
         read(source / "ui/screens/tasks/TasksViewModel.kt") + implementation), f"No client access: {name}"
 
-assert implementation.count(": AppServerUiPort") == 1
+assert len(re.findall(r"\)\s*:\s*AppServerUiPort\s*\{", implementation)) == 1, "Exactly one App Server implementation"
 assert "abstract fun bind(implementation: LocalAppServer): AppServerUiPort" in implementation
 assert "LocalToolRouter.search(" in tool_logic
 assert "LocalCapabilityDiscovery.resolve(tools, query)" in execution
