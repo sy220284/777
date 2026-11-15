@@ -41,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -1465,11 +1466,37 @@ fun ToolsScreen(
                                             placeholder = "按工具名称或能力搜索",
                                             modifier = Modifier.fillMaxWidth().testTag("tool-directory-search"),
                                         )
-                                        val discovered = remember(
-                                            toolDirectoryQuery, capabilityRevision,
-                                        ) { viewModel.discoverCapabilities(toolDirectoryQuery) }
+                                        val queryResult by produceState<
+                                            Result<List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot>>?
+                                        >(
+                                            initialValue = null,
+                                            showToolDirectory, toolDirectoryQuery, capabilityRevision,
+                                        ) {
+                                            if (showToolDirectory) {
+                                                delay(120)
+                                                try {
+                                                    val matches = withContext(Dispatchers.Default) {
+                                                        viewModel.discoverCapabilities(toolDirectoryQuery)
+                                                    }
+                                                    value = Result.success(matches)
+                                                } catch (cancelled: CancellationException) {
+                                                    throw cancelled
+                                                } catch (failure: Exception) {
+                                                    value = Result.failure(failure)
+                                                }
+                                            }
+                                        }
+                                        val discovered = queryResult?.getOrNull().orEmpty()
+                                        queryResult?.exceptionOrNull()?.let { failure ->
+                                            Text(
+                                                "工具目录读取失败：" + (failure.message ?: "请重试"),
+                                                style = DsType.caption11.withReadingWeight(),
+                                                color = colors.dangerInk,
+                                            )
+                                        }
                                         Text(
-                                            "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",
+                                            if (queryResult == null) "正在匹配已注册工具…"
+                                            else "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",
                                             style = DsType.caption11.withReadingWeight(),
                                             color = colors.textSecondary,
                                         )
