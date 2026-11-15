@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
+import com.labteto.dshmobile.harness.tools.ToolDeviceRequirement
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadinessProjector
 import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
@@ -96,6 +97,39 @@ class LocalTaskCapabilityReadinessTest {
         )
         assertTrue(LocalTaskCapabilityReadinessProjector.project(
             "不要共享屏幕，只总结文档", githubConfigured = null, networkSearchEnabled = false,
+        ).isEmpty())
+    }
+
+    @Test fun registeredToolRequirementsCoverActionableInstructionsWithoutExtraUserProbes() {
+        assertEquals(
+            listOf(LocalTaskCapabilityReadiness(
+                LocalTaskCapabilityKind.ACCESSIBILITY,
+                LocalTaskCapabilityState.CONNECTION_REQUIRED)),
+            LocalTaskCapabilityReadinessProjector.project(
+                "点击按钮并输入文字", githubConfigured = null, networkSearchEnabled = false,
+                accessibilityActive = false,
+                requiredDeviceCapabilities = setOf(ToolDeviceRequirement.ACCESSIBILITY),
+            ),
+        )
+        assertEquals(
+            listOf(LocalTaskCapabilityReadiness(
+                LocalTaskCapabilityKind.NOTIFICATION_ACCESS,
+                LocalTaskCapabilityState.CONNECTION_REQUIRED)),
+            LocalTaskCapabilityReadinessProjector.project(
+                "通知列表", githubConfigured = null, networkSearchEnabled = false,
+                notificationAccessActive = false,
+                requiredDeviceCapabilities = setOf(ToolDeviceRequirement.NOTIFICATION_ACCESS),
+            ),
+        )
+    }
+
+    @Test fun taskExplicitlyExcludingDeviceOrNotificationOverridesCapabilityHints() {
+        assertTrue(LocalTaskCapabilityReadinessProjector.project(
+            "不要操作设备，不读取通知，分析日志",
+            githubConfigured = null, networkSearchEnabled = false,
+            accessibilityActive = false, notificationAccessActive = false,
+            requiredDeviceCapabilities = setOf(
+                ToolDeviceRequirement.ACCESSIBILITY, ToolDeviceRequirement.NOTIFICATION_ACCESS),
         ).isEmpty())
     }
 
