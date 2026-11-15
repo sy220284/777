@@ -165,7 +165,7 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "从实时注册表发现扩展。已知名称可用 select:工具名1,工具名2，一次指定最多 128 个，并聚焦本轮可选工具清单；自动标出本轮预计可用、已加载、缺失及待加载工具，并给出超出定义预算时下一批精确选择命令。已装入本轮模型工具表的 MCP/GitHub 等扩展可直接加入 code_mode_run，串联前序执行结果；仍须逐步经过实际连接与权限审批。", properties(
+        add(tool("capability_search", "从实时注册表发现扩展。已知名称可用 select:工具名1,工具名2，一次指定最多 128 个，并聚焦当前任务的可选工具候选。结果区分已注册、已选择候选与定义预算不足；以下一模型请求最终提供的工具表为实际可用依据。进入该工具表的 MCP/GitHub 扩展可参与 code_mode_run，仍须逐步经过真实连接与权限审批。", properties(
             "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
         ), listOf("query")))
         add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
@@ -201,11 +201,24 @@ object LocalToolCatalog {
             "description" to string("目标和完成标准"),
             "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("按用户要求交付的工作区相对文件路径；讨论任务填空数组")) },
             "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("按用户要求执行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },
-            "review_requirements" to buildJsonObject { put("type", "array"); put("items", string("仅任务明确要求时填写 code（独立代码审查）和/或 security（独立安全审查）；其他任务为 []。审查观点、人工确认与真实测试分别结算")) },
+            "review_requirements" to buildJsonObject {
+                put("type", "array")
+                put("items", buildJsonObject {
+                    put("type", "string")
+                    put("description", "用户明确要求独立审查时选择 code 或 security")
+                    put("enum", buildJsonArray { add("code"); add("security") })
+                })
+            },
         ), listOf("description", "artifact_paths", "verification_commands")))
         add(tool("get_goal", "读取当前会话目标", properties()))
         add(tool("update_goal", "更新当前 Work Goal 状态。完成前依据原目标真实执行已声明的验收命令并核验当前成果版本；命令未执行、最新失败、缺少退出码、文件缺失和版本变化会分别说明修复动作。受阻时保留已完成进度，按具体错误恢复后继续结算。", properties(
-            "status" to string("active、paused、completed 或 blocked"),
+            "status" to buildJsonObject {
+                put("type", "string")
+                put("description", "active、paused、completed 或 blocked")
+                put("enum", buildJsonArray {
+                    add("active"); add("paused"); add("completed"); add("blocked")
+                })
+            },
             "note" to string("状态说明"),
         ), listOf("status")))
         add(tool("work_finding", "从真实工具回执记录调查发现；提出假说、补充依据、推翻错误判断，或列出当前目标的发现。仅在遇到有价值的新线索时调用；发现记录不等于已独立验证", properties(
