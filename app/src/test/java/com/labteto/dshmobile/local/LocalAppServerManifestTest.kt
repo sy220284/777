@@ -40,7 +40,6 @@ import org.junit.Assert.assertThrows
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
-import com.labteto.dshmobile.uicontract.UiAppServerFeature
 
 class LocalAppServerManifestTest {
     @Test fun scopedNoticesActivateOnlyRequestedFeatureOwner() = runBlocking {
