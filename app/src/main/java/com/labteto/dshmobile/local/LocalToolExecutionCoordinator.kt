@@ -172,16 +172,20 @@ internal class LocalToolExecutionCoordinator(
         enableOptionalTools(githubTools, target)
     }
 
-    /** Give MCP tools registered during this run a chance to enter the next schema budget.
-     * Discovery is never authorization; the live registry and per-call approval remain authoritative. */
+    /** Newly connected MCP services may register hundreds of tools. Only operations
+     * relevant to the active user task receive model schema priority; the complete
+     * catalog remains available by exact capability search. Discovery grants no access.
+     */
     fun prioritizeRunCreatedMcpTools(
-        names: List<String>, target: MutableSet<String> = enabledOptionalTools,
+        names: List<String>,
+        taskContext: String,
+        target: MutableSet<String> = enabledOptionalTools,
     ) {
-        val preferred = names.mapNotNull(registry::get)
+        val candidates = names.mapNotNull(registry::get)
             .filter { LocalToolRouter.isOptional(it) &&
                 it.metadata.family.equals("MCP", ignoreCase = true) &&
                 isNetworkSearchPermitted(it.name) }
-            .map(HarnessTool::name)
+        val preferred = LocalToolRouter.relevantOptionalToolNames(candidates, taskContext)
         enableOptionalTools(preferred, target)
         synchronized(target) {
             val existing = target.toList()
