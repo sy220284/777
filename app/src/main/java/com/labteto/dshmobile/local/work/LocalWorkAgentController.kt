@@ -14,7 +14,7 @@ internal class LocalWorkAgentController(
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val agentControl: LocalAgentControlPort,
     private val teamProjection: LocalWorkTeamUiProjection,
-) : com.labteto.dshmobile.uicontract.WorkTeamUiPort {
+) : com.labteto.dshmobile.uicontract.WorkAgentUiPort {
     override val snapshots = runtimeStateStore.state.map { snapshot() }.distinctUntilChanged()
     override fun snapshot(): com.labteto.dshmobile.uicontract.UiWorkTeamSnapshot = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
         val current = runtimeStateStore.state.value

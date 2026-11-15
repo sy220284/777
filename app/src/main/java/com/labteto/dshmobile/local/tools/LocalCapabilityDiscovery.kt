@@ -35,24 +35,35 @@ internal object LocalCapabilityDiscovery {
         )
     }
 
+    /** Project only the selected tools: large MCP registries should not materialize every schema per query. */
+    private fun entry(tool: HarnessTool): LocalToolCatalogueEntry {
+        val schema = tool.schema["function"] as JsonObject
+        return LocalToolCatalogueEntry(
+            tool.name, tool.metadata.family, tool.access.name, tool.approvalPolicy.name,
+            tool.metadata.requirements, schema["parameters"] as JsonObject,
+        )
+    }
+
     fun catalogue(registered: List<HarnessTool>): List<LocalToolCatalogueEntry> =
         registered.asSequence()
             .filter { it.exposure != ToolExposure.INTERNAL }
             .sortedBy(HarnessTool::name)
-            .map { tool ->
-                val schema = tool.schema["function"] as JsonObject
-                LocalToolCatalogueEntry(
-                    tool.name, tool.metadata.family, tool.access.name, tool.approvalPolicy.name,
-                    tool.metadata.requirements, schema["parameters"] as JsonObject,
-                )
-            }.toList()
+            .map(::entry).toList()
 
     fun searchCatalogue(registered: List<HarnessTool>, query: String, limit: Int): List<LocalToolCatalogueEntry> {
-        if (LocalToolRouter.isInventoryRequest(query)) return catalogue(registered).take(limit)
-        val resolution = resolve(registered, query, limit)
-        val byName = catalogue(registered).associateBy(LocalToolCatalogueEntry::name)
-        return resolution.ranked.map(HarnessTool::name)
-            .distinct().take(limit).mapNotNull(byName::get)
+        require(limit > 0) { "能力搜索数量须大于零" }
+        if (LocalToolRouter.isInventoryRequest(query)) {
+            return registered.asSequence()
+                .filter { it.exposure != ToolExposure.INTERNAL }
+                .sortedBy(HarnessTool::name)
+                .take(limit)
+                .map(::entry)
+                .toList()
+        }
+        return resolve(registered, query, limit).ranked
+            .distinctBy(HarnessTool::name)
+            .take(limit)
+            .map(::entry)
     }
 
     fun deviceHints(registered: List<HarnessTool>, task: String): Set<ToolDeviceRequirement> {

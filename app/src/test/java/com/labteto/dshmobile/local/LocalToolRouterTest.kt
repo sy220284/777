@@ -57,6 +57,22 @@ class LocalToolRouterTest {
 
 
     @Test
+    fun liveCatalogueSearchReturnsOnlySelectedSchemasAndRejectsInvalidPageSize() {
+        val tools = listOf(
+            tool("read", "读取文件", ToolExposure.CORE, "文件"),
+            tool("media_create", "生成媒体", ToolExposure.OPTIONAL, "媒体", setOf("生成媒体")),
+            tool("web_search", "网页搜索", ToolExposure.OPTIONAL, "网络", setOf("网页搜索")),
+        )
+        val selected = LocalCapabilityDiscovery.searchCatalogue(tools, "select:read,web_search", 5)
+        assertEquals(listOf("read", "web_search"), selected.map { it.name })
+        assertEquals(listOf("media_create", "read", "web_search"),
+            LocalCapabilityDiscovery.searchCatalogue(tools, "全部工具", 10).map { it.name })
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            LocalCapabilityDiscovery.searchCatalogue(tools, "网页搜索", 0)
+        }
+    }
+
+    @Test
     fun exactCapabilitySelectionSupportsLargeBatchesWithoutTruncation() {
         val selected = (1..180).map { "mcp_demo_tool$it" }
         assertEquals(selected, LocalToolRouter.exactSelection("select:" + selected.joinToString(",")))

@@ -45,5 +45,3 @@ interface WorkAgentUiPort {
     suspend fun submit(command: WorkTeamUiCommand): UiWorkTeamResult
 }
 
-/** Source compatibility for existing Team screen callers; no second UI port implementation. */
-typealias WorkTeamUiPort = WorkAgentUiPort
