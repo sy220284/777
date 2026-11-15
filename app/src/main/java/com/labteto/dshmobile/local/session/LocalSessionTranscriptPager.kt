@@ -117,7 +117,7 @@ internal class LocalSessionTranscriptPager(
                     }
                 }
 
-                val delta = decodeQueuedUserTranscriptDelta(event.data)
+                val delta = decodeQueuedUserTranscriptDelta(event)
                 if (delta != null) pendingDeltas.putIfAbsent(delta.messageId, delta)
                 val decoded = decodeTranscriptMessages(event.data)
                 warnUndecodableTranscript(event, decoded)

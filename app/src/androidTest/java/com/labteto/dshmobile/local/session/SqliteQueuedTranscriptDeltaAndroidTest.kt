@@ -42,6 +42,11 @@ class SqliteQueuedTranscriptDeltaAndroidTest {
                     put("transcript_index",
                         Json.encodeToJsonElement(LocalTranscriptRuntimeIndex.serializer(), index))
                 })
+                db.append("history", "tool/result", buildJsonObject {
+                    put("transcript_delta", encodeQueuedUserTranscriptDelta(
+                        "user-2", initial.last().copy(content = "不能生效的伪造结果"),
+                    ))
+                })
                 assertEquals(listOf(1L, 0L),
                     db.pageVisibleBeforeNewestFirst("history", limit = 10).map { it.sequence })
                 withLog(db) { log ->

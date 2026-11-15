@@ -14,6 +14,8 @@ import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.projectSessionTranscriptTail
 import com.labteto.dshmobile.local.session.projectLocalTranscriptRuntimeIndexTail
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
+import com.labteto.dshmobile.local.session.encodeQueuedUserTranscriptDelta
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -104,6 +106,27 @@ class LocalQueuedUserMessageEditorTest {
             assertEquals(queue.snapshot(),
                 decodeLocalAgentInboxPending(requireNotNull(log.latest(LOCAL_AGENT_INBOX_EVENT_TYPE)).data))
             assertEquals(null, editor.remove("user-1"))
+        }
+
+    @Test fun unrelatedToolResultCannotForgeQueuedMessageEdit() =
+        withQueue { log, _, _ ->
+            val before = LocalSessionTranscriptPager(log).all()
+            log.append("tool/result", buildJsonObject {
+                put("transcript_delta", encodeQueuedUserTranscriptDelta(
+                    "user-1", before.first().copy(content = "伪造内容"),
+                ))
+                put("transcript_index", Json.encodeToJsonElement(
+                    LocalTranscriptRuntimeIndex.serializer(), LocalTranscriptRuntimeIndex(),
+                ))
+            })
+            assertEquals(before, LocalSessionTranscriptPager(log).all())
+            assertEquals(before, projectSessionTranscriptTail(
+                emptyList(), log.snapshot(), -1L,
+            ).messages)
+            assertEquals(buildLocalTranscriptRuntimeIndex(before),
+                projectLocalTranscriptRuntimeIndexTail(
+                    LocalTranscriptRuntimeIndex(), log.snapshot(), -1L,
+                ))
         }
 
     @Test fun repeatedEditsAndRemovalKeepOriginalOrderingWithoutHistoryCopies() =

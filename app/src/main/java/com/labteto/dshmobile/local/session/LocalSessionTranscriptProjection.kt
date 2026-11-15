@@ -160,8 +160,14 @@ internal fun encodeQueuedUserTranscriptDelta(
 }
 
 /** Invalid persisted deltas fail closed rather than silently replaying a stale user turn. */
-internal fun decodeQueuedUserTranscriptDelta(data: JsonObject): LocalQueuedUserTranscriptDelta? {
-    val encoded = data["transcript_delta"] ?: return null
+internal fun decodeQueuedUserTranscriptDelta(event: LocalSessionEventLog.Event): LocalQueuedUserTranscriptDelta? {
+    // Only the owning queued-user timeline action can mutate a committed transcript.
+    // Arbitrary tool payloads must never be interpreted as Session control events.
+    if (event.type != LOCAL_AGENT_INBOX_EVENT_TYPE ||
+        (event.data["action"] as? JsonPrimitive)?.contentOrNull != LOCAL_QUEUED_USER_TIMELINE_ACTION) {
+        return null
+    }
+    val encoded = event.data["transcript_delta"] ?: return null
     val delta = encoded as? JsonObject ?: error("持久消息变更结构损坏")
     val messageId = (delta["message_id"] as? JsonPrimitive)?.contentOrNull
         ?.takeIf(String::isNotBlank) ?: error("持久消息变更缺少消息编号")
@@ -211,7 +217,7 @@ internal fun projectSessionTranscriptTail(
         .forEach { event ->
             // An unreadable transcript cannot be marked as durably projected.
             if (undecodableTranscript) return@forEach
-            val delta = decodeQueuedUserTranscriptDelta(event.data)
+            val delta = decodeQueuedUserTranscriptDelta(event)
             if (delta != null) {
                 // The durable Event contains a single change, not a duplicate of the whole
                 // conversation. Historical rows stay in their original order.

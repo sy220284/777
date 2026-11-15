@@ -57,7 +57,7 @@ internal fun projectLocalTranscriptRuntimeIndexTail(
         .filter { event -> event.sequence > sequenceExclusive }
         .sortedBy(LocalSessionEventLog.Event::sequence)
         .forEach { event ->
-            val delta = decodeQueuedUserTranscriptDelta(event.data)
+            val delta = decodeQueuedUserTranscriptDelta(event)
             if (delta != null) {
                 val encoded = event.data["transcript_index"]
                     ?: error("持久消息变更缺少会话索引")
