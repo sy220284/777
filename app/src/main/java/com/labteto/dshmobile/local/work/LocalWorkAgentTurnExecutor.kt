@@ -189,8 +189,13 @@ internal class LocalWorkAgentTurnExecutor(
             }
             binding.executionControl.budget.beginExecutionSlice(effectiveModel.executionBudget)
             val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
-            workTurnToolRuntime.clear(binding)
-            workTurnToolRuntime.prepare(binding, input)
+            // A continuation belongs to the same user task. Keep the already admitted
+            // tool selection instead of clearing it and re-discovering from a synthetic
+            // "continue" user message. A newly recovered binding starts with no selection.
+            if (binding.continuationParentRunId == null || binding.enabledOptionalTools.isEmpty()) {
+                workTurnToolRuntime.clear(binding)
+                workTurnToolRuntime.prepare(binding, input)
+            }
             val foregroundSessionId = runSessionId
             var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
             val lease = LocalExecutionService.acquireTurn(context, foregroundSessionId)
@@ -220,6 +225,10 @@ internal class LocalWorkAgentTurnExecutor(
             }
             val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
             var outputLimitHasProgress = false
+            // AgentTurnEngine emits TurnFailed and then rethrows the same model exception.
+            // Once the event has settled the failure, the enclosing catch must not enqueue
+            // another continuation or overwrite the already queued recovery with an error.
+            var failureSettledInEvent = false
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             val replyFormHandlingByStep = mutableMapOf<Int,
@@ -983,7 +992,20 @@ internal class LocalWorkAgentTurnExecutor(
                                         automaticContinuationCount = binding.automaticContinuationCount,
                                         pendingInputs = binding.runHandle.pendingInputs.size(),
                                     )
+                                // A checkpoint event alone does not resume a failed run.
+                                // Persist the model-visible boundary, then atomically enqueue a
+                                // new continuation using the existing durable Inbox contract.
                                 if (continuationEligible) {
+                                    workModelHistoryRuntime.checkpointAtTurnBoundary(binding,
+                                        if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") "turn/budget-continuation"
+                                        else "turn/stream-interrupted")
+                                }
+                                val continuationQueued = continuationEligible &&
+                                    queueAutomaticWorkContinuation(
+                                        binding, runContext.runId, requireNotNull(lastModelError),
+                                        uiSourceMessageId,
+                                    )
+                                if (continuationQueued) {
                                     runEventLog.append("turn/end", buildJsonObject {
                                         put("source_message_id", uiSourceMessageId)
                                         put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
@@ -994,9 +1016,6 @@ internal class LocalWorkAgentTurnExecutor(
                                         put("detail", detail)
                                         put("messages", runState.value.transcriptIndex.totalMessageCount)
                                     })
-                                    workModelHistoryRuntime.checkpointAtTurnBoundary(binding,
-                                        if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") "turn/budget-continuation"
-                                        else "turn/stream-interrupted")
                                 } else {
                                     val transcriptMessage = runTranscript.newMessage("system", "执行失败：$detail")
                                     val turnEnd = runEventLog.append("turn/end", buildJsonObject {
@@ -1008,9 +1027,11 @@ internal class LocalWorkAgentTurnExecutor(
                                     })
                                     runTranscript.applyMessages(listOf(transcriptMessage), turnEnd.sequence)
                                     workModelHistoryRuntime.checkpointAtTurnBoundary(binding, "turn/failed")
+                                    binding.state.update { it.copy(error = "执行失败：$detail") }
                                 }
                                 workModelHistoryRuntime.persist(binding)
                             }
+                            failureSettledInEvent = true
                         }
                         is AgentEvent.TurnCancelled -> {
                             settlePendingTools("cancelled")
@@ -1061,16 +1082,20 @@ internal class LocalWorkAgentTurnExecutor(
                 // TurnCancelled durably records and projects the visible stop message.
             } catch (error: Exception) {
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-                val modelError = error as? LocalModelException
-                val queued = if (modelError != null && !waitingForReplyFormSubmission) {
-                    queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
-                } else {
-                    false
+                if (!failureSettledInEvent) {
+                    // Exceptional failures before TurnFailed was fully persisted still need
+                    // recovery. The usual event path has already committed the only Inbox
+                    // continuation and must remain the authoritative settlement.
+                    val modelError = error as? LocalModelException
+                    val queued = if (modelError != null && !waitingForReplyFormSubmission) {
+                        queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
+                    } else {
+                        false
+                    }
+                    if (!queued) {
+                        binding.state.update { it.copy(error = error.message ?: "本机执行失败") }
+                    }
                 }
-                if (!queued) {
-                    binding.state.update { it.copy(error = error.message ?: "本机执行失败") }
-                }
-                // TurnFailed has already settled tool side effects and checkpointed model-visible state.
             } finally {
                 binding.interactions.cancelAll()
                 binding.state.update {

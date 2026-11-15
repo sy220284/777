@@ -39,6 +39,15 @@ internal fun resolveWorkGoalTransition(
     }.resolve(current, candidate)
 
 
+/** The transition and its verification evidence belong to one Work decision.
+ * Pass the same immutable evidence to the committed event instead of scanning
+ * file hashes, tool receipts and reviewer decisions a second time.
+ */
+internal data class ResolvedWorkGoalUpdate(
+    val goal: LocalGoal,
+    val deliveryEvidence: LocalWorkDeliveryEvidence?,
+)
+
 internal fun resolveWorkGoalUpdate(
     snapshot: LocalWorkState,
     status: String,
@@ -46,7 +55,7 @@ internal fun resolveWorkGoalUpdate(
     eventLog: LocalSessionEventLog,
     workspaceRoot: java.io.File? = null,
     executingToolId: String? = null,
-): LocalGoal {
+): ResolvedWorkGoalUpdate {
     val current = snapshot.goal ?: error("当前会话没有目标")
     val proposed = current.copy(status = status, note = note?.take(2_000))
     val candidate = if (proposed == current) current else proposed.copy(revision = Math.incrementExact(current.revision))
@@ -65,5 +74,5 @@ internal fun resolveWorkGoalUpdate(
         })
         throw LocalWorkGoalAcceptanceRejectedException(transition.reason ?: "目标状态变更被运行时拒绝")
     }
-    return transition.value
+    return ResolvedWorkGoalUpdate(transition.value, delivery)
 }

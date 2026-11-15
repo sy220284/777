@@ -1,11 +1,54 @@
 package com.labteto.dshmobile.local.chat
 
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatUnifiedTurnContextTest {
+
+    @Test
+    fun bothChatModesRejectDiscardedCurrentImagesWithoutBlockingOlderImages() {
+        val image = kotlinx.serialization.json.buildJsonObject {
+            put("role", "user")
+            put("content", kotlinx.serialization.json.buildJsonArray {
+                add(kotlinx.serialization.json.buildJsonObject {
+                    put("type", "local_image_ref")
+                    put("path", ".dsh/attachments/picture.png")
+                })
+            })
+        }
+        val nextText = kotlinx.serialization.json.buildJsonObject {
+            put("role", "user")
+            put("content", "现在只回答文字问题")
+        }
+        val native = com.labteto.dshmobile.local.model.LocalImageInputMode.NATIVE
+        val tool = com.labteto.dshmobile.local.model.LocalImageInputMode.TOOL
+        requireChatImageInputSupported(listOf(image), native)
+        val rejected = runCatching {
+            requireChatImageInputSupported(listOf(image), tool)
+        }.exceptionOrNull()
+        assertTrue(rejected is IllegalStateException)
+        assertTrue(rejected?.message.orEmpty().contains("无法直接读取本轮图片"))
+        // Separate dialogue turns by an assistant reply. Consecutive user messages
+        // belong to the same active input batch and must retain all their images.
+        val assistant = kotlinx.serialization.json.buildJsonObject {
+            put("role", "assistant")
+            put("content", "已收到图片")
+        }
+        requireChatImageInputSupported(listOf(image, assistant, nextText), tool)
+        assertFalse(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(
+            listOf(image, assistant, nextText),
+        ))
+        assertTrue(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(
+            listOf(nextText, assistant, image),
+        ))
+        assertTrue(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(
+            listOf(image, nextText),
+        ))
+    }
+
     @Test
     fun sharedAssemblyKeepsLiveSceneAndInstructionsButDropsRedirectedHistory() {
         val ctx = ChatContextState(scene = ChatSceneState(location = "书房"))

@@ -64,6 +64,8 @@ data class AgentToolResult(
     val fileVersions: Map<String, String> = emptyMap(),
     val executionId: String? = null,
     val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
+    /** Exact typed output for tool-to-tool composition, not user-facing prose. */
+    val structuredResult: kotlinx.serialization.json.JsonElement? = null,
 )
 
 fun AgentToolResult.modelVisibleContent(): String {

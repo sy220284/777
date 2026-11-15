@@ -326,6 +326,56 @@ class CodeModePluginTest {
         assertFalse(registry.isReadOnlyCodeModePlan(fake))
     }
 
+
+    @Test fun typedToolResultDrivesConditionsAndArgumentsDespiteHumanReadableContent() = runTest {
+        val registry = ToolRegistry()
+        var received: JsonObject? = null
+        register(registry, "inspect") {
+            ToolResult(
+                content = "已找到文件，具体路径在结构化回执中",
+                structuredResult = buildJsonObject {
+                    put("approved", true)
+                    put("file", buildJsonObject { put("path", "src/checked.kt") })
+                },
+            )
+        }
+        registry.register(HarnessTool(
+            "consume", functionToolSchema("consume", "验证结构化结果", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", true)
+            }), ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER, ToolExposure.CORE,
+            ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, args, _ ->
+                received = args
+                ToolResult("ok")
+            },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "inspect"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "consume")
+                    put("args", buildJsonObject {
+                        put("path", buildJsonObject {
+                            put("\$step_result", 1)
+                            put("path", "file.path")
+                        })
+                    })
+                    put("when", buildJsonObject {
+                        put("step", 1)
+                        put("path", "approved")
+                        put("equals", true)
+                    })
+                })
+            })
+        }
+        val result = registry.execute("code_mode_run", script)
+        assertFalse(result.content, result.isError)
+        assertEquals("src/checked.kt", (received?.get("path") as JsonPrimitive).content)
+        assertEquals(result.content, result.structuredResult.toString())
+    }
+
     @Test fun priorDurableResultCanSupplyNestedArgumentsToNextTool() = runTest {
         val registry = ToolRegistry()
         var received: JsonObject? = null

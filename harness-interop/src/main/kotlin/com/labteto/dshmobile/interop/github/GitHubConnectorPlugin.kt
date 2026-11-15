@@ -223,9 +223,10 @@ class GitHubConnectorPlugin(
             status.login?.let { put("login", it) }
             status.rateLimitRemaining?.let { put("rate_limit_remaining", it) }
             status.error?.let { put("error", it) }
-        }.toString()
+        }
         return ToolResult(
-            content = output,
+            content = output.toString(),
+            structuredResult = output,
             isError = status.configured && status.error != null,
         )
     }
@@ -278,6 +279,15 @@ class GitHubConnectorPlugin(
             }
             ToolResult(
                 content = response.render(),
+                // Keep the HTTP status and headers for people while preserving the actual
+                // JSON body as an independently typed tool-to-tool result.
+                structuredResult = response.body.takeIf(String::isNotBlank)?.let { payload ->
+                    try {
+                        json.parseToJsonElement(payload)
+                    } catch (_: kotlinx.serialization.SerializationException) {
+                        null // Some valid HTTP endpoints do not return JSON.
+                    }
+                },
                 isError = failed,
                 errorCode = failureCode,
                 retryable = failed && !mutation && response.status >= 500,

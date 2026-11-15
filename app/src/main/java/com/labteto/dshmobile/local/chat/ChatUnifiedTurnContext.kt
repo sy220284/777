@@ -1,5 +1,19 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.model.LocalImageInputMode
+import com.labteto.dshmobile.local.model.hasActiveLocalUserImages
+import kotlinx.serialization.json.JsonObject
+
+/** Shared direct/group chat input contract. Work can independently call vision tools. */
+internal fun requireChatImageInputSupported(
+    messages: List<JsonObject>,
+    selectedMode: LocalImageInputMode,
+) {
+    check(selectedMode != LocalImageInputMode.TOOL || !hasActiveLocalUserImages(messages)) {
+        "当前聊天无法直接读取本轮图片，请在模型设置中选择自动或原生图片输入，并使用支持图片理解的模型。"
+    }
+}
+
 /**
  * The only assembly boundary for model-facing chat context in direct, group and proactive modes.
  *

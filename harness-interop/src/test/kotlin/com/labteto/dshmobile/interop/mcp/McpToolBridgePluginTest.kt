@@ -503,6 +503,10 @@ class McpToolBridgePluginTest {
                     "tools/call" -> buildJsonObject {
                         put("result", buildJsonObject {
                             put("isError", false)
+                            put("structuredContent", buildJsonObject {
+                                put("value", "machine-verified")
+                                put("count", 2)
+                            })
                             put("content", buildJsonArray {
                                 add(buildJsonObject {
                                     put("type", "text")
@@ -562,6 +566,10 @@ class McpToolBridgePluginTest {
         )
         assertFalse(call.isError)
         assertTrue(call.content.contains("remote-ok"))
+        assertEquals("machine-verified",
+            requireNotNull(call.structuredResult).jsonObject.getValue("value").jsonPrimitive.content)
+        assertEquals("2",
+            requireNotNull(call.structuredResult).jsonObject.getValue("count").jsonPrimitive.content)
         assertEquals("echo.tool", requests.last().second["name"]?.jsonPrimitive?.content)
         assertEquals("hello", requests.last().second["arguments"]?.let { it as JsonObject }?.get("text")?.jsonPrimitive?.content)
 

@@ -440,6 +440,7 @@ class LocalWorkGoalContinuationTest {
         val failure = LocalWorkResumeCommand(
             "run-restore", 88L, "MODEL_TIMEOUT", 1, "original").toQueueInput()
         assertFalse(shouldDiscardWorkGoalContinuation(failure, emptyList(), work))
+        assertTrue(shouldDiscardWorkGoalContinuation(failure, listOf(user), work))
         val outputLimit = LocalWorkResumeCommand("long-text", 90L,
             WORK_OUTPUT_LIMIT_CONTINUATION, 1, null).toQueueInput()
         assertFalse(shouldDiscardWorkGoalContinuation(outputLimit, emptyList(), LocalWorkState()))

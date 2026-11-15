@@ -26,7 +26,10 @@ class LocalToolCapabilityIntentTest {
 
         assertTrue(followUp.requestsGitHub)
         assertFalse(unrelated.requestsGitHub)
-        assertFalse(followUp.context.contains("<work-checkpoint>"))
+        assertFalse(LocalToolCapabilityIntent.from(
+            "继续",
+            listOf(message("user", "<work-checkpoint>GitHub 不应触发</work-checkpoint>")),
+        ).requestsGitHub)
     }
 
     @Test
@@ -40,6 +43,20 @@ class LocalToolCapabilityIntentTest {
         assertTrue(LocalToolCapabilityIntent.latestUserInput(history) == "检查当前 Android 页面")
         assertTrue(LocalToolCapabilityIntent.latestUserInput(
             listOf(message("user", "<chat-continuity>only synthetic</chat-continuity>"))) == null)
+    }
+
+    @Test
+    fun unrelatedNewRequestCannotReenableGithubFromAnOldTask() {
+        val history = listOf(
+            message("user", "检查 GitHub PR 的测试和发布状态"),
+            message("assistant", "已检查"),
+        )
+        assertFalse(LocalToolCapabilityIntent.from(
+            "现在只制作本地 UI 布局", history,
+        ).requestsGitHub)
+        assertTrue(LocalToolCapabilityIntent.from(
+            "接着做", history,
+        ).requestsGitHub)
     }
 
     @Test

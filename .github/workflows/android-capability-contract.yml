@@ -3,29 +3,16 @@ name: Android 能力契约回归
 'on':
   pull_request:
     paths:
-      - 'app/src/main/java/com/labteto/dshmobile/local/tools/**'
-      - 'app/src/test/java/com/labteto/dshmobile/local/tools/**'
-      - 'app/src/main/java/com/labteto/dshmobile/ui/screens/tools/**'
-      - 'app/src/test/java/com/labteto/dshmobile/ui/screens/tools/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/**'
-      - 'app/src/main/res/drawable/ic_ui_*.xml'
-      - 'app/src/main/java/com/labteto/dshmobile/local/work/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/model/**'
-      - 'app/src/test/java/com/labteto/dshmobile/local/model/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/vision/**'
-      - 'app/src/test/java/com/labteto/dshmobile/local/LocalVisionPluginTest.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/LocalModelException.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt'
-      - 'app/src/test/java/com/labteto/dshmobile/local/LocalModelRequestErrorOriginTest.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/LocalBuiltinToolRuntime.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/files/**'
-      - 'app/src/test/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinatorTest.kt'
-      - 'app/src/test/java/com/labteto/dshmobile/local/LocalWorkspaceTest.kt'
-      - 'harness-core/src/main/kotlin/com/labteto/dshmobile/harness/tools/**'
-      - 'harness-core/src/test/kotlin/com/labteto/dshmobile/harness/tools/**'
-      - 'harness-core/src/main/kotlin/com/labteto/dshmobile/harness/capability/**'
+      # Changes in Chat, Work, Session, Model, Tool, UI and any shared Harness
+      # require the same compilation/contract checks. Narrow historical filters
+      # left cross-feature regressions untested.
+      - 'app/src/**'
+      - 'app/build.gradle.kts'
+      - 'core/src/**'
+      - 'harness-core/src/**'
+      - 'harness-interop/src/**'
       - 'harness-device-android/src/**'
+      - 'harness-runtime-android/src/**'
       - '.github/workflows/android-capability-contract.yml'
   workflow_dispatch:
 

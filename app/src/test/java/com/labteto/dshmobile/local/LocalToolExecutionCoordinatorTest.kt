@@ -322,6 +322,27 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun exactSelectionReplacesOldSchemaExposureWithoutUnregisteringTools() {
+        val registry = ToolRegistry().apply {
+            listOf("old_lookup", "next_lookup", "other_lookup").forEach { name ->
+                register(tool(name = name, access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "可选工具", keywords = setOf("查询")) { ToolResult("ok") })
+            }
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools(listOf("old_lookup", "other_lookup"))
+        coordinator.searchCapabilities("select:next_lookup")
+        assertEquals(listOf("next_lookup"), coordinator.enabledOptionalSnapshot().toList())
+        assertFalse(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+            .contains("old_lookup"))
+        assertEquals("old_lookup", registry.get("old_lookup")?.name)
+        coordinator.searchCapabilities("select:old_lookup,next_lookup")
+        assertEquals(listOf("old_lookup", "next_lookup"),
+            coordinator.enabledOptionalSnapshot().toList())
+    }
+
+    @Test
     fun exactMultiToolSelectionLoadsOnlyNamedRegisteredToolsInOneStep() {
         val registry = ToolRegistry().apply {
             listOf("mcp_lookup", "github_status", "unrelated_search").forEach { name ->
@@ -617,6 +638,27 @@ class LocalToolExecutionCoordinatorTest {
             "session-read", false, false, approval = { _, _, _ -> true })
         assertTrue(blocked.isError)
         assertEquals(1, executions)
+    }
+
+    @Test
+    fun newWorkTaskPreparesOnlyRelevantToolDefinitionsInsteadOfEarlierRequests() = runBlocking {
+        val registry = ToolRegistry().apply {
+            register(tool("team_create_member", ToolAccess.AGENT_CONTROL,
+                ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "团队", keywords = setOf("创建团队")) { ToolResult("ok") })
+            register(tool("local_render", ToolAccess.READ_ONLY,
+                ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                family = "界面", keywords = setOf("渲染界面")) { ToolResult("ok") })
+        }
+        val coordinator = coordinator(registry)
+        val history = listOf(buildJsonObject {
+            put("role", "user")
+            put("content", "创建团队")
+        })
+        coordinator.prepareWorkTurnCapabilities("渲染界面", history, { false })
+        val selected = coordinator.enabledOptionalSnapshot()
+        assertTrue("local_render" in selected)
+        assertFalse("team_create_member" in selected)
     }
 
     @Test

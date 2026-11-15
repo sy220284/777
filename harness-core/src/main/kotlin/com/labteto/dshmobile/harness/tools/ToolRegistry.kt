@@ -73,6 +73,8 @@ data class ToolResult(
     val processExitCode: Int? = null,
     val fileVersions: Map<String, String> = emptyMap(),
     val richContent: com.labteto.dshmobile.harness.tools.ToolRichContent? = null,
+    /** Machine-readable result, independent of the human-readable content string. */
+    val structuredResult: kotlinx.serialization.json.JsonElement? = null,
 )
 
 data class ToolPostHookFailure(

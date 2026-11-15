@@ -824,6 +824,9 @@ class McpToolBridgePlugin(
                                             ToolResult(
                                                 content = completeMcpToolResult(result),
                                                 richContent = com.labteto.dshmobile.harness.tools.ToolRichContent(result),
+                                                // Prefer MCP's protocol-level structuredContent. Keep the
+                                                // full typed envelope for older servers that return only content.
+                                                structuredResult = result["structuredContent"] ?: result,
                                                 isError = remoteError,
                                                 errorCode = if (remoteError) "MCP_REMOTE_REJECTED" else null,
                                                 recoveryHint = if (remoteError)

@@ -397,9 +397,11 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 ?: throw StepReferenceException("步骤 $ordinal 尚无执行回执")
             if (source.retention != ToolResultRetention.DURABLE)
                 throw StepReferenceException("步骤 $ordinal 的临时结果不可传递")
-            if (source.content.length > MAX_REFERENCE_SOURCE_CHARS)
+            if (source.structuredResult == null && source.content.length > MAX_REFERENCE_SOURCE_CHARS)
                 throw StepReferenceException("步骤 $ordinal 的结果过大")
-            val parsed = parseResultBody(source.content)
+            val parsed = source.structuredResult ?: parseResultBody(source.content)
+            if (parsed.toString().length > MAX_REFERENCE_SOURCE_CHARS)
+                throw StepReferenceException("步骤 $ordinal 的结构化结果过大")
             var selected: JsonElement = parsed
             val path = (node["path"] as? JsonPrimitive)?.content.orEmpty()
             for (segment in (parseReferencePath(path)
@@ -428,9 +430,8 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
         retryable = false, recoveryHint = "请修正脚本和工具授权后重新检查步骤。",
     )
 
-    private fun receipt(steps: List<JsonObject>, status: String, failureCode: String?): ToolResult =
-        ToolResult(
-            content = buildJsonObject {
+    private fun receipt(steps: List<JsonObject>, status: String, failureCode: String?): ToolResult {
+        val output = buildJsonObject {
                 put("status", status)
                 put("completed_steps", steps.count { it["status"]?.jsonPrimitive?.content == "completed" })
                 put("skipped_steps", steps.count { it["status"]?.jsonPrimitive?.content == "skipped" })
@@ -439,7 +440,10 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                         "reference_failed", "unknown_after_exception")
                 })
                 put("steps", JsonArray(steps))
-            }.toString(),
+        }
+        return ToolResult(
+            content = output.toString(),
+            structuredResult = output,
             isError = failureCode != null,
             errorCode = failureCode,
             retryable = false,
@@ -448,6 +452,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 else "停止在失败步骤。先核对每步执行回执和文件状态，避免重复具有副作用的操作。"
             },
         )
+    }
 
     private companion object {
         const val TOOL_NAME = "code_mode_run"
