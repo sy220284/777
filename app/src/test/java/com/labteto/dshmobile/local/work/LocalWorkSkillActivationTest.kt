@@ -86,7 +86,7 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
-    fun longExplicitSkillIsBoundedAndItsUnreadTailIsNotPretendedLoaded() {
+    fun longExplicitSkillLoadsCompleteRulesWithoutAnotherModelStep() {
         val root = Files.createTempDirectory("explicit-skill-budget").toFile()
         try {
             val workspace = LocalWorkspace(root)
@@ -94,10 +94,11 @@ class LocalWorkSkillActivationTest {
             workspace.write(".dsh/skills/long-skill/SKILL.md", longBody)
             val guidance = resolveLocalWorkSkillGuidance(workspace, "@skill:long-skill\n执行")
             assertTrue(guidance.contains("START_REQUIRED"))
-            assertFalse(guidance.contains("TAIL_NOT_READ"))
-            assertTrue(guidance.contains("已限制本轮自动注入"))
-            assertTrue(guidance.contains("skill(name=long-skill)"))
-            assertTrue(guidance.length < 20_000)
+            assertTrue(guidance.contains("TAIL_NOT_READ"))
+            assertTrue(guidance.contains("[技能规则结束]"))
+            assertFalse(guidance.contains("已限制本轮自动注入"))
+            assertFalse(guidance.contains("skill(name=long-skill)"))
+            assertTrue(guidance.length >= longBody.length)
             // The persisted original must remain untouched and retrievable through the tool.
             assertTrue(workspace.readSkill("long-skill").endsWith("TAIL_NOT_READ"))
         } finally { root.deleteRecursively() }
@@ -117,7 +118,7 @@ class LocalWorkSkillActivationTest {
             )
             val result = resolveLocalWorkSkillGuidance(workspace, "@skill:explicit\n执行", pins)
             assertTrue(result.contains("EXPLICIT_START"))
-            assertFalse(result.contains("EXPLICIT_TAIL"))
+            assertTrue(result.contains("EXPLICIT_TAIL"))
             assertFalse(result.contains("SECOND_PIN_GUIDANCE"))
             assertTrue(result.contains("skill(name=second)"))
             assertEquals(1, Regex("EXPLICIT_START").findAll(result).count())
