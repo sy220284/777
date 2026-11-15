@@ -159,6 +159,25 @@ class LocalToolCatalogTest {
     }
 
     @Test
+    fun goalStatusAndReviewTypeSchemasMatchTheRuntimeContract() {
+        val byName = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        fun properties(name: String) = byName.getValue(name).jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertEquals(setOf("active", "paused", "completed", "blocked"),
+            properties("update_goal").getValue("status").jsonObject.getValue("enum")
+                .jsonArray.map { it.jsonPrimitive.content }.toSet())
+        assertEquals(setOf("code", "security"),
+            properties("create_goal").getValue("review_requirements").jsonObject
+                .getValue("items").jsonObject.getValue("enum")
+                .jsonArray.map { it.jsonPrimitive.content }.toSet())
+        assertTrue(byName.getValue("capability_search").jsonObject["function"]!!
+            .jsonObject.getValue("description").jsonPrimitive.content.contains("候选"))
+    }
+
+    @Test
     fun sessionEventSearchExposesPagingControls() {
         val functions = LocalToolCatalog.specs.associateBy {
             it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
