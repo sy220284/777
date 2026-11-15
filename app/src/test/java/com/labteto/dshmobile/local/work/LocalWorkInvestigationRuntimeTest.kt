@@ -176,6 +176,62 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun provenNonMutatingToolFailuresRecoverAfterRealSuccessfulWork() {
+        val log = log()
+        try {
+            log.append("turn/start", buildJsonObject { put("run_id", "r1") })
+            log.append("tool/result", buildJsonObject {
+                put("id", "bad-args"); put("name", "code_mode_run")
+                put("is_error", true); put("side_effect", "none")
+                put("error_code", "CODE_MODE_INVALID_CHILD_ARGUMENTS")
+            })
+            assertFalse(LocalWorkInvestigationRuntime.recoveredReadOnlyFailure(log))
+            log.append("tool/result", buildJsonObject {
+                put("id", "worked"); put("name", "bash")
+                put("is_error", false); put("side_effect", "completed")
+            })
+            assertTrue("成功执行的后续工具能够恢复已结算的参数错误",
+                LocalWorkInvestigationRuntime.recoveredReadOnlyFailure(log))
+            log.append("tool/result", buildJsonObject {
+                put("id", "unexposed"); put("name", "mcp_remote")
+                put("is_error", true); put("side_effect", "none")
+                put("error_code", "TOOL_NOT_EXPOSED")
+            })
+            assertFalse(LocalWorkInvestigationRuntime.recoveredReadOnlyFailure(log))
+        } finally { log.close() }
+    }
+
+    @Test fun longTurnCannotHideAnEarlyUnknownWriteBehindRecentEvents() {
+        val log = log()
+        try {
+            log.append("turn/start", buildJsonObject { put("run_id", "long-run") })
+            log.append("tool/result", buildJsonObject {
+                put("id", "unsafe"); put("name", "write")
+                put("is_error", true); put("side_effect", "possible")
+                put("error_code", "TOOL_OUTCOME_UNKNOWN")
+            })
+            repeat(400) { index ->
+                log.append("tool/result", buildJsonObject {
+                    put("id", "safe-$"+"index"); put("name", "read")
+                    put("is_error", false); put("side_effect", "none")
+                })
+            }
+            assertFalse("即使未知写入超出近期日志窗口，也不得继续执行",
+                LocalWorkInvestigationRuntime.recoveredReadOnlyFailure(log))
+            log.append("turn/start", buildJsonObject { put("run_id", "next-run") })
+            log.append("tool/result", buildJsonObject {
+                put("id", "safe-failure"); put("name", "read")
+                put("is_error", true); put("side_effect", "none")
+            })
+            log.append("tool/result", buildJsonObject {
+                put("id", "safe-recovered"); put("name", "read")
+                put("is_error", false); put("side_effect", "none")
+            })
+            assertTrue("下一轮的安全恢复不应受前一轮失败影响",
+                LocalWorkInvestigationRuntime.recoveredReadOnlyFailure(log))
+        } finally { log.close() }
+    }
+
     @Test fun theSameGitHubPathOnDistinctRefsIsTrackedSeparately() {
         val log = log()
         try {
