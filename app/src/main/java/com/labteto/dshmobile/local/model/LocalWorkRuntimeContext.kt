@@ -1,7 +1,10 @@
 package com.labteto.dshmobile.local.model
 
 /** Current-route facts; specialised tool instructions are injected only for relevant tasks. */
-internal fun withWorkRuntimeContext(
+internal data class LocalWorkRuntimeContextParts(val stable: String, val dynamic: String)
+
+/** Static model/session rules remain cacheable; task-only guidance must be appended at the turn tail. */
+internal fun workRuntimeContextParts(
     context: String,
     workspacePath: String,
     model: String,
@@ -9,7 +12,7 @@ internal fun withWorkRuntimeContext(
     profile: LocalModelProfile?,
     configuredProfiles: List<LocalModelProfile> = emptyList(),
     task: String = "",
-): String {
+): LocalWorkRuntimeContextParts {
     val routedModel = model.takeIf(String::isNotBlank) ?: profile?.model.orEmpty()
     val protocol = profile?.let {
         resolveLocalModelProtocol(it.authKind, it, routedModel, baseUrl)
@@ -28,7 +31,7 @@ internal fun withWorkRuntimeContext(
         .containsMatchIn(task)
     val asksPhoneFiles = Regex("手机.{0,8}(下载|文件)|下载目录|安装包|Download/|\\bapk\\b", RegexOption.IGNORE_CASE)
         .containsMatchIn(task)
-    val runtime = buildString {
+    val stable = buildString {
         appendLine("【当前运行时事实】")
         appendLine("- 产品：777 本机 Harness · 工作模式")
         appendLine("- 工作区：$workspacePath")
@@ -45,6 +48,9 @@ internal fun withWorkRuntimeContext(
         appendLine("- 新发现要先依据真实来源判断，再决定是否深入；普通失败尝试排查可恢复原因，外部副作用未知时先核对状态；不因为兴奋或有新问题自行扩大授权、创建子代理或计划外任务。")
         appendLine("- 用户明确要求独立代码审查或独立安全审查时，在 create_goal.review_requirements 中分别注明 code 或 security；仅在确有此要求时声明。审查报告、人工接纳和文件/真实测试结果各自独立，最终完成由 Work 原有目标状态规则统一判断。")
         appendLine("- 最终答复突出实际完成的工作、关键发现及证据、仍待调查的问题，工具的完整执行明细交由可展开的运行记录查看；不得以模型文字代替实际结果。")
+        append("用户要求检查、修改或验证时，依据实际工具结果答复；未执行的步骤和未确认的结果须如实标明。")
+    }.trimEnd()
+    val dynamic = buildString {
         if (asksModel) {
             if (configuredProfiles.isNotEmpty()) {
                 val shown = configuredProfiles.take(16).joinToString("；") { saved ->
@@ -74,7 +80,31 @@ internal fun withWorkRuntimeContext(
         if (asksUsage) {
             appendLine("- Token/上下文账本以 environment_info 中的 TokenUsageAnalyticsStore 为准，按实际数据核算。")
         }
-        append("用户要求检查、修改或验证时，依据实际工具结果答复；未执行的步骤和未确认的结果须如实标明。")
     }.trimEnd()
-    return listOf(runtime, context.trim()).filter(String::isNotBlank).joinToString("\n\n")
+    return LocalWorkRuntimeContextParts(
+        stable = listOf(stable, context.trim()).filter(String::isNotBlank).joinToString("\n\n"),
+        dynamic = dynamic,
+    )
+}
+
+/** Compatibility surface for tests and call sites that need the complete rendered instruction. */
+internal fun withWorkRuntimeContext(
+    context: String,
+    workspacePath: String,
+    model: String,
+    baseUrl: String,
+    profile: LocalModelProfile?,
+    configuredProfiles: List<LocalModelProfile> = emptyList(),
+    task: String = "",
+): String {
+    val parts = workRuntimeContextParts(
+        context = context,
+        workspacePath = workspacePath,
+        model = model,
+        baseUrl = baseUrl,
+        profile = profile,
+        configuredProfiles = configuredProfiles,
+        task = task,
+    )
+    return listOf(parts.stable, parts.dynamic).filter(String::isNotBlank).joinToString("\n\n")
 }

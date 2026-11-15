@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.ToolExposure
+import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
@@ -144,8 +146,6 @@ internal class LocalToolSchemaProjection(
             omittedReasons = emptyMap(),
             compactedNames = emptySet(),
         )
-        val promptBudget = if (agentTeamMode) LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS
-            else optionalToolPromptBudgetForRoute(modelState, history)
         val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
         val tools = registry.names()
             .mapNotNull(registry::get)
@@ -156,8 +156,24 @@ internal class LocalToolSchemaProjection(
                     // Admission checks the actual child tool contracts before any step runs.
                     tool.name == "code_mode_run"
             }
+        val visibleTools = if (planModeEnabled) tools.map(HarnessTool::forReadOnlyModelScope) else tools
+        val coreDefinitionTokens = visibleTools.asSequence()
+            .filter { it.exposure == ToolExposure.CORE }
+            .sumOf { estimateModelTokens(it.schema.toString()) }
+        val requestedOptionalTokens = visibleTools.asSequence()
+            .filter { it.exposure == ToolExposure.OPTIONAL && it.name in enabled }
+            .sumOf { estimateModelTokens(it.schema.toString()) }
+        // Keep the normal cache-friendly budget, but expand to the 24k declared ceiling
+        // when the task explicitly loads more tools and the route has genuine spare tokens.
+        val requestedDefinitionTokens = maxOf(
+            LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS, requestedOptionalTokens,
+        )
+        // Team, planning and ordinary Work requests use the same actual token ledger.
+        val promptBudget = optionalToolPromptBudgetForRoute(
+            modelState, history, coreDefinitionTokens, requestedDefinitionTokens,
+        )
         val selection = LocalToolRouter.selectSchemas(
-            tools = if (planModeEnabled) tools.map(HarnessTool::forReadOnlyModelScope) else tools,
+            tools = visibleTools,
             enabledOptional = enabled,
             maxOptionalDefinitionTokens = promptBudget,
         )

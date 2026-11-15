@@ -4,6 +4,7 @@ import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.withWorkRuntimeContext
+import com.labteto.dshmobile.local.model.workRuntimeContextParts
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,6 +51,29 @@ class LocalWorkRuntimeContextTest {
         assertTrue(context.contains("用户规则：完成后复查。"))
         assertFalse(context.contains("account-private-reference"))
     }
+    @Test
+    fun taskSpecificInstructionsCannotPolluteStablePrefix() {
+        fun parts(task: String) = workRuntimeContextParts(
+            context = "固定用户规则",
+            workspacePath = "/workspace",
+            model = "claude-sonnet-5-5",
+            baseUrl = "https://api.anthropic.com/v1",
+            profile = null,
+            task = task,
+        )
+        val sourceCode = parts("读取 GitHub 代码")
+        val usage = parts("检查模型 Token 用量")
+        val ordinary = parts("写一首小诗")
+        org.junit.Assert.assertEquals(sourceCode.stable, usage.stable)
+        org.junit.Assert.assertEquals(sourceCode.stable, ordinary.stable)
+        assertTrue(sourceCode.dynamic.contains("工作区清点"))
+        assertTrue(usage.dynamic.contains("TokenUsageAnalyticsStore"))
+        assertFalse(ordinary.dynamic.contains("TokenUsageAnalyticsStore"))
+        assertFalse(sourceCode.stable.contains("工作区清点"))
+        assertFalse(usage.stable.contains("TokenUsageAnalyticsStore"))
+        assertTrue(sourceCode.stable.contains("固定用户规则"))
+    }
+
     @Test
     fun businessBudgetAndSalesStatsDoNotLoadModelTokenLedger() {
         for (task in listOf("写一份预算表", "统计销售额")) {

@@ -71,6 +71,13 @@ internal object LocalKimiPolicy {
         return if (model.equals("k3", true) && baseUrl != null && isOfficial(baseUrl)) {
             // Allow an explicit context setting; never assume a Plus tier has 1M.
             override?.takeIf { it <= 1_048_576 } ?: defaultWindow
-        } else defaultWindow ?: override
+        } else when {
+            // A user-configured smaller limit is meaningful for a constrained gateway.
+            // Never let a manual setting enlarge a documented model window without
+            // an explicit route capability contract (Kimi's subscription case above).
+            defaultWindow == null -> override
+            override == null -> defaultWindow
+            else -> minOf(defaultWindow, override)
+        }
     }
 }

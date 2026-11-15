@@ -130,10 +130,13 @@ private fun routedContextBudget(model: String?, baseUrl: String?, contextWindowT
         ?.coerceIn(1, (window / 2).coerceAtLeast(1))
         ?: minOf(DEFAULT_OUTPUT_RESERVE_TOKENS, window / 4)
     val headroom = minOf(DEFAULT_HEADROOM_TOKENS, (window * 0.08).toInt()).coerceAtLeast(1)
+    // The former minimum could exceed the space left after reserving output and headroom,
+    // so a small-context model could be admitted with a physically impossible request.
+    val availableInput = (window.toLong() - outputReserve - headroom).coerceAtLeast(1L)
     val messageBudget = minOf(
-        (window * CONTEXT_TRIGGER_RATIO).toInt(),
-        window - outputReserve - headroom,
-    ).coerceAtLeast(minOf(UNKNOWN_ROUTE_OPERATIONAL_INPUT_TOKENS, window / 2))
+        (window.toDouble() * CONTEXT_TRIGGER_RATIO).toLong(),
+        availableInput,
+    ).coerceAtLeast(1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     val tail = ((window - outputReserve) * TAIL_RATIO).toInt().coerceAtLeast(1)
     return RoutedContextBudget(
         messageBudgetTokens = messageBudget,

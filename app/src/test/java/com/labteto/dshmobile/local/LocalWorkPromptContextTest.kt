@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.work.withWorkTurnContext
+import com.labteto.dshmobile.local.model.LocalInstructionScope
+import com.labteto.dshmobile.local.model.LOCAL_INSTRUCTION_SCOPE
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -30,6 +33,10 @@ class LocalWorkPromptContextTest {
         assertEquals("固定系统", first[0]["content"]?.toString()?.trim('"'))
         assertEquals("固定运行时与长期规则", first[1]["content"]?.toString()?.trim('"'))
         assertEquals("本轮召回记忆-A", first[first.lastIndex - 1]["content"]?.toString()?.trim('"'))
+        assertEquals(LocalInstructionScope.SESSION.name,
+            first[1][LOCAL_INSTRUCTION_SCOPE]?.jsonPrimitive?.content)
+        assertEquals(LocalInstructionScope.TURN.name,
+            first[first.lastIndex - 1][LOCAL_INSTRUCTION_SCOPE]?.jsonPrimitive?.content)
         assertEquals("本轮问题", first.last()["content"]?.toString()?.trim('"'))
 
         val secondHistory = listOf(
@@ -60,6 +67,8 @@ class LocalWorkPromptContextTest {
         )
         val selected = result.single { it["content"]?.toString()?.contains("SKILL_BEGIN") == true }
         assertTrue(selected["content"].toString().contains("SKILL_END"))
+        assertEquals(LocalInstructionScope.TURN.name,
+            selected[LOCAL_INSTRUCTION_SCOPE]?.jsonPrimitive?.content)
         assertEquals("task", result.last()["content"]?.toString()?.trim('"'))
     }
 
