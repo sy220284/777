@@ -180,3 +180,17 @@ Session EventLog 为历史和恢复唯一持久源，分页/检查点/投影从�
 `LocalLegacySessionMigration`、`LocalLegacySqliteMigration`、`LegacyUsageProjection` 均参与旧用户本地数据无损迁移与累计用量校准，经过代码复核予以保留。旧的 `LegacyProviderUsageCompat` 只是对 Model 内同名且已存在的 `normalizedForAccounting` 扩展包装；经代码引用核查，无当前功能消费，作为真实冗余删除，且无需改变既有会话和计费行为。
 
 后续按同样证据标准审查静态无引用候选：先从动态入口（Manifest、Hilt、反射、资源、公开 ABI）、数据迁移与测试调用验证，再决定删除。静态未引用不作为直接删除理由。
+
+## 十一、无显式 import 候选的二次证据与无用实现清理
+
+全仓 CI 输出的 `unreferenced_production_candidates` 是 **没有被显式 import 命中的文件**，不能用作“死代码清单”。在 2026-11-15 的审计产物上，283 个候选中，有 252 个仍存在其他文件的词法调用候选，仅 31 个暂时没有观察到调用候选。
+
+进一步源码复查发现，`LocalToolScopeProjection.kt` 的 `HarnessTool.forReadOnlyModelScope` 通过 `HarnessTool::forReadOnlyModelScope` 被 `LocalToolSchemaProjection` 真实调用（规划模式和只读子任务需要）；原扫描器仅识别带括号调用，漏掉这种 Kotlin 方法引用。现已将方法引用纳入调用候选，并在同一全仓 CI 中断言这条安全约束路径必须被扫描到。该文件保留。
+
+对未被调用且没有 Manifest/注入/公开合同入口的文件，已按真实定义、同名搜索、用途和所有权完成具体删除判定：
+- `LocalHarnessConfigurationComponents.kt`：旧的双模型配置 Compose 页面，现行 UI 没有入口；
+- `LocalSuspendResult.kt`：无任何消费者的私有协程结果封装；
+- `WorkflowStage.kt`：未被引用的旧展示状态文字表；
+- `LocalPersonaAuthoringUiProjection.kt`：未被调用的重复 Persona 转换封装，原 Chat `authoringDraft/applyTo` 仍保留。
+
+此处清理仅针对证明确认无调用的旧实现；保留 `LocalToolScopeProjection`、`NativeV6ToolsUiTypes`、`LocalMiniMaxSkillCatalog`、所有 Android Service、Hilt provider、历史数据 DTO 与可恢复事务代码。最终仍需按最新 SHA 完整 JVM/Android 编译验收。
