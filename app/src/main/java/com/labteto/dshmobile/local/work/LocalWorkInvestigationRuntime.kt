@@ -21,6 +21,13 @@ internal object LocalWorkInvestigationRuntime {
     private val searchTools = setOf("grep", "glob", "list_files", "web_search", "archive_list")
     private val partialTools = setOf("read", "read_chunk", "tool_output_read", "archive_read")
     private val documentTools = setOf("web_fetch", "file_inspect")
+    private val githubSearchTools = setOf("mcp__GitHub__search", "mcp__GitHub__search_prs",
+        "mcp__GitHub__search_issues")
+    private val githubDocumentTools = setOf("mcp__GitHub__fetch_pr",
+        "mcp__GitHub__fetch_pr_patch", "mcp__GitHub__fetch_pr_file_patch",
+        "mcp__GitHub__get_pr_diff", "mcp__GitHub__fetch_commit",
+        "mcp__GitHub__fetch_issue", "mcp__GitHub__fetch")
+    private val githubSliceTools = setOf("mcp__GitHub__fetch_file", "mcp__GitHub__fetch_blob")
 
     private fun JsonObject.text(key: String): String =
         (get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -30,10 +37,9 @@ internal object LocalWorkInvestigationRuntime {
 
     private fun sourceKind(name: String): String? = when {
         name == "archive_list" -> "listing"
-        name in searchTools || name == "mcp__GitHub__search" -> "search"
-        name in partialTools || name == "mcp__GitHub__fetch_file" -> "slice"
-        name in documentTools || name == "mcp__GitHub__fetch_pr" ||
-            name == "mcp__GitHub__fetch_pr_file_patch" -> "document"
+        name in searchTools || name in githubSearchTools -> "search"
+        name in partialTools || name in githubSliceTools -> "slice"
+        name in documentTools || name in githubDocumentTools -> "document"
         else -> null
     }
 
@@ -44,14 +50,23 @@ internal object LocalWorkInvestigationRuntime {
         val resource = if (repo.isNotBlank() && prNumber.isNotBlank()) "$repo#PR$prNumber" else repo
         val ref = args.text("ref")
         val url = args.text("url").substringBefore('?').substringBefore('#')
+        val pr = args.text("pr_number")
+        val issue = args.text("issue_number")
+        val commit = args.text("commit_sha")
+        val blob = args.text("blob_sha")
         val value = when {
             name == "tool_output_read" -> "结果回执:" + args.text("call_id")
             name == "archive_read" && path.isNotBlank() -> path + "!" + args.text("member")
-            resource.isNotBlank() && path.isNotBlank() ->
-                if (ref.isBlank()) "$resource/$path" else "$resource@$ref/$path"
+            repo.isNotBlank() && pr.isNotBlank() ->
+                "$repo#PR-$pr" + if (path.isNotBlank()) "/$path" else ""
+            repo.isNotBlank() && issue.isNotBlank() -> "$repo#issue-$issue"
+            repo.isNotBlank() && path.isNotBlank() ->
+                if (ref.isBlank()) "$repo/$path" else "$repo@$ref/$path"
+            repo.isNotBlank() && commit.isNotBlank() -> "$repo@$commit"
+            repo.isNotBlank() && blob.isNotBlank() -> "$repo@blob:$blob"
             path.isNotBlank() -> path
             url.isNotBlank() -> url
-            resource.isNotBlank() -> resource
+            repo.isNotBlank() -> repo
             else -> name
         }
         val visible = value.replace("\n", " ")
@@ -87,7 +102,10 @@ internal object LocalWorkInvestigationRuntime {
         listOf("tool", toolName, "repo", args.text("repository_full_name"),
             args.text("repo_full_name"), "path", args.text("path"), args.text("file_path"),
             "ref", args.text("ref"), "url", args.text("url"), "call", args.text("call_id"),
-            "pr_number", args.text("pr_number"), "issue_number", args.text("issue_number"),
+            "pr", args.text("pr_number"), "issue", args.text("issue_number"),
+            "commit", args.text("commit_sha"), "blob", args.text("blob_sha"),
+            "base", args.text("base"), "head", args.text("head"),
+            "format", args.text("format"),
             "query", args.text("query"), "pattern", args.text("pattern"),
             "member", args.text("member"), "prefix", args.text("prefix"))
             .joinToString("\u0000")

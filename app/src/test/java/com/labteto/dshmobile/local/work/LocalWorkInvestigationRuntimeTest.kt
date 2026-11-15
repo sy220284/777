@@ -383,6 +383,45 @@ class LocalWorkInvestigationRuntimeTest {
     }
 
 
+
+    @Test fun differentPullRequestsAndPatchesDoNotCollapseIntoOneInvestigationSource() {
+        val log = log()
+        try {
+            fun source(id: String, tool: String, pr: Int, path: String? = null) {
+                val declaration = log.append("tool/call", buildJsonObject {
+                    put("id", id); put("name", tool)
+                })
+                val result = log.append("tool/result", buildJsonObject {
+                    put("id", id); put("is_error", false)
+                })
+                LocalWorkInvestigationRuntime.observe(
+                    log, "goal-pr-evidence", "turn-a", id, tool,
+                    buildJsonObject {
+                        put("repo_full_name", "owner/repo")
+                        put("pr_number", pr)
+                        if (path != null) put("path", path)
+                    }, declaration.sequence, result.sequence, "same output", false,
+                )
+            }
+            source("pr923", "mcp__GitHub__fetch_pr", 923)
+            val first = LocalWorkInvestigationRuntime.progressIdentity(log, "goal-pr-evidence")
+            source("pr924", "mcp__GitHub__fetch_pr", 924)
+            assertFalse(first == LocalWorkInvestigationRuntime.progressIdentity(log, "goal-pr-evidence"))
+            source("patch923", "mcp__GitHub__fetch_pr_file_patch", 923, "src/Engine.kt")
+            source("patch924", "mcp__GitHub__fetch_pr_file_patch", 924, "src/Engine.kt")
+            source("diff924", "mcp__GitHub__get_pr_diff", 924)
+            val observations = log.eventsOfTypesAfter(-1L, setOf("work/source-observed"))
+            assertEquals(5, observations.size)
+            assertEquals(5, observations.map { it.data["source_key"] }.toSet().size)
+            val sources = observations.map { it.data["source"].toString() }
+            assertTrue(sources.any { "repo#PR-923" in it })
+            assertTrue(sources.any { "repo#PR-924/src/Engine.kt" in it })
+            val context = LocalWorkInvestigationRuntime.context(log, "goal-pr-evidence", "turn-a")
+            assertTrue(context.contains("repo#PR-923"))
+            assertTrue(context.contains("repo#PR-924"))
+        } finally { log.close() }
+    }
+
     @Test fun unidentifiedReadIsNotRecordedAsGroundedSourceCoverage() {
         val log = log()
         try {
