@@ -332,21 +332,23 @@ internal fun LocalAgentTeamSheet(
                 variant = SyButtonVariant.Ghost,
                 size = SyButtonSize.Small,
             )
-            Text(
-                stringResource(R.string.local_team_readonly_hint),
-                style = DsType.caption11, color = colors.textSecondary,
-            )
-            SyButton(
-                text = stringResource(R.string.local_team_lead_followup),
-                onClick = { onLeadFollowup("") },
-                variant = SyButtonVariant.Ghost,
-                size = SyButtonSize.Small,
-            )
+            if (team.members.isNotEmpty() || team.tasks.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.local_team_readonly_hint),
+                    style = DsType.caption11, color = colors.textSecondary,
+                )
+                SyButton(
+                    text = stringResource(R.string.local_team_lead_followup),
+                    onClick = { onLeadFollowup("") },
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                )
+            }
 
             if (team.standaloneAgents.isNotEmpty()) {
                 Text("独立子智能体", style = DsType.small13Strong.withReadingWeight(), color = colors.textTertiary)
                 team.standaloneAgents.forEach { agent ->
-                    StandaloneAgentRow(agent, onAgentOperation)
+                    StandaloneAgentRow(agent, onAgentOperation, toast.second)
                 }
             }
             if (team.members.isNotEmpty() || team.tasks.isNotEmpty() || team.failure != null) {
@@ -1041,10 +1043,10 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
 private fun StandaloneAgentRow(
     agent: LocalAgentChildUiState,
     onOperation: suspend (String, UiWorkAgentOperation, String?) -> LocalWorkUiActionResult,
+    onFeedback: (String) -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val scope = rememberCoroutineScope()
-    val toast = rememberSyToast()
     var expanded by rememberSaveable(agent.id) { mutableStateOf(false) }
     var draft by rememberSaveable(agent.id) { mutableStateOf("") }
     var detail by remember(agent.id) { mutableStateOf("") }
@@ -1077,9 +1079,14 @@ private fun StandaloneAgentRow(
                     try {
                         val result = onOperation(agent.id, operation, message)
                         detail = result.message
-                        if (result.accepted) toast.second(result.message)
-                        else toast.second("操作未完成：" + result.message)
+                        if (result.accepted) onFeedback(result.message)
+                        else onFeedback("操作未完成：" + result.message)
                         if (result.accepted && operation == UiWorkAgentOperation.SEND_MESSAGE) draft = ""
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        detail = failure.message ?: "子智能体操作失败"
+                        onFeedback("操作未完成：" + detail)
                     } finally { busy = false }
                 }
             }
@@ -1090,7 +1097,7 @@ private fun StandaloneAgentRow(
                     SyButton(text = "暂停", enabled = !busy && agent.continuable,
                         onClick = { perform(UiWorkAgentOperation.INTERRUPT) },
                         variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
-                } else if (agent.continuable) {
+                } else if (agent.canResume) {
                     SyButton(text = "继续", enabled = !busy,
                         onClick = { perform(UiWorkAgentOperation.RESUME) },
                         variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
@@ -1101,8 +1108,8 @@ private fun StandaloneAgentRow(
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 verticalAlignment = Alignment.CenterVertically) {
                 SyTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f),
-                    enabled = !busy, singleLine = true, placeholder = { Text("给子智能体发送消息") })
-                SyButton(text = "发送", enabled = draft.isNotBlank() && !busy,
+                    enabled = !busy && agent.canMessage, singleLine = true, placeholder = { Text("给子智能体发送消息") })
+                SyButton(text = "发送", enabled = draft.isNotBlank() && !busy && agent.canMessage,
                     onClick = { perform(UiWorkAgentOperation.SEND_MESSAGE, draft) },
                     size = SyButtonSize.Small)
             }
@@ -1124,7 +1131,12 @@ private fun StandaloneAgentRow(
                             try {
                                 val result = onOperation(agent.id, UiWorkAgentOperation.CLOSE, null)
                                 detail = result.message
-                                toast.second(result.message)
+                                onFeedback(if (result.accepted) result.message else "操作未完成：" + result.message)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                detail = failure.message ?: "关闭子智能体失败"
+                                onFeedback("操作未完成：" + detail)
                             } finally { busy = false }
                         }
                     }
@@ -1132,5 +1144,4 @@ private fun StandaloneAgentRow(
             }
         }
     }
-    SyToastHost(toast)
 }

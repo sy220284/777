@@ -10,7 +10,13 @@ data class LocalAgentChildUiState(
     val label: String,
     val status: String,
     val continuable: Boolean,
-)
+    val pendingMessageCount: Int = 0,
+    val canMessage: Boolean = false,
+) {
+    val canResume: Boolean
+        get() = continuable && status in setOf("interrupted", "dormant", "waiting_slice") &&
+            (pendingMessageCount > 0 || status == "waiting_slice")
+}
 
 data class LocalAgentTeamUiState(
     val standaloneAgents: List<LocalAgentChildUiState> = emptyList(),
@@ -53,6 +59,8 @@ data class LocalAgentTeamUiState(
                     label = info.label.removePrefix("子代理："),
                     status = info.status,
                     continuable = info.continuable,
+                    pendingMessageCount = info.pendingMessageCount,
+                    canMessage = info.canMessage,
                 )
             },
             members = members.map { member ->

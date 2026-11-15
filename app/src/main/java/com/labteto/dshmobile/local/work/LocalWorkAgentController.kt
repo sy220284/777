@@ -19,7 +19,7 @@ internal class LocalWorkAgentController(
     override fun snapshot(): com.labteto.dshmobile.uicontract.UiWorkTeamSnapshot = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
         val current = runtimeStateStore.state.value
         val active = current.usageMode == com.labteto.dshmobile.local.LocalUsageMode.WORK && !current.loading
-        val team = current.work.team
+        val team = current.work.team.withJobs(current.work.jobs)
         com.labteto.dshmobile.uicontract.UiWorkTeamSnapshot(
             runtimeStateStore.uiBindingIdentity(current).takeIf { active && !runtimeStateStore.sessionTransitioning },
             if (active) team.members.map { member -> com.labteto.dshmobile.uicontract.UiWorkTeamMember(
@@ -31,11 +31,15 @@ internal class LocalWorkAgentController(
                     task.id, task.revision, task.subject, task.status,
                     task.ownerName, task.blockedByTitles, task.ready)
             } else emptyList(),
-            agents = if (active) agentControl.agents(current.sessionId).map { agent ->
+            agents = if (active) team.standaloneAgents.map { agent ->
                 com.labteto.dshmobile.uicontract.UiWorkAgent(
-                    agent.id, agent.label, agent.status, agent.continuable, agent.teamManaged,
+                    agent.id, agent.label, agent.status, agent.continuable, false,
                 )
-            } else emptyList())
+            } + (if (active) team.members.map { member ->
+                com.labteto.dshmobile.uicontract.UiWorkAgent(
+                    member.jobId, member.friendlyName, member.activity, true, true,
+                )
+            } else emptyList()) else emptyList())
     }
     override fun readOutput(identity: com.labteto.dshmobile.uicontract.UiSessionIdentity, memberId: String, expectedJobId: String): com.labteto.dshmobile.uicontract.UiWorkTeamResult = try {
         synchronized(runtimeStateStore.foregroundRunHandle.lock) {

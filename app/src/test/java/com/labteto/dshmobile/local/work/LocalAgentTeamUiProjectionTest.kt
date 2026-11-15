@@ -37,6 +37,16 @@ class LocalAgentTeamUiProjectionTest {
     }
 
     @Test
+    fun resumeActionReflectsRealPersistentAgentAdmission() {
+        val runnable = LocalAgentChildUiState("child", "验证助手", "interrupted", true, pendingMessageCount = 1)
+        assertTrue(runnable.canResume)
+        assertTrue(runnable.copy(status = "waiting_slice", pendingMessageCount = 0).canResume)
+        assertFalse(runnable.copy(status = "completed").canResume)
+        assertFalse(runnable.copy(status = "dormant", pendingMessageCount = 0).canResume)
+        assertFalse(runnable.copy(continuable = false).canResume)
+    }
+
+    @Test
     fun standaloneChildAppearsInTheExistingWorkCollaborationSurface() {
         val standalone = LocalJobInfo("job-child-1", "子代理：代码核验", "running", isAgent = true)
         val teamMember = LocalJobInfo("job-team-1", "子代理：团队助手", "running", isAgent = true)
