@@ -171,10 +171,10 @@ class LocalWorkToolSurfaceFocusTest {
         try {
             binding.runHandle.modelHistory.append(buildJsonObject {
                 put("role", "user")
-                put("content", "查询当前系统能力")
+                put("content", "分析文件路径")
             })
             val policy = localAgentRunPolicy(LocalUsageMode.WORK)
-            runtime.prepare(binding, "查询当前系统能力")
+            runtime.prepare(binding, "分析文件路径")
             // The first model step admits the user task before any model-emitted tool call.
             val first = runtime.schemas(policy, binding)
             assertTrue("mcp_later_lookup" !in LocalToolSchemaProjection(registry, executor).names(first))
