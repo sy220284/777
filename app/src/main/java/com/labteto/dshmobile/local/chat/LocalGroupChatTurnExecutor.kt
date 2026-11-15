@@ -205,6 +205,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         val persona = chatPersonaStore.get(member.personaId)
         val startedAtNanos = System.nanoTime()
         val interactiveAttempts = snapshot.modelState.modelAttempts.coerceIn(1, 2)
+        var nativeImagesSent = false
 
         return try {
             val turnContext = chatReplyCoordinator.buildGroupTurnContext(
@@ -230,9 +231,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 snapshot.modelState.baseUrl,
                 snapshot.modelState.model,
             )
-            if (hasLocalImageRefs(groupRequestHistory) && groupImageMode == LocalImageInputMode.TOOL) {
-                throw IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。")
-            }
+            requireChatImageInputSupported(groupRequestHistory, groupImageMode)
             val requestMessages = prepareLocalMultimodalMessages(
                 messages = groupRequestHistory,
                 workspaceRoot = File(workspacePath),
@@ -245,6 +244,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN,
                 resourceScheduler = runtimeStateStore.resourceScheduler,
             )
+            nativeImagesSent = com.labteto.dshmobile.local.model.hasMaterializedImageUrls(requestMessages)
             val rawReply = completeWithRetry(
                 key = key,
                 snapshot = snapshot,
@@ -257,7 +257,11 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 temperature = persona.behaviorTuning.roleplayTemperature(
                     snapshot.modelState.model, snapshot.modelState.baseUrl,
                 ),
-            )
+            ).also {
+                if (nativeImagesSent) imageCapabilities.markSupported(
+                    snapshot.modelState.baseUrl, snapshot.modelState.model,
+                )
+            }
             val replyCards = LocalChatReplyUiDocuments()
             val finalReply = chatReplyCoordinator.finalizeGroup(
                 snapshot = snapshot,
@@ -315,7 +319,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 put("status", "failed")
                 put("elapsed_ms", (System.nanoTime() - startedAtNanos) / 1_000_000L)
             })
-            val failure = if (hasLocalImageRefs(baseHistory) && imageInputUnsupported(error)) {
+            val failure = if (nativeImagesSent && imageInputUnsupported(error)) {
                 imageCapabilities.markUnsupported(snapshot.modelState.baseUrl, snapshot.modelState.model)
                 IllegalStateException("当前模型不支持图片理解，请切换支持图片的模型后重试。", error)
             } else {
