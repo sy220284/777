@@ -413,6 +413,27 @@ class LocalToolRouterTest {
     }
 
     @Test
+    fun exactIdentifierDoesNotLoadUnrelatedToolsSharingArbitraryNameSegments() {
+        val tools = listOf(
+            tool("mcp_middle_lookup", "读取指定仓库", ToolExposure.OPTIONAL,
+                "MCP", setOf("专用仓库")),
+            tool("unrelated_lookup", "查询其他项目", ToolExposure.OPTIONAL,
+                "外部", setOf("其他项目")),
+            tool("unrelated_action", "另一执行动作", ToolExposure.OPTIONAL,
+                "外部", setOf("执行动作")),
+        )
+        assertEquals(listOf("mcp_middle_lookup"),
+            LocalToolRouter.search(tools, "请执行 mcp_middle_lookup 完成当前读取")
+                .map(HarnessTool::name))
+        assertEquals(listOf("mcp_middle_lookup"),
+            LocalToolRouter.search(tools, "先按 mcp_middle_lookup 处理任务")
+                .map(HarnessTool::name))
+        assertEquals(listOf("unrelated_lookup"),
+            LocalToolRouter.search(tools, "只查找 lookup").map(HarnessTool::name)
+                .filter { it == "unrelated_lookup" })
+    }
+
+    @Test
     fun capabilityDiscoveryFindsNamesAndKeywordsInsideLongQuery() {
         val tools = listOf(
             tool("middle_tool", "执行远端中间步骤", ToolExposure.OPTIONAL, "远端",

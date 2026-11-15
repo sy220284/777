@@ -207,7 +207,7 @@ internal object LocalToolRouter {
         val optionalTools = tools.filter(::isOptional)
         val vocabulary = HashSet<String>()
         fun index(value: String) {
-            capabilitySearchTerms(value.lowercase()).forEach(vocabulary::add)
+            capabilitySearchTerms(value.lowercase(), splitIdentifierParts = true).forEach(vocabulary::add)
         }
         optionalTools.forEach { tool ->
             index(tool.name)
@@ -232,7 +232,7 @@ internal object LocalToolRouter {
             for (term in terms) {
                 val match = when {
                     name == term -> 10_000
-                    name.split('_', '-').any { it == term && term != "tool" } -> 2_000
+                    name.split('_', '-').any { it == term } -> 2_000
                     keywords.any { it == term } -> 1_200
                     family == term -> 800
                     hasExplicitIntentTerm(name, term) -> 600
@@ -261,12 +261,19 @@ internal object LocalToolRouter {
      * ASCII names embedded in Chinese instructions, underscore-separated identifiers
      * and unspaced Chinese phrases all remain discoverable.
      */
-    private fun capabilitySearchTerms(text: String): Sequence<String> = sequence {
+    private fun capabilitySearchTerms(
+        text: String,
+        splitIdentifierParts: Boolean = false,
+    ): Sequence<String> = sequence {
         for (token in CAPABILITY_WORDS.findAll(text)) {
             val value = token.value
             yield(value)
-            for (part in value.split('_', '-')) {
-                if (part.length >= 2) yield(part)
+            // Splitting is useful when indexing registered names, but splitting an
+            // explicitly requested name would load unrelated tools sharing a suffix.
+            if (splitIdentifierParts) {
+                for (part in value.split('_', '-')) {
+                    if (part.length >= 2) yield(part)
+                }
             }
             for (han in CAPABILITY_HAN.findAll(value)) {
                 val word = han.value
