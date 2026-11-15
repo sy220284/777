@@ -266,8 +266,9 @@ private fun WorkTasksScreen(
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
-                    if (state.managementFailed) {
-                        Text(stringResource(R.string.tasks_operation_failed), color = colors.dangerInk)
+                    if (state.managementFailed || state.managementError != null) {
+                        Text(state.managementError?.takeIf(String::isNotBlank)
+                            ?: stringResource(R.string.tasks_operation_failed), color = colors.dangerInk)
                         SyButton(stringResource(R.string.common_retry), onClick = { viewModel.refresh() })
                     }
                     when {
