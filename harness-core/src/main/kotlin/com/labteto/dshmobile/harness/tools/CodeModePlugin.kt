@@ -218,6 +218,17 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 }
                 return receipt(observations, "stopped", "CODE_MODE_REFERENCE_FAILED")
             }
+            // Check the complete expanded input, not an arbitrary 8K cap on each
+            // reference. Repeated references can also multiply the argument size.
+            if (resolvedArguments.toString().length > MAX_SCRIPT_CHARS) {
+                observations += buildJsonObject {
+                    put("index", index + 1)
+                    put("tool", name)
+                    put("status", "reference_failed")
+                    put("hint", "本步骤展开的参数超过编排预算；请分块读取或缩小字段范围")
+                }
+                return receipt(observations, "stopped", "CODE_MODE_REFERENCE_FAILED")
+            }
             // The parent call receipt and each child tool receipt have different call identities.
             val attrs = original.attributes + (
                 "call_id" to (original.attributes["call_id"]?.toString().orEmpty()
@@ -405,11 +416,10 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 ?: throw StepReferenceException("步骤 $ordinal 尚无执行回执")
             if (source.retention != ToolResultRetention.DURABLE)
                 throw StepReferenceException("步骤 $ordinal 的临时结果不可传递")
-            if (source.structuredResult == null && source.content.length > MAX_REFERENCE_SOURCE_CHARS)
-                throw StepReferenceException("步骤 $ordinal 的结果过大")
+            // The prior result is already an owned, durable ToolResult. Select the
+            // requested field before applying a limit to the materialized child input:
+            // a large JSON document can contain a tiny identifier needed downstream.
             val parsed = source.structuredResult ?: parseResultBody(source.content)
-            if (parsed.toString().length > MAX_REFERENCE_SOURCE_CHARS)
-                throw StepReferenceException("步骤 $ordinal 的结构化结果过大")
             var selected: JsonElement = parsed
             val path = (node["path"] as? JsonPrimitive)?.content.orEmpty()
             for (segment in (parseReferencePath(path)
@@ -425,8 +435,8 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                     else -> "步骤 $ordinal 的结果是文本或 JSON 标量，无法读取 '$path'；直接比较整个结果时请省略 path，结构化字段须由前序工具返回 JSON 对象"
                 })
             }
-            if (selected.toString().length > MAX_REFERENCE_VALUE_CHARS)
-                throw StepReferenceException("步骤 $ordinal 的字段超过传递长度限制")
+            if (selected.toString().length > MAX_SCRIPT_CHARS)
+                throw StepReferenceException("步骤 $ordinal 的字段超过单步参数预算；请分块读取数据")
             selected
         } else JsonObject(node.mapValues { (_, element) -> resolveReferences(element, history) })
         is JsonArray -> JsonArray(node.map { resolveReferences(it, history) })
@@ -465,8 +475,6 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
     private companion object {
         const val TOOL_NAME = "code_mode_run"
         const val MAX_SCRIPT_CHARS = 256_000
-        const val MAX_REFERENCE_SOURCE_CHARS = 128_000
-        const val MAX_REFERENCE_VALUE_CHARS = 8_192
         const val RESULT_REFERENCE_KEY = "\$step_result"
         const val MAX_RESULT_CHARS = 4_000
         val JSON_NUMBER_PATTERN = Regex("""-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?""")

@@ -549,6 +549,63 @@ class CodeModePluginTest {
         assertTrue(actual.content.contains("completed_steps"))
     }
 
+    @Test fun largeDurableDocumentCanPassOnlyTheRequestedSmallField() = runTest {
+        val registry = ToolRegistry()
+        val source = buildJsonObject {
+            put("unused", "x".repeat(170_000))
+            put("identifier", "selected-id")
+        }
+        register(registry, "produce") { ToolResult(source.toString(), structuredResult = source) }
+        var received: JsonObject? = null
+        registry.register(HarnessTool(
+            "consume", functionToolSchema("consume", "使用筛选字段", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", true)
+            }), ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER, ToolExposure.CORE,
+            ToolMetadata("test"), executor = HarnessToolExecutor { _, args, _ ->
+                received = args
+                ToolResult("ok")
+            },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val plan = buildJsonObject { put("steps", buildJsonArray {
+            add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
+            add(buildJsonObject { put("tool", "consume"); put("args", buildJsonObject {
+                put("value", buildJsonObject { put("\\$step_result", 1); put("path", "identifier") })
+            }) })
+        }) }
+        val result = registry.execute("code_mode_run", plan)
+        assertFalse(result.content, result.isError)
+        assertEquals("selected-id", (received?.get("value") as JsonPrimitive).content)
+    }
+
+    @Test fun longSelectedFieldFlowsToNextToolUnderActualExpandedArgumentBudget() = runTest {
+        val registry = ToolRegistry()
+        val body = "Y".repeat(24_000)
+        register(registry, "produce") { ToolResult(buildJsonObject { put("body", body) }.toString()) }
+        var received: JsonObject? = null
+        registry.register(HarnessTool(
+            "consume", functionToolSchema("consume", "传递合法的较长字段", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", true)
+            }), ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER, ToolExposure.CORE,
+            ToolMetadata("test"), executor = HarnessToolExecutor { _, args, _ ->
+                received = args
+                ToolResult("ok")
+            },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject { put("steps", buildJsonArray {
+            add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
+            add(buildJsonObject { put("tool", "consume"); put("args", buildJsonObject {
+                put("value", buildJsonObject { put("\\$step_result", 1); put("path", "body") })
+            }) })
+        }) }
+        val result = registry.execute("code_mode_run", script)
+        assertFalse(result.content, result.isError)
+        assertEquals(body, (received?.get("value") as JsonPrimitive).content)
+    }
+
     @Test fun conditionalStepsSkipWithoutExecutingMutations() = runTest {
         val registry = ToolRegistry()
         var writes = 0

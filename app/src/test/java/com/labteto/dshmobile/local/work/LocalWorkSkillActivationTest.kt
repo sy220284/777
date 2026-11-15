@@ -105,7 +105,7 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
-    fun explicitSkillGetsBudgetBeforeOtherPinsAndIsNotLoadedTwice() {
+    fun explicitSkillAndOtherPinsStayCompleteWithoutDoubleLoading() {
         val root = Files.createTempDirectory("skill-explicit-priority").toFile()
         try {
             val workspace = LocalWorkspace(root)
@@ -119,10 +119,30 @@ class LocalWorkSkillActivationTest {
             val result = resolveLocalWorkSkillGuidance(workspace, "@skill:explicit\n执行", pins)
             assertTrue(result.contains("EXPLICIT_START"))
             assertTrue(result.contains("EXPLICIT_TAIL"))
-            assertFalse(result.contains("SECOND_PIN_GUIDANCE"))
-            assertTrue(result.contains("skill(name=second)"))
+            assertTrue(result.contains("SECOND_PIN_GUIDANCE"))
+            assertTrue(result.contains("[已固定技能：second]"))
+            assertFalse(result.contains("skill(name=second)"))
             assertEquals(1, Regex("EXPLICIT_START").findAll(result).count())
             assertFalse(result.contains("[已固定技能：explicit]"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test
+    fun twoLongPinnedSkillsKeepTheirCompleteRulesWithoutSilentCharacterBudget() {
+        val root = Files.createTempDirectory("pinned-skills-long").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            workspace.write(".dsh/skills/first/SKILL.md", "FIRST_START\\n" + "A".repeat(20_000) + "\\nFIRST_TAIL")
+            workspace.write(".dsh/skills/second/SKILL.md", "SECOND_START\\n" + "B".repeat(22_000) + "\\nSECOND_TAIL")
+            val pins = listOf(
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "first"),
+                LocalPinnedInvocation(LocalPinnedInvocation.Kind.SKILL, "second"),
+            )
+            val result = resolveLocalWorkSkillGuidance(workspace, "继续", pins)
+            assertTrue(result.contains("FIRST_TAIL"))
+            assertTrue(result.contains("SECOND_TAIL"))
+            assertFalse(result.contains("内容较长；调用"))
+            assertEquals(1, Regex("SECOND_START").findAll(result).count())
         } finally { root.deleteRecursively() }
     }
 
