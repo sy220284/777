@@ -144,6 +144,21 @@ class LocalToolCatalogTest {
     }
 
     @Test
+    fun workFindingActionAndStatusUseExactRuntimeEnumerations() {
+        val tool = LocalToolCatalog.specs.single {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == "work_finding"
+        }
+        val properties = tool.jsonObject["function"]!!.jsonObject["parameters"]!!
+            .jsonObject["properties"]!!.jsonObject
+        assertEquals(setOf("record", "revise", "list"),
+            properties.getValue("action").jsonObject.getValue("enum").jsonArray
+                .map { it.jsonPrimitive.content }.toSet())
+        assertEquals(setOf("hypothesis", "supported", "rejected"),
+            properties.getValue("status").jsonObject.getValue("enum").jsonArray
+                .map { it.jsonPrimitive.content }.toSet())
+    }
+
+    @Test
     fun sessionEventSearchExposesPagingControls() {
         val functions = LocalToolCatalog.specs.associateBy {
             it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
