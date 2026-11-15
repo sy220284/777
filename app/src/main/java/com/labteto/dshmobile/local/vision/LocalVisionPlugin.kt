@@ -305,17 +305,17 @@ class LocalVisionPlugin(
         val key = fixedKey ?: routeKeyProvider(route)
             ?: return ToolResult("当前模型密钥尚未配置", isError = true,
                 errorCode = "VISION_MODEL_NOT_CONFIGURED", recoveryHint = "请在模型设置中配置模型凭据。")
-        val boundedPrompt = buildString {
+        val completePrompt = buildString {
             appendLine(intro)
             appendLine("依据可见内容回答；需要分析或建议时区分可见事实与推断，不臆测画面外事实。")
             append("任务：")
-            append(prompt.take(4_000))
+            append(prompt)
         }
         return runCatching {
             analyzer.analyze(
                 key,
                 route.copy(usageContext = usageContext),
-                boundedPrompt,
+                completePrompt,
                 imageDataUrl,
             )
         }.fold(

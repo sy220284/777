@@ -722,6 +722,31 @@ class LocalAgentRunCoordinatorTest {
     }
 
     @Test
+    fun queuedLegacyRunRetainsCheckpointVersionAndOriginalInputContract() {
+        withCoordinator { coordinator, log ->
+            log.append(LOCAL_AGENT_RUN_CHECKPOINT_EVENT, buildJsonObject {
+                put("version", 2)
+                put("run_id", "legacy-run")
+                put("session_id", "s1")
+                put("status", "running")
+                put("phase", "step_started")
+                put("mode", "work")
+                put("model", "deepseek-flash")
+                put("base_url", "https://api.deepseek.com")
+                put("profile_id", "historical-profile")
+                put("input", "历史完整指令")
+                put("memory_input", "历史完整上下文")
+            })
+            coordinator.markRecoveryQueued("s1", "legacy-run")
+            val checkpoint = requireNotNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            assertEquals("2", checkpoint.data["version"]?.toString())
+            val recovered = requireNotNull(coordinator.recoveryDecision("s1", SessionRepairResult()))
+            assertNull(recovered.blockedReason)
+            assertEquals("run-recovery:legacy-run", recovered.queuedInput?.id)
+        }
+    }
+
+    @Test
     fun missingOriginalInputBlocksResumeInsteadOfInventingAReplacement() {
         withCoordinator { coordinator, log ->
             val context = coordinator.start(

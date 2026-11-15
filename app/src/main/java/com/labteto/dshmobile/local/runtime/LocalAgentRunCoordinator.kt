@@ -657,8 +657,10 @@ internal class LocalAgentRunCoordinator(
             val latest = log.latest(eventType(kind)) ?: return@retire false
             if (latest.data["run_id"]?.jsonPrimitive?.contentOrNull != runId) return@retire false
             log.append(eventType(kind), buildJsonObject {
+                // Status updates preserve the version of the original checkpoint.
+                // Legacy v2 inputs remain embedded in that checkpoint; upgrading only
+                // the marker would demand a nonexistent v3 run-input event on recovery.
                 latest.data.forEach { (key, value) -> put(key, value) }
-                put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)
                 put("run_id", runId)
                 put("session_id", sessionId)
                 put("status", status.name.lowercase())
