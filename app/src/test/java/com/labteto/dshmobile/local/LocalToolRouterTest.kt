@@ -423,14 +423,13 @@ class LocalToolRouterTest {
                 "外部", setOf("执行动作")),
         )
         assertEquals(listOf("mcp_middle_lookup"),
-            LocalToolRouter.search(tools, "请执行 mcp_middle_lookup 完成当前读取")
+            LocalToolRouter.search(tools, "请用 mcp_middle_lookup 完成当前读取")
                 .map(HarnessTool::name))
         assertEquals(listOf("mcp_middle_lookup"),
             LocalToolRouter.search(tools, "先按 mcp_middle_lookup 处理任务")
                 .map(HarnessTool::name))
-        assertEquals(listOf("unrelated_lookup"),
-            LocalToolRouter.search(tools, "只查找 lookup").map(HarnessTool::name)
-                .filter { it == "unrelated_lookup" })
+        assertEquals(listOf("mcp_middle_lookup", "unrelated_lookup"),
+            LocalToolRouter.search(tools, "lookup").map(HarnessTool::name))
     }
 
     @Test
