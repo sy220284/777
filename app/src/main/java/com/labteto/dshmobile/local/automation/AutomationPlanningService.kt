@@ -210,33 +210,47 @@ internal fun parseAutomationPlan(
     require(scheduleType != AutomationScheduleType.LEGACY) { "事件时间安排无效" }
 
     val minimumFuture = nowMillis + 60_000L
-    val requestedFirstRun = task.long("firstRunAtMillis") ?: minimumFuture
+    // Conditional schedules have their own trigger; calendar schedules need an
+    // actual, future first run. Guessing a one-minute delay can fire a user's
+    // event at an entirely different time.
+    val firstRun = if (scheduleType in setOf(
+            AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW,
+        )) {
+        minimumFuture
+    } else {
+        val requested = task.long("firstRunAtMillis")
+            ?: error("缺少首次执行时间，请重新确认事件日期与时刻")
+        require(requested >= minimumFuture) {
+            "首次执行时间不在可安排的未来范围，请核对日期与时区"
+        }
+        requested
+    }
     val recurring = when (scheduleType) {
         AutomationScheduleType.DAILY -> 24L * 60L
         AutomationScheduleType.WEEKLY -> 7L * 24L * 60L
         AutomationScheduleType.MONTHLY -> 30L * 24L * 60L
-        AutomationScheduleType.INTERVAL -> (task.long("recurringMinutes") ?: 0L)
-            .coerceAtLeast(60L)
+        AutomationScheduleType.INTERVAL -> {
+            val minutes = task.long("recurringMinutes") ?: error("缺少执行间隔分钟数")
+            require(minutes >= 60L) { "执行间隔至少为 60 分钟" }
+            minutes
+        }
         else -> null
     }
     val silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) {
-        (task.long("silenceMinutes") ?: 60L).coerceAtLeast(60L)
-    } else {
-        null
+        val minutes = task.long("silenceMinutes") ?: error("缺少沉默触发时长")
+        require(minutes >= 60L) { "沉默触发时长至少为 60 分钟" }
+        minutes
+    } else null
+    fun windowMinute(key: String, message: String): Int {
+        val minute = task.long(key) ?: error("缺少$message")
+        require(minute in 0L until 24L * 60L) { "$message无效" }
+        return minute.toInt()
     }
-    val windowStart = if (scheduleType == AutomationScheduleType.WINDOW) {
-        (task.long("windowStartMinuteOfDay") ?: error("缺少时间窗开始时间")).toInt()
-    } else {
-        null
-    }
-    val windowEnd = if (scheduleType == AutomationScheduleType.WINDOW) {
-        (task.long("windowEndMinuteOfDay") ?: error("缺少时间窗结束时间")).toInt()
-    } else {
-        null
-    }
+    val windowStart = if (scheduleType == AutomationScheduleType.WINDOW)
+        windowMinute("windowStartMinuteOfDay", "时间窗开始时间") else null
+    val windowEnd = if (scheduleType == AutomationScheduleType.WINDOW)
+        windowMinute("windowEndMinuteOfDay", "时间窗结束时间") else null
     if (scheduleType == AutomationScheduleType.WINDOW) {
-        require(windowStart in 0 until 24 * 60) { "时间窗开始时间无效" }
-        require(windowEnd in 0 until 24 * 60) { "时间窗结束时间无效" }
         require(windowStart != windowEnd) { "时间窗不能覆盖整天" }
     }
     return AutomationPlanDraft(
@@ -244,10 +258,7 @@ internal fun parseAutomationPlan(
         sourceRevision = sourceRevision,
         prompt = prompt,
         scheduleType = scheduleType,
-        firstRunAt = if (
-            scheduleType == AutomationScheduleType.SILENCE ||
-            scheduleType == AutomationScheduleType.WINDOW
-        ) minimumFuture else requestedFirstRun.coerceAtLeast(minimumFuture),
+        firstRunAt = firstRun,
         recurringMinutes = recurring,
         silenceMinutes = silenceMinutes,
         windowStartMinuteOfDay = windowStart,
