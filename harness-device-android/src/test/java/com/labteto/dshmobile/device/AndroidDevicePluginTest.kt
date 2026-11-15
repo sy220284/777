@@ -69,6 +69,32 @@ class AndroidDevicePluginTest {
     }
 
     @Test
+    fun deviceIntentKeywordsSelectOnlyRelevantOperations() = runTest {
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(RecordingProvider()))
+        val tools = registry.context.tools
+        fun selected(term: String) = tools.names().filter { name ->
+            term in requireNotNull(tools.get(name)).metadata.discoveryKeywords
+        }.toSet()
+
+        // The generic Android intent needs a small useful starting surface.
+        assertEquals(setOf("android_device_info", "android_screen"), selected("手机"))
+        assertEquals(setOf("android_screen"), selected("界面"))
+        assertEquals(setOf("android_app_list"), selected("应用"))
+        // Separate domains no longer preselect unrelated actions or consume schema tokens.
+        assertEquals(setOf("android_notification_status", "android_notification_list"), selected("通知"))
+        assertEquals(setOf("android_clipboard_get", "android_clipboard_set"), selected("剪贴板"))
+        assertEquals(setOf("android_vscreen_start", "android_vscreen_list",
+            "android_vscreen_status"), selected("虚拟屏"))
+        assertTrue("android_vscreen_close" !in selected("手机"))
+        // Common multi-step phone interaction is still immediately available.
+        assertEquals(setOf("android_screen", "android_find", "android_tap_text",
+            "android_input_text"), selected("操作手机"))
+        assertTrue(tools.names().all { requireNotNull(tools.get(it))
+            .metadata.discoveryKeywords.isNotEmpty() })
+    }
+
+    @Test
     fun exposesCompleteCatalogAndUninstallsWithoutLeakingTools() = runTest {
         val provider = RecordingProvider()
         val registry = PluginRegistry()
