@@ -23,8 +23,11 @@ internal fun resolveLocalWorkSkillGuidance(
             throw IllegalArgumentException("所选技能 ${name} 已移除或无法读取，请返回技能页重新选择。", error)
         }
     }
-    var remainingChars = MAX_EAGER_SKILL_GUIDANCE_CHARS
-    val explicitExcerpt = explicitDocument?.take(remainingChars)?.also { remainingChars -= it.length }
+    // An explicitly chosen skill is authoritative task input: deliver every rule.
+    // Only automatic additional pinned previews share the eager-injection budget.
+    // The model request's actual context ledger decides whether the full input fits.
+    var remainingChars = (MAX_EAGER_SKILL_GUIDANCE_CHARS - (explicitDocument?.length ?: 0))
+        .coerceAtLeast(0)
     val pinnedConnectors = selectedInvocations.filter {
         it.kind == LocalPinnedInvocation.Kind.CONNECTOR
     }.joinToString("、") { it.id }
@@ -61,13 +64,11 @@ internal fun resolveLocalWorkSkillGuidance(
     """.trimIndent()
     if (explicitName != null) {
         val document = checkNotNull(explicitDocument)
-        val excerpt = checkNotNull(explicitExcerpt)
-        val full = excerpt.length == document.length
         return """
             [本轮技能已加载：${explicitName}]
             用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。
-            ${excerpt}
-            ${if (full) "[技能规则结束]" else "[内容较长，已限制本轮自动注入；请调用 skill(name=$explicitName) 读取完整文档。不能假定未加载部分已阅读。]"}
+            ${document}
+            [技能规则结束]
             $pinnedNote
         """.trimIndent()
     }
