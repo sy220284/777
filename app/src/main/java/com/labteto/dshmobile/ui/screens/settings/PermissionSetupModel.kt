@@ -9,6 +9,15 @@ internal enum class PermissionSetupFeature {
 
 internal enum class NotificationGrantAction { REQUEST_RUNTIME, OPEN_APP_SETTINGS }
 
+/** Only an unbound, authorized listener is eligible for the Android rebind request. */
+internal enum class NotificationAccessRepair { OPEN_SYSTEM_SETTINGS, REQUEST_REBIND, READY }
+
+internal fun notificationAccessRepair(granted: Boolean, connected: Boolean): NotificationAccessRepair = when {
+    !granted -> NotificationAccessRepair.OPEN_SYSTEM_SETTINGS
+    !connected -> NotificationAccessRepair.REQUEST_REBIND
+    else -> NotificationAccessRepair.READY
+}
+
 /** After one attempt, system settings are a reliable route even when Android suppresses the dialog. */
 internal fun notificationGrantAction(apiLevel: Int, attempted: Boolean): NotificationGrantAction =
     if (apiLevel >= 33 && !attempted) NotificationGrantAction.REQUEST_RUNTIME
