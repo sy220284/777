@@ -191,6 +191,28 @@ class LocalWorkToolSurfaceFocusTest {
         }
     }
 
+    @Test fun missingToolBudgetRecoveryRunsOnceAndPreservesExactSelection() {
+        val selection = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
+        selection.add("mcp_pinned_status")
+        assertTrue(selection.requestForNextStep("mcp_later_lookup"))
+        assertTrue(selection.hasBudgetOmittedRecoveryCandidate(
+            mapOf("mcp_later_lookup" to "工具定义需要约 118 Token，当前可用 73")))
+        // Internal heuristic reordering must not erase the upcoming recovery.
+        selection.clear()
+        selection.add("mcp_pinned_status")
+        selection.applyRequestedPriority()
+        assertEquals(listOf("mcp_later_lookup", "mcp_pinned_status"), selection.toList())
+        selection.finishCapacityCheck()
+        assertFalse(selection.hasBudgetOmittedRecoveryCandidate(
+            mapOf("mcp_later_lookup" to "本轮工具预算不足")))
+        selection.markExactFocus()
+        assertFalse(selection.requestForNextStep("mcp_excluded"))
+        assertTrue(selection.requestForNextStep("mcp_later_lookup"))
+        selection.beginNewTask()
+        assertFalse(selection.hasBudgetOmittedRecoveryCandidate(
+            mapOf("mcp_later_lookup" to "本轮工具预算不足")))
+    }
+
     @Test fun runToolSelectionReplacesRedundantPriorityCursorAndRestoresOnReset() {
         val selection = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
         assertFalse(selection.isPreparedForContinuation())
