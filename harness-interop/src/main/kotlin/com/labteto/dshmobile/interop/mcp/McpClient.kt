@@ -69,6 +69,10 @@ internal fun Response.mcpHttpFailure(body: String): McpHttpException {
 
 class McpRpcException(val code: Int) : IllegalStateException("MCP RPC 错误（$code）")
 
+/** Safe error identity from an isolated worker; server response details are not exposed. */
+class McpProtocolNegotiationException :
+    IllegalStateException("MCP initialize 协议版本协商失败")
+
 data class McpToolDefinition(
     val name: String,
     val description: String?,
