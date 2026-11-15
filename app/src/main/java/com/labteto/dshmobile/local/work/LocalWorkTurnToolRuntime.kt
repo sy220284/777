@@ -23,6 +23,7 @@ import com.labteto.dshmobile.local.tools.latestUserTurnHasArchive
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.isParallelSafeReadTool
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
+import com.labteto.dshmobile.local.tools.LocalToolRouter
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -82,7 +83,15 @@ internal class LocalWorkTurnToolRuntime(
     internal fun schemas(
         policy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding,
-    ): JsonArray {
+    ): JsonArray = selectSchemas(policy, binding).also {
+        recordSchemaAdmission(binding, it)
+    }.schemas
+
+    /** Select once for the model request; compaction may invalidate this candidate. */
+    internal fun selectSchemas(
+        policy: LocalAgentRunPolicy,
+        binding: LocalWorkRunBinding,
+    ): LocalToolRouter.ToolSchemaSelection {
         // 此时最新用户消息已从 PendingInput 队列写进历史，首轮集群标记才可靠。
         val history = binding.runHandle.modelHistory.snapshot()
         val teamMode = isLocalAgentTeamTurn(history)
@@ -143,6 +152,14 @@ internal class LocalWorkTurnToolRuntime(
             enabledOptional = enabled,
             agentTeamMode = teamMode,
         )
+        return selection
+    }
+
+    /** Record omission facts only for the final model-facing selection. */
+    internal fun recordSchemaAdmission(
+        binding: LocalWorkRunBinding,
+        selection: LocalToolRouter.ToolSchemaSelection,
+    ) {
         // The request evidence already records the exact schema digest. Only record a separate
         // fact when a selected capability could not reach the model; no parallel tool registry.
         if (selection.omittedReasons.isNotEmpty()) {
@@ -151,7 +168,9 @@ internal class LocalWorkTurnToolRuntime(
             try {
                 binding.eventLog.append("tool/schema-admission", buildJsonObject {
                     put("version", 1)
-                    put("enabled_optional_count", enabled.size)
+                    put("enabled_optional_count", synchronized(binding.enabledOptionalTools) {
+                        binding.enabledOptionalTools.size
+                    })
                     put("omitted_total", selection.omittedReasons.size)
                     put("omitted", buildJsonObject {
                         selection.omittedReasons.entries.take(24).forEach { (name, reason) ->
@@ -165,7 +184,6 @@ internal class LocalWorkTurnToolRuntime(
                 )
             }
         }
-        return selection.schemas
     }
 
     internal fun names(
