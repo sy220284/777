@@ -489,6 +489,32 @@ class LocalHarnessViewModel @Inject constructor(
         ))
     }
 
+    /** Standalone Agent actions use the same Work Agent UI contract as Team actions. */
+    internal suspend fun controlAgent(
+        agentId: String,
+        operation: com.labteto.dshmobile.uicontract.UiWorkAgentOperation,
+        text: String?,
+    ): LocalWorkUiActionResult {
+        val snapshot = teamUi.snapshot()
+        val identity = snapshot.identity ?: return LocalWorkUiActionResult(false, "会话已变化")
+        val agent = snapshot.agents.singleOrNull { it.id == agentId && !it.teamManaged }
+            ?: return LocalWorkUiActionResult(false, "子智能体已变化，请刷新状态")
+        val command = when (operation) {
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.INSPECT ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.InspectAgent(identity, agent.id)
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.SEND_MESSAGE ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.SendAgentMessage(identity, agent.id,
+                    requireNotNull(text).takeIf(String::isNotBlank) ?: error("消息内容不能为空"))
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.INTERRUPT ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.InterruptAgent(identity, agent.id)
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.RESUME ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.ResumeAgent(identity, agent.id)
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.CLOSE ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.CloseAgent(identity, agent.id)
+        }
+        return teamActionResult(teamUi.submit(command))
+    }
+
     internal suspend fun stopTeam(): LocalWorkUiActionResult {
         val snapshot = teamUi.snapshot()
         val identity = snapshot.identity ?: return LocalWorkUiActionResult(false, "会话已变化")

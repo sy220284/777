@@ -9,6 +9,9 @@ data class UiWorkTeamTask(
     val id: String, val revision: Int, val subject: String, val status: String,
     val ownerName: String?, val blockedBy: List<String>, val ready: Boolean,
 )
+/** Operations permitted by the unified Work-owned Agent UI port. */
+enum class UiWorkAgentOperation { INSPECT, SEND_MESSAGE, INTERRUPT, RESUME, CLOSE }
+
 /** Client-visible child Agent record. Team and standalone share the durable Job identity. */
 data class UiWorkAgent(val id: String, val label: String, val status: String,
     val continuable: Boolean, val teamManaged: Boolean)

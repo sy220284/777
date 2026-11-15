@@ -30,6 +30,7 @@ class LocalAgentTeamUiRegressionTest {
                     onSendMemberMessage = { _, _ -> LocalWorkUiActionResult(true, "已投递") },
                     onStopMember = { LocalWorkUiActionResult(true, "已停止") },
                     onStopAll = { LocalWorkUiActionResult(true, "已停止") },
+                    onAgentOperation = { _, _, _ -> LocalWorkUiActionResult(true, "已执行") },
                     onLeadFollowup = {}, onDismiss = {},
                 )
             }
@@ -83,6 +84,7 @@ class LocalAgentTeamUiRegressionTest {
                     onSendMemberMessage = { _, _ -> LocalWorkUiActionResult(true, "已发送") },
                     onStopMember = { LocalWorkUiActionResult(true, "已停止") },
                     onStopAll = { LocalWorkUiActionResult(true, "已停止") },
+                    onAgentOperation = { _, _, _ -> LocalWorkUiActionResult(true, "已执行") },
                     onLeadFollowup = {},
                     onDismiss = {},
                     onCollapse = { collapseCount++ },
@@ -178,6 +180,7 @@ class LocalAgentTeamUiRegressionTest {
                     onSendMemberMessage = { _, _ -> LocalWorkUiActionResult(true, "已投递") },
                     onStopMember = { LocalWorkUiActionResult(true, "已停止") },
                     onStopAll = { LocalWorkUiActionResult(true, "已停止") },
+                    onAgentOperation = { _, _, _ -> LocalWorkUiActionResult(true, "已执行") },
                     onLeadFollowup = onLeadFollowup, onDismiss = {},
                 )
             }
