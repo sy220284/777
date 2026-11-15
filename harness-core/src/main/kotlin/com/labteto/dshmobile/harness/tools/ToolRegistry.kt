@@ -118,6 +118,11 @@ class ToolRegistry private constructor(
     }
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
+
+    /** Side-effect-free schema preflight. The real call still revalidates all guards. */
+    internal fun validateArguments(tool: HarnessTool, input: JsonObject): String? =
+        validateToolInput(tool, input)
+
     fun names(): List<String> = tools.snapshot().keys.toList()
 
     /**
