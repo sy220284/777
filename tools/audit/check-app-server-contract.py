@@ -44,7 +44,9 @@ for name in endpoints:
     assert re.search(r"\bval " + name + r":", api), f"Missing typed owner: {name}"
     assert ("." + name) in (read(source / "ui/screens/local/LocalHarnessViewModel.kt") +
         read(source / "ui/screens/tools/ToolsScreen.kt") +
-        read(source / "ui/screens/tasks/TasksViewModel.kt") + implementation), f"No client access: {name}"
+        read(source / "ui/screens/tasks/TasksViewModel.kt") +
+        read(source / "ui/screens/settings/SettingsViewModel.kt") +
+        implementation), f"No client access: {name}"
 
 assert len(re.findall(r"\)\s*:\s*AppServerUiPort\s*\{", implementation)) == 1, "Exactly one App Server implementation"
 assert "abstract fun bind(implementation: LocalAppServer): AppServerUiPort" in implementation
@@ -62,6 +64,8 @@ assert "appServer.attachments.import" in read(source / "ui/screens/local/LocalHa
 assert "appServer.queuedUsers" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.media" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.usage" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
+assert "appServer.memory" in read(source / "ui/screens/settings/SettingsViewModel.kt")
+assert "appServer.pricing" in read(source / "ui/screens/settings/SettingsViewModel.kt")
 work_feature = read(source / "ui/screens/local/LocalFeatureUiActions.kt")
 for required in (
     "saveWorkspaceFileToDownloads", "publishedWorkspaceFile", "workspaceDirectory",

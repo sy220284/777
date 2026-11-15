@@ -9,9 +9,11 @@ sealed interface MemoryUiCommand {
     /** The Owner validates the supplied immutable revision before changing a record. */
     data class Update(val expected: MemoryRecord, val content: String, val pinned: Boolean) : MemoryUiCommand
     data class Forget(val expected: MemoryRecord) : MemoryUiCommand
+    data class Restore(val expected: MemoryRecord) : MemoryUiCommand
 }
 sealed interface MemoryUiReceipt {
     data class Updated(val record: MemoryRecord) : MemoryUiReceipt
+    data class Restored(val record: MemoryRecord) : MemoryUiReceipt
     data object Forgotten : MemoryUiReceipt
     data object StaleOrMissing : MemoryUiReceipt
     /** Memory is durable; only derived diary cleanup still needs recovery. Do not replay the mutation. */

@@ -8,6 +8,8 @@ import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.presentation.LocalSettingsMemoryContext
 import com.labteto.dshmobile.local.session.LocalConversationMode
+import com.labteto.dshmobile.uicontract.MemoryUiCommand
+import com.labteto.dshmobile.uicontract.MemoryUiReceipt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,9 +37,7 @@ internal class MemorySettingsController(
     private val scope: CoroutineScope,
     private val context: () -> LocalSettingsMemoryContext,
     private val read: (MemoryManagementQuery) -> MemoryManagementPage,
-    private val updateRecord: (MemoryRecord, String, Boolean) -> MemoryRecord,
-    private val forgetRecord: (MemoryRecord) -> Boolean,
-    private val restoreRecord: (MemoryRecord) -> MemoryRecord,
+    private val submit: (MemoryUiCommand) -> MemoryUiReceipt,
 ) {
     private val mutable = MutableStateFlow(MemoryManagementUiState())
     val state = mutable.asStateFlow()
@@ -89,21 +89,27 @@ internal class MemorySettingsController(
     }
 
     fun update(id: String, content: String, pinned: Boolean, onDone: (String?) -> Unit = {}) =
-        mutate(id, onDone) { updateRecord(it, content, pinned); true }
+        mutate(id, onDone) { MemoryUiCommand.Update(it, content, pinned) }
 
-    fun forget(id: String, onDone: (String?) -> Unit = {}) = mutate(id, onDone, forgetRecord)
+    fun forget(id: String, onDone: (String?) -> Unit = {}) =
+        mutate(id, onDone) { MemoryUiCommand.Forget(it) }
 
     fun restore(id: String, onDone: (String?) -> Unit = {}) =
-        mutate(id, onDone) { restoreRecord(it); true }
+        mutate(id, onDone) { MemoryUiCommand.Restore(it) }
 
-    private fun mutate(id: String, onDone: (String?) -> Unit, write: (MemoryRecord) -> Boolean) {
+    private fun mutate(id: String, onDone: (String?) -> Unit, command: (MemoryRecord) -> MemoryUiCommand) {
         if (id in state.value.busyIds) return
         val current = state.value.records.firstOrNull { it.id == id }
         if (current == null) { onDone("记忆已经变化，请刷新后重试"); return }
         mutable.update { it.copy(busyIds = it.busyIds + id) }
         scope.launch {
             val error = try {
-                if (withContext(Dispatchers.IO) { write(current) }) null else "记忆已变化或已停用，请刷新后重试"
+                when (val receipt = withContext(Dispatchers.IO) { submit(command(current)) }) {
+                    is MemoryUiReceipt.Updated, is MemoryUiReceipt.Restored, MemoryUiReceipt.Forgotten -> null
+                    MemoryUiReceipt.StaleOrMissing -> "记忆已变化或已停用，请刷新后重试"
+                    is MemoryUiReceipt.CommittedWithWarning -> receipt.message
+                    is MemoryUiReceipt.Failed -> receipt.message ?: "记忆操作失败，请重试"
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { failure.message ?: "记忆保存失败，请重试" }
             finally { mutable.update { it.copy(busyIds = it.busyIds - id) } }

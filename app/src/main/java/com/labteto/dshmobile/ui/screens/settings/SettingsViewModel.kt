@@ -57,7 +57,9 @@ class SettingsViewModel @Inject constructor(
 
     private val appContext = context.applicationContext
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
-    private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness::memoryContext, settingsData::memoryPage, settingsData::updateMemory, settingsData::forgetMemory, settingsData::restoreMemory)
+    private val memorySettingsController = MemorySettingsController(
+        viewModelScope, localHarness::memoryContext, appServer.memory::memoryPage, appServer.memory::submit,
+    )
     internal val personalizationRulesEditor = PersonalizationRulesEditor()
     private var desiredUserRules: String? = null
     private var desiredAutoRecall: Boolean? = null
@@ -79,9 +81,9 @@ class SettingsViewModel @Inject constructor(
     val approvalMode: StateFlow<LocalApprovalMode> = localHarness.approvalMode
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
     val searchUsage: StateFlow<LocalSearchUsageSnapshot> = settingsData.searchUsage
-    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
+    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = appServer.usage.revision
         .mapLatest {
-            withContext(Dispatchers.IO) { settingsData.usageSnapshot() }
+            withContext(Dispatchers.IO) { appServer.usage.snapshot() }
         }
         .stateIn(
             scope = viewModelScope,
@@ -206,7 +208,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshDeepSeekPricing() {
-        viewModelScope.launch { settingsData.refreshDeepSeekPricing() }
+        viewModelScope.launch { appServer.pricing.refreshOfficial() }
     }
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null) =
@@ -447,11 +449,11 @@ class SettingsViewModel @Inject constructor(
         key: String,
         modelFilter: String? = null,
     ): TokenUsageGroupDetail? = withContext(Dispatchers.IO) {
-        settingsData.usageGroupDetail(kind, key, modelFilter)
+        appServer.usage.groupDetail(kind, key, modelFilter)
     }
 
     suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
-        settingsData.usageRecord(requestId)
+        appServer.usage.requestDetail(requestId)
     }
 
     fun refreshDeviceCapabilities() = deviceCapabilitiesController.refresh()
