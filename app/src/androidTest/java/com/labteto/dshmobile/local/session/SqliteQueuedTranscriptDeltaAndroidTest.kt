@@ -29,6 +29,10 @@ class SqliteQueuedTranscriptDeltaAndroidTest {
             File(context.cacheDir, "$name-events-unused"), Json,
             sessionId = "history", sqlite = db,
         )
+        fun <T> withLog(db: SqliteSessionEventDatabase, use: (LocalSessionEventLog) -> T): T {
+            val log = openLog(db)
+            return try { use(log) } finally { log.close() }
+        }
         try {
             SqliteSessionEventDatabase(context, Json, name).use { db ->
                 db.append("history", "user/message", buildJsonObject {
@@ -42,12 +46,12 @@ class SqliteQueuedTranscriptDeltaAndroidTest {
                 })
                 assertEquals(listOf(1L, 0L),
                     db.pageVisibleBeforeNewestFirst("history", limit = 10).map { it.sequence })
-                openLog(db).use { log ->
+                withLog(db) { log ->
                     assertEquals(listOf(replacement, initial.last()), LocalSessionTranscriptPager(log).all())
                 }
             }
             SqliteSessionEventDatabase(context, Json, name).use { db ->
-                openLog(db).use { log ->
+                withLog(db) { log ->
                     assertEquals(listOf(replacement, initial.last()), LocalSessionTranscriptPager(log).all())
                     assertEquals(listOf(replacement, initial.last()), projectSessionTranscriptTail(
                         emptyList(), log.visibleTranscriptEventsAfter(-1L), -1L,
