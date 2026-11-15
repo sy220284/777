@@ -413,7 +413,49 @@ class LocalToolRouterTest {
     }
 
     @Test
-    fun capabilitySearchConsumesOnlyBoundedQueryTerms() {
+    fun capabilityDiscoveryFindsNamesAndKeywordsInsideLongQuery() {
+        val tools = listOf(
+            tool("middle_tool", "执行远端中间步骤", ToolExposure.OPTIONAL, "远端",
+                setOf("middle-keyword", "同步令牌")),
+            tool("unrelated_tool", "记录别的东西", ToolExposure.OPTIONAL, "记录",
+                setOf("other-keyword")),
+        )
+        val query = "开头内容 " + "无关文字".repeat(3_000) +
+            " 请使用 middle_tool 完成同步令牌操作 " +
+            "结尾内容".repeat(3_000)
+        assertEquals(listOf("middle_tool"),
+            LocalToolRouter.search(tools, query).map(HarnessTool::name))
+    }
+
+    @Test
+    fun capabilityDiscoveryRecognizesUnspacedChineseAndMixedIdentifiers() {
+        val tools = listOf(
+            tool("android_click_node", "实际点击手机控件", ToolExposure.OPTIONAL,
+                "设备", setOf("点击控件")),
+            tool("mcp_middle_lookup", "核对中间项目", ToolExposure.OPTIONAL,
+                "MCP", setOf("中间项目")),
+        )
+        val request = "说明" + "前置说明".repeat(2_000) +
+            "请调用mcp_middle_lookup进行处理并点击控件" +
+            "后续说明".repeat(2_000)
+        assertEquals(listOf("mcp_middle_lookup", "android_click_node"),
+            LocalToolRouter.search(tools, request).map(HarnessTool::name))
+    }
+
+    @Test
+    fun repeatedIrrelevantQueryWordsDoNotDisplaceExactToolMatch() {
+        val tools = listOf(
+            tool("middle_tool", "准确指定工具", ToolExposure.OPTIONAL, "测试",
+                setOf("专用操作")),
+            tool("generic_tool", "通用的查找说明", ToolExposure.OPTIONAL, "查找",
+                setOf("通用")),
+        )
+        val query = "查找 ".repeat(4_000) + "middle_tool" + " 查找".repeat(4_000)
+        assertEquals("middle_tool", LocalToolRouter.search(tools, query).first().name)
+    }
+
+    @Test
+    fun capabilitySearchScansWholeQueryWithoutIrrelevantTermAmplification() {
         val target = tool(
             "target", "target capability", ToolExposure.OPTIONAL, "MCP", setOf("mcp"),
         )

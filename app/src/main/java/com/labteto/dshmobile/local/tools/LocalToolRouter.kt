@@ -201,20 +201,26 @@ internal object LocalToolRouter {
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
-        val termPattern = Regex("[\\p{L}\\p{N}_-]{2,}")
-        val front = termPattern.findAll(normalized.take(MAX_CAPABILITY_QUERY_EDGE_CHARS))
-            .map { it.value }.take(12).toList()
-        val tail = termPattern.findAll(normalized.takeLast(MAX_CAPABILITY_QUERY_EDGE_CHARS))
-            .map { it.value }.toList().takeLast(12)
-        val chunks = front + tail
-        val hanWords = Regex("[\u4e00-\u9fff]{2,}")
-        val chineseTerms = chunks.flatMap { chunk ->
-            hanWords.findAll(chunk).flatMap { it.value.windowed(2).asSequence() }.toList()
+        // Index vocabulary from the live registry once, then examine the full query.
+        // Irrelevant long-form text does not multiply scoring work by the catalog size.
+        // Unlike head/tail sampling, explicit capabilities in the middle are preserved.
+        val optionalTools = tools.filter(::isOptional)
+        val vocabulary = HashSet<String>()
+        fun index(value: String) {
+            capabilitySearchTerms(value.lowercase()).forEach(vocabulary::add)
         }
-        val terms = (chunks + chineseTerms).toSet()
+        optionalTools.forEach { tool ->
+            index(tool.name)
+            index(tool.metadata.family)
+            tool.metadata.discoveryKeywords.forEach(::index)
+            index(description(tool))
+            tool.metadata.requirements.forEach(::index)
+            tool.metadata.usageNotes.forEach(::index)
+        }
+        val terms = capabilitySearchTerms(normalized)
+            .filterTo(linkedSetOf()) { it in vocabulary }
         val scored = mutableListOf<Pair<HarnessTool, Int>>()
-        for (tool in tools) {
-            if (!isOptional(tool)) continue
+        for (tool in optionalTools) {
             val name = tool.name.lowercase()
             val family = tool.metadata.family.lowercase()
             val keywords = tool.metadata.discoveryKeywords.map(String::lowercase)
@@ -248,6 +254,30 @@ internal object LocalToolRouter {
                 .thenBy { it.first.name },
         )
         return scored.take(limit.coerceAtLeast(1)).map { it.first }
+    }
+
+    /**
+     * Tokenize the complete query and registered tool metadata with the same rules.
+     * ASCII names embedded in Chinese instructions, underscore-separated identifiers
+     * and unspaced Chinese phrases all remain discoverable.
+     */
+    private fun capabilitySearchTerms(text: String): Sequence<String> = sequence {
+        for (token in CAPABILITY_WORDS.findAll(text)) {
+            val value = token.value
+            yield(value)
+            for (part in value.split('_', '-')) {
+                if (part.length >= 2) yield(part)
+            }
+            for (han in CAPABILITY_HAN.findAll(value)) {
+                val word = han.value
+                for (index in 0 until word.length - 1) {
+                    yield(word.substring(index, index + 2))
+                }
+            }
+            for (identifier in CAPABILITY_ASCII.findAll(value)) {
+                if (identifier.value.length >= 2) yield(identifier.value)
+            }
+        }
     }
 
     fun capabilitySummary(
@@ -332,5 +362,7 @@ internal object LocalToolRouter {
     private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
-    private const val MAX_CAPABILITY_QUERY_EDGE_CHARS = 4_096
+    private val CAPABILITY_WORDS = Regex("[\\p{L}\\p{N}_-]{2,}")
+    private val CAPABILITY_HAN = Regex("[\u4e00-\u9fff]{2,}")
+    private val CAPABILITY_ASCII = Regex("[a-z][a-z0-9_-]*")
 }
