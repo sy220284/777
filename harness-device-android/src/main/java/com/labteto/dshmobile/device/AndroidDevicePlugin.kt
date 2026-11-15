@@ -10,6 +10,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
+import com.labteto.dshmobile.harness.tools.ToolDeviceRequirement
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import com.labteto.dshmobile.harness.tools.functionToolSchema
@@ -93,6 +94,11 @@ class AndroidDevicePlugin(
                         family = "Android",
                         discoveryKeywords = discoveryKeywordsFor(spec.toolName),
                         requirements = requirementsFor(spec.toolName),
+                        requiredDeviceCapabilities = when {
+                            spec.toolName in ACCESSIBILITY_TOOLS -> setOf(ToolDeviceRequirement.ACCESSIBILITY)
+                            spec.toolName == "android_notification_list" -> setOf(ToolDeviceRequirement.NOTIFICATION_ACCESS)
+                            else -> emptySet()
+                        },
                     ),
                     executor = HarnessToolExecutor { _, input, _ ->
                         val arguments = input.mapValues { (_, value) -> value.jsonPrimitive.content }
