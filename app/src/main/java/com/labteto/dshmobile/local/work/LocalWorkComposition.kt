@@ -342,6 +342,10 @@ internal class LocalWorkComposition @Inject constructor(
             },
         )
     }
+    /** Model tools and UI share one Work-owned Agent control authority. */
+    private val agentControlPort: LocalAgentControlPort by lazy {
+        LocalWorkAgentControlRuntime(runtimeStateStore.jobManager, subagents, persistentJobs, agentTeams, agentSpawns)
+    }
     private val agentControlBuiltins by lazy {
         LocalAgentControlPlane(
             jobs = runtimeStateStore.jobManager,
@@ -351,6 +355,7 @@ internal class LocalWorkComposition @Inject constructor(
             teams = agentTeams,
             skillWorkspace = sessionStorage.files.workspace,
             spawns = agentSpawns,
+            control = agentControlPort,
         )
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
@@ -404,7 +409,7 @@ internal class LocalWorkComposition @Inject constructor(
 
     private val teamUiProjection by lazy { LocalWorkTeamUiProjection(agentTeams, workRunRegistry, runtimeStateStore) }
     internal val agentUi: LocalWorkAgentController by lazy {
-        LocalWorkAgentController(runtimeStateStore, agentTeams, teamUiProjection)
+        LocalWorkAgentController(runtimeStateStore, agentControlPort, teamUiProjection)
     }
     private val teamLifecycle by lazy { LocalWorkTeamLifecycle(runtimeStateStore, agentTeams, persistentJobs, teamUiProjection, scope) }
 

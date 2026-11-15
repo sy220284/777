@@ -49,7 +49,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val sessionUi: LocalSessionUiFacade,
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
-    private val teamUi: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
+    private val teamUi: com.labteto.dshmobile.uicontract.WorkAgentUiPort,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val documentMedia: com.labteto.dshmobile.uicontract.MediaUiPort,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,

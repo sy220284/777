@@ -39,9 +39,9 @@ internal class LocalAgentControlPlane(
     private val teams: LocalAgentTeamRuntime,
     private val skillWorkspace: LocalWorkspace? = null,
     private val spawns: LocalAgentSpawnController = LocalAgentSpawnController(subagents, persistentJobs),
-) {
     private val control: LocalAgentControlPort =
-        LocalWorkAgentControlRuntime(jobs, subagents, persistentJobs, teams, spawns)
+        LocalWorkAgentControlRuntime(jobs, subagents, persistentJobs, teams, spawns),
+) {
 
     /** Root-slice admission restores DAGs through the same control boundary as workflow. */
     internal suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) {

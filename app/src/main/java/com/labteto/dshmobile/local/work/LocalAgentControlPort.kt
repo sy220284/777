@@ -82,6 +82,14 @@ internal interface LocalAgentControlPort {
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String
     suspend fun workflow(binding: LocalWorkRunBinding, request: LocalAgentWorkflowRequest): String
     suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding)
+    /** Unified read/control boundary for every child, using the same Job registration. */
+    fun agents(sessionId: String): List<LocalAgentChildSnapshot>
+    fun teamSnapshot(sessionId: String): LocalAgentTeamUiState
+    fun teamReadOutput(sessionId: String, memberId: String, jobId: String): String
+    fun teamSendMessage(sessionId: String, memberId: String, text: String, jobId: String): String
+    fun teamInterruptMember(sessionId: String, memberId: String, jobId: String): String
+    fun teamInterruptAll(sessionId: String, jobIds: Set<String>): String
+    fun teamReassignTask(sessionId: String, taskId: String, revision: Int, memberId: String?): String
     fun list(sessionId: String): String
     fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String
     fun send(
@@ -148,6 +156,19 @@ internal class LocalWorkAgentControlRuntime(
     override suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) {
         subagents.resumePendingWorkflows(binding)
     }
+
+    override fun agents(sessionId: String): List<LocalAgentChildSnapshot> = registry.snapshots(sessionId)
+    override fun teamSnapshot(sessionId: String): LocalAgentTeamUiState = teams.uiState(sessionId)
+    override fun teamReadOutput(sessionId: String, memberId: String, jobId: String): String =
+        teams.outputForUi(sessionId, memberId, jobId)
+    override fun teamSendMessage(sessionId: String, memberId: String, text: String, jobId: String): String =
+        teams.sendUiMessage(sessionId, memberId, text, jobId)
+    override fun teamInterruptMember(sessionId: String, memberId: String, jobId: String): String =
+        teams.interruptUiMember(sessionId, memberId, jobId)
+    override fun teamInterruptAll(sessionId: String, jobIds: Set<String>): String =
+        teams.interruptAllUi(sessionId, jobIds)
+    override fun teamReassignTask(sessionId: String, taskId: String, revision: Int, memberId: String?): String =
+        teams.reassignUiTask(sessionId, taskId, revision, memberId)
 
     override fun list(sessionId: String): String = registry.list(sessionId)
     override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String {
