@@ -18,6 +18,8 @@ sealed interface UiAppServerCommand {
     data class Tools(val command: ToolsUiCommand) : UiAppServerCommand
     data class Settings(val command: SettingsUiCommand) : UiAppServerCommand
     data class Queue(val command: UiQueuedUserCommand) : UiAppServerCommand
+    data class Media(val command: MediaUiCommand) : UiAppServerCommand
+    data class Memory(val command: MemoryUiCommand) : UiAppServerCommand
 }
 sealed interface UiAppServerReply {
     data class Chat(val receipt: UiCommandReceipt) : UiAppServerReply
@@ -28,6 +30,8 @@ sealed interface UiAppServerReply {
     data class Tools(val receipt: ToolsUiReceipt) : UiAppServerReply
     data class Settings(val receipt: SettingsUiReceipt) : UiAppServerReply
     data class Queue(val receipt: UiCommandReceipt) : UiAppServerReply
+    data class Media(val receipt: MediaUiReceipt) : UiAppServerReply
+    data class Memory(val receipt: MemoryUiReceipt) : UiAppServerReply
 }
 
 /** Typed query envelope: one App Server entry for state reads, same owner-issued snapshots. */
@@ -39,6 +43,8 @@ sealed interface UiAppServerRead {
     data object QueuedUsers : UiAppServerRead
     data object Automations : UiAppServerRead
     data object Settings : UiAppServerRead
+    data object Usage : UiAppServerRead
+    data object Pricing : UiAppServerRead
     /** Null query lists registered capabilities, nonblank query uses live discovery ranking. */
     data class Capabilities(val query: String? = null, val limit: Int = 50) : UiAppServerRead
 }
@@ -50,6 +56,8 @@ sealed interface UiAppServerState {
     data class QueuedUsers(val snapshot: UiQueuedUserSnapshot) : UiAppServerState
     data class Automations(val snapshot: UiAutomationSnapshot) : UiAppServerState
     data class Settings(val snapshot: UiSettingsSnapshot) : UiAppServerState
+    data class Usage(val snapshot: com.labteto.dshmobile.local.TokenUsageAnalyticsSnapshot) : UiAppServerState
+    data class Pricing(val snapshot: UiProviderPricingSnapshot) : UiAppServerState
     data class Capabilities(val registered: List<UiToolCapabilitySnapshot>) : UiAppServerState
 }
 
@@ -66,6 +74,10 @@ interface AppServerUiPort {
     val files: FilesUiPort
     val attachments: AttachmentUiPort
     val queuedUsers: UiQueuedUserPort
+    val media: MediaUiPort
+    val usage: UsageUiPort
+    val memory: MemoryUiPort
+    val pricing: PricingUiPort
     fun manifest(): UiAppServerManifest
     /** Read one Feature owner without activating any unrelated owner. */
     fun read(query: UiAppServerRead): UiAppServerState

@@ -48,10 +48,10 @@ class LocalHarnessViewModel @Inject constructor(
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
     private val toolsUi: LocalToolsUiFacade,
-    private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
+
     private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
-    private val documentMedia: com.labteto.dshmobile.uicontract.MediaUiPort,
+
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
     private val sectionStore: LocalSessionSectionUiFacade,
@@ -64,6 +64,8 @@ class LocalHarnessViewModel @Inject constructor(
     private val workReadUi get() = appServer.workRead
     private val filesUi get() = appServer.files
     private val settingsUi get() = appServer.settings
+    private val usageUi get() = appServer.usage
+    private val documentMedia get() = appServer.media
 
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }

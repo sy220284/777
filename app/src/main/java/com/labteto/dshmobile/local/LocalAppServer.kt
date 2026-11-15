@@ -18,6 +18,10 @@ import com.labteto.dshmobile.uicontract.UiAppServerRead
 import com.labteto.dshmobile.uicontract.UiAppServerState
 import com.labteto.dshmobile.uicontract.UiQueuedUserPort
 import com.labteto.dshmobile.uicontract.UiQueuedUserCommand
+import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.MemoryUiPort
+import com.labteto.dshmobile.uicontract.UsageUiPort
+import com.labteto.dshmobile.uicontract.PricingUiPort
 import com.labteto.dshmobile.uicontract.WorkAgentUiPort
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
@@ -64,6 +68,10 @@ internal class LocalAppServer @Inject constructor(
     private val filesOwner: Provider<FilesUiPort>,
     private val attachmentsOwner: Provider<AttachmentUiPort>,
     private val queuedUserOwner: Provider<UiQueuedUserPort>,
+    private val mediaOwner: Provider<MediaUiPort>,
+    private val usageOwner: Provider<UsageUiPort>,
+    private val memoryOwner: Provider<MemoryUiPort>,
+    private val pricingOwner: Provider<PricingUiPort>,
 ) : AppServerUiPort {
     override val chat: ChatUiPort get() = chatOwner.get()
     override val work: WorkConversationUiPort get() = workOwner.get()
@@ -76,6 +84,10 @@ internal class LocalAppServer @Inject constructor(
     override val files: FilesUiPort get() = filesOwner.get()
     override val attachments: AttachmentUiPort get() = attachmentsOwner.get()
     override val queuedUsers: UiQueuedUserPort get() = queuedUserOwner.get()
+    override val media: MediaUiPort get() = mediaOwner.get()
+    override val usage: UsageUiPort get() = usageOwner.get()
+    override val memory: MemoryUiPort get() = memoryOwner.get()
+    override val pricing: PricingUiPort get() = pricingOwner.get()
 
     override fun manifest(): UiAppServerManifest = localAppServerManifest()
 
@@ -87,6 +99,8 @@ internal class LocalAppServer @Inject constructor(
         UiAppServerRead.QueuedUsers -> UiAppServerState.QueuedUsers(queuedUsers.snapshot())
         UiAppServerRead.Automations -> UiAppServerState.Automations(automation.snapshot())
         UiAppServerRead.Settings -> UiAppServerState.Settings(settings.initialState)
+        UiAppServerRead.Usage -> UiAppServerState.Usage(usage.snapshot())
+        UiAppServerRead.Pricing -> UiAppServerState.Pricing(pricing.snapshot())
         is UiAppServerRead.Capabilities -> {
             require(query.limit > 0) { "能力目录读取数量须大于零" }
             val matches = if (query.query.isNullOrBlank()) tools.capabilityCatalogue()
@@ -131,6 +145,8 @@ internal class LocalAppServer @Inject constructor(
         is UiAppServerCommand.Agent -> UiAppServerReply.Agent(agents.submit(command.command))
         is UiAppServerCommand.Automation -> UiAppServerReply.Automation(automation.submit(command.command))
         is UiAppServerCommand.Tools -> UiAppServerReply.Tools(tools.submit(command.command))
+        is UiAppServerCommand.Media -> UiAppServerReply.Media(media.submit(command.command))
+        is UiAppServerCommand.Memory -> UiAppServerReply.Memory(memory.submit(command.command))
         is UiAppServerCommand.Queue -> UiAppServerReply.Queue(when (val action = command.command) {
             is UiQueuedUserCommand.Edit -> queuedUsers.edit(action.identity, action.messageId, action.text)
             is UiQueuedUserCommand.Remove -> queuedUsers.remove(action.identity, action.messageId)

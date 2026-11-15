@@ -29,9 +29,9 @@ composition = read(tools_root)
 tools_ui = read(tool_ui)
 
 features = ("SHELL", "CHAT", "WORK", "AUTOMATION", "TOOLS", "SETTINGS")
-commands = ("Chat", "Work", "Session", "Agent", "Automation", "Tools", "Settings", "Queue")
+commands = ("Chat", "Work", "Session", "Agent", "Automation", "Tools", "Settings", "Queue", "Media", "Memory")
 endpoints = ("chat", "work", "session", "agents", "automation", "tools", "settings", "workRead",
-             "files", "attachments", "queuedUsers")
+             "files", "attachments", "queuedUsers", "media", "usage", "memory", "pricing")
 assert all(re.search(r"\b" + name + r"\b", catalog) for name in features)
 assert all(re.search(r"\b" + name + r"\b", api) for name in features)
 assert "LocalFeatureCatalog.modules.map" in implementation, "App Server must use the one FeatureCatalog"
@@ -60,6 +60,8 @@ assert "appServer.agents" in read(source / "ui/screens/local/LocalHarnessViewMod
 assert "appServer.files" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.attachments.import" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.queuedUsers" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
+assert "appServer.media" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
+assert "appServer.usage" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 work_feature = read(source / "ui/screens/local/LocalFeatureUiActions.kt")
 for required in (
     "saveWorkspaceFileToDownloads", "publishedWorkspaceFile", "workspaceDirectory",
@@ -87,7 +89,8 @@ names = [entry["name"] for entry in ui_contracts]
 assert len(names) == len(set(names)), "Duplicate UI contract interface declaration"
 assert all(name in names for name in ("AppServerUiPort", "ChatUiPort", "WorkConversationUiPort",
     "SessionUiPort", "AutomationUiPort", "ToolsManagementUiPort", "SettingsUiPort", "WorkAgentUiPort",
-    "FilesUiPort", "AttachmentUiPort", "UiQueuedUserPort"))
+    "FilesUiPort", "AttachmentUiPort", "UiQueuedUserPort", "MediaUiPort", "UsageUiPort",
+    "MemoryUiPort", "PricingUiPort"))
 out = root / "build/app-server-audit"
 out.mkdir(parents=True, exist_ok=True)
 (out / "interface-inventory.json").write_text(json.dumps({

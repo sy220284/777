@@ -32,6 +32,9 @@ import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.UiAppServerCommand
 import com.labteto.dshmobile.uicontract.UiAppServerReply
+import com.labteto.dshmobile.uicontract.MediaUiPort
+import com.labteto.dshmobile.uicontract.MediaUiCommand
+import com.labteto.dshmobile.uicontract.MediaUiReceipt
 import com.labteto.dshmobile.uicontract.UiQueuedUserCommand
 import com.labteto.dshmobile.uicontract.UiQueuedUserPort
 import com.labteto.dshmobile.uicontract.UiQueuedUserSnapshot
@@ -45,6 +48,42 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 
 class LocalAppServerManifestTest {
+    @Test fun mediaCommandsAreDelegatedWithoutStartingUnrelatedFeatures() = runBlocking {
+        val called = mutableListOf<String>()
+        val mediaPort = java.lang.reflect.Proxy.newProxyInstance(
+            MediaUiPort::class.java.classLoader, arrayOf(MediaUiPort::class.java)
+        ) { _, method, args ->
+            called += method.name
+            if (method.name == "submit") {
+                assertEquals(MediaUiCommand.RetryStorage, args?.firstOrNull())
+                MediaUiReceipt.Applied
+            } else error("Unexpected media method " + method.name)
+        } as MediaUiPort
+        val server = LocalAppServer(
+            chatOwner = Provider { error("Unexpected Chat") },
+            workOwner = Provider { error("Unexpected Work") },
+            sessionOwner = Provider { error("Unexpected Session") },
+            agentOwner = Provider { error("Unexpected Agents") },
+            automationOwner = Provider { error("Unexpected Automation") },
+            toolsOwner = Provider { error("Unexpected Tools") },
+            settingsOwner = Provider { error("Unexpected Settings") },
+            filesOwner = Provider { error("Unexpected Files") },
+            attachmentsOwner = Provider { error("Unexpected Attachments") },
+            queuedUserOwner = Provider { error("Unexpected Queue") },
+            mediaOwner = Provider { mediaPort },
+            usageOwner = Provider { error("Unexpected Usage") },
+            memoryOwner = Provider { error("Unexpected Memory") },
+            pricingOwner = Provider { error("Unexpected Pricing") },
+            workReadOwner = Provider { error("Unexpected WorkRead") },
+        )
+        assertEquals(
+            UiAppServerReply.Media(MediaUiReceipt.Applied),
+            server.submit(UiAppServerCommand.Media(MediaUiCommand.RetryStorage)),
+        )
+        assertEquals(listOf("submit"), called)
+    }
+
+
     @Test fun queueReadAndCommandsUseExistingOwnerOnlyWithExactIdentity() = runBlocking {
         val identity = UiSessionIdentity("queue-session", "active", 2L, null, null)
         val calls = mutableListOf<String>()
@@ -72,6 +111,10 @@ class LocalAppServerManifestTest {
             filesOwner = Provider { error("Files must stay dormant") },
             attachmentsOwner = Provider { error("Attachments must stay dormant") },
             queuedUserOwner = Provider { queuePort },
+            mediaOwner = Provider { error("Media owner must stay lazy") },
+            usageOwner = Provider { error("Usage owner must stay lazy") },
+            memoryOwner = Provider { error("Memory owner must stay lazy") },
+            pricingOwner = Provider { error("Pricing owner must stay lazy") },
             workReadOwner = Provider { error("Work read must stay dormant") },
         )
         assertEquals(
@@ -117,6 +160,10 @@ class LocalAppServerManifestTest {
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             queuedUserOwner = Provider { error("Queue owner must stay lazy") },
+            mediaOwner = Provider { error("Media owner must stay lazy") },
+            usageOwner = Provider { error("Usage owner must stay lazy") },
+            memoryOwner = Provider { error("Memory owner must stay lazy") },
+            pricingOwner = Provider { error("Pricing owner must stay lazy") },
             workReadOwner = Provider { error("WorkRead initialized unexpectedly") },
         )
         val stream = server.noticesFor(setOf(UiAppServerFeature.TOOLS))
@@ -160,6 +207,10 @@ class LocalAppServerManifestTest {
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             queuedUserOwner = Provider { error("Queue owner must stay lazy") },
+            mediaOwner = Provider { error("Media owner must stay lazy") },
+            usageOwner = Provider { error("Usage owner must stay lazy") },
+            memoryOwner = Provider { error("Memory owner must stay lazy") },
+            pricingOwner = Provider { error("Pricing owner must stay lazy") },
             workReadOwner = Provider { error("Work Read owner accessed by another Feature") },
         )
         assertEquals(UiAppServerState.Settings(settingsSnapshot), server.read(UiAppServerRead.Settings))
@@ -205,6 +256,10 @@ class LocalAppServerManifestTest {
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             queuedUserOwner = Provider { error("Queue owner must stay lazy") },
+            mediaOwner = Provider { error("Media owner must stay lazy") },
+            usageOwner = Provider { error("Usage owner must stay lazy") },
+            memoryOwner = Provider { error("Memory owner must stay lazy") },
+            pricingOwner = Provider { error("Pricing owner must stay lazy") },
             workReadOwner = Provider { error("reading owner must remain lazy") },
         )
         // Manifest and notification-flow acquisition must have no hidden initialization.
@@ -275,6 +330,10 @@ class LocalAppServerManifestTest {
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             queuedUserOwner = Provider { error("Queue owner must stay lazy") },
+            mediaOwner = Provider { error("Media owner must stay lazy") },
+            usageOwner = Provider { error("Usage owner must stay lazy") },
+            memoryOwner = Provider { error("Memory owner must stay lazy") },
+            pricingOwner = Provider { error("Pricing owner must stay lazy") },
             workReadOwner = Provider { error("read was not requested") },
         )
         assertThrows(kotlinx.coroutines.CancellationException::class.java) {
@@ -305,6 +364,10 @@ class LocalAppServerManifestTest {
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             queuedUserOwner = Provider { error("Queue owner must stay lazy") },
+            mediaOwner = Provider { error("Media owner must stay lazy") },
+            usageOwner = Provider { error("Usage owner must stay lazy") },
+            memoryOwner = Provider { error("Memory owner must stay lazy") },
+            pricingOwner = Provider { error("Pricing owner must stay lazy") },
             workReadOwner = Provider { error("work read unexpectedly initialized") },
         )
         assertEquals(6, server.manifest().endpoints.size)

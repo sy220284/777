@@ -37,3 +37,7 @@
 ## 排队消息的统一入口
 
 `AppServerUiPort.queuedUsers` 暴露与 Chat/Work 共用的 `UiQueuedUserPort`。客户端可通过 `read(QueuedUsers)` 获取当前会话排队消息，或提交 `UiAppServerCommand.Queue(Edit/Remove/Reorder)`。调用复用同一 `LocalConversationUiPortComposition`，原始会话身份、运行中消息状态、队列修改和存储写入继续由 Chat/Work Owner 原子校验。
+
+## 媒体、记忆、计费与用量
+
+App Server 还通过惰性注入公开 `media / memory / pricing / usage` 四个原有功能接口。媒体与记忆的类型化指令通过 `UiAppServerCommand.Media / Memory` 传入原 Owner 并返回原操作回执；用量与官方价格通过 `read(Usage/Pricing)` 查询原始只读快照。Work/Chat 的媒体创作和用量显示已从具体运行类改为 App Server 接入。
