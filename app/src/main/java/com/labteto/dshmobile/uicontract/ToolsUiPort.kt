@@ -118,8 +118,8 @@ interface ToolsUiPort {
     /** A null implementation means the provider has no ordered lifecycle history. */
     suspend fun lifecycleHistory(
         incarnation: String?, afterSequence: Long,
-    ): UiMcpLifecycleHistory? = null
-    suspend fun checkServerHealth(serverId: String): UiMcpHealth = UiMcpHealth.UNSUPPORTED
+    ): UiMcpLifecycleHistory?
+    suspend fun checkServerHealth(serverId: String): UiMcpHealth
     suspend fun githubConfigured(): Boolean
     fun capabilityCatalogue(): List<UiToolCapabilitySnapshot>
     /** Pure discovery: identical live ToolRegistry and ranking as model capability_search. */
@@ -129,23 +129,20 @@ interface ToolsUiPort {
         name: String, expectedSchema: kotlinx.serialization.json.JsonObject,
         argumentsJson: String,
     ): UiToolDraftValidation
-    fun pluginLifecycleSnapshots(): List<UiPluginLifecycle> = emptyList()
-    suspend fun recoverFailedPlugin(id: String): List<String> =
-        error("当前工具 Owner 不支持插件恢复")
-    fun activeToolHookIds(): List<String> = emptyList()
+    fun pluginLifecycleSnapshots(): List<UiPluginLifecycle>
+    suspend fun recoverFailedPlugin(id: String): List<String>
+    fun activeToolHookIds(): List<String>
     fun installedPluginIds(): List<String>
     suspend fun installedSkills(): List<UiSkillSnapshot>
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
     suspend fun readSkillDocument(id: String): String
     suspend fun curatedGitHubSkills(): List<String>
-    suspend fun codexOfficialPlugins(forceRefetch: Boolean = false): List<UiCodexPluginSnapshot> = emptyList()
-    suspend fun codexPluginDetail(id: String): UiCodexPluginDetailSnapshot =
-        error("当前市场没有 Codex 插件详情服务")
-    suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
-        error("当前市场不支持安装此插件技能")
-    suspend fun connectCodexPlugin(id: String): String = error("当前市场无法连接该插件")
-    suspend fun githubRepositories(): List<UiGitHubRepo> = emptyList()
-    suspend fun githubEntries(repoFullName: String, directory: String): List<UiGitHubEntry> = emptyList()
+    suspend fun codexOfficialPlugins(forceRefetch: Boolean = false): List<UiCodexPluginSnapshot>
+    suspend fun codexPluginDetail(id: String): UiCodexPluginDetailSnapshot
+    suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String
+    suspend fun connectCodexPlugin(id: String): String
+    suspend fun githubRepositories(): List<UiGitHubRepo>
+    suspend fun githubEntries(repoFullName: String, directory: String): List<UiGitHubEntry>
 
     suspend fun installGitHubSkill(link: String): String
     suspend fun installPreset(id: String)
