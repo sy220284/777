@@ -140,13 +140,13 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             validateReferencePlan(arguments, index + 1)?.let { problem ->
                 return rejection("CODE_MODE_BAD_REFERENCE", "步骤 ${index + 1} 的结果引用无效：$problem")
             }
-            // Reject invalid static arguments before *any* earlier write can run.
-            // References to prior results are validated after their values are resolved.
-            if (!containsResultReference(arguments)) {
-                liveTools.validateArguments(handler, arguments)?.let { problem ->
-                    return rejection("CODE_MODE_INVALID_CHILD_ARGUMENTS",
-                        "步骤 ${index + 1} ($name) 参数无效：$problem")
-                }
+            // Validate known siblings even when another argument references prior results.
+            // ToolRegistry revalidates the fully resolved arguments at execution time.
+            liveTools.validateDeferredArguments(handler, arguments) { value ->
+                value is JsonObject && RESULT_REFERENCE_KEY in value
+            }?.let { problem ->
+                return rejection("CODE_MODE_INVALID_CHILD_ARGUMENTS",
+                    "步骤 ${index + 1} ($name) 参数无效：$problem")
             }
             val condition = step["when"]
             if (condition != null) {
@@ -296,13 +296,6 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             else receipt(observations, "completed", null)
     }
 
-
-    /** Dynamic values cannot be type-checked until their source step settles. */
-    private fun containsResultReference(node: JsonElement): Boolean = when (node) {
-        is JsonObject -> RESULT_REFERENCE_KEY in node || node.values.any(::containsResultReference)
-        is JsonArray -> node.any(::containsResultReference)
-        else -> false
-    }
 
     /** All references are checked before the first side-effecting tool is entered. */
     private fun validateReferencePlan(node: JsonElement, stepNumber: Int): String? = when (node) {
