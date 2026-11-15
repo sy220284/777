@@ -134,12 +134,20 @@ class LocalWorkToolSurfaceFocusTest {
         coordinator.searchCapabilities("select:read", focus)
         assertTrue("core-only exact selection must retain its focus", focus.exactFocus)
         assertTrue("core-only selection must remove earlier optional schemas", focus.isEmpty())
+        assertTrue("显式仅 CORE 选择在同任务续跑中属于已准备状态",
+            focus.isPreparedForContinuation())
         focus.beginNewTask()
         assertFalse(focus.exactFocus)
+        assertFalse("新任务应恢复工具发现", focus.isPreparedForContinuation())
     }
 
     @Test fun runToolSelectionReplacesRedundantPriorityCursorAndRestoresOnReset() {
         val selection = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
+        assertFalse(selection.isPreparedForContinuation())
+        selection.add("read-only-optional")
+        assertTrue(selection.isPreparedForContinuation())
+        selection.clear()
+        assertFalse(selection.isPreparedForContinuation())
         assertTrue(selection.isNewTask("用 MCP 获取 X 平台帖子"))
         assertFalse(selection.isNewTask("用 MCP 获取 X 平台帖子"))
         selection.markExactFocus()

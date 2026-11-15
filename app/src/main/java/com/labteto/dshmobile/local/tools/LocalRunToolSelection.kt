@@ -25,6 +25,9 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
 
     @Synchronized fun resetTask() { lastTask = null }
 
+    /** An explicit CORE-only select is a valid empty optional set, not an unprepared task. */
+    fun isPreparedForContinuation(): Boolean = exactFocus || isNotEmpty()
+
     /** A new real user task may use normal relevance/pinned-tool admission again. */
     fun beginNewTask() { exactFocus = false }
 
