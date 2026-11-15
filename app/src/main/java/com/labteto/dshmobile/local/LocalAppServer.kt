@@ -29,6 +29,17 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 
+/** One feature manifest drawn directly from the authoritative Architecture 3.0 catalog. */
+internal fun localAppServerManifest() = UiAppServerManifest(
+    UI_CONTRACT_VERSION,
+    LocalFeatureCatalog.modules.map { module ->
+        UiAppServerEndpoint(
+            UiAppServerFeature.valueOf(module.id.name),
+            module.routes.map { it.name },
+        )
+    },
+)
+
 /** Android-local app-server: one discoverable API to existing Feature Ports, not a new daemon. */
 @Singleton
 internal class LocalAppServer @Inject constructor(
@@ -43,15 +54,7 @@ internal class LocalAppServer @Inject constructor(
     override val chat: ChatUiPort = conversation.chat
     override val work: WorkConversationUiPort = conversation.work
 
-    override fun manifest() = UiAppServerManifest(
-        UI_CONTRACT_VERSION,
-        LocalFeatureCatalog.modules.map { module ->
-            UiAppServerEndpoint(
-                UiAppServerFeature.valueOf(module.id.name),
-                module.routes.map { it.name },
-            )
-        },
-    )
+    override fun manifest(): UiAppServerManifest = localAppServerManifest()
 
     override val notices = merge(
         chat.snapshots.map { UiAppServerNotice(UiAppServerFeature.CHAT, it.identity) },

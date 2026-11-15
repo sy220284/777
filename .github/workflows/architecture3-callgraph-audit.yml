@@ -5,6 +5,7 @@ name: 777 架构 3.0 全仓调用关系审计
     paths:
       - '.github/workflows/architecture3-callgraph-audit.yml'
       - 'tools/audit/scan-callgraph.py'
+      - 'tools/audit/check-app-server-contract.py'
       - 'app/src/main/**'
       - 'core/src/main/**'
       - 'harness-core/src/main/**'
@@ -51,6 +52,8 @@ jobs:
         run: |
           python3 .github/scripts/check-local-architecture-boundaries.py
           python3 .github/scripts/check-local-performance-invariants.py
+      - name: 六大功能统一接口与工具发现契约检查
+        run: python3 tools/audit/check-app-server-contract.py
       - name: 输出全仓证据摘要
         run: |
           python3 - <<'PY'
@@ -86,5 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: architecture3-full-callgraph
-          path: build/callgraph-audit/
+          path: |
+            build/callgraph-audit/
+            build/app-server-audit/
           retention-days: 30

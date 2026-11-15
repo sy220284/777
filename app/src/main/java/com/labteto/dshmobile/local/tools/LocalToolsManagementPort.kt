@@ -12,24 +12,22 @@ internal interface LocalToolsManagementPort {
     ): com.labteto.dshmobile.interop.mcp.McpLifecycleHistory
     suspend fun checkMcpHealth(serverId: String): com.labteto.dshmobile.interop.mcp.McpServerHealth
     /** Composer Owner's selected connector IDs; disconnected pins remain selected. */
-    fun selectedConnectorIds(): Set<String> = emptySet()
+    fun selectedConnectorIds(): Set<String>
 
-    fun pluginLifecycleSnapshots(): List<com.labteto.dshmobile.harness.plugin.PluginLifecycleSnapshot> =
-        emptyList()
-    suspend fun recoverFailedPlugin(id: String): List<String> =
-        error("当前工具 Owner 不支持插件恢复")
+    fun pluginLifecycleSnapshots(): List<com.labteto.dshmobile.harness.plugin.PluginLifecycleSnapshot>
+    suspend fun recoverFailedPlugin(id: String): List<String>
     suspend fun remoteGitBranches(repository: String): List<String>
     suspend fun compareLocalGit(repository: String, includeUntracked: Boolean = false): kotlinx.serialization.json.JsonObject
     suspend fun compareRemoteGit(repository: String, remote: String, branch: String): kotlinx.serialization.json.JsonObject
     suspend fun compareCommitGit(repository: String, commit: String): kotlinx.serialization.json.JsonObject
 
-    fun activeToolHookIds(): List<String> = emptyList()
+    fun activeToolHookIds(): List<String>
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry>
     /** Same live-registry ranking and exact-select contract as model capability_search. */
     fun discoverCapabilities(query: String, limit: Int): List<LocalToolCatalogueEntry>
     /** Task-only hint from registered tool contracts; does not grant permission. */
-    fun requiredDeviceCapabilitiesForTask(task: String): Set<com.labteto.dshmobile.harness.tools.ToolDeviceRequirement> = emptySet()
+    fun requiredDeviceCapabilitiesForTask(task: String): Set<com.labteto.dshmobile.harness.tools.ToolDeviceRequirement>
     fun validateCapabilityDraft(
         name: String, expectedSchema: kotlinx.serialization.json.JsonObject,
         argumentsJson: String,
