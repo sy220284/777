@@ -194,3 +194,39 @@ Session EventLog 为历史和恢复唯一持久源，分页/检查点/投影从�
 - `LocalPersonaAuthoringUiProjection.kt`：未被调用的重复 Persona 转换封装，原 Chat `authoringDraft/applyTo` 仍保留。
 
 此处清理仅针对证明确认无调用的旧实现；保留 `LocalToolScopeProjection`、`NativeV6ToolsUiTypes`、`LocalMiniMaxSkillCatalog`、所有 Android Service、Hilt provider、历史数据 DTO 与可恢复事务代码。最终仍需按最新 SHA 完整 JVM/Android 编译验收。
+
+## 十二、本轮运行链路与使用体验复核
+
+本节在原全仓 3.0 静态架构与调用关系审计基础上，继续从**用户一次完整任务**反向检查实际运行链路。参照 `docs/ARCHITECTURE.md`、`docs/SYSTEM-AUDIT-GUIDE.zh-CN.md`、`docs/SHARED-AUDIT-CONCLUSIONS.zh-CN.md`、`docs/UI-UX.zh-CN.md`，外部约束另以 Android 官方前台服务与权限文档、Kotlin 协程取消语义为准。单次源码阅读、词法扫描与设备/模型实测分别记录证据，不能互相替代。
+
+### 12.1 产品功能链路逐域判定
+
+| 功能域 | 实际入口 → 事实 Owner → 展示/执行 | 使用体验检查结果与落地 |
+|---|---|---|
+| Shell | Launcher/通知 → Shell 路由与 Feature Port → 对应页面 | 沿用 #924 已完成的 Manifest 启动路径修正；Shell 只跳转与展示，任务恢复归原 Session / Work Owner。避免通知直接重建执行状态 |
+| Chat | 单聊/群聊/主动消息 → Chat Turn Owner → 消息与日记/人物连续性 → UI | 复查现有 Chat/Automation Port 的边界与单一 Session 事件水位。当前未发现足以支持再次引入状态协调器的证据，保留现有消息事务、跨会话隔离与取消语义 |
+| Work | 用户指令/续跑 → Work Run Binding → 工具 Schema → 实际工具 → 回执/Goal → UI | 已修正任务身份首次确立过晚、待优先工具被新任务逻辑清除；显式选择在同一真实任务持续有效。用户明确选择的 SKILL.md 改为完整输入，不再需要因 18k 截断先多执行一次 `skill(name)` |
+| Automation | 用户明确创建计划 → Automation Store/Worker → Chat/Work Port → 真正执行结果 | 将工具预选中的普通“任务、后台”和“定时调度”语义分离；不以一般 Work 任务提示词触发排程工具。保留创建/取消真实权限审批、任务代次与 WorkManager 真实调度规则 |
+| Tools | ToolRegistry 注册 → 任务相关预选/明确选择 → 模型工具表 → 原工具执行与审批 | Android 34 项工具从全体共用关键词变为按屏幕、应用、通知、剪贴板、虚拟屏等操作匹配；MCP 管理操作与远端工具各用自身意图；终端的运行命令/读取/关闭分别匹配。修正 `TOOL_NOT_EXPOSED` 的预选根因，不改变执行授权 |
+| Settings | Settings/Tools UI Port → 配置和许可唯一 Owner → 真实状态投影 | 沿用 #924 已收敛的 Tools/Settings Port；安装、连接、已授权、本轮模型可见状态分开说明。Android 系统授权依旧以返回后的实际系统状态确认 |
+
+### 12.2 被误当作“保护”而妨碍正常任务的限制
+
+- **显式技能硬截断**：原先读到完整规则后只发送最前 18,000 字符，且发送前另外固定拒绝超过 24,000 字符。两项与所选模型的实际容量不一致，用户选择的技能尾部规则可能遗漏。现把完整显式技能作为本轮输入，保留真实模型上下文容量、API 错误和请求恢复机制；自动附加的其他固定技能仍按预览预算提供分页查阅，避免无关文档一次挤占上下文。
+- **过宽工具关键词**：原 Android 工具每个均匹配“手机、应用、界面、通知、剪贴板、虚拟屏”；MCP、Runtime、Automation 也存在工具族共享宽泛关键词。导致一次语义命中预选整组工具，消耗真实模型工具定义预算，后续需要再发现所需工具。现改为由工具注册来源维护逐操作匹配词，能力目录与显式名称查找依然可找到全部工具。
+- **任务身份晚于工具表创建**：Work 第一次实际生成工具表时仍可能认作新任务而清掉下一步候选。当前在 `prepare` 取得真实用户任务后确立该边界，再执行工具预选；同一任务中的临时续跑不再覆盖用户/Agent 的显式选择。
+- **报告状态与执行事实混淆**：已注册、已选候选、下一步可用、实际已进入模型工具表和真实执行成功分别由各自事实证明。候选提示不能提前报告已执行或已授权；已注册工具仍可在下一步用精确选择加载。
+
+### 12.3 需要保持的真实边界
+
+- Android 无障碍、通知及其他系统权限，以系统确认状态为准；前台/后台限制来自实际 Android 平台；创建定时任务需要用户批准。
+- ToolRegistry 每次执行时复核真实注册、参数、请求快照和操作授权；读写副作用必须具备可审计回执。Code Mode 嵌套调用继续复用这些同一规则。
+- Work/Session/Automation 各自的任务代次、Session 租约、运行身份和持久 Inbox 保护不同的事实；未知写入结果先对账，避免重复执行。
+- 模型上下文和工具定义的预算由实际模型路由/请求判定，保留真实资源约束，移除与真实容量无关的人工字符拦截。
+
+### 12.4 本轮验收证据
+
+- 旧基线 Android JVM 回归：`3542 tests completed, 3 failed`，失败集中在工具精确选择反馈和 Work 下一步工具焦点。现已对应修正生产实现、真实状态措辞及用例。
+- 新增或更新：`LocalWorkToolSurfaceFocusTest`、`LocalWorkSkillActivationTest`、`LocalWorkPromptContextTest`、`AndroidDevicePluginTest`、`AutomationToolContractTest`、`AndroidRuntimePluginTest`、`McpToolBridgePluginTest`。
+- 全仓静态审计仍由 `.github/workflows` 的架构 3.0 CI 和 `tools/audit/scan-callgraph.py` 自动生成逐文件证据；最终 Android 编译、JVM 用例和模拟器路径以 PR 当前 HEAD 的对应 CI 回执判定。
+- 审计只将已改生产代码列为“完成修改”。通过 CI 是功能回归证据，涉及具体机型权限、供应商模型实际窗口与长时间后台执行仍需对应真实设备/服务环境回执。
