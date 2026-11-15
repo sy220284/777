@@ -426,6 +426,12 @@ internal suspend fun prepareLocalMultimodalMessages(
     }
 }
 
+/** Only active user images require native input; older images remain historical.
+ * Work tool images retain their own independent capability admission contract.
+ */
+internal fun hasActiveLocalUserImages(messages: List<JsonObject>): Boolean =
+    activeUserMessageIndices(messages, ::hasLocalImageRefs).isNotEmpty()
+
 private fun activeImageMessageIndices(
     messages: List<JsonObject>,
     mode: LocalImageInputMode,
