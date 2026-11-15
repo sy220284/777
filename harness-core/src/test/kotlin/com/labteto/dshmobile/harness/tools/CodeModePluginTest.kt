@@ -262,6 +262,49 @@ class CodeModePluginTest {
         assertEquals(0, writes)
     }
 
+    @Test fun laterStaticArgumentTypeFailureRejectsBeforeAnyEarlierWrite() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("changed")
+        }
+        registry.register(HarnessTool(
+            name = "typed_read",
+            schema = functionToolSchema(
+                name = "typed_read",
+                description = "requires an integer",
+                properties = buildJsonObject {
+                    put("count", buildJsonObject { put("type", "integer") })
+                },
+                required = setOf("count"),
+            ),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {})
+                })
+                add(buildJsonObject {
+                    put("tool", "typed_read")
+                    put("args", buildJsonObject { put("count", "3") })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", script,
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_INVALID_CHILD_ARGUMENTS", actual.errorCode)
+        assertEquals(0, writes)
+        assertTrue(actual.isError)
+    }
+
     @Test fun toolExceptionsProduceAnExplicitUnknownEffectReceipt() = runTest {
         val registry = ToolRegistry()
         var laterCalls = 0
