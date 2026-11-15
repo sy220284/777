@@ -112,6 +112,7 @@ internal class LocalWorkAgentControlRuntime(
     private val subagents: LocalWorkSubagentRuntime,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val teams: LocalAgentTeamRuntime,
+    private val spawns: LocalAgentSpawnController,
 ) : LocalAgentControlPort {
     // Team stop remains an AgentControl adapter; Team owns the durable stop fact.
     override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? {
@@ -124,8 +125,6 @@ internal class LocalWorkAgentControlRuntime(
         }
         return teams.execute(call, binding)
     }
-
-    private val spawns = LocalAgentSpawnController(subagents, persistentJobs)
 
     override suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String =
         spawns.delegate(binding, request)
