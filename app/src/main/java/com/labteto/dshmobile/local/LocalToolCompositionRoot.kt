@@ -458,6 +458,22 @@ internal class LocalToolCompositionRoot @Inject constructor(
     override suspend fun recoverFailedPlugin(id: String) = plugins.recoverFailedPlugin(id)
     override fun activeToolHookIds(): List<String> = registry.hookIds()
     override fun installedPluginIds(): List<String> = plugins.installedPluginIds()
+    override fun requiredDeviceCapabilitiesForTask(task: String):
+        Set<com.labteto.dshmobile.harness.tools.ToolDeviceRequirement> {
+        if (task.isBlank()) return emptySet()
+        val candidates = registry.names().mapNotNull(registry::get)
+            .filter { it.metadata.requiredDeviceCapabilities.isNotEmpty() }
+        val byName = candidates.associateBy { it.name }
+        // Read the live tool metadata that already drives model capability selection.
+        // UI needs a hint only; ToolRegistry and Android remain authorization owners.
+        return com.labteto.dshmobile.local.tools.LocalToolRouter
+            .relevantOptionalToolNames(candidates, task)
+            .asSequence()
+            .mapNotNull(byName::get)
+            .flatMap { it.metadata.requiredDeviceCapabilities.asSequence() }
+            .toSet()
+    }
+
     override fun capabilityCatalogue(): List<com.labteto.dshmobile.local.tools.LocalToolCatalogueEntry> =
         registry.names().sorted().mapNotNull { name ->
             registry.get(name)?.takeUnless {
