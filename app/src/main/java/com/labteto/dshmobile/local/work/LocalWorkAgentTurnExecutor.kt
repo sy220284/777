@@ -685,7 +685,10 @@ internal class LocalWorkAgentTurnExecutor(
                         if (binding.steeringRevision.value != latestAcceptedSamplingRevision) {
                             workSteeredToolResult(call.toLocalToolCall())
                         } else if (!modelToolStepSurface.allows(call.name)) {
-                            modelToolStepSurface.hiddenCallResult(call.name)
+                            modelToolStepSurface.hiddenCallResult(
+                                call.name,
+                                workTurnToolRuntime.prepareUnexposedForNextStep(binding, call.name),
+                            )
                         } else {
                             workTurnToolRuntime.execute(
                                 binding = binding,
@@ -701,7 +704,14 @@ internal class LocalWorkAgentTurnExecutor(
                 toolBatch = AgentToolBatchExecutor { calls ->
                     modelToolStepSurface.executeBound {
                         agentRunCoordinator.ensureCurrentOwner(runContext)
-                        modelToolStepSurface.executeVisibleBatch(calls) { visibleCalls ->
+                        modelToolStepSurface.executeVisibleBatch(
+                            calls,
+                            onUnexposed = { name ->
+                                if (binding.steeringRevision.value == latestAcceptedSamplingRevision)
+                                    workTurnToolRuntime.prepareUnexposedForNextStep(binding, name)
+                                else false
+                            },
+                        ) { visibleCalls ->
                             workTurnToolRuntime.executeBatch(
                                 binding = binding,
                                 calls = visibleCalls.map { it.toLocalToolCall() },
