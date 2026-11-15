@@ -117,6 +117,32 @@ class LocalWorkPlanModeCoordinatorTest {
     }
 
     @Test
+    fun emptyPlanCannotClaimUserApprovalAndCannotExitPlanningMode() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "empty-plan", loading = false,
+            usageMode = LocalUsageMode.WORK))
+        val log = LocalSessionEventLogRegistry(
+            File(temporary.root, "empty-plan-logs").apply { mkdirs() }, json,
+        )
+        var work = LocalWorkState(planMode = true)
+        val port = object : LocalWorkStatePort {
+            override fun snapshot() = work
+            override fun update(transform: (LocalWorkState) -> LocalWorkState) {
+                work = transform(work)
+            }
+        }
+        val failed = runCatching {
+            exitWorkPlanMode(LocalToolCall("empty", "exit_plan_mode", buildJsonObject {}, "{}"),
+                "  ", port, runtime.foregroundInteractions, log.get("empty-plan"), persist = {})
+        }
+        assertTrue(failed.isFailure)
+        assertTrue(work.planMode)
+        assertEquals(null, runtime.state.value.work.pendingQuestion)
+        assertEquals(null, log.get("empty-plan").latest("plan/approved"))
+        log.clearAndEvict(setOf("empty-plan"))
+    }
+
+    @Test
     fun planModeCommitsInWorkBoundaryAndUpdatesForegroundPrompt() {
         val fixture = fixture()
         fixture.runtime.foregroundRunHandle.modelHistory.prepend(buildJsonObject {

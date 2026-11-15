@@ -107,6 +107,7 @@ internal suspend fun exitWorkPlanMode(
     persist: () -> Unit,
 ): String {
     if (!state.snapshot().planMode) return "当前未启用规划模式"
+    require(plan.isNotBlank()) { "提交审批的计划为空，请先形成完整可执行方案" }
 
     val answer = interactions.awaitQuestion(
         LocalQuestion(

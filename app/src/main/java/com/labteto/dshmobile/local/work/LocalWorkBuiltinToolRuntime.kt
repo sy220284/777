@@ -94,13 +94,17 @@ internal class LocalWorkBuiltinToolRuntime(
 }
 
 /** Preserve the model's entire question and choice set for the real approval UI. */
-internal fun workQuestionFromArgs(callId: String, args: JsonObject): LocalQuestion = LocalQuestion(
-    callId = callId,
-    question = args.string("question"),
-    options = args["options"]?.jsonArray
-        ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-        .orEmpty(),
-)
+internal fun workQuestionFromArgs(callId: String, args: JsonObject): LocalQuestion {
+    val question = args.string("question")
+    require(question.isNotBlank()) { "需要向用户提出明确的问题" }
+    return LocalQuestion(
+        callId = callId,
+        question = question,
+        options = args["options"]?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            .orEmpty(),
+    )
+}
 
 /**
  * The model tool contract requires both acceptance arrays, even when explicitly empty.

@@ -80,6 +80,13 @@ class LocalWorkBuiltinToolRuntimeTest {
     }
 
     @Test
+    fun emptyQuestionFailsBeforeOpeningAnUnanswerableUserDialog() {
+        assertTrue(runCatching {
+            workQuestionFromArgs("empty-question", buildJsonObject { put("question", "   ") })
+        }.isFailure)
+    }
+
+    @Test
     fun explicitEmptyAcceptanceAndDeclaredVerifiersRemainValid() {
         assertEquals(
             emptyList<String>() to emptyList<String>(),
