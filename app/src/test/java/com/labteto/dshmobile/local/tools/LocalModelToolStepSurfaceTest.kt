@@ -49,6 +49,25 @@ class LocalModelToolStepSurfaceTest {
         assertTrue(actuallyExecuted.contains("mcp_x_twitter_x_post"))
     }
 
+    @Test fun unexposedToolCanBeQueuedWithoutExecutingInCurrentBatch() = runBlocking {
+        val surface = LocalModelToolStepSurface()
+        surface.capture(JsonArray(listOf(schema("read"))))
+        val requested = mutableListOf<String>()
+        val actuallyExecuted = mutableListOf<String>()
+        val results = surface.executeVisibleBatch(
+            listOf(call("a", "mcp_later"), call("b", "read")),
+            onUnexposed = { name -> requested += name; true },
+        ) { visible ->
+            actuallyExecuted += visible.map { it.name }
+            visible.map { AgentToolResult("ok") }
+        }
+        assertEquals(listOf("mcp_later"), requested)
+        assertEquals(listOf("read"), actuallyExecuted)
+        assertEquals("TOOL_NOT_EXPOSED", results.first().errorCode)
+        assertTrue(results.first().recoveryHint.orEmpty().contains("下一模型步骤"))
+        assertFalse(results.last().isError)
+    }
+
     @Test fun hiddenOnlyBatchNeverInvokesExecutor() = runBlocking {
         val surface = LocalModelToolStepSurface()
         surface.capture(JsonArray(listOf(schema("read"))))
