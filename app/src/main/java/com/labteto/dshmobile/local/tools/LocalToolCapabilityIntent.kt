@@ -8,7 +8,6 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /** Bounded task-intent projection used only to decide which optional tool schemas to pre-attach. */
 internal data class LocalToolCapabilityIntent(
-    val context: String,
     val requestsGitHub: Boolean,
 ) {
     companion object {
@@ -16,22 +15,18 @@ internal data class LocalToolCapabilityIntent(
             input: String,
             history: List<JsonObject>,
         ): LocalToolCapabilityIntent {
-            val recentUserInputs = meaningfulUserInputs(history).take(4).toList()
-            val context = buildString {
-                append(input.takeLast(4_000))
-                recentUserInputs.forEach { content ->
-                    append('\n')
-                    append(content.takeLast(1_500))
-                }
-            }.takeLast(10_000)
-            val githubIntent = sequenceOf(input)
-                .plus(recentUserInputs.asSequence())
-                .mapNotNull(::githubIntentSignal)
-                .firstOrNull()
-                ?: false
+            // The latest real request decides which provider is needed. Historical
+            // GitHub mentions are relevant only for an explicit "continue" command.
+            // Do not resurrect credentials and tool schemas from unrelated old tasks.
+            val current = githubIntentSignal(input)
+            val recent = if (current == null &&
+                input.trim().lowercase() in CONTINUATION_COMMANDS
+            ) {
+                meaningfulUserInputs(history).take(4)
+                    .mapNotNull(::githubIntentSignal).firstOrNull()
+            } else null
             return LocalToolCapabilityIntent(
-                context = context,
-                requestsGitHub = githubIntent,
+                requestsGitHub = current ?: recent ?: false,
             )
         }
 
@@ -64,6 +59,9 @@ internal data class LocalToolCapabilityIntent(
             return null
         }
 
+        private val CONTINUATION_COMMANDS = setOf(
+            "继续", "继续吧", "继续执行", "继续处理", "接着", "接着做", "接着来", "接着处理",
+        )
         private val GITHUB_NEGATION_MARKERS = listOf(
             "不用github",
             "不使用github",
