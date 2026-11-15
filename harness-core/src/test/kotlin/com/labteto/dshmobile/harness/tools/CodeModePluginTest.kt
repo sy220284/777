@@ -752,10 +752,26 @@ class CodeModePluginTest {
         register(registry, "produce") {
             ToolResult("private", retention = ToolResultRetention.EPHEMERAL)
         }
-        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
-            writes++
-            ToolResult("saved")
-        }
+        // The placeholder must satisfy the child tool's declared schema. Otherwise
+        // deferred-argument preflight rejects the plan before ephemeral retention is tested.
+        registry.register(HarnessTool(
+            name = "write",
+            schema = functionToolSchema("write", "write text", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("properties", buildJsonObject {
+                    put("value", buildJsonObject { put("type", "string") })
+                })
+                put("required", buildJsonArray { add(JsonPrimitive("value")) })
+            }),
+            access = ToolAccess.WORKSPACE_WRITE,
+            approvalPolicy = ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, _, _ ->
+                writes++
+                ToolResult("saved")
+            },
+        ))
         CodeModePlugin(registry).install(HarnessContext(registry))
         val chained = buildJsonObject {
             put("steps", buildJsonArray {
