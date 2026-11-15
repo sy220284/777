@@ -182,8 +182,9 @@ internal fun shouldDiscardWorkGoalContinuation(
 ): Boolean =
     input.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.WORK_CONTINUATION &&
         (!isCurrentWorkGoalContinuation(input.continuation, work, eventLog) ||
-            (input.continuation?.failureCode in setOf(WORK_GOAL_PROGRESS_CONTINUATION, WORK_OUTPUT_LIMIT_CONTINUATION) &&
-                remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER }))
+            // An explicit user instruction always supersedes autonomous continuation,
+            // including model stream recovery. Its durable checkpoint remains available.
+            remaining.any { it.kind == com.labteto.dshmobile.harness.agent.QueuedAgentInputKind.USER })
 
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
