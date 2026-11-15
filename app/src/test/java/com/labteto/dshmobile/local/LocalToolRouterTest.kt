@@ -451,6 +451,22 @@ class LocalToolRouterTest {
         assertTrue(!summary.contains("连接条件-7"))
     }
 
+    @Test
+    fun capacityOmissionsAreTypedWhileUserFacingReasonsRemainReadable() {
+        val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
+        val optional = tool("remote_action", "远端工具", ToolExposure.OPTIONAL, "MCP")
+        val omitted = LocalToolRouter.selectSchemas(
+            listOf(core, optional), setOf("remote_action"), maxOptionalDefinitionTokens = 0)
+        assertEquals(setOf("remote_action"), omitted.budgetOmittedNames)
+        assertTrue("remote_action" in omitted.omittedReasons)
+        assertEquals(listOf("read"), names(omitted.schemas))
+
+        val included = LocalToolRouter.selectSchemas(
+            listOf(core, optional), setOf("remote_action"), maxOptionalDefinitionTokens = 16_000)
+        assertTrue(included.budgetOmittedNames.isEmpty())
+        assertTrue("remote_action" in names(included.schemas))
+    }
+
     private fun tool(
         name: String,
         description: String,
