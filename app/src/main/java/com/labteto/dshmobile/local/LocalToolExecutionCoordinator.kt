@@ -372,7 +372,7 @@ internal class LocalToolExecutionCoordinator(
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
                 if (tool.name in projected) {
-                    append(if (tool.name in previouslyEnabled) " [已选候选]" else " [下一步候选]")
+                    append(if (tool.name in previouslyEnabled) " [已加载]" else " [下一步可用]")
                 }
                 selection.omittedReasons[tool.name]?.let { reason ->
                     append(" [当前未装入：").append(reason).append("]")
