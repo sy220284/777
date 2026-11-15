@@ -109,7 +109,7 @@ internal data class LocalWorkFeatureUiActions(
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
     val saveWorkspaceFileToDownloads: suspend (String) -> String = { error("保存到下载目录未连接") },
     val importWorkspaceFile: (suspend (Uri) -> String)? = null,
-    val publishedWorkspaceFile: suspend (String) -> com.labteto.dshmobile.local.files.LocalPublishedDownload? = { null },
+    val publishedWorkspaceFile: suspend (String) -> com.labteto.dshmobile.uicontract.UiPublishedDownload? = { null },
     val workspaceDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
     val workspaceDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { _, _ ->
         LocalWorkspaceDirectoryPage(emptyList(), null)

@@ -1126,7 +1126,7 @@ internal fun LocalWorkArtifactMessageRow(
     var error by remember(artifact.reference) { mutableStateOf<String?>(null) }
     var savingDownload by remember(artifact.reference) { mutableStateOf(false) }
     var published by remember(artifact.reference, sessionId) {
-        mutableStateOf<com.labteto.dshmobile.local.files.LocalPublishedDownload?>(null)
+        mutableStateOf<com.labteto.dshmobile.uicontract.UiPublishedDownload?>(null)
     }
     val publicationRevision = if (actions != null && sessionId != null) actions.eventSequenceForUi(sessionId) else -1L
     LaunchedEffect(artifact.reference, artifact.fileObservation, actions, publicationRevision) {
@@ -1287,7 +1287,7 @@ internal fun InlineReplyArtifactActions(
     onOpen: () -> Unit,
     onError: (String) -> Unit,
     onSaveToDownloads: (() -> Unit)? = null,
-    published: com.labteto.dshmobile.local.files.LocalPublishedDownload? = null,
+    published: com.labteto.dshmobile.uicontract.UiPublishedDownload? = null,
     onOpenPublished: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current

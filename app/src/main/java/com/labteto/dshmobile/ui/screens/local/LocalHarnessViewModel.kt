@@ -426,10 +426,10 @@ class LocalHarnessViewModel @Inject constructor(
     }
 
     suspend fun importWorkspaceFile(uri: Uri): String = filesUi.importWorkspaceFile(uri)
-    internal suspend fun publishedWorkspaceFile(path: String) = filesUi.publishedWorkspaceFile(path)
+    internal suspend fun publishedWorkspaceFile(path: String) = filesUi.publishedWorkspaceSnapshot(path)
     internal suspend fun saveWorkspaceFileToDownloads(path: String) = filesUi.saveWorkspaceFileToDownloads(path)
     internal suspend fun publishedWorkspaceFileForSession(sessionId: String, path: String) =
-        filesUi.publishedWorkspaceFile(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+        filesUi.publishedWorkspaceSnapshot(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
     internal suspend fun saveWorkspaceFileToDownloadsForSession(sessionId: String, path: String) =
         filesUi.saveWorkspaceFileToDownloads(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
     suspend fun workspaceFiles() = filesUi.workspaceFiles()

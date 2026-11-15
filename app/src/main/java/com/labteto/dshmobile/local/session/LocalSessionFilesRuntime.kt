@@ -203,8 +203,15 @@ class LocalSessionFilesRuntime @Inject internal constructor(
             HarnessResourceKind.FILE_IO, "file:preview_page", priority = HarnessResourcePriority.INTERACTIVE
         ) { workspace.preview(path, offset = offset) } }
 
-    override suspend fun publishedWorkspaceFile(path: String): LocalPublishedDownload? =
+    internal suspend fun publishedWorkspaceFile(path: String): LocalPublishedDownload? =
         withContext(Dispatchers.IO) { downloadsPublisher.publishedWorkspace(path) }
+
+    override suspend fun publishedWorkspaceSnapshot(path: String): com.labteto.dshmobile.uicontract.UiPublishedDownload? =
+        publishedWorkspaceFile(path)?.let { item ->
+            com.labteto.dshmobile.uicontract.UiPublishedDownload(
+                location = item.location, uri = item.uri, currentVersion = item.currentVersion,
+            )
+        }
 
     override suspend fun saveWorkspaceFileToDownloads(path: String): String =
         withContext(Dispatchers.IO) {

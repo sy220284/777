@@ -8,6 +8,9 @@ import com.labteto.dshmobile.local.session.LocalConversationFiles
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFilePreview
 
+/** Public read-only view of a locally published file; publishing ownership stays internal. */
+data class UiPublishedDownload(val location: String, val uri: android.net.Uri, val currentVersion: Boolean)
+
 /** Native read capability. Path resolution and read budgets belong to the existing file owner. */
 interface FilesUiPort {
     suspend fun workspaceFiles(): List<LocalWorkspaceFile>
@@ -23,6 +26,6 @@ interface FilesUiPort {
     suspend fun importWorkspaceFile(uri: android.net.Uri): String
     suspend fun saveWorkspaceFileToDownloads(path: String): String
     suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long
-    suspend fun publishedWorkspaceFile(path: String): com.labteto.dshmobile.local.files.LocalPublishedDownload?
+    suspend fun publishedWorkspaceSnapshot(path: String): UiPublishedDownload?
 
 }
