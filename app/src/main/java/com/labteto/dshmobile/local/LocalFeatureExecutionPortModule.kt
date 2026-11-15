@@ -39,6 +39,16 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal object LocalFeatureExecutionPortModule {
+    /** Both ports are views of one existing conversation composition; no duplicate executor. */
+    @Provides
+    @Singleton
+    fun provideChatUiPort(composition: LocalConversationUiPortComposition):
+        com.labteto.dshmobile.uicontract.ChatUiPort = composition.chat
+
+    @Provides
+    @Singleton
+    fun provideWorkConversationUiPort(composition: LocalConversationUiPortComposition):
+        com.labteto.dshmobile.uicontract.WorkConversationUiPort = composition.work
     @Provides
     @Singleton
     fun providePersonaPortraitUiPort(owner: com.labteto.dshmobile.local.chat.LocalPersonaPortraitOwner):

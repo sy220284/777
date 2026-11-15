@@ -8,11 +8,149 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import javax.inject.Provider
+import java.lang.reflect.Proxy
+import kotlinx.coroutines.runBlocking
+import com.labteto.dshmobile.uicontract.AppServerUiPort
+import com.labteto.dshmobile.uicontract.ChatUiPort
+import com.labteto.dshmobile.uicontract.ChatUiCommand
+import com.labteto.dshmobile.uicontract.WorkConversationUiPort
+import com.labteto.dshmobile.uicontract.WorkConversationUiCommand
+import com.labteto.dshmobile.uicontract.SessionUiPort
+import com.labteto.dshmobile.uicontract.SessionUiCommand
+import com.labteto.dshmobile.uicontract.WorkAgentUiPort
+import com.labteto.dshmobile.uicontract.WorkTeamUiCommand
+import com.labteto.dshmobile.uicontract.UiWorkTeamResult
+import com.labteto.dshmobile.uicontract.AutomationUiPort
+import com.labteto.dshmobile.uicontract.AutomationUiCommand
+import com.labteto.dshmobile.uicontract.AutomationUiReceipt
+import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
+import com.labteto.dshmobile.uicontract.ToolsUiCommand
+import com.labteto.dshmobile.uicontract.ToolsUiReceipt
+import com.labteto.dshmobile.uicontract.SettingsUiPort
+import com.labteto.dshmobile.uicontract.SettingsUiCommand
+import com.labteto.dshmobile.uicontract.SettingsUiReceipt
+import com.labteto.dshmobile.uicontract.UiCommandReceipt
+import com.labteto.dshmobile.uicontract.UiSessionIdentity
+import com.labteto.dshmobile.uicontract.UiAppServerCommand
+import com.labteto.dshmobile.uicontract.UiAppServerReply
+import org.junit.Assert.assertThrows
 
 class LocalAppServerManifestTest {
+
+    @Test fun allCommandsDelegateToOneExactOwnerWithoutStartingOtherFeatures() = runBlocking {
+        val activated = mutableListOf<String>()
+        val invoked = mutableListOf<String>()
+        fun <T> owner(name: String, target: T): Provider<T> = Provider {
+            activated += name
+            target
+        }
+
+        val chat = proxy<ChatUiPort>("chat", invoked, UiCommandReceipt.Accepted)
+        val work = proxy<WorkConversationUiPort>("work", invoked, UiCommandReceipt.Queued)
+        val session = proxy<SessionUiPort>("session", invoked, UiCommandReceipt.Accepted)
+        val teamReceipt = UiWorkTeamResult(UiCommandReceipt.Accepted, "任务已受理")
+        val agents = proxy<WorkAgentUiPort>("agents", invoked, teamReceipt)
+        val automation = proxy<AutomationUiPort>("automation", invoked, AutomationUiReceipt.Applied("task"))
+        val tools = proxy<ToolsManagementUiPort>("tools", invoked, Unit)
+        val settings = proxy<SettingsUiPort>("settings", invoked, Unit)
+
+        val server = LocalAppServer(
+            chatOwner = owner("chat", chat),
+            workOwner = owner("work", work),
+            sessionOwner = owner("session", session),
+            agentOwner = owner("agents", agents),
+            automationOwner = owner("automation", automation),
+            toolsOwner = owner("tools", tools),
+            settingsOwner = owner("settings", settings),
+            workReadOwner = Provider { error("reading owner must remain lazy") },
+        )
+        // Manifest and notification-flow acquisition must have no hidden initialization.
+        server.manifest()
+        server.notices
+        assertTrue(activated.isEmpty())
+
+        val identity = UiSessionIdentity("s", "activation", 1L, null, null)
+        suspend fun check(
+            command: UiAppServerCommand,
+            expected: UiAppServerReply,
+            owner: String,
+            operation: String,
+        ) {
+            val oldActivated = activated.size
+            val oldInvoked = invoked.size
+            assertEquals(expected, server.submit(command))
+            assertEquals(listOf(owner), activated.drop(oldActivated))
+            assertEquals(listOf("$owner.$operation"), invoked.drop(oldInvoked))
+        }
+
+        check(
+            UiAppServerCommand.Chat(ChatUiCommand.SendText(identity, "hi")),
+            UiAppServerReply.Chat(UiCommandReceipt.Accepted), "chat", "submit",
+        )
+        check(
+            UiAppServerCommand.Work(WorkConversationUiCommand.SendText(identity, "run")),
+            UiAppServerReply.Work(UiCommandReceipt.Queued), "work", "submit",
+        )
+        check(
+            UiAppServerCommand.Session(SessionUiCommand.Open("s")),
+            UiAppServerReply.Session(UiCommandReceipt.Accepted), "session", "submit",
+        )
+        check(
+            UiAppServerCommand.Agent(WorkTeamUiCommand.StopTeam(identity, emptySet())),
+            UiAppServerReply.Agent(teamReceipt), "agents", "submit",
+        )
+        check(
+            UiAppServerCommand.Automation(AutomationUiCommand.Delete("task")),
+            UiAppServerReply.Automation(AutomationUiReceipt.Applied("task")), "automation", "submit",
+        )
+        check(
+            UiAppServerCommand.Tools(ToolsUiCommand.ClearGitHub),
+            UiAppServerReply.Tools(ToolsUiReceipt.Applied()), "tools", "clearGitHub",
+        )
+        check(
+            UiAppServerCommand.Settings(SettingsUiCommand.ClearCredential),
+            UiAppServerReply.Settings(SettingsUiReceipt.Submitted), "settings", "clearCredential",
+        )
+        check(
+            UiAppServerCommand.Settings(SettingsUiCommand.SaveModel("secret", "test", "https://test.invalid")),
+            UiAppServerReply.Settings(SettingsUiReceipt.Applied), "settings", "saveModel",
+        )
+    }
+
+    @Test fun cancellationFromSettingsOwnerIsNotConvertedIntoSuccessfulReceipt() {
+        val port = proxy<SettingsUiPort>("settings", mutableListOf(), Unit) {
+            throw kotlinx.coroutines.CancellationException("Owner cancellation")
+        }
+        val server = LocalAppServer(
+            chatOwner = Provider { error("chat was not requested") },
+            workOwner = Provider { error("work was not requested") },
+            sessionOwner = Provider { error("session was not requested") },
+            agentOwner = Provider { error("agent was not requested") },
+            automationOwner = Provider { error("automation was not requested") },
+            toolsOwner = Provider { error("tools was not requested") },
+            settingsOwner = Provider { port },
+            workReadOwner = Provider { error("read was not requested") },
+        )
+        assertThrows(kotlinx.coroutines.CancellationException::class.java) {
+            runBlocking { server.submit(UiAppServerCommand.Settings(SettingsUiCommand.ClearCredential)) }
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private inline fun <reified T : Any> proxy(
+        owner: String,
+        invoked: MutableList<String>,
+        response: Any?,
+        crossinline custom: () -> Any? = { response },
+    ): T = Proxy.newProxyInstance(T::class.java.classLoader, arrayOf(T::class.java)) { _, method, _ ->
+        invoked += "$owner.${method.name}"
+        custom()
+    } as T
+
     @Test fun readingManifestDoesNotInitializeAnyFeatureOwner() {
         val server = LocalAppServer(
-            conversationOwner = Provider { error("conversation unexpectedly initialized") },
+            chatOwner = Provider { error("chat unexpectedly initialized") },
+            workOwner = Provider { error("work unexpectedly initialized") },
             sessionOwner = Provider { error("session unexpectedly initialized") },
             agentOwner = Provider { error("agent unexpectedly initialized") },
             automationOwner = Provider { error("automation unexpectedly initialized") },

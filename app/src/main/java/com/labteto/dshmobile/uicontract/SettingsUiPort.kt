@@ -140,7 +140,8 @@ fun SettingsUiPort.submit(command: SettingsUiCommand): SettingsUiReceipt = try {
         is SettingsUiCommand.SaveModel -> return SettingsUiReceipt.Rejected
     }
     SettingsUiReceipt.Applied
-} catch (failure: Exception) { SettingsUiReceipt.Failed(failure.message) }
+} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+catch (failure: Exception) { SettingsUiReceipt.Failed(failure.message) }
 
 suspend fun SettingsUiPort.save(command: SettingsUiCommand.SaveModel): SettingsUiReceipt = try {
     saveModel(command.apiKey, command.model, command.baseUrl, command.protocol, command.profileId,

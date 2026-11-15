@@ -47,7 +47,8 @@ internal fun localAppServerManifest() = UiAppServerManifest(
 /** Android-local app-server: one discoverable API to existing Feature Ports, not a new daemon. */
 @Singleton
 internal class LocalAppServer @Inject constructor(
-    private val conversationOwner: Provider<LocalConversationUiPortComposition>,
+    private val chatOwner: Provider<ChatUiPort>,
+    private val workOwner: Provider<WorkConversationUiPort>,
     private val sessionOwner: Provider<SessionUiPort>,
     private val agentOwner: Provider<WorkAgentUiPort>,
     private val automationOwner: Provider<AutomationUiPort>,
@@ -55,8 +56,8 @@ internal class LocalAppServer @Inject constructor(
     private val settingsOwner: Provider<SettingsUiPort>,
     private val workReadOwner: Provider<WorkReadUiPort>,
 ) : AppServerUiPort {
-    override val chat: ChatUiPort get() = conversationOwner.get().chat
-    override val work: WorkConversationUiPort get() = conversationOwner.get().work
+    override val chat: ChatUiPort get() = chatOwner.get()
+    override val work: WorkConversationUiPort get() = workOwner.get()
     override val session: SessionUiPort get() = sessionOwner.get()
     override val agents: WorkAgentUiPort get() = agentOwner.get()
     override val automation: AutomationUiPort get() = automationOwner.get()
