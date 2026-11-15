@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
 import com.labteto.dshmobile.local.feature.LocalFeatureRoute
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
-import com.labteto.dshmobile.uicontract.UiAppServerFeature
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,6 +35,7 @@ import com.labteto.dshmobile.uicontract.UiAppServerReply
 import com.labteto.dshmobile.uicontract.UiAppServerRead
 import com.labteto.dshmobile.uicontract.UiAppServerState
 import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
+import com.labteto.dshmobile.uicontract.UiAppServerFeature
 import org.junit.Assert.assertThrows
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
