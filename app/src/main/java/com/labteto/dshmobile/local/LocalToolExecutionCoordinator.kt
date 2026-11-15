@@ -317,7 +317,7 @@ internal class LocalToolExecutionCoordinator(
                 if (unavailableNames.isNotEmpty()) append(
                     "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
                 if (alreadyBuiltIn.isNotEmpty()) append(
-                    "本轮已仅保留选定内置工具，之前启用的可选扩展已退出模型工具表。")
+                    "本轮已移除之前加载的可选扩展；所有内置 CORE 工具仍可按原策略直接调用。")
                 }.trimEnd()
             }
             // Don't bounce the user back to guess an internal capability name.

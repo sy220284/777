@@ -138,6 +138,20 @@ class LocalWorkToolSurfaceFocusTest {
         assertFalse(focus.exactFocus)
     }
 
+    @Test fun runToolSelectionReplacesRedundantPriorityCursorAndRestoresOnReset() {
+        val selection = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
+        assertTrue(selection.isNewTask("用 MCP 获取 X 平台帖子"))
+        assertFalse(selection.isNewTask("用 MCP 获取 X 平台帖子"))
+        selection.markExactFocus()
+        assertTrue(selection.exactFocus)
+        assertTrue(selection.isNewTask("改为查询 GitHub PR"))
+        selection.beginNewTask()
+        assertFalse(selection.exactFocus)
+        assertFalse(selection.isNewTask("改为查询 GitHub PR"))
+        selection.resetTask()
+        assertTrue(selection.isNewTask("改为查询 GitHub PR"))
+    }
+
     private fun optional(name: String) = HarnessTool(
         name = name,
         schema = functionToolSchema(name, "Read data"),

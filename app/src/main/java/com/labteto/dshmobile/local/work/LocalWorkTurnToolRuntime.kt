@@ -59,7 +59,7 @@ internal class LocalWorkTurnToolRuntime(
     internal fun captureBindings(schemas: JsonArray) = registry.captureBindings(schemas)
     internal fun clear(binding: LocalWorkRunBinding) {
         execution.clearTurnCapabilities(binding.enabledOptionalTools)
-        binding.toolPriority.reset()
+        binding.enabledOptionalTools.resetTask()
     }
 
     internal suspend fun prepare(
@@ -87,7 +87,7 @@ internal class LocalWorkTurnToolRuntime(
         val history = binding.runHandle.modelHistory.snapshot()
         val teamMode = isLocalAgentTeamTurn(history)
         val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
-        val newTask = !activeTask.isNullOrBlank() && binding.toolPriority.isNewTask(activeTask)
+        val newTask = !activeTask.isNullOrBlank() && binding.enabledOptionalTools.isNewTask(activeTask)
         if (newTask) binding.enabledOptionalTools.beginNewTask()
         // Explicit select: owns the visible optional surface for this task. Discoverability,
         // registration and per-call approval continue to use their existing shared owners.

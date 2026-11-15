@@ -14,6 +14,17 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
     /** Explicit select: wins over automatic pins and task hints until the task changes. */
     fun markExactFocus() { exactFocus = true }
 
+    /** The task cursor and its model-visible selection share this run's ownership. */
+    @Volatile private var lastTask: String? = null
+
+    @Synchronized fun isNewTask(task: String): Boolean {
+        if (task == lastTask) return false
+        lastTask = task
+        return true
+    }
+
+    @Synchronized fun resetTask() { lastTask = null }
+
     /** A new real user task may use normal relevance/pinned-tool admission again. */
     fun beginNewTask() { exactFocus = false }
 
