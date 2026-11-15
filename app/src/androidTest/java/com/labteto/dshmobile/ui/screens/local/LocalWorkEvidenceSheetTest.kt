@@ -169,6 +169,7 @@ class LocalWorkEvidenceSheetTest {
         },
     ) = LocalWorkFeatureUiActions(
         workState = MutableStateFlow(LocalWorkUiState(sessionId = "work-1")),
+        agentAction = { _, _, _ -> error("证据清单展示不应触发智能体操作") },
         workspaceFiles = { emptyList() },
         conversationFiles = { error("not used by evidence sheet") },
         previewWorkspaceFile = { previewReads.incrementAndGet(); error("history opened file preview") },
