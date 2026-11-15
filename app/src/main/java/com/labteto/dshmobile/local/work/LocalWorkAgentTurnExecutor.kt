@@ -460,19 +460,18 @@ internal class LocalWorkAgentTurnExecutor(
                         // Replace this request's layer, never append catalog updates to history.
                         workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
-                    val advertisedTools = runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding))
-                    latestAcceptedSamplingRevision = observedSteer
-                    val tools = modelToolStepSurface.capture(
-                        advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),
-                    )
+                    // Select a provisional tool surface for compaction cost only.
+                    // The actual model-visible selection is frozen after compaction.
+                    val preliminarySelection = workTurnToolRuntime.selectSchemas(runPolicy, binding)
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
                             estimateModelTokens(workPromptContext.dynamic + improvementGuidance +
                                 investigationContext + reusableDiscoveryContext) +
                             estimateModelTokens(workPromptContext.skill)
+                    var historyCompacted = false
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         LocalWorkSummarySettings.attach(context)
-                        val extra = productContextTokens + estimateModelTokens(tools.toString())
+                        val extra = productContextTokens + estimateModelTokens(preliminarySelection.schemas.toString())
                         if (LocalWorkSummarySettings.state.value) {
                             val outcome = sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
                                 workModelHistoryRuntime.compactSemanticallyBeforeStep(binding, extra) { request ->
@@ -511,12 +510,25 @@ internal class LocalWorkAgentTurnExecutor(
                             if (outcome is LocalWorkSamplingOutcome.Completed && !outcome.value) {
                                 agentRunCoordinator.ensureCurrentOwner(runContext)
                                 if (binding.steeringRevision.value != observedSteer) continue
-                                workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                                historyCompacted = workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                            } else if (outcome is LocalWorkSamplingOutcome.Completed) {
+                                historyCompacted = outcome.value
                             }
                         } else {
-                            workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                            historyCompacted = workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
                         }
                     }
+                    // Re-project with the final history budget only when compaction changed
+                    // the input. Ordinary steps reuse the first selection without duplicate work.
+                    val finalSelection = if (historyCompacted) {
+                        workTurnToolRuntime.selectSchemas(runPolicy, binding)
+                    } else preliminarySelection
+                    workTurnToolRuntime.recordSchemaAdmission(binding, finalSelection)
+                    val advertisedTools = runToolSurface.next(finalSelection.schemas)
+                    latestAcceptedSamplingRevision = observedSteer
+                    val tools = modelToolStepSurface.capture(
+                        advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),
+                    )
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
