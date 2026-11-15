@@ -3,7 +3,7 @@ package com.labteto.dshmobile.local.work
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class LocalWorkAgentControlBuiltinRuntimeTest {
+class LocalAgentControlToolSurfaceTest {
     @Test
     fun agentControlToolSurfaceIsExplicitAndComplete() {
         assertEquals(
@@ -45,7 +45,7 @@ class LocalWorkAgentControlBuiltinRuntimeTest {
                 "team_stop_all",
                 "team_wait",
             ),
-            LocalWorkAgentControlBuiltinRuntime.TOOL_NAMES,
+            LocalAgentControlPlane.TOOL_NAMES,
         )
     }
 }

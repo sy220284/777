@@ -57,7 +57,7 @@ internal fun resolveWorkGoalUpdate(
     executingToolId: String? = null,
 ): ResolvedWorkGoalUpdate {
     val current = snapshot.goal ?: error("当前会话没有目标")
-    val proposed = current.copy(status = status, note = note?.take(2_000))
+    val proposed = current.copy(status = status, note = note)
     val candidate = if (proposed == current) current else proposed.copy(revision = Math.incrementExact(current.revision))
     val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, current, workspaceRoot, executingToolId) else null
     val transition = resolveWorkGoalTransition(current, candidate, snapshot, delivery)

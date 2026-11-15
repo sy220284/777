@@ -39,6 +39,13 @@ object JsonSchemaValidator {
         path: String = "$",
     ): String? = validateValue(value, schema, path)
 
+    /** Preflight known arguments; defer only actual result-reference leaves. */
+    internal fun validateTrustedDeferred(
+        value: JsonElement,
+        schema: JsonObject,
+        isDeferred: (JsonElement) -> Boolean,
+    ): String? = validateValue(value, schema, "$", isDeferred)
+
     fun validateSchema(
         schema: JsonObject,
         requireObjectRoot: Boolean = false,
@@ -229,7 +236,9 @@ object JsonSchemaValidator {
         value: JsonElement,
         schema: JsonObject,
         path: String,
+        isDeferred: ((JsonElement) -> Boolean)? = null,
     ): String? {
+        if (isDeferred?.invoke(value) == true) return null
         val expectedType = schema["type"]?.let { (it as? JsonPrimitive)?.content }
         when (expectedType) {
             "object" -> {
@@ -249,9 +258,9 @@ object JsonSchemaValidator {
                 obj.forEach { (key, child) ->
                     val childSchema = properties[key] as? JsonObject
                     if (childSchema != null) {
-                        validateValue(child, childSchema, "$path.$key")?.let { return it }
+                        validateValue(child, childSchema, "$path.$key", isDeferred)?.let { return it }
                     } else if (additional is JsonObject) {
-                        validateValue(child, additional, "$path.$key")?.let { return it }
+                        validateValue(child, additional, "$path.$key", isDeferred)?.let { return it }
                     }
                 }
             }
@@ -266,7 +275,7 @@ object JsonSchemaValidator {
                 val itemSchema = schema["items"] as? JsonObject
                 if (itemSchema != null) {
                     array.forEachIndexed { index, child ->
-                        validateValue(child, itemSchema, "$path[$index]")?.let { return it }
+                        validateValue(child, itemSchema, "$path[$index]", isDeferred)?.let { return it }
                     }
                 }
             }
@@ -321,11 +330,20 @@ object JsonSchemaValidator {
         }
 
         val enumValues = schema["enum"] as? JsonArray
-        if (enumValues != null && enumValues.none { jsonSchemaEquals(it, value) }) {
+        if (enumValues != null && (isDeferred == null || !containsDeferredValue(value, isDeferred)) &&
+            enumValues.none { jsonSchemaEquals(it, value) }) {
             return "$path 不在允许枚举值中"
         }
         return null
     }
+
+    /** An enum on a container cannot be checked until its deferred descendants resolve. */
+    private fun containsDeferredValue(value: JsonElement, deferred: (JsonElement) -> Boolean): Boolean =
+        deferred(value) || when (value) {
+            is JsonObject -> value.values.any { containsDeferredValue(it, deferred) }
+            is JsonArray -> value.any { containsDeferredValue(it, deferred) }
+            else -> false
+        }
 
     private fun JsonObject.bound(keyword: String): BigDecimal? =
         (this[keyword] as? JsonPrimitive)

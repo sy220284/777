@@ -17,6 +17,26 @@ import org.junit.Test
 
 class AndroidRuntimePluginTest {
     @Test
+    fun terminalIntentDoesNotExposeEveryRuntimeOperation() = runBlocking {
+        val root = kotlin.io.path.createTempDirectory("runtime-selection-").toFile()
+        try {
+            val registry = PluginRegistry()
+            registry.install(AndroidRuntimePlugin(root))
+            val names = registry.context.tools.names()
+            fun selected(term: String) = names.filter { name ->
+                term in requireNotNull(registry.context.tools.get(name))
+                    .metadata.discoveryKeywords
+            }.toSet()
+            assertTrue(selected("终端") == setOf("terminal_open"))
+            assertTrue(selected("执行命令") == setOf("process_exec"))
+            assertTrue(selected("终端输出") == setOf("terminal_read"))
+            assertTrue(selected("关闭终端") == setOf("terminal_close"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun pluginRegistersRuntimeToolsAndExecutesOnlyAfterApproval() = runBlocking {
         val root = kotlin.io.path.createTempDirectory("runtime-plugin-").toFile()
         try {

@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -118,6 +119,22 @@ class ToolRegistry private constructor(
     }
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
+
+    /** Side-effect-free schema preflight. The real call still revalidates all guards. */
+    internal fun validateArguments(tool: HarnessTool, input: JsonObject): String? =
+        validateToolInput(tool, input)
+
+    /** Preview static fields while allowing prior step result references to resolve later. */
+    internal fun validateDeferredArguments(
+        tool: HarnessTool,
+        input: JsonObject,
+        isDeferred: (JsonElement) -> Boolean,
+    ): String? {
+        val parameters = (tool.schema["function"] as? JsonObject)
+            ?.get("parameters") as? JsonObject ?: return null
+        return JsonSchemaValidator.validateTrustedDeferred(input, parameters, isDeferred)
+    }
+
     fun names(): List<String> = tools.snapshot().keys.toList()
 
     /**

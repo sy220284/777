@@ -3,6 +3,8 @@ name: 777 聊天与工作真实设备交互回归
 'on':
   pull_request:
     paths:
+      - 'app/src/main/java/com/labteto/dshmobile/notify/**'
+      - 'app/src/androidTest/java/com/labteto/dshmobile/notify/**'
       - 'app/src/main/java/com/labteto/dshmobile/local/chat/**'
       - 'app/src/main/java/com/labteto/dshmobile/local/work/**'
       - 'app/src/main/java/com/labteto/dshmobile/local/model/**'
@@ -52,7 +54,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest,com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest,com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest,com.labteto.dshmobile.ui.screens.settings.PermissionSetupFlowAndroidTest --stacktrace --console=plain
+          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest,com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest,com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest,com.labteto.dshmobile.ui.screens.settings.PermissionSetupFlowAndroidTest,com.labteto.dshmobile.notify.NotificationRoutingAndroidTest --stacktrace --console=plain
       - name: 失败时输出真实断言
         if: failure()
         run: |

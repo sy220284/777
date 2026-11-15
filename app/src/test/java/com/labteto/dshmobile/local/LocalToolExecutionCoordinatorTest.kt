@@ -360,7 +360,7 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue("mcp_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         assertFalse("unrelated_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
         val again = coordinator.searchCapabilities("select:mcp_lookup")
-        assertTrue(again.contains("[已加载]"))
+        assertTrue(again.contains("[已选候选]"))
     }
 
     @Test
@@ -403,7 +403,7 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue("工具定义实际预算必须仍有效", omitted.isNotEmpty())
         assertTrue(report.contains("待加载队列"))
         assertTrue(report.contains("select:" + omitted.joinToString(",")))
-        assertTrue(report.contains("[下一步可用]"))
+        assertTrue(report.contains("[下一步候选]"))
         val next = coordinator.searchCapabilities("select:" + omitted.take(2).joinToString(","))
         val after = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
         assertTrue(omitted.first() in after)
@@ -751,12 +751,14 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("mcp_x_twitter_x_post", "mcp_other_x_post"), created)
         val coordinator = coordinator(registry)
         coordinator.enableOptionalTools((0 until 180).map { "older_$it" })
-        coordinator.prioritizeRunCreatedMcpTools(created)
+        coordinator.prioritizeRunCreatedMcpTools(created, "发帖到 x-twitter")
         val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
         assertTrue("mcp_x_twitter_x_post" in visible)
-        assertTrue("mcp_other_x_post" in visible)
+        assertFalse("无关 MCP 服务不应挤占新增工具预算", "mcp_other_x_post" in visible)
         assertFalse("mcp_fake_x_post" in visible)
         assertEquals("mcp_x_twitter_x_post", coordinator.enabledOptionalSnapshot().first())
+        // Every remote capability remains registered and discoverable by exact name.
+        assertEquals("mcp_other_x_post", registry.get("mcp_other_x_post")?.name)
         assertEquals(created, discovery.observe(registry))
         registry.unregister("mcp_x_twitter_x_post")
         assertEquals(listOf("mcp_other_x_post"), discovery.observe(registry))

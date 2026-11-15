@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.LocalRunToolSelection
 import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
 import com.labteto.dshmobile.local.work.LocalWorkGoalAcceptanceRejectedException
@@ -171,16 +172,20 @@ internal class LocalToolExecutionCoordinator(
         enableOptionalTools(githubTools, target)
     }
 
-    /** Give MCP tools registered during this run a chance to enter the next schema budget.
-     * Discovery is never authorization; the live registry and per-call approval remain authoritative. */
+    /** Newly connected MCP services may register hundreds of tools. Only operations
+     * relevant to the active user task receive model schema priority; the complete
+     * catalog remains available by exact capability search. Discovery grants no access.
+     */
     fun prioritizeRunCreatedMcpTools(
-        names: List<String>, target: MutableSet<String> = enabledOptionalTools,
+        names: List<String>,
+        taskContext: String,
+        target: MutableSet<String> = enabledOptionalTools,
     ) {
-        val preferred = names.mapNotNull(registry::get)
+        val candidates = names.mapNotNull(registry::get)
             .filter { LocalToolRouter.isOptional(it) &&
                 it.metadata.family.equals("MCP", ignoreCase = true) &&
                 isNetworkSearchPermitted(it.name) }
-            .map(HarnessTool::name)
+        val preferred = LocalToolRouter.relevantOptionalToolNames(candidates, taskContext)
         enableOptionalTools(preferred, target)
         synchronized(target) {
             val existing = target.toList()
@@ -289,26 +294,33 @@ internal class LocalToolExecutionCoordinator(
             return LocalToolRouter.capabilityDirectory(registered,
                 synchronized(target) { target.toSet() }, blocked)
         }
-        val exactNames = LocalToolRouter.exactSelection(query)
-        val alreadyBuiltIn = exactNames.orEmpty().filter { name ->
-            tools.any { it.name == name && it.exposure == com.labteto.dshmobile.harness.tools.ToolExposure.CORE }
-        }
-        val matches = if (exactNames == null) LocalToolRouter.search(tools, query)
-            else exactNames.mapNotNull { name ->
-                tools.firstOrNull { it.name == name && LocalToolRouter.isOptional(it) }
-            }
-        val unavailableNames = exactNames.orEmpty().filter { name ->
-            name !in alreadyBuiltIn && matches.none { it.name == name }
-        }
+        val discovery = com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery.resolve(tools, query)
+        val exactNames = discovery.exactNames
+        val alreadyBuiltIn = discovery.core
+        val matches = discovery.optional
+        val unavailableNames = discovery.unavailable
         if (matches.isEmpty()) {
-            if (exactNames != null) return buildString {
-                if (alreadyBuiltIn.isNotEmpty()) appendLine(
-                    "以下是内置工具，无需加载即可直接调用：" + alreadyBuiltIn.joinToString(", "))
-                if (unavailableNames.isNotEmpty()) appendLine(
-                    "指定工具当前无法加载：" + unavailableNames.joinToString(", "))
-                if (unavailableNames.isNotEmpty()) append(
-                    "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
-            }.trimEnd()
+            if (exactNames != null) {
+                // Selecting only CORE tools is still an exact focus: clear prior OPTIONAL
+                // schemas without treating the built-in tool as unavailable.
+                if (alreadyBuiltIn.isNotEmpty()) synchronized(target) {
+                    target.clear()
+                    if (target is LocalRunToolSelection) target.markExactFocus()
+                }
+                return buildString {
+                    if (alreadyBuiltIn.isNotEmpty()) appendLine(
+                        "以下是内置工具，无需加载即可直接调用：" + alreadyBuiltIn.joinToString(", "))
+                    if (unavailableNames.isNotEmpty()) appendLine(
+                        "指定工具当前无法加载：" + unavailableNames.joinToString(", "))
+                    if (unavailableNames.isNotEmpty()) append(
+                        "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
+                    if (alreadyBuiltIn.isNotEmpty()) append(
+                        "本轮已移除之前加载的可选扩展；所有内置 CORE 工具仍可按原策略直接调用。")
+                }.trimEnd()
+            }
+            // A fuzzy match on a CORE tool is a successful discovery; nothing needs loading.
+            if (alreadyBuiltIn.isNotEmpty()) return "已找到内置工具，可直接调用：" +
+                alreadyBuiltIn.joinToString(", ") + "；执行依旧按当前权限与工具策略校验。"
             // Don't bounce the user back to guess an internal capability name.
             return "实时工具表没有精确匹配的扩展能力。请勿猜测调用不存在的工具，也不必因此放弃任务。\n" +
                 "在允许联网与写入的 Work 中，可先用 web_search / GitHub 查找可复用实现，" +
@@ -328,9 +340,15 @@ internal class LocalToolExecutionCoordinator(
             // Unselected tools remain installed in ToolRegistry and can be reselected.
             val previous = if (exactNames == null) target.filterNot { it in selected }
                 else emptyList()
+            val previouslyFocused = target is LocalRunToolSelection && target.exactFocus
             target.clear()
             target.addAll(selected)
             target.addAll(previous)
+            // Explicit select: stays in force on this real task. A later natural-language
+            // discovery may add matching tools, but cannot re-enable automatic unrelated pins.
+            if ((exactNames != null || previouslyFocused) && target is LocalRunToolSelection) {
+                target.markExactFocus()
+            }
             target.toSet()
         }
         val selection = LocalToolRouter.selectSchemas(
@@ -343,11 +361,11 @@ internal class LocalToolExecutionCoordinator(
         }.toSet()
         val omittedNames = matches.map(HarnessTool::name).filterNot(projected::contains)
         return buildString {
-            appendLine("找到 ${matches.size} 个扩展工具，${matches.size - omittedNames.size} 个已装入下一模型步骤。")
+            appendLine("找到 ${matches.size} 个扩展工具，${matches.size - omittedNames.size} 个通过初步定义预算筛选；实际可用状态以下一次模型请求的工具表为准。")
             if (alreadyBuiltIn.isNotEmpty()) appendLine(
                 "内置工具可直接调用：" + alreadyBuiltIn.joinToString(", "))
             if (exactNames != null) appendLine(
-                "已按 select: 将本轮可选工具聚焦到指定名称；其它工具仍可重新选择，已装入的可直接使用。")
+                "已按 select: 将本轮可选工具聚焦到指定名称；其它工具仍可重新选择，实际进入模型工具表后可直接使用。")
             if (unavailableNames.isNotEmpty()) appendLine(
                 "指定但未能加载：" + unavailableNames.joinToString(", ") + "（未注册、被关闭或不是可选扩展；不会改用相似工具）"
             )
@@ -355,7 +373,7 @@ internal class LocalToolExecutionCoordinator(
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
                 if (tool.name in projected) {
-                    append(if (tool.name in previouslyEnabled) " [已加载]" else " [下一步可用]")
+                    append(if (tool.name in previouslyEnabled) " [已选候选]" else " [下一步候选]")
                 }
                 selection.omittedReasons[tool.name]?.let { reason ->
                     append(" [当前未装入：").append(reason).append("]")

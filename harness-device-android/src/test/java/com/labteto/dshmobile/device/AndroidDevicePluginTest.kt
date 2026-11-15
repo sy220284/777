@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.plugin.PluginRegistry
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolContext
+import com.labteto.dshmobile.harness.tools.ToolDeviceRequirement
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
@@ -66,6 +67,51 @@ class AndroidDevicePluginTest {
         assertEquals(ToolAccess.DEVICE, clickNode.access)
         val notificationStatus = requireNotNull(registry.context.tools.get("android_notification_status"))
         assertEquals(ToolAccess.READ_ONLY, notificationStatus.access)
+    }
+
+    @Test
+    fun deviceIntentKeywordsSelectOnlyRelevantOperations() = runTest {
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(RecordingProvider()))
+        val tools = registry.context.tools
+        fun selected(term: String) = tools.names().filter { name ->
+            term in requireNotNull(tools.get(name)).metadata.discoveryKeywords
+        }.toSet()
+
+        // The generic Android intent needs a small useful starting surface.
+        assertEquals(setOf("android_device_info"), selected("手机"))
+        assertTrue("设计界面不是设备操作", selected("界面").isEmpty())
+        assertEquals(setOf("android_screen"), selected("查看手机界面"))
+        assertEquals(setOf("android_app_list"), selected("应用"))
+        // Separate domains no longer preselect unrelated actions or consume schema tokens.
+        assertEquals(setOf("android_notification_status"), selected("通知"))
+        assertEquals(setOf("android_notification_list"), selected("读取通知"))
+        assertEquals(setOf("android_clipboard_get", "android_clipboard_set"), selected("剪贴板"))
+        assertEquals(setOf("android_vscreen_start", "android_vscreen_list",
+            "android_vscreen_status"), selected("虚拟屏"))
+        assertTrue("android_vscreen_close" !in selected("手机"))
+        // Common multi-step phone interaction is still immediately available.
+        assertEquals(setOf("android_screen", "android_find", "android_tap_text",
+            "android_input_text"), selected("操作手机"))
+        assertTrue(tools.names().all { requireNotNull(tools.get(it))
+            .metadata.discoveryKeywords.isNotEmpty() })
+    }
+
+    @Test
+    fun registeredDeviceRequirementsDifferentiateStatusProbeFromActualAccess() = runTest {
+        val registry = PluginRegistry()
+        registry.install(AndroidDevicePlugin(RecordingProvider()))
+        fun requirements(name: String) =
+            requireNotNull(registry.context.tools.get(name)).metadata.requiredDeviceCapabilities
+        assertEquals(setOf(ToolDeviceRequirement.ACCESSIBILITY), requirements("android_click_node"))
+        assertEquals(setOf(ToolDeviceRequirement.ACCESSIBILITY), requirements("android_input_text"))
+        assertEquals(setOf(ToolDeviceRequirement.ACCESSIBILITY), requirements("android_screen"))
+        assertEquals(setOf(ToolDeviceRequirement.NOTIFICATION_ACCESS),
+            requirements("android_notification_list"))
+        assertTrue("权限状态查询应允许在未授权时使用",
+            requirements("android_notification_status").isEmpty())
+        assertTrue(requirements("android_device_info").isEmpty())
+        assertTrue(requirements("android_vscreen_start").isEmpty())
     }
 
     @Test

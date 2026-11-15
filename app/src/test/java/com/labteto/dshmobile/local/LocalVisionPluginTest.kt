@@ -169,6 +169,21 @@ class LocalVisionPluginTest {
     }
 
     @Test
+    fun longImageAnalysisInstructionReachesTheModelUnchanged() = runTest {
+        val analyzer = RecordingAnalyzer()
+        val registry = PluginRegistry()
+        registry.install(plugin(RecordingDevice(), analyzer))
+        val fullTask = "逐项核对每个可见按钮及其状态；".repeat(500) + "必须检查此处末尾验收要求"
+        val result = registry.context.tools.execute(
+            name = "vision_analyze_screen",
+            input = buildJsonObject { put("prompt", fullTask) },
+            context = ToolContext(approval = { true }),
+        )
+        assertFalse(result.content, result.isError)
+        assertTrue(analyzer.calls.single().prompt.endsWith("任务：" + fullTask))
+    }
+
+    @Test
     fun virtualScreenAnalysisUsesRequestedDisplayAfterFreshApproval() = runTest {
         val device = RecordingDevice()
         val analyzer = RecordingAnalyzer()

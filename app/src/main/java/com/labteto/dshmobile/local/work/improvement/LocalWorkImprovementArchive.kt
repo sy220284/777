@@ -438,7 +438,10 @@ internal class LocalWorkImprovementArchive(
                 }
                 "work/finding" -> {
                     val id = data.text("finding_id").orEmpty()
-                    if (id.isNotBlank() && data.text("status") in setOf("hypothesis", "supported", "rejected")) {
+                    if (id.isNotBlank() && data.text("status") == "retracted") {
+                        findings.remove(id)
+                    } else if (id.isNotBlank() &&
+                        data.text("status") in setOf("hypothesis", "supported", "rejected")) {
                         findings[id] = Finding(session, data.text("goal_id").orEmpty(),
                             data.text("project_id").orEmpty(), id, e.sequence,
                             e.createdAt, data.text("status").orEmpty(),

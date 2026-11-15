@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull

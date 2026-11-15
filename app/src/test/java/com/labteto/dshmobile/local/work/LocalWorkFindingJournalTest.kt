@@ -78,6 +78,53 @@ class LocalWorkFindingJournalTest {
         }
     }
 
+    @Test fun retractRemovesFindingFromLiveViewsButKeepsOriginalEvidence() {
+        val history = log()
+        try {
+            history.tool("read-with-evidence")
+            val recorded = LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                put("action", "record")
+                put("summary", "早期检查提示应当复用这套可能重复的代码实现")
+                put("status", "supported")
+                put("source_call_id", "read-with-evidence")
+            })
+            val id = recorded.substringAfter("ID=").substringBefore("；")
+            assertTrue(LocalWorkFindingJournal.supportedForReplan(history, "goal-a", id))
+            assertTrue(runCatching {
+                LocalWorkFindingJournal.execute(history, "another-goal", buildJsonObject {
+                    put("action", "retract"); put("finding_id", id)
+                })
+            }.isFailure)
+            val response = LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                put("action", "retract")
+                put("finding_id", id)
+            })
+            assertTrue(response.contains("已撤回"))
+            assertFalse(LocalWorkFindingJournal.supportedForReplan(history, "goal-a", id))
+            assertEquals("当前目标没有调查线索",
+                LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                    put("action", "list")
+                }))
+            val events = history.eventsOfTypesAfter(-1L, setOf("work/finding"))
+            assertEquals(2, events.size)
+            assertEquals("supported", events.first().data["status"].toString().trim('"'))
+            assertEquals("retracted", events.last().data["status"].toString().trim('"'))
+            assertTrue(runCatching {
+                LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                    put("action", "retract"); put("finding_id", id)
+                })
+            }.isFailure)
+            history.tool("new-read")
+            assertTrue(runCatching {
+                LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                    put("action", "revise"); put("finding_id", id)
+                    put("summary", "已撤回记录需要重新调查而不能复活")
+                    put("source_call_id", "new-read")
+                })
+            }.isFailure)
+        } finally { history.close() }
+    }
+
     @Test fun rejectsInventedFailedOrOtherGoalReceiptsAndUnrelatedRevisions() {
         val history = log()
         try {

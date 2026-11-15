@@ -2080,6 +2080,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     if (showTeamPanel && state.usageMode == LocalUsageMode.WORK && state.team.visible) {
         LocalAgentTeamSheet(
             team = state.team,
+            onAgentOperation = { agentId, operation, message ->
+                requireNotNull(workActions) { "WORK_AGENT_UI_PORT_MISSING" }
+                    .agentAction(agentId, operation, message)
+            },
             onMemberOutput = onTeamMemberOutput,
             onSendMemberMessage = onSendTeamMemberMessage,
             onStopMember = onStopTeamMember,

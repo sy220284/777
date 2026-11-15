@@ -47,7 +47,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest --stacktrace --console=plain
+          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest --stacktrace --console=plain
       - name: 失败时输出真实断言
         if: failure()
         run: |

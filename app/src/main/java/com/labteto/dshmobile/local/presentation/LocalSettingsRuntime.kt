@@ -47,8 +47,6 @@ class LocalSettingsRuntime @Inject internal constructor(
     runtimeStateStore: LocalRuntimeStateStore,
 ) : com.labteto.dshmobile.uicontract.SettingsUiPort {
     private val runtimeState = runtimeStateStore.state
-    internal val nativeState: Flow<LocalHarnessSettingsState> = runtimeState.map { it.toSettingsUiState() }.distinctUntilChanged()
-    internal val nativeInitialState: LocalHarnessSettingsState get() = runtimeState.value.toSettingsUiState()
     override val state: Flow<com.labteto.dshmobile.uicontract.UiSettingsSnapshot> = runtimeState.map { it.toSettingsUiState().toNeutralSnapshot() }.distinctUntilChanged()
     override val initialState get() = runtimeState.value.toSettingsUiState().toNeutralSnapshot()
     override val apiModelPresets get() = LocalModelPresets.entries
@@ -101,7 +99,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun stageLegacySessionRestore(archive: java.io.InputStream) =
         sessionStorage.stageLegacyRestoreStorage(archive)
     /** Read the current effective policy each time; never cache a stale grant or expose secrets. */
-    internal fun executionPolicySummary(): UiExecutionPolicySnapshot {
+    override fun executionPolicySummary(): UiExecutionPolicySnapshot {
         val policy = executionPolicy.current()
         val names = mapOf(
             "network.enabled" to "网络访问开关",

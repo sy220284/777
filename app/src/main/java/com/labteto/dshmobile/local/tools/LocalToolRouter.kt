@@ -31,19 +31,26 @@ internal object LocalToolRouter {
         tools: List<HarnessTool>,
         taskContext: String,
     ): List<String> {
-        val normalized = (if (taskContext.length <= MAX_TASK_CONTEXT_CHARS) taskContext
-            else taskContext.take(MAX_TASK_CONTEXT_CHARS / 2) + "\n" +
-                taskContext.takeLast(MAX_TASK_CONTEXT_CHARS / 2)).lowercase()
+        // Search the entire actual task. Previous head/tail slicing silently ignored
+        // an explicit tool name placed in the middle of a long specification.
+        val normalized = taskContext.lowercase()
         if (normalized.isBlank()) return emptyList()
+
+        // Large registries repeat common intent terms across providers. Match each unique
+        // term against this task once, without truncating the user's actual requirement.
+        val matchedTerms = HashMap<String, Boolean>()
+        fun matches(term: String): Boolean = matchedTerms.getOrPut(term.lowercase()) {
+            hasExplicitIntentTerm(normalized, term)
+        }
 
         // New plugin/MCP tools participate automatically through their registered metadata.
         // Order by task relevance, never by an arbitrary fixed number of optional tools.
         return tools.asSequence()
             .filter(::isOptional)
             .mapNotNull { tool ->
-                val exactName = hasExplicitIntentTerm(normalized, tool.name)
+                val exactName = matches(tool.name)
                 val keywordHits = tool.metadata.discoveryKeywords.count { keyword ->
-                    hasExplicitIntentTerm(normalized, keyword)
+                    matches(keyword)
                 }
                 // A broad family label ("网络", "智能体", "会话") must not implicitly activate
                 // every optional tool in that category. Explicit discovery still searches family.
@@ -87,6 +94,8 @@ internal object LocalToolRouter {
         val schemas: JsonArray,
         val omittedReasons: Map<String, String>,
         val compactedNames: Set<String>,
+        /** Capacity omissions are typed; execution/recovery never parse display text. */
+        val budgetOmittedNames: Set<String> = emptySet(),
     )
 
     fun visibleSchemas(
@@ -113,10 +122,11 @@ internal object LocalToolRouter {
             .filter { it.exposure == ToolExposure.OPTIONAL }
             .associateBy(HarnessTool::name)
 
-        var remainingTokens = maxOptionalDefinitionTokens.coerceIn(0, MAX_OPTIONAL_TOOL_PROMPT_TOKENS)
+        var remainingTokens = maxOptionalDefinitionTokens.coerceAtLeast(0)
         val optionalSchemas = ArrayList<JsonElement>()
         val omitted = linkedMapOf<String, String>()
         val compacted = linkedSetOf<String>()
+        val budgetOmitted = linkedSetOf<String>()
         for (name in enabledOptional) {
             val tool = optionalByName[name] ?: continue // Missing tools remain absent on purpose.
             // A valid, large MCP/plug-in schema is not an admission error merely because
@@ -125,16 +135,18 @@ internal object LocalToolRouter {
             // complete registered schema.
             val original = tool.schema
             if (remainingTokens <= 0) {
+                budgetOmitted += name
                 omitted[name] = "本轮可选工具定义预算已用尽；按精确名称重新选择可优先装入"
                 continue
             }
 
             val originalCost = estimateModelTokens(original.toString())
-            val reduced = if (originalCost > minOf(remainingTokens, MAX_OPTIONAL_SCHEMA_TOKENS)) {
+            val reduced = if (originalCost > remainingTokens) {
                 compactDescriptiveAnnotations(original)
             } else original
             val selectedCost = estimateModelTokens(reduced.toString())
-            if (selectedCost > MAX_OPTIONAL_SCHEMA_TOKENS || selectedCost > remainingTokens) {
+            if (selectedCost > remainingTokens) {
+                budgetOmitted += name
                 omitted[name] = "工具参数定义需要约 $selectedCost Token，当前可用 $remainingTokens；已尝试精简说明文本"
                 continue
             }
@@ -145,7 +157,7 @@ internal object LocalToolRouter {
 
         // The core surface remains byte-for-byte stable for cache continuity.
         return ToolSchemaSelection(JsonArray(core.map(HarnessTool::schema) + optionalSchemas),
-            omitted, compacted)
+            omitted, compacted, budgetOmitted)
     }
 
     private fun compactDescriptiveAnnotations(value: JsonElement, propertyNames: Boolean = false): JsonElement =
@@ -167,15 +179,13 @@ internal object LocalToolRouter {
      * This never infers additional capabilities from descriptions or old task text.
      * The execution coordinator still enforces the current registry, schema budget and approval.
      */
-    private const val MAX_EXACT_SELECTION_NAMES = 128
-
     fun exactSelection(query: String): List<String>? {
         val command = query.trim()
         if (!command.startsWith("select:", ignoreCase = true)) return null
         val names = command.substringAfter(':').split(',', '，').map(String::trim)
-        require(names.isNotEmpty() && names.size <= MAX_EXACT_SELECTION_NAMES && names.all {
+        require(names.isNotEmpty() && names.all {
             it.matches(Regex("[A-Za-z][A-Za-z0-9_-]{0,127}"))
-        }) { "精确工具选择格式：select:工具名1,工具名2（最多 $MAX_EXACT_SELECTION_NAMES 个）" }
+        }) { "精确工具选择格式：select:工具名1,工具名2" }
         return names.distinct()
     }
 
@@ -188,23 +198,32 @@ internal object LocalToolRouter {
         tools: List<HarnessTool>,
         query: String,
         limit: Int = Int.MAX_VALUE,
+        includeCore: Boolean = false,
     ): List<HarnessTool> {
         val normalized = query.trim().lowercase()
         require(normalized.isNotEmpty()) { "能力搜索内容不能为空" }
-        val termPattern = Regex("[\\p{L}\\p{N}_-]{2,}")
-        val front = termPattern.findAll(normalized.take(MAX_CAPABILITY_QUERY_EDGE_CHARS))
-            .map { it.value }.take(12).toList()
-        val tail = termPattern.findAll(normalized.takeLast(MAX_CAPABILITY_QUERY_EDGE_CHARS))
-            .map { it.value }.toList().takeLast(12)
-        val chunks = front + tail
-        val hanWords = Regex("[\u4e00-\u9fff]{2,}")
-        val chineseTerms = chunks.flatMap { chunk ->
-            hanWords.findAll(chunk).flatMap { it.value.windowed(2).asSequence() }.toList()
+        // Index vocabulary from the live registry once, then examine the full query.
+        // Irrelevant long-form text does not multiply scoring work by the catalog size.
+        // Unlike head/tail sampling, explicit capabilities in the middle are preserved.
+        val searchableTools = tools.filter {
+            isOptional(it) || (includeCore && it.exposure == ToolExposure.CORE)
         }
-        val terms = (chunks + chineseTerms).toSet()
+        val vocabulary = HashSet<String>()
+        fun index(value: String) {
+            capabilitySearchTerms(value.lowercase(), splitIdentifierParts = true).forEach(vocabulary::add)
+        }
+        searchableTools.forEach { tool ->
+            index(tool.name)
+            index(tool.metadata.family)
+            tool.metadata.discoveryKeywords.forEach(::index)
+            index(description(tool))
+            tool.metadata.requirements.forEach(::index)
+            tool.metadata.usageNotes.forEach(::index)
+        }
+        val terms = capabilitySearchTerms(normalized)
+            .filterTo(linkedSetOf()) { it in vocabulary }
         val scored = mutableListOf<Pair<HarnessTool, Int>>()
-        for (tool in tools) {
-            if (!isOptional(tool)) continue
+        for (tool in searchableTools) {
             val name = tool.name.lowercase()
             val family = tool.metadata.family.lowercase()
             val keywords = tool.metadata.discoveryKeywords.map(String::lowercase)
@@ -238,6 +257,37 @@ internal object LocalToolRouter {
                 .thenBy { it.first.name },
         )
         return scored.take(limit.coerceAtLeast(1)).map { it.first }
+    }
+
+    /**
+     * Tokenize the complete query and registered tool metadata with the same rules.
+     * ASCII names embedded in Chinese instructions, underscore-separated identifiers
+     * and unspaced Chinese phrases all remain discoverable.
+     */
+    private fun capabilitySearchTerms(
+        text: String,
+        splitIdentifierParts: Boolean = false,
+    ): Sequence<String> = sequence {
+        for (token in CAPABILITY_WORDS.findAll(text)) {
+            val value = token.value
+            yield(value)
+            // Splitting is useful when indexing registered names, but splitting an
+            // explicitly requested name would load unrelated tools sharing a suffix.
+            if (splitIdentifierParts) {
+                for (part in value.split('_', '-')) {
+                    if (part.length >= 2) yield(part)
+                }
+            }
+            for (han in CAPABILITY_HAN.findAll(value)) {
+                val word = han.value
+                for (index in 0 until word.length - 1) {
+                    yield(word.substring(index, index + 2))
+                }
+            }
+            for (identifier in CAPABILITY_ASCII.findAll(value)) {
+                if (identifier.value.length >= 2) yield(identifier.value)
+            }
+        }
     }
 
     fun capabilitySummary(
@@ -317,11 +367,10 @@ internal object LocalToolRouter {
         description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
 
     internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 16_000
-    internal const val MAX_OPTIONAL_TOOL_PROMPT_TOKENS = 24_000
-    private const val MAX_OPTIONAL_SCHEMA_TOKENS = 24_000
     private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
     private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
     private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
-    private const val MAX_TASK_CONTEXT_CHARS = 12_000
-    private const val MAX_CAPABILITY_QUERY_EDGE_CHARS = 4_096
+    private val CAPABILITY_WORDS = Regex("[\\p{L}\\p{N}_-]{2,}")
+    private val CAPABILITY_HAN = Regex("[\u4e00-\u9fff]{2,}")
+    private val CAPABILITY_ASCII = Regex("[a-z][a-z0-9_-]*")
 }

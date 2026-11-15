@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.presentation
 
+import com.labteto.dshmobile.local.model.LocalConversationSampleCoordinator
+import com.labteto.dshmobile.local.model.LocalConversationSampleResult
 import com.labteto.dshmobile.local.session.LocalSessionReadRuntime
 import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
@@ -23,7 +25,12 @@ import kotlinx.coroutines.withContext
 @Singleton
 class LocalSessionUiFacade @Inject constructor(
     private val session: LocalSessionReadRuntime,
+    private val sampler: LocalConversationSampleCoordinator,
 ) : UiMessageHistoryPort {
+    /** Session-level preview action: UI never injects a model execution coordinator. */
+    internal suspend fun sampleSession(sessionId: String, prompt: String): LocalConversationSampleResult =
+        sampler.sample(sessionId, prompt)
+
     internal suspend fun previewMessages(sessionId: String, limit: Int = 12): List<LocalHarnessMessage> =
         withContext(Dispatchers.IO) { session.previewTail(sessionId, limit) }
 

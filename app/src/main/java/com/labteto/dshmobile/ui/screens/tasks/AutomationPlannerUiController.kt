@@ -1,103 +1,89 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
-import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.automation.AutomationPlanDraft
-import com.labteto.dshmobile.local.presentation.LocalHarnessTaskState
-import com.labteto.dshmobile.local.presentation.LocalAutomationPlanningFacade
-import com.labteto.dshmobile.local.presentation.LocalTaskRuntime
+import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.uicontract.AutomationUiPort
+import com.labteto.dshmobile.uicontract.AutomationUiReceipt
+import com.labteto.dshmobile.uicontract.PlanChatAutomationCommand
+import com.labteto.dshmobile.uicontract.UiAutomationRejection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** A UI turn only. Plan validation, identity fencing and task writes belong to AutomationUiPort. */
 internal class AutomationPlannerUiController(
     private val scope: CoroutineScope,
-    private val localRuntime: LocalTaskRuntime,
-    private val planningService: LocalAutomationPlanningFacade,
-    private val _state: MutableStateFlow<TasksUiState>,
-    private val save: (AutomationPlanDraft, String?, String) -> Boolean,
-    private val tasks: () -> List<com.labteto.dshmobile.automation.AutomationTask>,
+    private val automation: AutomationUiPort,
+    private val state: MutableStateFlow<TasksUiState>,
 ) {
     private var revision = 0L
     private var planJob: Job? = null
+
     init {
         scope.launch {
-            var owner = planningService.currentRevision()
-            planningService.revisions.collect { current ->
+            var owner = automation.planningRevision()
+            automation.planningChanges.collect { current ->
                 if (current != owner) {
                     owner = current
                     revision += 1
                     planJob?.cancel()
-                    _state.update { it.copy(planning = false, plannerError = null) }
+                    state.update { it.copy(planning = false, plannerError = null, plannerFailureReason = null) }
                 }
             }
         }
     }
+
     fun submitChatPlan(input: String, editingTaskId: String? = null) {
-        val snapshot = localRuntime.snapshot()
-        if (!canPlanChat(snapshot) || input.isBlank() || _state.value.planning) return
-        val expectedSessionId = snapshot.sessionId
+        val context = automation.context()
+        val identity = context.identity ?: return
+        if (!context.canPlanChat || input.isBlank() || state.value.planning) return
         val request = ++revision
-        _state.update { it.copy(planning = true, plannerError = null) }
+        state.update { it.copy(planning = true, plannerError = null, plannerFailureReason = null) }
         planJob = scope.launch {
             try {
-            runCatching { planningService.plan(input) }
-                .onSuccess { draft ->
-                    if (request != revision) return@onSuccess
-                    val latest = localRuntime.snapshot()
-                    if (latest.sessionId != expectedSessionId ||
-                        draft.sourceSessionId != expectedSessionId ||
-                        !planningService.isCurrent(draft)
-                    ) {
-                        _state.update {
-                            it.copy(
-                                planning = false,
-                                plannerError = PlannerUiError.SESSION_CHANGED,
-                            )
-                        }
-                        return@onSuccess
-                    }
-                    val saved = withContext(Dispatchers.IO) { save(draft, editingTaskId, expectedSessionId) }
-                    if (request != revision) return@onSuccess
-                    _state.update {
-                        if (saved) {
-                            it.copy(
-                                tasks = tasks(),
-                                planning = false,
-                                plannerError = null,
-                                saveRevision = it.saveRevision + 1L,
-                            )
-                        } else {
-                            it.copy(
-                                planning = false,
-                                plannerError = PlannerUiError.SAVE_FAILED,
-                            )
-                        }
-                    }
+                val result = withContext(Dispatchers.IO) {
+                    automation.planAndSave(PlanChatAutomationCommand(identity, input, editingTaskId))
                 }
-                .onFailure { error ->
-                    if (error is kotlinx.coroutines.CancellationException) throw error
-                    if (request != revision) return@onFailure
-                    if (localRuntime.snapshot().sessionId != expectedSessionId) {
-                        _state.update { it.copy(planning = false, plannerError = PlannerUiError.SESSION_CHANGED) }
-                        return@onFailure
-                    }
-                    _state.update {
-                        it.copy(
+                if (request != revision) return@launch
+                state.update { previous ->
+                    when (result) {
+                        is AutomationUiReceipt.Applied -> previous.copy(
+                            planning = false,
+                            plannerError = null,
+                            plannerFailureReason = null,
+                            saveRevision = previous.saveRevision + 1L,
+                        )
+                        is AutomationUiReceipt.Rejected -> previous.copy(
+                            planning = false,
+                            plannerError = if (result.reason in setOf(
+                                    UiAutomationRejection.STALE_CONTEXT,
+                                    UiAutomationRejection.STALE_TASK,
+                                )) PlannerUiError.SESSION_CHANGED else PlannerUiError.SAVE_FAILED,
+                            plannerFailureReason = null,
+                        )
+                        is AutomationUiReceipt.Failed -> previous.copy(
                             planning = false,
                             plannerError = PlannerUiError.PLAN_FAILED,
+                            plannerFailureReason = result.message?.takeIf(String::isNotBlank),
                         )
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                AppLog.failure("TaskScheduling", "plan_and_save_chat_event", failure)
+                if (request == revision) {
+                    state.update { it.copy(planning = false, plannerError = PlannerUiError.PLAN_FAILED,
+                        plannerFailureReason = failure.message?.takeIf(String::isNotBlank)) }
+                }
             } finally {
-                if (request == revision) _state.update { it.copy(planning = false) }
+                if (request == revision) state.update { it.copy(planning = false) }
             }
         }
     }
-    private fun canPlanChat(snapshot: LocalHarnessTaskState): Boolean =
-        snapshot.usageMode == LocalUsageMode.CHAT && !snapshot.groupChat.enabled && snapshot.sessionId.isNotBlank()
 }

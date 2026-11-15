@@ -6,6 +6,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonElement
 
+/**
+ * The transport admission fact is shared by model errors and their retry/continuation policy.
+ * Keeping it with model values avoids coupling the error contract to the network failure handler.
+ */
+internal enum class LocalModelAdmissionState {
+    NOT_APPLICABLE, NOT_SENT, REJECTED, MAYBE_ADMITTED, ADMITTED,
+}
+
 /** One OpenAI-compatible function call emitted by the model. */
 data class LocalToolCall(
     val id: String,

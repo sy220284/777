@@ -10,6 +10,8 @@ import java.io.FileOutputStream
 import java.io.Reader
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.util.PriorityQueue
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.ArrayDeque
@@ -71,6 +73,9 @@ data class LocalWorkspaceSearchPage(
     val nextOffset: Int?,
 )
 
+/** One bounded random-access byte page and its true EOF fact from the same file read. */
+internal data class LocalWorkspaceRawPage(val bytes: ByteArray, val complete: Boolean)
+
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
     private val root: File,
@@ -98,7 +103,10 @@ class LocalWorkspace(
             block()
         } finally {
             synchronized(directoryNameSnapshots) { directoryNameSnapshots.clear() }
-            synchronized(searchCursors) { searchCursors.clear() }
+            synchronized(searchCursors) {
+                searchCursors.clear()
+                searchTickets.clear()
+            }
         }
     }
     // Retain only the small traversal frontier between consecutive tool pages. On a
@@ -341,17 +349,30 @@ class LocalWorkspace(
         return file.length()
     }
 
-    /** Binary-safe paged raw read. The file size never determines allocation size. */
-    fun readRawPage(relativePath: String, offset: Long, maxBytes: Int = 64 * 1024): ByteArray {
+    /** Binary-safe paged raw read; retained for callers needing only bytes. */
+    fun readRawPage(relativePath: String, offset: Long, maxBytes: Int = 64 * 1024): ByteArray =
+        readRawPageWithEnd(relativePath, offset, maxBytes).bytes
+
+    /**
+     * Read a page and determine its EOF from one consistent file descriptor.
+     * Exact-multiple files complete on their final real page, without an empty
+     * follow-up request or a second potentially stale size observation.
+     */
+    internal fun readRawPageWithEnd(
+        relativePath: String,
+        offset: Long,
+        maxBytes: Int = 64 * 1024,
+    ): LocalWorkspaceRawPage {
         require(offset >= 0L && maxBytes in 1..1024 * 1024) { "分页读取参数无效" }
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：" + relativePath }
         java.io.RandomAccessFile(file, "r").use { source ->
-            require(offset <= source.length()) { "字节偏移超出文件末尾" }
+            val length = source.length()
+            require(offset <= length) { "字节偏移超出文件末尾" }
             source.seek(offset)
-            val bytes = ByteArray(minOf(maxBytes.toLong(), source.length() - offset).toInt())
+            val bytes = ByteArray(minOf(maxBytes.toLong(), length - offset).toInt())
             source.readFully(bytes)
-            return bytes
+            return LocalWorkspaceRawPage(bytes, complete = offset + bytes.size == length)
         }
     }
 
@@ -398,7 +419,7 @@ class LocalWorkspace(
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
         val matcher = globRegex(pattern.replace('\\', '/'))
-        return discoverPage(directory, MAX_SCAN_DEPTH, cursor, "glob", "未找到匹配文件", pattern) { file ->
+        return discoverPage(directory, Int.MAX_VALUE, cursor, "glob", "未找到匹配文件", pattern) { file ->
             file.takeIf { it.isFile && isInsideWorkspace(it) }
                 ?.relativeTo(directory)?.invariantSeparatorsPath
                 ?.takeIf(matcher::matches)
@@ -409,7 +430,8 @@ class LocalWorkspace(
     fun list(relativePath: String = ".", depth: Int = 3, cursor: Int = 0): String {
         val directory = resolve(relativePath)
         require(directory.isDirectory) { "目录不存在：$relativePath" }
-        return discoverPage(directory, depth.coerceIn(1, 8), cursor, "list_files", "目录为空", "") { file ->
+        require(depth >= 1) { "目录扫描深度必须大于零" }
+        return discoverPage(directory, depth, cursor, "list_files", "目录为空", "") { file ->
             file.takeIf { it != directory && isInsideWorkspace(it) }?.let {
                 val suffix = if (it.isDirectory) "/" else " (${it.length()} B)"
                 displayPath(it) + suffix
@@ -457,7 +479,7 @@ class LocalWorkspace(
             } else rows.joinToString("\n"))
             if (nextCursor != null) {
                 append("\n[目录扫描未完：再次调用 $toolName，保持路径、匹配条件与深度不变，")
-                append("传入 cursor=$nextCursor 继续；目录发生增删时请从头扫描]")
+                append("传入 cursor=$nextCursor 继续；next_cursor=$nextCursor；目录发生增删时请从头扫描]")
             }
         }
     }
@@ -485,7 +507,7 @@ class LocalWorkspace(
         val scanKey = listOf("search", directory.path, regex.toString(), query).joinToString("\u0000")
         val iterator = if (directory.isFile) {
             scanPageIterator(directory, 0, scanKey, resumeEntry)
-        } else scanPageIterator(directory, MAX_SCAN_DEPTH, scanKey, resumeEntry)
+        } else scanPageIterator(directory, Int.MAX_VALUE, scanKey, resumeEntry)
         val matches = mutableListOf<String>()
         val warnings = mutableListOf<String>()
         var outputChars = 0
@@ -564,7 +586,7 @@ class LocalWorkspace(
             if (nextCursor != null) {
                 append("\n[搜索未完成：再次调用 grep，保持 query/path/regex 不变并传入 cursor=\"")
                 append(nextCursor)
-                append("\" 继续；如文件发生增删，请从头搜索]")
+                append("\" 继续；next_cursor=$nextCursor；如文件发生增删，请从头搜索]")
             }
         }
     }
@@ -655,6 +677,9 @@ class LocalWorkspace(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SearchCursor>?): Boolean =
             size > 4
     }
+    // Cancelling/refreshing a query invalidates scans still running outside the shared lock.
+    private val searchTickets = HashMap<String, Long>()
+    private var nextSearchTicket = 0L
 
     /**
      * Search results are materialized once per fresh query and paged in relevance order.
@@ -664,11 +689,27 @@ class LocalWorkspace(
         val needle = query.trim()
         require(needle.isNotEmpty() && needle.length <= 128 &&
             offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
+        // Never hold the shared cursor lock across filesystem traversal. A per-query
+        // ticket prevents an older, cancelled scan from replacing a newer snapshot.
+        val ticket = if (offset == 0) synchronized(searchCursors) {
+            searchCursors.remove(needle)
+            (++nextSearchTicket).also { searchTickets[needle] = it }
+        } else null
+        val firstPage = if (ticket != null) try {
+            SearchCursor(rankedWorkspaceFileNames(needle, isCurrent = {
+                synchronized(searchCursors) { searchTickets[needle] == ticket }
+            }), pageSize)
+        } catch (failure: Throwable) {
+            synchronized(searchCursors) {
+                if (searchTickets[needle] == ticket) searchTickets.remove(needle)
+            }
+            throw failure
+        } else null
         return synchronized(searchCursors) {
-            val cursor = if (offset == 0) {
-                SearchCursor(searchWorkspaceFileNames(needle, limit = 10_000), pageSize).also {
-                    searchCursors[needle] = it
-                }
+            val cursor = if (firstPage != null) {
+                require(searchTickets[needle] == ticket) { "搜索已更新，请以当前关键词重新查询" }
+                searchTickets.remove(needle)
+                firstPage.also { searchCursors[needle] = it }
             } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
             require(cursor.pageSize == pageSize && cursor.nextPage == offset) {
                 "搜索游标已失效，请重新搜索"
@@ -690,26 +731,66 @@ class LocalWorkspace(
     }
 
     fun stopWorkspaceSearch(query: String): Boolean = synchronized(searchCursors) {
-        searchCursors.remove(query.trim()) != null
+        val needle = query.trim()
+        val stoppedActiveScan = searchTickets.remove(needle) != null
+        searchCursors.remove(needle) != null || stoppedActiveScan
     }
 
-    /** Match and rank bounded filesystem entries, preserving complete filename-first results. */
+    /**
+     * Match filenames across the complete workspace. DirectoryStream-backed walking avoids
+     * materializing every sibling in a large folder; it never follows symbolic links.
+     * Full UI search sorts all real matches once, then pages that immutable result set.
+     * Callers requesting a limited list use a bounded top-K heap while scanning the SAME
+     * complete tree; neither mode reports a partial scan as "no more results".
+     */
+    private fun rankedWorkspaceFileNames(
+        needle: String,
+        limit: Int? = null,
+        isCurrent: () -> Boolean = { true },
+    ): List<LocalWorkspaceFile> {
+        fun checkActive() {
+            if (Thread.currentThread().isInterrupted)
+                throw java.io.InterruptedIOException("文件搜索已取消")
+            if (!isCurrent()) throw java.util.concurrent.CancellationException("文件搜索已停止或被新查询替换")
+        }
+        checkActive()
+        val rank = compareByDescending<Pair<Int, LocalWorkspaceFile>> { it.first }
+            .thenBy { it.second.path }
+        val matches = if (limit == null) ArrayList<Pair<Int, LocalWorkspaceFile>>() else null
+        val top = limit?.let {
+            PriorityQueue<Pair<Int, LocalWorkspaceFile>>(minOf(it, 512), rank.reversed())
+        }
+        Files.walk(canonicalRoot.toPath()).use { walked ->
+            val paths = walked.iterator()
+            while (true) {
+                checkActive()
+                if (!paths.hasNext()) break
+                val path = paths.next()
+                if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) continue
+                val file = path.toFile()
+                if (!isInsideWorkspace(file)) continue
+                val relative = file.relativeTo(canonicalRoot).invariantSeparatorsPath
+                val score = scoreWorkspaceFileMatch(needle, relative) ?: continue
+                val match = score to LocalWorkspaceFile(relative, file.length(), file.lastModified())
+                if (top == null) {
+                    matches!!.add(match)
+                } else if (top.size < limit!!) {
+                    top.add(match)
+                } else if (rank.compare(match, top.peek()) < 0) {
+                    top.poll()
+                    top.add(match)
+                }
+            }
+        }
+        checkActive()
+        return (matches ?: top!!.toList()).sortedWith(rank).map { it.second }
+    }
+
     fun searchWorkspaceFileNames(query: String, limit: Int = 500): List<LocalWorkspaceFile> {
         val needle = query.trim()
         require(needle.isNotBlank() && needle.length <= 128) { "搜索关键词不能为空且最多 128 字" }
-        val top = limit.coerceIn(1, 10_000)
-        return safeWalk(canonicalRoot, maxVisited = 50_000, maxMillis = 5_000L)
-            .filter { it.isFile && isInsideWorkspace(it) }
-            .mapNotNull { file ->
-                val path = file.relativeTo(canonicalRoot).invariantSeparatorsPath
-                val score = scoreWorkspaceFileMatch(needle, path) ?: return@mapNotNull null
-                score to LocalWorkspaceFile(path, file.length(), file.lastModified())
-            }
-            .sortedWith(compareByDescending<Pair<Int, LocalWorkspaceFile>> { it.first }
-                .thenBy { it.second.path })
-            .take(top)
-            .map { it.second }
-            .toList()
+        require(limit > 0) { "搜索结果数量必须大于零" }
+        return rankedWorkspaceFileNames(needle, limit)
     }
 
     /** Snapshot real files for explicit global search without exposing raw File handles. */

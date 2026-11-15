@@ -5,16 +5,14 @@ import com.labteto.dshmobile.local.files.LocalSkillMetadata
 import java.util.Locale
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 
-private const val MAX_EAGER_SKILL_GUIDANCE_CHARS = 18_000
-
 /** Selected skill instructions are loaded once per model step and never persisted in history. */
 internal fun resolveLocalWorkSkillGuidance(
     workspace: LocalWorkspace,
     input: String,
     selectedInvocations: List<LocalPinnedInvocation> = emptyList(),
 ): String {
-    // Explicit selection is the strongest instruction source. Reserve its budget
-    // before auto-pinned instructions so a long pinned set cannot hide the user's choice.
+    // User-selected skills are part of the requested task. The model request's real
+    // context budget, not a separate character quota, decides whether they fit.
     val explicitName = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)").find(input)?.groupValues?.get(1)
     val explicitDocument = explicitName?.let { name ->
         try {
@@ -23,8 +21,6 @@ internal fun resolveLocalWorkSkillGuidance(
             throw IllegalArgumentException("所选技能 ${name} 已移除或无法读取，请返回技能页重新选择。", error)
         }
     }
-    var remainingChars = MAX_EAGER_SKILL_GUIDANCE_CHARS
-    val explicitExcerpt = explicitDocument?.take(remainingChars)?.also { remainingChars -= it.length }
     val pinnedConnectors = selectedInvocations.filter {
         it.kind == LocalPinnedInvocation.Kind.CONNECTOR
     }.joinToString("、") { it.id }
@@ -38,18 +34,10 @@ internal fun resolveLocalWorkSkillGuidance(
         }
         selection.id to document
     }
-    // Selected SKILL.md is loaded directly for this model step; no extra skill(name)
-    // discovery/tool call is required. Keep model history free of repeated instructions.
-    // Keep several pinned skills from overwhelming each model step. Each skill can still
-    // be retrieved in full through skill(name), including user-only skills explicitly pinned.
+    // Include every selected rule. Silent truncation can remove the operative
+    // instruction and make a user-pinned skill behave differently on each turn.
     val pinnedSkillInstructions = pinnedSkills.joinToString("\n\n") { (name, document) ->
-        val excerpt = document.take(remainingChars.coerceAtLeast(0))
-        remainingChars -= excerpt.length
-        if (excerpt.length == document.length) {
-            "[已固定技能：$name]\n$excerpt\n[技能结束]"
-        } else {
-            "[已固定技能：$name]\n$excerpt\n[内容较长；调用 skill(name=$name) 可读取完整文档]"
-        }
+        "[已固定技能：$name]\n$document\n[技能结束]"
     }
     val pinnedNote = if (pinnedConnectors.isEmpty() && pinnedSkills.isEmpty()) "" else """
         [用户明确固定的调用来源]
@@ -61,13 +49,11 @@ internal fun resolveLocalWorkSkillGuidance(
     """.trimIndent()
     if (explicitName != null) {
         val document = checkNotNull(explicitDocument)
-        val excerpt = checkNotNull(explicitExcerpt)
-        val full = excerpt.length == document.length
         return """
             [本轮技能已加载：${explicitName}]
             用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。
-            ${excerpt}
-            ${if (full) "[技能规则结束]" else "[内容较长，已限制本轮自动注入；请调用 skill(name=$explicitName) 读取完整文档。不能假定未加载部分已阅读。]"}
+            ${document}
+            [技能规则结束]
             $pinnedNote
         """.trimIndent()
     }

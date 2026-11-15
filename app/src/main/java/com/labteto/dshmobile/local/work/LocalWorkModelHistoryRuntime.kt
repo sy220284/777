@@ -2,7 +2,7 @@ package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.agent.modelMessageForAgentInput
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.model.LocalHistoryCompactor
 import com.labteto.dshmobile.local.model.LocalHistorySummaryMode
@@ -144,7 +144,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
     internal fun compactIfNeeded(
         binding: LocalWorkRunBinding,
         extraTokens: Int = 0,
-    ) {
+    ): Boolean {
         val snapshot = binding.aggregateSnapshot()
         val resources = runtimeStateStore.resourceSnapshot()
         val baseBudget = runtimeStateStore.historyBudgetFor(snapshot, resources)
@@ -168,7 +168,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
             structuredWorkState = structuredWorkState(snapshot, binding.eventLog, workSessionProjection),
         ) ?: run {
             updateContextMetrics(binding)
-            return
+            return false
         }
 
         runtimeStateStore.requestPressureStore.advanceGeneration(
@@ -197,6 +197,7 @@ internal class LocalWorkModelHistoryRuntime @Inject constructor(
         checkpoint(binding, "session/compaction")
         updateContextMetrics(binding)
         persist(binding)
+        return true
     }
 
     /** Runs before the foreground request acquires its model slot; never called from overflow. */

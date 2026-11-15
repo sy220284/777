@@ -192,7 +192,7 @@ internal class LocalWorkAgentTurnExecutor(
             // A continuation belongs to the same user task. Keep the already admitted
             // tool selection instead of clearing it and re-discovering from a synthetic
             // "continue" user message. A newly recovered binding starts with no selection.
-            if (binding.continuationParentRunId == null || binding.enabledOptionalTools.isEmpty()) {
+            if (binding.continuationParentRunId == null || !binding.enabledOptionalTools.isPreparedForContinuation()) {
                 workTurnToolRuntime.clear(binding)
                 workTurnToolRuntime.prepare(binding, input)
             }
@@ -460,19 +460,21 @@ internal class LocalWorkAgentTurnExecutor(
                         // Replace this request's layer, never append catalog updates to history.
                         workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
-                    val advertisedTools = runToolSurface.next(workTurnToolRuntime.schemas(runPolicy, binding))
-                    latestAcceptedSamplingRevision = observedSteer
-                    val tools = modelToolStepSurface.capture(
-                        advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),
-                    )
+                    // Select a provisional tool surface for compaction cost only.
+                    // The actual model-visible selection is frozen after compaction.
+                    val preliminarySelection = workTurnToolRuntime.selectSchemas(runPolicy, binding)
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
                             estimateModelTokens(workPromptContext.dynamic + improvementGuidance +
                                 investigationContext + reusableDiscoveryContext) +
                             estimateModelTokens(workPromptContext.skill)
-                    if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
+                    var historyCompacted = false
+                    val recoveryNeedsBudget = binding.enabledOptionalTools
+                        .hasBudgetOmittedRecoveryCandidate(preliminarySelection.budgetOmittedNames)
+                    if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep) ||
+                        recoveryNeedsBudget) {
                         LocalWorkSummarySettings.attach(context)
-                        val extra = productContextTokens + estimateModelTokens(tools.toString())
+                        val extra = productContextTokens + estimateModelTokens(preliminarySelection.schemas.toString())
                         if (LocalWorkSummarySettings.state.value) {
                             val outcome = sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
                                 workModelHistoryRuntime.compactSemanticallyBeforeStep(binding, extra) { request ->
@@ -511,12 +513,28 @@ internal class LocalWorkAgentTurnExecutor(
                             if (outcome is LocalWorkSamplingOutcome.Completed && !outcome.value) {
                                 agentRunCoordinator.ensureCurrentOwner(runContext)
                                 if (binding.steeringRevision.value != observedSteer) continue
-                                workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                                historyCompacted = workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                            } else if (outcome is LocalWorkSamplingOutcome.Completed) {
+                                historyCompacted = outcome.value
                             }
                         } else {
-                            workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
+                            historyCompacted = workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
                         }
                     }
+                    // Re-project with the final history budget only when compaction changed
+                    // the input. Ordinary steps reuse the first selection without duplicate work.
+                    val finalSelection = if (historyCompacted) {
+                        workTurnToolRuntime.selectSchemas(runPolicy, binding)
+                    } else preliminarySelection
+                    workTurnToolRuntime.recordSchemaAdmission(binding, finalSelection)
+                    // One recovery-driven compaction attempt per rejected model step.
+                    // Further calls must not spin on the same unobtainable capacity.
+                    binding.enabledOptionalTools.finishCapacityCheck()
+                    val advertisedTools = runToolSurface.next(finalSelection.schemas)
+                    latestAcceptedSamplingRevision = observedSteer
+                    val tools = modelToolStepSurface.capture(
+                        advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),
+                    )
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
@@ -673,7 +691,10 @@ internal class LocalWorkAgentTurnExecutor(
                         if (binding.steeringRevision.value != latestAcceptedSamplingRevision) {
                             workSteeredToolResult(call.toLocalToolCall())
                         } else if (!modelToolStepSurface.allows(call.name)) {
-                            modelToolStepSurface.hiddenCallResult(call.name)
+                            modelToolStepSurface.hiddenCallResult(
+                                call.name,
+                                workTurnToolRuntime.prepareUnexposedForNextStep(binding, call.name),
+                            )
                         } else {
                             workTurnToolRuntime.execute(
                                 binding = binding,
@@ -689,7 +710,14 @@ internal class LocalWorkAgentTurnExecutor(
                 toolBatch = AgentToolBatchExecutor { calls ->
                     modelToolStepSurface.executeBound {
                         agentRunCoordinator.ensureCurrentOwner(runContext)
-                        modelToolStepSurface.executeVisibleBatch(calls) { visibleCalls ->
+                        modelToolStepSurface.executeVisibleBatch(
+                            calls,
+                            onUnexposed = { name ->
+                                if (binding.steeringRevision.value == latestAcceptedSamplingRevision)
+                                    workTurnToolRuntime.prepareUnexposedForNextStep(binding, name)
+                                else false
+                            },
+                        ) { visibleCalls ->
                             workTurnToolRuntime.executeBatch(
                                 binding = binding,
                                 calls = visibleCalls.map { it.toLocalToolCall() },

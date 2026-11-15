@@ -33,6 +33,32 @@ internal object LocalWorkFindingJournal {
         log.withWriterLease {
             when (val action = args.text("action")) {
                 "list" -> list(log, goalId)
+                "retract" -> {
+                    // The source-backed record remains in the append-only event log.
+                    // A tombstone removes it from all current task projections.
+                    val id = args.text("finding_id").trim()
+                    require(id.isNotBlank()) { "撤回发现必须提供 finding_id" }
+                    val previous = log.latestMatching(setOf(EVENT)) {
+                        it.text("finding_id") == id && it.text("goal_id") == goalId
+                    } ?: error("找不到当前目标内的调查发现")
+                    require(previous.data.text("status") != "retracted") { "该发现已经撤回" }
+                    val reason = args.text("summary").trim()
+                    require(reason.length <= 500) { "撤回说明最多 500 字" }
+                    log.append(EVENT, buildJsonObject {
+                        put("finding_id", id)
+                        put("goal_id", goalId)
+                        put("project_id", previous.data.text("project_id").ifBlank { projectId })
+                        put("source_message_id", sourceMessageId.orEmpty())
+                        put("action", "retract")
+                        put("summary", previous.data.text("summary"))
+                        put("status", "retracted")
+                        put("source_call_id", previous.data.text("source_call_id"))
+                        previous.data["source_sequence"]?.let { put("source_sequence", it) }
+                        put("next_action", "")
+                        put("reason", reason)
+                    })
+                    "已撤回调查发现 ID=$id；保留原始事件审计，后续工作上下文与重规划不再使用该发现"
+                }
                 "record", "revise" -> {
                     val summary = args.text("summary").trim()
                     require(summary.length in 8..500) { "发现说明须为 8—500 字" }
@@ -59,9 +85,13 @@ internal object LocalWorkFindingJournal {
                         "finding-" + UUID.randomUUID()
                     } else {
                         val id = args.text("finding_id")
-                        require(id.isNotBlank() && log.latestMatching(setOf(EVENT)) {
+                        val previous = log.latestMatching(setOf(EVENT)) {
                             it.text("finding_id") == id && it.text("goal_id") == goalId
-                        } != null) { "找不到当前目标内可修订的发现记录" }
+                        }
+                        require(id.isNotBlank() && previous != null &&
+                            previous.data.text("status") != "retracted") {
+                            "找不到当前目标内可修订的发现记录，已撤回的发现需重新记录"
+                        }
                         id
                     }
                     val nextAction = args.text("next_action").trim().take(300)
@@ -100,7 +130,9 @@ internal object LocalWorkFindingJournal {
             }
         }
         if (current.isEmpty()) return "当前目标没有调查线索"
-        return current.values.toList().takeLast(20).joinToString("\n") {
+        val active = current.values.filter { it.text("status") != "retracted" }.takeLast(20)
+        if (active.isEmpty()) return "当前目标没有调查线索"
+        return active.joinToString("\n") {
             "ID=${it.text("finding_id")}；状态=${it.text("status")}；" +
                 "发现=${it.text("summary")}；来源=${it.text("source_call_id")}；" +
                 "下一步=${it.text("next_action")}"

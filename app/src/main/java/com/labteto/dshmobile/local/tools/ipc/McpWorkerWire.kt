@@ -29,3 +29,10 @@ internal object McpWorkerWire {
     fun validResponseSize(value: String): Boolean =
         value.toByteArray(Charsets.UTF_8).size <= MAX_RESPONSE_BYTES
 }
+
+/** Only a fixed category crosses the worker IPC. Never forward server error bodies. */
+internal fun mcpWorkerSafeFailureCode(failure: Exception): String {
+    return if (failure is com.labteto.dshmobile.interop.mcp.McpProtocolNegotiationException)
+        "MCP_PROTOCOL_NEGOTIATION_FAILED"
+        else failure.javaClass.simpleName
+}

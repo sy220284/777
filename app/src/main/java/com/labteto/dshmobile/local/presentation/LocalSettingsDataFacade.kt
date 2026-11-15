@@ -67,10 +67,16 @@ class LocalSettingsDataFacade @Inject internal constructor(
             is com.labteto.dshmobile.uicontract.MemoryUiCommand.Forget ->
                 if (forgetMemory(command.expected)) com.labteto.dshmobile.uicontract.MemoryUiReceipt.Forgotten
                 else com.labteto.dshmobile.uicontract.MemoryUiReceipt.StaleOrMissing
+            is com.labteto.dshmobile.uicontract.MemoryUiCommand.Restore ->
+                com.labteto.dshmobile.uicontract.MemoryUiReceipt.Restored(restoreMemory(command.expected))
         }
     } catch (pending: MemoryCleanupPendingException) {
         com.labteto.dshmobile.uicontract.MemoryUiReceipt.CommittedWithWarning(requireNotNull(pending.message))
-    } catch (failure: Exception) { com.labteto.dshmobile.uicontract.MemoryUiReceipt.Failed(failure.message) }
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        com.labteto.dshmobile.uicontract.MemoryUiReceipt.Failed(failure.message)
+    }
     internal fun updateMemory(existing: MemoryRecord, content: String, pinned: Boolean): MemoryRecord {
         val updated = memoryManager.update(existing = existing, content = content, pinned = pinned)
         recoverDiaryAfterMemorySave("记忆已保存")

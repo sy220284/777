@@ -74,17 +74,7 @@ internal class LocalWorkBuiltinToolRuntime(
                     "$receipt；目标已通过验收，手机下载交付将在本轮结束时处理"
                 else receipt
             }
-            "ask_user_question" -> run.interactions.awaitQuestion(
-                LocalQuestion(
-                    callId = call.id,
-                    question = args.string("question").take(2_000),
-                    options = args["options"]
-                        ?.jsonArray
-                        ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-                        .orEmpty()
-                        .take(6),
-                ),
-            )
+            "ask_user_question" -> run.interactions.awaitQuestion(workQuestionFromArgs(call.id, args))
             else -> error("未覆盖的 Work builtin：${call.name}")
         }
     }
@@ -101,6 +91,19 @@ internal class LocalWorkBuiltinToolRuntime(
             "ask_user_question",
         )
     }
+}
+
+/** Preserve the model's entire question and choice set for the real approval UI. */
+internal fun workQuestionFromArgs(callId: String, args: JsonObject): LocalQuestion {
+    val question = args.string("question")
+    require(question.isNotBlank()) { "需要向用户提出明确的问题" }
+    return LocalQuestion(
+        callId = callId,
+        question = question,
+        options = args["options"]?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            .orEmpty(),
+    )
 }
 
 /**

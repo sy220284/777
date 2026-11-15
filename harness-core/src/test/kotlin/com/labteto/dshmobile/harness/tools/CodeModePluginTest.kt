@@ -262,6 +262,130 @@ class CodeModePluginTest {
         assertEquals(0, writes)
     }
 
+    @Test fun laterStaticArgumentTypeFailureRejectsBeforeAnyEarlierWrite() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("changed")
+        }
+        registry.register(HarnessTool(
+            name = "typed_read",
+            schema = functionToolSchema(
+                name = "typed_read",
+                description = "requires an integer",
+                properties = buildJsonObject {
+                    put("count", buildJsonObject { put("type", "integer") })
+                },
+                required = setOf("count"),
+            ),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject {
+                    put("tool", "write")
+                    put("args", buildJsonObject {})
+                })
+                add(buildJsonObject {
+                    put("tool", "typed_read")
+                    put("args", buildJsonObject { put("count", "3") })
+                })
+            })
+        }
+        val actual = registry.execute("code_mode_run", script,
+            context = ToolContext(approval = { true }))
+        assertEquals("CODE_MODE_INVALID_CHILD_ARGUMENTS", actual.errorCode)
+        assertEquals(0, writes)
+        assertTrue(actual.isError)
+    }
+
+    @Test fun deferredArgumentStillRejectsInvalidStaticEnumBeforeAnyWrite() = runTest {
+        val registry = ToolRegistry()
+        var writes = 0
+        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
+            writes++
+            ToolResult("3")
+        }
+        registry.register(HarnessTool(
+            name = "typed_read",
+            schema = functionToolSchema("typed_read", "Count and action",
+                properties = buildJsonObject {
+                    put("count", buildJsonObject { put("type", "integer") })
+                    put("action", buildJsonObject {
+                        put("type", "string")
+                        put("enum", buildJsonArray { add(JsonPrimitive("inspect")); add(JsonPrimitive("list")) })
+                    })
+                },
+                required = setOf("count", "action"),
+            ),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "write"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "typed_read")
+                    put("args", buildJsonObject {
+                        put("count", buildJsonObject { put("\$step_result", 1) })
+                        put("action", "delete")
+                    })
+                })
+            })
+        }
+        val result = registry.execute("code_mode_run", script, context = ToolContext(approval = { true }))
+        assertTrue(result.isError)
+        assertEquals("CODE_MODE_INVALID_CHILD_ARGUMENTS", result.errorCode)
+        assertEquals(0, writes)
+        assertTrue(result.content.contains("action"))
+    }
+
+    @Test fun deferredChildStillRequiresSchemaValidationAfterResultResolution() = runTest {
+        val registry = ToolRegistry()
+        var reads = 0
+        register(registry, "source") { ToolResult("invalid") }
+        registry.register(HarnessTool(
+            name = "typed_read",
+            schema = functionToolSchema("typed_read", "Requires integer",
+                properties = buildJsonObject {
+                    put("count", buildJsonObject { put("type", "integer") })
+                },
+                required = setOf("count"),
+            ),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, _, _ -> reads++; ToolResult("ok") },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject {
+            put("steps", buildJsonArray {
+                add(buildJsonObject { put("tool", "source"); put("args", buildJsonObject {}) })
+                add(buildJsonObject {
+                    put("tool", "typed_read")
+                    put("args", buildJsonObject {
+                        put("count", buildJsonObject { put("\$step_result", 1) })
+                    })
+                })
+            })
+        }
+        val result = registry.execute("code_mode_run", script)
+        assertTrue(result.isError)
+        assertEquals("CODE_MODE_STEP_FAILED", result.errorCode)
+        assertEquals(0, reads)
+    }
+
     @Test fun toolExceptionsProduceAnExplicitUnknownEffectReceipt() = runTest {
         val registry = ToolRegistry()
         var laterCalls = 0
@@ -425,6 +549,63 @@ class CodeModePluginTest {
         assertTrue(actual.content.contains("completed_steps"))
     }
 
+    @Test fun largeDurableDocumentCanPassOnlyTheRequestedSmallField() = runTest {
+        val registry = ToolRegistry()
+        val source = buildJsonObject {
+            put("unused", "x".repeat(170_000))
+            put("identifier", "selected-id")
+        }
+        register(registry, "produce") { ToolResult(source.toString(), structuredResult = source) }
+        var received: JsonObject? = null
+        registry.register(HarnessTool(
+            "consume", functionToolSchema("consume", "使用筛选字段", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", true)
+            }), ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER, ToolExposure.CORE,
+            ToolMetadata("test"), executor = HarnessToolExecutor { _, args, _ ->
+                received = args
+                ToolResult("ok")
+            },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val plan = buildJsonObject { put("steps", buildJsonArray {
+            add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
+            add(buildJsonObject { put("tool", "consume"); put("args", buildJsonObject {
+                put("value", buildJsonObject { put("\$step_result", 1); put("path", "identifier") })
+            }) })
+        }) }
+        val result = registry.execute("code_mode_run", plan)
+        assertFalse(result.content, result.isError)
+        assertEquals("selected-id", (received?.get("value") as JsonPrimitive).content)
+    }
+
+    @Test fun longSelectedFieldFlowsToNextToolUnderActualExpandedArgumentBudget() = runTest {
+        val registry = ToolRegistry()
+        val body = "Y".repeat(24_000)
+        register(registry, "produce") { ToolResult(buildJsonObject { put("body", body) }.toString()) }
+        var received: JsonObject? = null
+        registry.register(HarnessTool(
+            "consume", functionToolSchema("consume", "传递合法的较长字段", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("additionalProperties", true)
+            }), ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER, ToolExposure.CORE,
+            ToolMetadata("test"), executor = HarnessToolExecutor { _, args, _ ->
+                received = args
+                ToolResult("ok")
+            },
+        ))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val script = buildJsonObject { put("steps", buildJsonArray {
+            add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
+            add(buildJsonObject { put("tool", "consume"); put("args", buildJsonObject {
+                put("value", buildJsonObject { put("\$step_result", 1); put("path", "body") })
+            }) })
+        }) }
+        val result = registry.execute("code_mode_run", script)
+        assertFalse(result.content, result.isError)
+        assertEquals(body, (received?.get("value") as JsonPrimitive).content)
+    }
+
     @Test fun conditionalStepsSkipWithoutExecutingMutations() = runTest {
         val registry = ToolRegistry()
         var writes = 0
@@ -571,10 +752,26 @@ class CodeModePluginTest {
         register(registry, "produce") {
             ToolResult("private", retention = ToolResultRetention.EPHEMERAL)
         }
-        register(registry, "write", ToolAccess.WORKSPACE_WRITE) {
-            writes++
-            ToolResult("saved")
-        }
+        // The placeholder must satisfy the child tool's declared schema. Otherwise
+        // deferred-argument preflight rejects the plan before ephemeral retention is tested.
+        registry.register(HarnessTool(
+            name = "write",
+            schema = functionToolSchema("write", "write text", parameterSchema = buildJsonObject {
+                put("type", "object")
+                put("properties", buildJsonObject {
+                    put("value", buildJsonObject { put("type", "string") })
+                })
+                put("required", buildJsonArray { add(JsonPrimitive("value")) })
+            }),
+            access = ToolAccess.WORKSPACE_WRITE,
+            approvalPolicy = ToolApprovalPolicy.ALWAYS,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, _, _ ->
+                writes++
+                ToolResult("saved")
+            },
+        ))
         CodeModePlugin(registry).install(HarnessContext(registry))
         val chained = buildJsonObject {
             put("steps", buildJsonArray {

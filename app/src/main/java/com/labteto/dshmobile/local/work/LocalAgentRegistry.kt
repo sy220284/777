@@ -6,6 +6,15 @@ import com.labteto.dshmobile.local.jobs.LocalJobRegistration
 
 internal enum class LocalAgentAddressSpace { ALL, STANDALONE }
 
+/** Read model only, never a second persistent Agent registry. */
+internal data class LocalAgentChildSnapshot(
+    val id: String,
+    val label: String,
+    val status: String,
+    val continuable: Boolean,
+    val teamManaged: Boolean,
+)
+
 /**
  * Codex AgentControl.resolve identity admission: a durable child is identified by the
  * existing Job manager's authoritative registration, not its label or the current UI session.
@@ -63,12 +72,25 @@ internal class LocalAgentRegistry(private val jobs: LocalJobManager) {
     fun resolveStandaloneChild(sessionId: String, agentId: String): LocalJobInfo =
         resolveStandalone(sessionId, agentId).info
 
+    fun snapshots(sessionId: String): List<LocalAgentChildSnapshot> {
+        require(sessionId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
+        return jobs.agentRegistrations(sessionId).map { registration ->
+            val info = registration.info
+            LocalAgentChildSnapshot(
+                id = info.id,
+                label = info.label.removePrefix("子代理："),
+                status = info.status,
+                continuable = info.continuable,
+                teamManaged = LocalAgentTeamContract.isTeamJobId(info.id),
+            )
+        }
+    }
+
     /** Existing list format is preserved; Team members remain visible but not controllable here. */
     fun list(sessionId: String): String {
         require(sessionId.isNotBlank()) { "AGENT_TARGET_REQUIRED" }
-        val agents = jobs.agentRegistrations(sessionId).map { registration ->
-            "${registration.info.id} [${registration.info.status}] " +
-                registration.info.label.removePrefix("子代理：")
+        val agents = snapshots(sessionId).map { agent ->
+            "${agent.id} [${agent.status}] " + agent.label
         }
         return if (agents.isEmpty()) "没有后台代理" else agents.joinToString("\n")
     }

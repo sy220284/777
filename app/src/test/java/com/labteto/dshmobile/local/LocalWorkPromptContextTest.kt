@@ -73,14 +73,17 @@ class LocalWorkPromptContextTest {
     }
 
     @Test
-    fun oversizeExplicitSkillFailsRatherThanSilentlyTruncating() {
-        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
-            withWorkTurnContext(
-                history = listOf(message("user", "task")),
-                stableContext = "", dynamicContext = "",
-                selectedSkillContext = "x".repeat(24_001),
-            )
-        }
+    fun longExplicitSkillIsPreservedForActualModelBudgetAdmission() {
+        val skill = "REQUIRED_FIRST\n" + "x".repeat(45_000) + "\nREQUIRED_LAST"
+        val request = withWorkTurnContext(
+            history = listOf(message("user", "task")),
+            stableContext = "", dynamicContext = "",
+            selectedSkillContext = skill,
+        )
+        val context = request.single { it["role"]?.jsonPrimitive?.content == "system" }
+        assertEquals(skill, context["content"]?.jsonPrimitive?.content)
+        assertEquals(LocalInstructionScope.TURN.name,
+            context[LOCAL_INSTRUCTION_SCOPE]?.jsonPrimitive?.content)
     }
 
 }

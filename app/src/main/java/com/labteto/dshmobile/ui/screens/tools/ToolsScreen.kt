@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -39,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -63,9 +66,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
-import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.network.requiresAndroid17LocalNetworkPermission
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -168,12 +171,14 @@ internal class ToolsOperationGate {
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val localTools: ToolsManagementUiPort,
+    private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     @ApplicationContext private val appContext: Context,
-    private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
+    private val localTools: ToolsManagementUiPort get() = appServer.tools
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
+    private val _capabilityRevision = MutableStateFlow(0L)
+    val capabilityRevision: StateFlow<Long> = _capabilityRevision.asStateFlow()
     private val _agentBackendStatus = MutableStateFlow("正在读取执行器设置")
     val agentBackendStatus: StateFlow<String> = _agentBackendStatus.asStateFlow()
     fun refreshAgentBackend() { viewModelScope.launch {
@@ -219,11 +224,16 @@ class ToolsViewModel @Inject constructor(
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { _agentBackendStatus.value = "撤销失败，请重试；原授权状态未确认" }
     } }
-    val networkSearchEnabled: StateFlow<Boolean> = networkSearchSettings.enabled
-    val deepSeekSearchPreferred: StateFlow<Boolean> = networkSearchSettings.deepSeekPreferred
+    val networkSearchEnabled: StateFlow<Boolean> = localTools.networkSearchEnabled
+    val deepSeekSearchPreferred: StateFlow<Boolean> = localTools.deepSeekSearchPreferred
 
-    fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
-    fun setDeepSeekSearchPreferred(enabled: Boolean) = networkSearchSettings.setDeepSeekPreferred(enabled)
+    fun setNetworkSearchEnabled(enabled: Boolean) = localTools.setNetworkSearchEnabled(enabled)
+    fun setDeepSeekSearchPreferred(enabled: Boolean) = localTools.setDeepSeekSearchPreferred(enabled)
+
+    /** Reads the same live registry and query ranking as Agent capability_search. */
+    fun discoverCapabilities(query: String): List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot> =
+        if (query.isBlank()) localTools.capabilityCatalogue()
+        else localTools.discoverCapabilities(query, Int.MAX_VALUE)
     private val operationGate = ToolsOperationGate()
     private val requestedCodexLogos = mutableSetOf<String>()
     private var mcpLoginJob: kotlinx.coroutines.Job? = null
@@ -299,6 +309,10 @@ class ToolsViewModel @Inject constructor(
 
     init {
         refresh()
+        viewModelScope.launch {
+            appServer.noticesFor(setOf(com.labteto.dshmobile.uicontract.UiAppServerFeature.TOOLS))
+                .collect { _capabilityRevision.value += 1L }
+        }
         viewModelScope.launch {
             localTools.skillChanges().collectLatest {
                 // A directory may be created just before its SKILL.md is written.
@@ -1203,6 +1217,7 @@ fun ToolsScreen(
         }
     }
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
+    val capabilityRevision by viewModel.capabilityRevision.collectAsStateWithLifecycle()
     val deepSeekSearchPreferred by viewModel.deepSeekSearchPreferred.collectAsStateWithLifecycle()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
@@ -1232,6 +1247,8 @@ fun ToolsScreen(
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var showConnectorSettings by rememberSaveable { mutableStateOf(false) }
+    var showToolDirectory by rememberSaveable { mutableStateOf(false) }
+    var toolDirectoryQuery by rememberSaveable { mutableStateOf("") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
     // Single page with three tabs. The registered tool catalogue is not user-facing.
     var selectedTab by rememberSaveable(startAtPlugins, startAtSkills) {
@@ -1436,6 +1453,72 @@ fun ToolsScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                     AgentBackendSettings(viewModel)
+                                    SyButton(
+                                        text = if (showToolDirectory) "收起实时工具目录" else "查看实时工具目录",
+                                        onClick = { showToolDirectory = !showToolDirectory },
+                                        variant = SyButtonVariant.Ghost,
+                                        modifier = Modifier.fillMaxWidth().testTag("tool-directory-toggle"),
+                                    )
+                                    if (showToolDirectory) {
+                                        SySearchField(
+                                            value = toolDirectoryQuery,
+                                            onValueChange = { toolDirectoryQuery = it },
+                                            placeholder = "按工具名称或能力搜索",
+                                            modifier = Modifier.fillMaxWidth().testTag("tool-directory-search"),
+                                        )
+                                        val queryResult by produceState<
+                                            Result<List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot>>?
+                                        >(
+                                            initialValue = null,
+                                            showToolDirectory, toolDirectoryQuery, capabilityRevision,
+                                            state.localPlugins, state.servers, state.skills,
+                                        ) {
+                                            if (showToolDirectory) {
+                                                delay(120)
+                                                try {
+                                                    val matches = withContext(Dispatchers.Default) {
+                                                        viewModel.discoverCapabilities(toolDirectoryQuery)
+                                                    }
+                                                    value = Result.success(matches)
+                                                } catch (cancelled: CancellationException) {
+                                                    throw cancelled
+                                                } catch (failure: Exception) {
+                                                    value = Result.failure(failure)
+                                                }
+                                            }
+                                        }
+                                        val discovered = queryResult?.getOrNull().orEmpty()
+                                        queryResult?.exceptionOrNull()?.let { failure ->
+                                            Text(
+                                                "工具目录读取失败：" + (failure.message ?: "请重试"),
+                                                style = DsType.caption11.withReadingWeight(),
+                                                color = colors.dangerInk,
+                                            )
+                                        }
+                                        Text(
+                                            if (queryResult == null) "正在匹配已注册工具…"
+                                            else "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",
+                                            style = DsType.caption11.withReadingWeight(),
+                                            color = colors.textSecondary,
+                                        )
+                                        LazyColumn(
+                                            modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp)
+                                                .testTag("tool-directory-results"),
+                                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                                        ) {
+                                            items(discovered, key = { it.name }) { capability ->
+                                                ToolCapabilityRow(
+                                                    title = capability.name,
+                                                    status = capability.family + " · " + capability.access,
+                                                    state = StateDotState.Idle,
+                                                    icon = SyEntryIcons.Tools,
+                                                    onClick = onUseCapability?.let { handoff -> {
+                                                        handoff("请使用 " + capability.name + " 工具完成当前工作，核验调用与执行回执。")
+                                                    } },
+                                                )
+                                            }
+                                        }
+                                    }
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                                         Text(
                                             stringResource(R.string.cap_center_settings_group),

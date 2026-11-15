@@ -10,6 +10,7 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
+import com.labteto.dshmobile.harness.tools.ToolDeviceRequirement
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import com.labteto.dshmobile.harness.tools.functionToolSchema
@@ -91,8 +92,13 @@ class AndroidDevicePlugin(
                     exposure = ToolExposure.OPTIONAL,
                     metadata = ToolMetadata(
                         family = "Android",
-                        discoveryKeywords = ANDROID_DISCOVERY_KEYWORDS,
+                        discoveryKeywords = discoveryKeywordsFor(spec.toolName),
                         requirements = requirementsFor(spec.toolName),
+                        requiredDeviceCapabilities = when {
+                            spec.toolName in ACCESSIBILITY_TOOLS -> setOf(ToolDeviceRequirement.ACCESSIBILITY)
+                            spec.toolName == "android_notification_list" -> setOf(ToolDeviceRequirement.NOTIFICATION_ACCESS)
+                            else -> emptySet()
+                        },
                     ),
                     executor = HarnessToolExecutor { _, input, _ ->
                         val arguments = input.mapValues { (_, value) -> value.jsonPrimitive.content }
@@ -134,9 +140,46 @@ class AndroidDevicePlugin(
     }
 
     private companion object {
-        val ANDROID_DISCOVERY_KEYWORDS = setOf(
-            "android", "安卓", "手机", "设备", "应用", "界面", "无障碍", "通知", "剪贴板", "虚拟屏",
-        )
+        // Each Android operation contributes its own intent terms. A request mentioning
+        // "手机" must not eagerly fill the model schema budget with every Android tool.
+        // All tools remain registered and discoverable by exact name at any time.
+        fun discoveryKeywordsFor(name: String): Set<String> = when (name) {
+            "android_device_info" -> setOf("android", "安卓", "手机", "设备", "手机信息", "系统版本")
+            "android_app_list" -> setOf("应用", "应用列表", "已安装应用", "列出应用", "查看应用")
+            "android_app_info" -> setOf("应用详情", "应用信息", "应用包名")
+            "android_app_launch" -> setOf("打开应用", "启动应用")
+            "android_settings_get" -> setOf("读取系统设置", "系统设置项")
+            "android_screen" -> setOf("查看屏幕", "查看手机界面", "当前屏幕", "无障碍", "操作手机", "操控手机")
+            "android_find" -> setOf("操作手机", "查找控件", "定位控件", "查找按钮", "查找输入框", "界面元素")
+            "android_click_node" -> setOf("点击控件", "点击节点")
+            "android_set_text_node" -> setOf("节点输入", "修改控件文本")
+            "android_scroll" -> setOf("滚动页面", "页面滚动", "滑动列表")
+            "android_wait" -> setOf("等待控件", "等待页面", "等待出现")
+            "android_open_uri" -> setOf("打开链接", "打开网址", "系统链接")
+            "android_tap_text" -> setOf("操作手机", "点击文字", "点击按钮", "点击文本")
+            "android_type" -> setOf("文字输入", "替换文本")
+            "android_input_text" -> setOf("操作手机", "输入文字", "填写表单", "向输入框输入", "输入文本")
+            "android_tap" -> setOf("坐标点击", "点击坐标")
+            "android_swipe" -> setOf("坐标滑动", "滑动屏幕")
+            "android_back" -> setOf("返回上一页", "系统返回")
+            "android_home" -> setOf("返回桌面", "系统主页")
+            "android_screenshot" -> setOf("截图", "屏幕截图", "手机截图")
+            "android_notification_status" -> setOf("通知", "通知权限", "通知访问")
+            "android_notification_list" -> setOf("读取通知", "通知列表", "查看系统通知")
+            "android_clipboard_get" -> setOf("剪贴板", "读取剪贴板", "粘贴板")
+            "android_clipboard_set" -> setOf("剪贴板", "写入剪贴板", "复制文字")
+            "android_clipboard_clear" -> setOf("清空剪贴板", "清除剪贴板")
+            "android_vscreen_create" -> setOf("创建虚拟屏", "创建虚拟显示")
+            "android_vscreen_start" -> setOf("虚拟屏", "虚拟屏启动", "启动虚拟屏")
+            "android_vscreen_list" -> setOf("虚拟屏", "虚拟显示列表")
+            "android_vscreen_status" -> setOf("虚拟屏", "虚拟显示状态")
+            "android_vscreen_launch" -> setOf("虚拟屏打开应用", "虚拟屏启动应用")
+            "android_vscreen_tap" -> setOf("虚拟屏点击", "虚拟显示点击")
+            "android_vscreen_swipe" -> setOf("虚拟屏滑动", "虚拟显示滑动")
+            "android_vscreen_screenshot" -> setOf("虚拟屏截图", "虚拟显示截图")
+            "android_vscreen_close" -> setOf("关闭虚拟屏", "关闭虚拟显示")
+            else -> setOf(name)
+        }
         val ACCESSIBILITY_TOOLS = setOf(
             "android_screen", "android_find", "android_click_node", "android_set_text_node",
             "android_scroll", "android_wait", "android_tap_text", "android_type", "android_input_text", "android_tap",

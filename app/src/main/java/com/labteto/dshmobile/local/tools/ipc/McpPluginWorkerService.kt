@@ -192,7 +192,7 @@ class McpPluginWorkerService : Service() {
                     val transportFailure = failure is IOException
                     if (transportFailure) invalidate(token, "MCP_WORKER_IO_FAILURE")
                     send(sender, McpWorkerWire.RESPONSE, requestId, token,
-                        error = failure.javaClass.simpleName,
+                        error = mcpWorkerSafeFailureCode(failure),
                         transportError = transportFailure,
                         httpStatus = (failure as? com.labteto.dshmobile.interop.mcp.McpHttpException)
                             ?.statusCode ?: 0,

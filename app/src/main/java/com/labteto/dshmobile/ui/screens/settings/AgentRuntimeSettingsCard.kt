@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeLimits
 import com.labteto.dshmobile.local.model.LocalModelConfigContract
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -48,7 +48,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun LocalAgentSettingsCard(
-    local: LocalHarnessSettingsState,
+    local: UiSettingsSnapshot,
     viewModel: SettingsViewModel,
     report: (String) -> Unit,
 ) {

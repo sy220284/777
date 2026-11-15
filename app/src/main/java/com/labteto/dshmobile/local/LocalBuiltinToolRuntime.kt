@@ -182,11 +182,13 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 HarnessResourceKind.FILE_IO, "tool:read_chunk"
             ) {
                 val offset = args.long("start_byte", 0L)
+                val requestedBytes = args.int("max_bytes", 48 * 1024)
                 val page = runInterruptible(Dispatchers.IO) {
-                    workspace.readRawPage(args.string("path"), offset, args.int("max_bytes", 48 * 1024))
+                    workspace.readRawPageWithEnd(args.string("path"), offset, requestedBytes)
                 }
-                "start_byte=" + offset + "；next_byte=" + (offset + page.size) +
-                    "；本页字节=" + page.size + "\n" + java.util.Base64.getEncoder().encodeToString(page)
+                "start_byte=" + offset + "；本页字节=" + page.bytes.size + "；complete=" + page.complete +
+                    (if (page.complete) "" else "；next_byte=" + (offset + page.bytes.size)) +
+                    "\n" + java.util.Base64.getEncoder().encodeToString(page.bytes)
             } }
             "tool_output_read" -> args.optionalString("query")?.takeIf(String::isNotBlank)?.let { query ->
                 root.toolOutputStore.search(
@@ -320,7 +322,12 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 LocalShellTool.execute(args, workspace, jobs, boundSessionId)
             }
             "job_list" -> jobs.list(boundSessionId)
-            "job_output" -> jobs.output(args.string("job_id"), boundSessionId)
+            "job_output" -> {
+                val id = args.string("job_id")
+                if (jobs.agentRegistrations(boundSessionId).any { it.info.id == id })
+                    work.get().agentOutput(boundSessionId, id)
+                else jobs.output(id, boundSessionId)
+            }
             "job_kill" -> jobs.kill(args.string("job_id"), boundSessionId)
             "web_search" -> {
                 val queries = args["queries"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
@@ -471,7 +478,9 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "read_skill" -> readAuthorizedSkill(args.string("name"))
-            "session_search" -> sessionAccess.search(args.string("query"), boundSessionId)
+            "session_search" -> sessionAccess.search(
+                args.string("query"), boundSessionId, args.optionalString("cursor"),
+            )
             "memory_search", "memory_list", "memory_remember", "memory_update", "memory_forget" ->
                 memoryTools(binding).execute(call.name, args, allowMutation)
             "session_event_search" -> sessionAccess.authorizedLog(

@@ -13,7 +13,7 @@ data class UiWorkPlanSnapshot(val sessionId: String, val plan: List<String>,
 
 /** Bounded views of actual Work facts. Owners fence cursors and resolve file versions. */
 interface WorkReadUiPort {
-    fun planForUi(sessionId: String): UiWorkPlanSnapshot? = null
+    fun planForUi(sessionId: String): UiWorkPlanSnapshot?
     fun artifactsForUi(sessionId: String, eventLimit: Int = 384): List<LocalArtifactUiItem>
     fun artifactRevisionForUi(sessionId: String): LocalWorkHistoryRevision?
     fun refreshArtifactFilesForUi(sessionId: String, items: List<LocalArtifactUiItem>): List<LocalArtifactUiItem>

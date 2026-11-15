@@ -179,10 +179,10 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         withContext(Dispatchers.IO) { workspace.directoryPage(path, offset) }
 
     override suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile> =
-        withContext(Dispatchers.IO) { workspace.searchWorkspaceFileNames(query) }
+        kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchWorkspaceFileNames(query) }
 
     override suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
-        withContext(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
+        kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
 
     override fun observeWorkspaceFiles(paths: List<String>): kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange> =
         watchWorkspaceFileChanges(File(workspace.path), paths)
@@ -205,6 +205,13 @@ class LocalSessionFilesRuntime @Inject internal constructor(
 
     internal suspend fun publishedWorkspaceFile(path: String): LocalPublishedDownload? =
         withContext(Dispatchers.IO) { downloadsPublisher.publishedWorkspace(path) }
+
+    override suspend fun publishedWorkspaceSnapshot(path: String): com.labteto.dshmobile.uicontract.UiPublishedDownload? =
+        publishedWorkspaceFile(path)?.let { item ->
+            com.labteto.dshmobile.uicontract.UiPublishedDownload(
+                location = item.location, uri = item.uri, currentVersion = item.currentVersion,
+            )
+        }
 
     override suspend fun saveWorkspaceFileToDownloads(path: String): String =
         withContext(Dispatchers.IO) {

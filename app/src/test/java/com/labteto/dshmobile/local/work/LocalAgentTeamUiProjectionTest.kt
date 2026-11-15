@@ -36,6 +36,41 @@ class LocalAgentTeamUiProjectionTest {
         assertEquals(0, completed.completedMemberCount)
     }
 
+    @Test
+    fun resumeActionReflectsRealPersistentAgentAdmission() {
+        val runnable = LocalAgentChildUiState("child", "验证助手", "interrupted", true, pendingMessageCount = 1)
+        assertTrue(runnable.canResume)
+        assertTrue(runnable.copy(status = "waiting_slice", pendingMessageCount = 0).canResume)
+        assertFalse(runnable.copy(status = "completed").canResume)
+        assertFalse(runnable.copy(status = "dormant", pendingMessageCount = 0).canResume)
+        assertFalse(runnable.copy(continuable = false).canResume)
+    }
+
+    @Test
+    fun standaloneChildAppearsInTheExistingWorkCollaborationSurface() {
+        val standalone = LocalJobInfo("job-child-1", "子代理：代码核验", "running", isAgent = true)
+        val teamMember = LocalJobInfo("job-team-1", "子代理：团队助手", "running", isAgent = true)
+        val otherProcess = LocalJobInfo("job-terminal", "终端", "running", isAgent = false)
+        val view = LocalAgentTeamUiState().withJobs(listOf(standalone, teamMember, otherProcess))
+        assertEquals(listOf("job-child-1"), view.standaloneAgents.map { it.id })
+        assertEquals("代码核验", view.standaloneAgents.single().label)
+        assertTrue(view.visible)
+        val resumed = view.withJobs(listOf(standalone.copy(status = "interrupted"), teamMember))
+        assertEquals("interrupted", resumed.standaloneAgents.single().status)
+        assertEquals(1, resumed.standaloneAgents.size)
+    }
+
+    @Test
+    fun teamAndStandaloneRemainSeparateViewsOfOneJobOwner() {
+        val original = LocalAgentTeamUiState(members = listOf(member("active").copy(jobId = "job-team-2")))
+        val view = original.withJobs(listOf(
+            LocalJobInfo("job-team-2", "团队成员", "running", isAgent = true),
+            LocalJobInfo("child-2", "子代理：检索", "dormant", isAgent = true),
+        ))
+        assertEquals("running", view.members.single().activity)
+        assertEquals(listOf("child-2"), view.standaloneAgents.map { it.id })
+    }
+
     private fun member(phase: String) = LocalAgentTeamMemberUiState(
         id = "member", jobId = "job", name = "助手", description = "核验资料",
         phase = phase, activity = "waiting",

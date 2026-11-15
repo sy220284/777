@@ -21,9 +21,8 @@ import com.labteto.dshmobile.local.model.DeepSeekPricingState
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptUiState
-import com.labteto.dshmobile.local.presentation.LocalHarnessSettingsState
+import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import com.labteto.dshmobile.local.presentation.LocalSettingsDataFacade
-import com.labteto.dshmobile.local.presentation.LocalSettingsRuntime
 import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.labteto.dshmobile.ui.theme.APP_BACKGROUND_DIR
@@ -50,14 +49,17 @@ import kotlinx.coroutines.withContext
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val hostsStore: HostsStore,
-    private val localHarness: LocalSettingsRuntime,
+    private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     private val settingsData: LocalSettingsDataFacade,
     @ApplicationContext context: Context,
 ) : ViewModel() {
+    private val localHarness get() = appServer.settings
 
     private val appContext = context.applicationContext
     private val deviceCapabilitiesController = DeviceCapabilitiesController(appContext)
-    private val memorySettingsController = MemorySettingsController(viewModelScope, localHarness::memoryContext, settingsData::memoryPage, settingsData::updateMemory, settingsData::forgetMemory, settingsData::restoreMemory)
+    private val memorySettingsController = MemorySettingsController(
+        viewModelScope, localHarness::memoryContext, appServer.memory::memoryPage, appServer.memory::submit,
+    )
     internal val personalizationRulesEditor = PersonalizationRulesEditor()
     private var desiredUserRules: String? = null
     private var desiredAutoRecall: Boolean? = null
@@ -68,20 +70,20 @@ class SettingsViewModel @Inject constructor(
     private val _state = MutableStateFlow(AppSettings())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
-    val localHarnessState: StateFlow<LocalHarnessSettingsState> = localHarness.nativeState
+    val localHarnessState: StateFlow<UiSettingsSnapshot> = localHarness.state
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = localHarness.nativeInitialState,
+            initialValue = localHarness.initialState,
         )
     val chatGptState: StateFlow<ChatGptUiState> = localHarness.chatGptState
     val chatStyleGuardBuiltInPhrases: List<String> get() = localHarness.chatStyleGuardBuiltInPhrases
     val approvalMode: StateFlow<LocalApprovalMode> = localHarness.approvalMode
     val deepSeekPricing: StateFlow<DeepSeekPricingState> = settingsData.deepSeekPricing
     val searchUsage: StateFlow<LocalSearchUsageSnapshot> = settingsData.searchUsage
-    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = settingsData.usageRevision
+    val usageAnalytics: StateFlow<TokenUsageAnalyticsSnapshot> = appServer.usage.revision
         .mapLatest {
-            withContext(Dispatchers.IO) { settingsData.usageSnapshot() }
+            withContext(Dispatchers.IO) { appServer.usage.snapshot() }
         }
         .stateIn(
             scope = viewModelScope,
@@ -206,7 +208,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun refreshDeepSeekPricing() {
-        viewModelScope.launch { settingsData.refreshDeepSeekPricing() }
+        viewModelScope.launch { appServer.pricing.refreshOfficial() }
     }
 
     suspend fun saveLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, contextWindowTokensOverride: Int? = null, credentialSourceProfileId: String? = null) =
@@ -447,11 +449,11 @@ class SettingsViewModel @Inject constructor(
         key: String,
         modelFilter: String? = null,
     ): TokenUsageGroupDetail? = withContext(Dispatchers.IO) {
-        settingsData.usageGroupDetail(kind, key, modelFilter)
+        appServer.usage.groupDetail(kind, key, modelFilter)
     }
 
     suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
-        settingsData.usageRecord(requestId)
+        appServer.usage.requestDetail(requestId)
     }
 
     fun refreshDeviceCapabilities() = deviceCapabilitiesController.refresh()
@@ -460,6 +462,8 @@ class SettingsViewModel @Inject constructor(
 
     fun openNotificationAccessSettings() =
         deviceCapabilitiesController.openNotificationAccessSettings()
+
+    fun repairNotificationAccess() = deviceCapabilitiesController.repairNotificationAccess()
 
     fun openAppNotificationSettings() = deviceCapabilitiesController.openAppNotificationSettings()
 

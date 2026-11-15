@@ -252,6 +252,8 @@ internal class LocalWorkComposition @Inject constructor(
         workspaceRoot = File(sessionStorage.files.workspace.path),
         persist = { binding -> sessionStorage.coordinator.enqueue(binding.persistenceSnapshot()) },
     )
+    /** A single launch path for persistent child Agents, including Team-managed children. */
+    private val agentSpawns by lazy { LocalAgentSpawnController(subagents, persistentJobs) }
     private val agentTeams: LocalAgentTeamRuntime by lazy {
         LocalAgentTeamRuntime(
             roleWorkspace = sessionStorage.files.workspace,
@@ -311,27 +313,22 @@ internal class LocalWorkComposition @Inject constructor(
                     "skill" !in tools.registry.names() || "skill" in roleExposed) {
                     "TEAM_SKILL_NOT_EXPOSED：技能工具未进入成员实际工具表"
                 }
-                persistentJobs.startReadonlySubagentResult(
+                agentSpawns.startPersistent(binding, LocalPersistentAgentLaunchRequest(
                     task = task,
                     model = model ?: roleBinding.modelOverride,
                     maxSteps = maxSteps,
                     instructions = roleBinding.instructions,
                     toolAllowlist = roleBinding.toolAllowlist,
-                    virtualScreen = false,
-                    forkParentCallId =
-                        parentCallId.takeIf { context == LocalTeamMemberContext.FORK },
                     parentToolCallId = parentCallId,
-                    sessionId = binding.sessionId,
-                    boundState = binding.aggregateSnapshot(),
-                    historySnapshot = binding.runHandle.modelHistory::snapshot,
                     requestedJobId = requestedJobId,
+                    forkParentHistory = context == LocalTeamMemberContext.FORK,
                     allowMutation = roleBinding.allowMutation,
                     teamManaged = true,
                     workspaceRepository = agentTeams.memberWorkspaceRepository(binding.sessionId, requestedJobId),
                     backendCapabilities = agentTeams.memberBackendCapabilities(binding.sessionId, requestedJobId),
                     // 基础网络、后台任务与技能可用；敏感扩展只能由 Lead 按名称授权。
                     initialOptionalTools = activeOptional,
-                )
+                ))
             },
             sendToTeammate = { agentId, input, sessionId ->
                 persistentJobs.sendInput(agentId, input, sessionId)
@@ -345,6 +342,10 @@ internal class LocalWorkComposition @Inject constructor(
             },
         )
     }
+    /** Model tools and UI share one Work-owned Agent control authority. */
+    private val agentControlPort: LocalAgentControlPort by lazy {
+        LocalWorkAgentControlRuntime(runtimeStateStore.jobManager, subagents, persistentJobs, agentTeams, agentSpawns)
+    }
     private val agentControlBuiltins by lazy {
         LocalAgentControlPlane(
             jobs = runtimeStateStore.jobManager,
@@ -353,6 +354,8 @@ internal class LocalWorkComposition @Inject constructor(
             persistentJobs = persistentJobs,
             teams = agentTeams,
             skillWorkspace = sessionStorage.files.workspace,
+            spawns = agentSpawns,
+            control = agentControlPort,
         )
     }
     private val turnExecutor = LocalWorkAgentTurnExecutor(
@@ -406,8 +409,10 @@ internal class LocalWorkComposition @Inject constructor(
 
     private val teamUiProjection by lazy { LocalWorkTeamUiProjection(agentTeams, workRunRegistry, runtimeStateStore) }
     internal val agentUi: LocalWorkAgentController by lazy {
-        LocalWorkAgentController(runtimeStateStore, agentTeams, teamUiProjection)
+        LocalWorkAgentController(runtimeStateStore, agentControlPort, teamUiProjection)
     }
+    internal fun agentOutput(sessionId: String, agentId: String): String =
+        agentControlPort.output(sessionId, agentId)
     private val teamLifecycle by lazy { LocalWorkTeamLifecycle(runtimeStateStore, agentTeams, persistentJobs, teamUiProjection, scope) }
 
     init { teamLifecycle }

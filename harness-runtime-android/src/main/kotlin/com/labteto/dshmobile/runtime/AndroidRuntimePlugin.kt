@@ -73,7 +73,7 @@ class AndroidRuntimePlugin(
                 metadata = ToolMetadata(
                     family = "运行时",
                     environmentBound = true,
-                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = runtimeDiscoveryKeywordsFor("runtime_command_status"),
                     requirements = emptyList(),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -113,7 +113,7 @@ class AndroidRuntimePlugin(
                 metadata = ToolMetadata(
                     family = "运行时",
                     environmentBound = true,
-                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = runtimeDiscoveryKeywordsFor("process_exec"),
                     requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -155,7 +155,7 @@ class AndroidRuntimePlugin(
                 metadata = ToolMetadata(
                     family = "运行时",
                     environmentBound = true,
-                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = runtimeDiscoveryKeywordsFor("terminal_open"),
                     requirements = listOf("目标命令必须存在；可先调用 runtime_command_status 检查"),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -203,7 +203,7 @@ class AndroidRuntimePlugin(
                 metadata = ToolMetadata(
                     family = "运行时",
                     environmentBound = true,
-                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = runtimeDiscoveryKeywordsFor("terminal_write"),
                     requirements = emptyList(),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -230,7 +230,7 @@ class AndroidRuntimePlugin(
                 metadata = ToolMetadata(
                     family = "运行时",
                     environmentBound = true,
-                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = runtimeDiscoveryKeywordsFor("terminal_read"),
                     requirements = emptyList(),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -261,7 +261,7 @@ class AndroidRuntimePlugin(
                 metadata = ToolMetadata(
                     family = "运行时",
                     environmentBound = true,
-                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = runtimeDiscoveryKeywordsFor("terminal_status"),
                     requirements = emptyList(),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -302,7 +302,7 @@ class AndroidRuntimePlugin(
                 metadata = ToolMetadata(
                     family = "运行时",
                     environmentBound = true,
-                    discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS,
+                    discoveryKeywords = runtimeDiscoveryKeywordsFor("terminal_close"),
                     requirements = emptyList(),
                 ),
                 executor = HarnessToolExecutor { _, input, _ ->
@@ -328,7 +328,7 @@ class AndroidRuntimePlugin(
             }, required = setOf("session_id", "rows", "columns")),
             access = ToolAccess.PROCESS, approvalPolicy = ToolApprovalPolicy.ALWAYS,
             exposure = ToolExposure.OPTIONAL, timeoutMillis = 10_000L,
-            metadata = ToolMetadata("运行时", environmentBound = true, discoveryKeywords = RUNTIME_DISCOVERY_KEYWORDS),
+            metadata = ToolMetadata("运行时", environmentBound = true, discoveryKeywords = runtimeDiscoveryKeywordsFor("terminal_resize")),
             executor = HarnessToolExecutor { _, input, _ ->
                 val sessionId = input.requiredString("session_id")
                 requireTerminalWorkspace(sessionId)
@@ -520,9 +520,19 @@ class AndroidRuntimePlugin(
         const val MAX_PROCESS_TIMEOUT_MILLIS = 120_000L
         const val PROCESS_TOOL_TIMEOUT_MILLIS = 125_000L
         const val MAX_TOOL_OUTPUT_CHARS = 120_000
-        val RUNTIME_DISCOVERY_KEYWORDS = setOf(
-            "runtime", "运行时", "进程", "终端", "命令", "shell", "git", "python", "node",
-        )
+        // The generic runtime family is discoverable, but task preactivation is
+        // operation-specific. Reading terminal output must not expose every process action.
+        fun runtimeDiscoveryKeywordsFor(name: String): Set<String> = when (name) {
+            "runtime_command_status" -> setOf("运行环境", "命令检查", "命令是否存在", "运行时检测")
+            "process_exec" -> setOf("执行命令", "运行命令", "启动进程", "python", "node", "shell")
+            "terminal_open" -> setOf("终端", "打开终端", "交互终端", "终端会话", "pty")
+            "terminal_write" -> setOf("终端输入", "终端写入", "发送到终端")
+            "terminal_read" -> setOf("终端输出", "读取终端", "终端读取")
+            "terminal_status" -> setOf("终端状态", "查询终端")
+            "terminal_close" -> setOf("关闭终端", "结束终端")
+            "terminal_resize" -> setOf("终端尺寸", "调整终端")
+            else -> setOf(name)
+        }
         val TOOL_NAMES = listOf(
             "runtime_command_status",
             "process_exec",

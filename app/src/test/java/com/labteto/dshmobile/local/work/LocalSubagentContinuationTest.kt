@@ -12,6 +12,22 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LocalSubagentContinuationTest {
+    @Test fun recoveryPreservesCompleteSelectedToolSetAndTerminalResult() {
+        val tools = (1..180).map { "mcp_demo_tool$it" }.toSet()
+        val answer = "开头必须保留\n" + "完整结果".repeat(20_000) + "\n结尾必须保留"
+        val encoded = encodeLocalSubagentHistoryCheckpoint(
+            backgroundJobId = "job-large", agentId = "sa-large", step = 8,
+            history = listOf(buildJsonObject {
+                put("role", "assistant"); put("content", answer); put("_dsh_completion", "COMPLETED")
+            }),
+            claimedMessageIds = emptySet(), enabledOptionalTools = tools,
+            terminalOutput = answer, resultId = "result-large",
+        )
+        val decoded = requireNotNull(decodeLocalSubagentHistoryCheckpoint(encoded))
+        assertEquals(tools, decoded.enabledOptionalTools)
+        assertEquals(answer, decoded.terminalOutput)
+    }
+
     @Test
     fun pausedSliceRequiresRootAdmissionAndDoesNotBecomeWritableCrashReplay() {
         assertFalse(canResumeSubagentAtRootSlice("waiting_slice", rootSliceAdmitted = false))

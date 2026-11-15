@@ -10,8 +10,9 @@ import com.shenyan.designsystem.foundation.LocalSyColors
 @Composable
 internal fun TaskManagementFeedback(state: TasksUiState, onRefresh: () -> Unit) {
     val colors = LocalSyColors.current
-    if (state.managementFailed) {
-        Text(stringResource(R.string.tasks_operation_failed), color = colors.dangerInk)
+    if (state.managementFailed || state.managementError != null) {
+        Text(state.managementError?.takeIf(String::isNotBlank)
+            ?: stringResource(R.string.tasks_operation_failed), color = colors.dangerInk)
         SyButton(stringResource(R.string.common_retry), onClick = onRefresh)
     } else state.notice?.let { notice ->
         Text(stringResource(when (notice) {

@@ -33,6 +33,7 @@ internal class LocalModelToolStepSurface {
     /** The batch path must enforce the same frozen model surface as single-tool dispatch. */
     suspend fun executeVisibleBatch(
         calls: List<AgentToolCall>,
+        onUnexposed: (String) -> Boolean = { false },
         execute: suspend (List<AgentToolCall>) -> List<AgentToolResult>,
     ): List<AgentToolResult> {
         val visible = calls.filter { allows(it.name) }
@@ -40,14 +41,18 @@ internal class LocalModelToolStepSurface {
         check(executed.size == visible.size) { "已暴露工具的批量执行结果数量不匹配" }
         val results = executed.iterator()
         return calls.map { call ->
-            if (allows(call.name)) results.next() else hiddenCallResult(call.name)
+            if (allows(call.name)) results.next()
+            else hiddenCallResult(call.name, onUnexposed(call.name))
         }
     }
 
-    fun hiddenCallResult(name: String) = AgentToolResult(
+    fun hiddenCallResult(name: String, queuedForNextStep: Boolean = false) = AgentToolResult(
         content = "模型调用了本步骤未暴露的工具：$name",
         isError = true,
         errorCode = "TOOL_NOT_EXPOSED",
-        recoveryHint = "新注册的 MCP 工具只能在下一次模型请求获得工具定义后调用；先用 capability_search 按精确工具名检查、加载，不能在当前步骤猜测调用或重复执行写入。",
+        recoveryHint = if (queuedForNextStep)
+            "工具已加入下一模型步骤优先候选；仍须实际进入模型工具表并通过权限审批，本步骤没有执行此工具或产生写入。"
+        else
+            "工具未进入本步骤工具表；通过 capability_search 查询当前可用能力，再在下一模型步骤选择调用。不要重复执行未核实的写入。",
     )
 }

@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.local.session
 
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
-import com.labteto.dshmobile.local.agent.LOCAL_QUEUED_USER_TIMELINE_ACTION
 import com.labteto.dshmobile.local.model.LOCAL_MODEL_TOOL_CALLS_EVENT_KEY
 import com.labteto.dshmobile.local.tools.optionalString
 import com.labteto.dshmobile.observability.AppLog
@@ -11,6 +9,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
+
+/** The durable Session event discriminators are shared facts: Agent writes queue
+ * payloads, while Session owns their exact wire identity for replay and paging.
+ */
+internal const val LOCAL_AGENT_INBOX_EVENT_TYPE = "agent/inbox/spliced"
+internal const val LOCAL_QUEUED_USER_TIMELINE_ACTION = "queued-user-timeline"
 
 /** Shared durable event contract for visible Chat checkpoints (never model history). */
 internal const val CHAT_STREAM_CHECKPOINT_EVENT = "chat/stream-checkpoint"
@@ -136,6 +140,58 @@ private fun decodeTranscriptBlocks(value: JsonArray?): List<LocalMessageBlock>? 
     return blocks
 }
 
+
+/** Compact, durable replacement/removal of one unconsumed user message. */
+internal data class LocalQueuedUserTranscriptDelta(
+    val messageId: String,
+    val replacement: LocalHarnessMessage?,
+)
+
+internal fun encodeQueuedUserTranscriptDelta(
+    messageId: String, replacement: LocalHarnessMessage?,
+): JsonObject {
+    require(messageId.isNotBlank() && (replacement == null ||
+        (replacement.id == messageId && replacement.role == "user")))
+    return JsonObject(buildMap {
+        put("message_id", JsonPrimitive(messageId))
+        put("operation", JsonPrimitive(if (replacement == null) "remove" else "edit"))
+        replacement?.let { put("message", encodeTranscriptMessages(listOf(it)).single()) }
+    })
+}
+
+/** Invalid persisted deltas fail closed rather than silently replaying a stale user turn. */
+internal fun decodeQueuedUserTranscriptDelta(event: LocalSessionEventLog.Event): LocalQueuedUserTranscriptDelta? {
+    // Only the owning queued-user timeline action can mutate a committed transcript.
+    // Arbitrary tool payloads must never be interpreted as Session control events.
+    if (event.type != LOCAL_AGENT_INBOX_EVENT_TYPE ||
+        (event.data["action"] as? JsonPrimitive)?.contentOrNull != LOCAL_QUEUED_USER_TIMELINE_ACTION) {
+        return null
+    }
+    val encoded = event.data["transcript_delta"] ?: return null
+    val delta = encoded as? JsonObject ?: error("持久消息变更结构损坏")
+    val messageId = (delta["message_id"] as? JsonPrimitive)?.contentOrNull
+        ?.takeIf(String::isNotBlank) ?: error("持久消息变更缺少消息编号")
+    val replacement = when ((delta["operation"] as? JsonPrimitive)?.contentOrNull) {
+        "remove" -> {
+            check("message" !in delta) { "删除事件含有意外消息正文" }
+            null
+        }
+        "edit" -> {
+            val message = delta["message"] as? JsonObject
+                ?: error("编辑事件缺少完整消息内容")
+            val decoded = decodeTranscriptMessages(
+                JsonObject(mapOf("transcript" to JsonArray(listOf(message)))),
+            )?.singleOrNull() ?: error("编辑事件包含无法解析的消息")
+            check(decoded.id == messageId && decoded.role == "user") {
+                "编辑事件与原用户消息身份不一致"
+            }
+            decoded
+        }
+        else -> error("未知持久消息变更动作")
+    }
+    return LocalQueuedUserTranscriptDelta(messageId, replacement)
+}
+
 internal fun assistantModelMessageFromEvent(data: JsonObject): JsonObject =
     (data["message"] as? JsonObject) ?: JsonObject(
         data - "transcript" - "replaces" - LOCAL_MODEL_TOOL_CALLS_EVENT_KEY,
@@ -161,6 +217,22 @@ internal fun projectSessionTranscriptTail(
         .forEach { event ->
             // An unreadable transcript cannot be marked as durably projected.
             if (undecodableTranscript) return@forEach
+            val delta = decodeQueuedUserTranscriptDelta(event)
+            if (delta != null) {
+                // The durable Event contains a single change, not a duplicate of the whole
+                // conversation. Historical rows stay in their original order.
+                val position = messages.indexOfFirst { it.id == delta.messageId }
+                if (position >= 0) {
+                    if (delta.replacement == null) {
+                        messages.removeAt(position)
+                        knownIds.remove(delta.messageId)
+                    } else {
+                        messages[position] = delta.replacement
+                    }
+                }
+                projectedThrough = maxOf(projectedThrough, event.sequence)
+                return@forEach
+            }
             if (event.type == "chat/active-transcript" || event.type == "work/active-transcript" ||
                 (event.type == LOCAL_AGENT_INBOX_EVENT_TYPE &&
                     (event.data["action"] as? JsonPrimitive)?.contentOrNull == LOCAL_QUEUED_USER_TIMELINE_ACTION)

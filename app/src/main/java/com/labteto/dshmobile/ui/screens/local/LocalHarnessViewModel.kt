@@ -5,8 +5,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
-import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
@@ -50,21 +48,24 @@ class LocalHarnessViewModel @Inject constructor(
     private val chatUi: LocalChatUiFacade,
     private val sessionUi: LocalSessionUiFacade,
     private val toolsUi: LocalToolsUiFacade,
-    private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
-    private val teamUi: com.labteto.dshmobile.uicontract.WorkTeamUiPort,
+
+    private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
-    private val documentMedia: com.labteto.dshmobile.uicontract.MediaUiPort,
+
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
-    private val approvalPreferences: LocalApprovalPreferences,
-    private val networkSearchSettings: LocalNetworkSearchSettings,
     private val sectionStore: LocalSessionSectionUiFacade,
     private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
     private val securityReviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentSecurityReviewUiFacade,
-    private val sampleCoordinator: com.labteto.dshmobile.local.model.LocalConversationSampleCoordinator,
     private val workProjectUi: com.labteto.dshmobile.local.presentation.LocalWorkProjectsUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+    private val teamUi get() = appServer.agents
+    private val workReadUi get() = appServer.workRead
+    private val filesUi get() = appServer.files
+    private val settingsUi get() = appServer.settings
+    private val usageUi get() = appServer.usage
+    private val documentMedia get() = appServer.media
 
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }
@@ -126,12 +127,12 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun consumePreparedDocumentDraft(sessionId: String): String? =
         nativeDocuments.consumePreparedDraft(sessionId)
 
-    val approvalMode = approvalPreferences.approvalMode
-    val networkSearchEnabled = networkSearchSettings.enabled
-    fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
+    val approvalMode = settingsUi.approvalMode
+    val networkSearchEnabled = toolsUi.networkSearchEnabled
+    fun setNetworkSearchEnabled(enabled: Boolean) = toolsUi.setNetworkSearchEnabled(enabled)
     val state = runtime.state
     val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
-    internal val queuedUserPort = conversationPorts.queuedUsers
+    internal val queuedUserPort get() = appServer.queuedUsers
     val shellState = state.projectShellState(viewModelScope)
     val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)
@@ -265,7 +266,7 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
 
     internal suspend fun sampleSession(sessionId: String, prompt: String) =
-        sampleCoordinator.sample(sessionId, prompt)
+        sessionUi.sampleSession(sessionId, prompt)
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
     internal suspend fun correctDiaryEntry(
@@ -344,7 +345,22 @@ class LocalHarnessViewModel @Inject constructor(
         }
         return deleted
     }
-    suspend fun importAttachment(uri: Uri): LocalImportedAttachment = runtime.session.importAttachment(uri)
+    /** Session identity is validated again by the Attachment Owner after Android file import. */
+    suspend fun importAttachment(uri: Uri): LocalImportedAttachment {
+        val identity = appServer.session.snapshot().identity
+            ?: error("当前会话正在切换，请重新选择附件")
+        return when (val receipt = appServer.attachments.import(
+            com.labteto.dshmobile.uicontract.ImportUiAttachmentCommand(identity, uri.toString())
+        )) {
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Imported -> receipt.attachment
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Rejected ->
+                error("附件导入被拒绝：" + receipt.reason)
+            is com.labteto.dshmobile.uicontract.UiAttachmentReceipt.Failed ->
+                error(receipt.message ?: "附件导入失败")
+            com.labteto.dshmobile.uicontract.UiAttachmentReceipt.GrantRevoked ->
+                error("文件访问权限已失效，请重新选择附件")
+        }
+    }
     internal suspend fun remoteGitBranchesForUi(repository: String) =
         toolsUi.remoteGitBranchesForUi(repository)
     internal suspend fun compareLocalGitForUi(repository: String, includeUntracked: Boolean) =
@@ -411,45 +427,45 @@ class LocalHarnessViewModel @Inject constructor(
         return securityReviewFacade.approve(sessionId, repository, review, diff)
     }
 
-    suspend fun importWorkspaceFile(uri: Uri): String = runtime.session.importWorkspaceFileForUi(uri)
-    internal suspend fun publishedWorkspaceFile(path: String) = runtime.session.publishedWorkspaceFileForUi(path)
-    internal suspend fun saveWorkspaceFileToDownloads(path: String) = runtime.session.saveWorkspaceFileToDownloadsForUi(path)
+    suspend fun importWorkspaceFile(uri: Uri): String = filesUi.importWorkspaceFile(uri)
+    internal suspend fun publishedWorkspaceFile(path: String) = filesUi.publishedWorkspaceSnapshot(path)
+    internal suspend fun saveWorkspaceFileToDownloads(path: String) = filesUi.saveWorkspaceFileToDownloads(path)
     internal suspend fun publishedWorkspaceFileForSession(sessionId: String, path: String) =
-        runtime.session.publishedWorkspaceFileForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+        filesUi.publishedWorkspaceSnapshot(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
     internal suspend fun saveWorkspaceFileToDownloadsForSession(sessionId: String, path: String) =
-        runtime.session.saveWorkspaceFileToDownloadsForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
-    suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
-    suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
-    suspend fun workspaceDirectoryPage(path: String, offset: Int) = runtime.session.workspaceDirectoryPageForUi(path, offset)
-    suspend fun searchWorkspaceFiles(query: String) = runtime.session.searchWorkspaceFilesForUi(query)
-    suspend fun searchWorkspacePage(query: String, offset: Int) = runtime.session.searchWorkspacePageForUi(query, offset)
-    suspend fun stopWorkspaceSearch(query: String) = runtime.session.stopWorkspaceSearchForUi(query)
+        filesUi.saveWorkspaceFileToDownloads(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+    suspend fun workspaceFiles() = filesUi.workspaceFiles()
+    suspend fun workspaceDirectory(path: String) = filesUi.workspaceDirectory(path)
+    suspend fun workspaceDirectoryPage(path: String, offset: Int) = filesUi.workspaceDirectoryPage(path, offset)
+    suspend fun searchWorkspaceFiles(query: String) = filesUi.searchWorkspaceFiles(query)
+    suspend fun searchWorkspacePage(query: String, offset: Int) = filesUi.searchWorkspacePage(query, offset)
+    suspend fun stopWorkspaceSearch(query: String) = filesUi.stopWorkspaceSearch(query)
     internal fun observeWorkspaceFiles(paths: List<String>) =
-        runtime.session.observeWorkspaceFilesForUi(paths)
-    suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
+        filesUi.observeWorkspaceFiles(paths)
+    suspend fun conversationFiles(sessionId: String) = filesUi.conversationFiles(sessionId)
     suspend fun previewWorkspaceFileForSession(sessionId: String, path: String) =
-        runtime.session.previewWorkspaceFileForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+        filesUi.previewWorkspaceFile(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
     suspend fun previewWorkspaceFilePageForSession(sessionId: String, path: String, offset: Long) =
-        runtime.session.previewWorkspaceFilePageForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path, offset)
-    suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
+        filesUi.previewWorkspaceFilePage(workProjectUi.relocatedReadPath(sessionId, path) ?: path, offset)
+    suspend fun previewWorkspaceFile(path: String) = filesUi.previewWorkspaceFile(path)
     suspend fun previewWorkspaceFilePage(path: String, offset: Long) =
-        runtime.session.previewWorkspaceFilePageForUi(path, offset)
+        filesUi.previewWorkspaceFilePage(path, offset)
     internal fun workEventChangesForUi(sessionId: String) = runtime.work.workEventChangesForUi(sessionId)
     internal fun workArtifactFileChangesForUi(sessionId: String, paths: List<String>) =
         runtime.work.workArtifactFileChangesForUi(sessionId, paths)
-    internal fun artifactRevisionForUi(sessionId: String) = runtime.work.artifactRevisionForUi(sessionId)
-    internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>) = runtime.work.refreshArtifactFilesForUi(sessionId, items)
-    internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem) = runtime.work.inspectArtifactForUi(sessionId, item)
-    fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
+    internal fun artifactRevisionForUi(sessionId: String) = workReadUi.artifactRevisionForUi(sessionId)
+    internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>) = workReadUi.refreshArtifactFilesForUi(sessionId, items)
+    internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem) = workReadUi.inspectArtifactForUi(sessionId, item)
+    fun artifactsForUi(sessionId: String) = workReadUi.artifactsForUi(sessionId)
     fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) =
-        runtime.work.historyPageForUi(sessionId, cursor)
+        workReadUi.historyPageForUi(sessionId, cursor)
 
     fun artifactHistoryForUi(sessionId: String, eventLimit: Int) =
-        runtime.work.artifactsForUi(sessionId, eventLimit)
-    fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
+        workReadUi.artifactsForUi(sessionId, eventLimit)
+    fun toolActivitiesForUi(sessionId: String) = workReadUi.toolActivitiesForUi(sessionId)
     fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
-        runtime.work.toolEvidenceForUi(sessionId, callId, sequence)
-    internal fun requirementEvidenceForUi(sessionId: String) = runtime.work.requirementEvidenceForUi(sessionId)
+        workReadUi.toolEvidenceForUi(sessionId, callId, sequence)
+    internal fun requirementEvidenceForUi(sessionId: String) = workReadUi.requirementEvidenceForUi(sessionId)
     fun linkRequirementEvidenceForUi(
         sessionId: String, target: com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
@@ -458,7 +474,7 @@ class LocalHarnessViewModel @Inject constructor(
         val prepared = runtime.work.prepareRequirementEvidenceForUi(sessionId, target.index, target.content, artifact) ?: return false
         return runtime.work.commitRequirementEvidenceForUi(prepared)
     }
-    fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
+    fun eventSequenceForUi(sessionId: String) = workReadUi.eventSequenceForUi(sessionId)
     /** Resolve the current binding before every team action; never reuse a stale job identity. */
     internal fun teamMemberOutput(jobId: String): String {
         val snapshot = teamUi.snapshot()
@@ -491,6 +507,32 @@ class LocalHarnessViewModel @Inject constructor(
         return teamActionResult(teamUi.submit(
             com.labteto.dshmobile.uicontract.WorkTeamUiCommand.StopMember(identity, memberId, member.jobId)
         ))
+    }
+
+    /** Standalone Agent actions use the same Work Agent UI contract as Team actions. */
+    internal suspend fun controlAgent(
+        agentId: String,
+        operation: com.labteto.dshmobile.uicontract.UiWorkAgentOperation,
+        text: String?,
+    ): LocalWorkUiActionResult {
+        val snapshot = teamUi.snapshot()
+        val identity = snapshot.identity ?: return LocalWorkUiActionResult(false, "会话已变化")
+        val agent = snapshot.agents.singleOrNull { it.id == agentId && !it.teamManaged }
+            ?: return LocalWorkUiActionResult(false, "子智能体已变化，请刷新状态")
+        val command = when (operation) {
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.INSPECT ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.InspectAgent(identity, agent.id)
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.SEND_MESSAGE ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.SendAgentMessage(identity, agent.id,
+                    requireNotNull(text).takeIf(String::isNotBlank) ?: error("消息内容不能为空"))
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.INTERRUPT ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.InterruptAgent(identity, agent.id)
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.RESUME ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.ResumeAgent(identity, agent.id)
+            com.labteto.dshmobile.uicontract.UiWorkAgentOperation.CLOSE ->
+                com.labteto.dshmobile.uicontract.WorkTeamUiCommand.CloseAgent(identity, agent.id)
+        }
+        return teamActionResult(teamUi.submit(command))
     }
 
     internal suspend fun stopTeam(): LocalWorkUiActionResult {

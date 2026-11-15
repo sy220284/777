@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local.agent
 
+import com.labteto.dshmobile.local.session.LOCAL_QUEUED_USER_TIMELINE_ACTION
+
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
+
 import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.agent.QueuedAgentInputKind
@@ -12,11 +16,11 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
 import com.labteto.dshmobile.local.session.buildLocalTranscriptRuntimeIndex
-import com.labteto.dshmobile.local.session.encodeTranscriptMessages
+import com.labteto.dshmobile.local.session.encodeQueuedUserTranscriptDelta
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 /** Queue and visible timeline are committed in one EventLog record while queue CAS owns admission. */
-internal const val LOCAL_QUEUED_USER_TIMELINE_ACTION = "queued-user-timeline"
 
 internal data class LocalQueuedUserTimelineUpdate(
     val messages: List<LocalHarnessMessage>,
@@ -72,9 +76,9 @@ internal class LocalQueuedUserMessageEditor(
             memoryInput = prepared.memoryInput,
             modelMessage = prepared.modelMessage,
         )
-        val messages = timeline.toMutableList().apply {
-            set(index, original.copy(content = prepared.visibleContent, blocks = prepared.blocks))
-        }
+        val replacement = original.copy(content = prepared.visibleContent, blocks = prepared.blocks)
+        val messages = timeline.toMutableList().apply { set(index, replacement) }
+        val updatedIndex = buildLocalTranscriptRuntimeIndex(messages)
         var eventSequence: Long? = null
         if (!queue.replaceUserCommitted(queued, revised) { pending ->
             check(eventLog.latestSequence() == beforeSequence) {
@@ -86,13 +90,18 @@ internal class LocalQueuedUserMessageEditor(
                     action = LOCAL_QUEUED_USER_TIMELINE_ACTION,
                     pending = pending,
                     affected = listOf(revised),
-                ) + ("transcript" to encodeTranscriptMessages(messages))),
+                ) + mapOf(
+                    "transcript_delta" to encodeQueuedUserTranscriptDelta(messageId, replacement),
+                    "transcript_index" to Json.encodeToJsonElement(
+                        LocalTranscriptRuntimeIndex.serializer(), updatedIndex,
+                    ),
+                )),
             )
             eventSequence = event.sequence
         }) return null
         return LocalQueuedUserTimelineUpdate(
             messages = messages,
-            transcriptIndex = buildLocalTranscriptRuntimeIndex(messages),
+            transcriptIndex = updatedIndex,
             eventSequence = requireNotNull(eventSequence),
             pendingCount = queue.size(),
         )
@@ -109,6 +118,7 @@ internal class LocalQueuedUserMessageEditor(
             "排队消息没有可核实的原始记录"
         }
         val messages = timeline.filterNot { it.id == messageId }
+        val updatedIndex = buildLocalTranscriptRuntimeIndex(messages)
         var eventSequence: Long? = null
         if (!queue.removeUserCommitted(messageId) { pending ->
             check(eventLog.latestSequence() == beforeSequence) {
@@ -120,13 +130,18 @@ internal class LocalQueuedUserMessageEditor(
                     action = LOCAL_QUEUED_USER_TIMELINE_ACTION,
                     pending = pending,
                     affected = listOf(queued),
-                ) + ("transcript" to encodeTranscriptMessages(messages))),
+                ) + mapOf(
+                    "transcript_delta" to encodeQueuedUserTranscriptDelta(messageId, null),
+                    "transcript_index" to Json.encodeToJsonElement(
+                        LocalTranscriptRuntimeIndex.serializer(), updatedIndex,
+                    ),
+                )),
             )
             eventSequence = event.sequence
         }) return null
         return LocalQueuedUserTimelineUpdate(
             messages = messages,
-            transcriptIndex = buildLocalTranscriptRuntimeIndex(messages),
+            transcriptIndex = updatedIndex,
             eventSequence = requireNotNull(eventSequence),
             pendingCount = queue.size(),
         )

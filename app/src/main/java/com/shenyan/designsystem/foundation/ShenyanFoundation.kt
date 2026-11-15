@@ -261,10 +261,6 @@ fun ShenyanTheme(
 enum class SyPhase { IDLE, WAITING, RUNNING, DONE, FAILED, CANCELLED, BLOCKED }
 
 data class SyOption(val id: String, val label: String, val enabled: Boolean = true)
-data class SyAction(val id: String, val label: String, val destructive: Boolean = false, val enabled: Boolean = true)
-data class SyStep(val id: String, val label: String, val detail: String, val phase: SyPhase)
-data class SyFileNode(val id: String, val name: String, val isFolder: Boolean, val depth: Int = 0)
-data class SyAttachment(val id: String, val name: String, val description: String = "", val phase: SyPhase = SyPhase.DONE)
 
 /** Nested surfaces become solid after three translucent layers. */
 val LocalSyGlassDepth = staticCompositionLocalOf { 0 }

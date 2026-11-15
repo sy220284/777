@@ -391,7 +391,7 @@ fun SyLoadingStates(phase: SyPhase, message: String, onRetry: (() -> Unit)? = nu
     }
 }
 
-/** Approval teaser: it opens a blocking SyApprovalDetail dialog. Never execute a side effect here. */
+/** Approval teaser: opening the live approval flow is owned by the caller. */
 @Composable
 fun SyApproveCard(title: String, reason: String,
                   onReviewApproval: () -> Unit, onPostpone: () -> Unit,

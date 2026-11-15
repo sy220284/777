@@ -41,7 +41,7 @@
 | 场景与入口 | 关键状态 / 交互 | 源码/任务 | 设计状态 |
 |---|---|---|---|
 | HOME 聊天 | 侧栏/搜索、群聊、长文本与换行、分支、用户/助手操作区、气泡、IME、滚动阅读 | `LocalConversationSurface`、`LocalHarnessMessageComponents` | 待实测 |
-| HOME 工作 | 时间线/计划、审批/提问、草稿队列/立即调整、停止、真实进度和成果卡 | `LocalConversationComposer`、`LocalWorkStateContent` | 待实测 |
+| HOME 工作 | 时间线/计划、审批/提问、草稿队列/立即调整、停止、真实进度和成果卡 | `LocalConversationComposer`、`LocalWorkSurfaceComponents` | 待实测 |
 | PERSONA_GALLERY / DIARY | 人物选择、详情编辑、群聊、日记与返回 | `PersonaGalleryOverviewV3`、`CharacterDiaryScreen` | 待实测 |
 | WORKSPACE | 列表/目录/预览、打开文件与回到会话成果 | `LocalWorkspaceFilesDialog` | 待实测 |
 | TASKS | 空列表/创建/编辑/真实执行状态 | `TasksScreen` | 待实测 |

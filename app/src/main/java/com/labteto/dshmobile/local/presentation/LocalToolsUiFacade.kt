@@ -32,7 +32,12 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
     private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
+    private val networkSearchSettings: com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings,
 ) : com.labteto.dshmobile.uicontract.ToolsManagementUiPort {
+    override val networkSearchEnabled = networkSearchSettings.enabled
+    override val deepSeekSearchPreferred = networkSearchSettings.deepSeekPreferred
+    override fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
+    override fun setDeepSeekSearchPreferred(enabled: Boolean) = networkSearchSettings.setDeepSeekPreferred(enabled)
     override suspend fun agentBackendStatus(): String = agentBackends.status()
     override suspend fun probeAgentBackend(): String = agentBackends.probe()
     override suspend fun configureAgentBackend(host: String, port: Int, pin: String, token: String, consent: Boolean) =
@@ -180,12 +185,19 @@ class LocalToolsUiFacade @Inject internal constructor(
         task, githubConfigured, networkSearchEnabled,
         showModelStatus, modelConfigured, mcpToolsAvailable, pluginsInstalled,
         accessibilityActive, notificationAccessActive,
+        tools.requiredDeviceCapabilitiesForTask(task),
     )
     override suspend fun configureGitHub(token: String) { tools.configureGitHub(token) }
     override suspend fun clearGitHub() = tools.clearGitHub()
     override fun capabilityCatalogue() = tools.capabilityCatalogue().map {
         com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(it.name, it.family, it.access, it.approval, it.requirements, it.parameterSchema)
     }
+    override fun discoverCapabilities(query: String, limit: Int) =
+        tools.discoverCapabilities(query, limit).map {
+            com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot(
+                it.name, it.family, it.access, it.approval, it.requirements, it.parameterSchema,
+            )
+        }
     override fun validateCapabilityDraft(
         name: String, expectedSchema: kotlinx.serialization.json.JsonObject, argumentsJson: String,
     ): com.labteto.dshmobile.uicontract.UiToolDraftValidation =

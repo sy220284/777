@@ -3,7 +3,7 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.harness.workflow.TaskGraphNode
 import com.labteto.dshmobile.harness.workflow.TaskGraphNodeResult
 import com.labteto.dshmobile.harness.workflow.TaskGraphOutcome
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import java.io.File
 import java.security.MessageDigest

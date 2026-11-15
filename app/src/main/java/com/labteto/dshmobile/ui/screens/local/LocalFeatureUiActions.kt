@@ -103,23 +103,19 @@ internal data class LocalWorkUiActionResult(
 
 internal data class LocalWorkFeatureUiActions(
     val workState: StateFlow<LocalWorkUiState>,
+    val agentAction: suspend (String, com.labteto.dshmobile.uicontract.UiWorkAgentOperation, String?) -> LocalWorkUiActionResult,
     val projectActions: LocalWorkProjectsUiActions? = null,
     val queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort? = null,
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
-    val saveWorkspaceFileToDownloads: suspend (String) -> String = { error("保存到下载目录未连接") },
+    val saveWorkspaceFileToDownloads: suspend (String) -> String,
     val importWorkspaceFile: (suspend (Uri) -> String)? = null,
-    val publishedWorkspaceFile: suspend (String) -> com.labteto.dshmobile.local.files.LocalPublishedDownload? = { null },
-    val workspaceDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
-    val workspaceDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { _, _ ->
-        LocalWorkspaceDirectoryPage(emptyList(), null)
-    },
-    val searchWorkspaceFiles: suspend (String) -> List<LocalWorkspaceFile> = { emptyList() },
-    val searchWorkspacePage: suspend (String, Int) -> LocalWorkspaceSearchPage = { _, _ ->
-        LocalWorkspaceSearchPage(emptyList(), null)
-    },
-    val stopWorkspaceSearch: suspend (String) -> Boolean = { false },
-    val observeWorkspaceFiles: (List<String>) -> kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.local.files.LocalWorkspaceFileChange> =
-        { kotlinx.coroutines.flow.emptyFlow() },
+    val publishedWorkspaceFile: suspend (String) -> com.labteto.dshmobile.uicontract.UiPublishedDownload?,
+    val workspaceDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry>,
+    val workspaceDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage,
+    val searchWorkspaceFiles: suspend (String) -> List<LocalWorkspaceFile>,
+    val searchWorkspacePage: suspend (String, Int) -> LocalWorkspaceSearchPage,
+    val stopWorkspaceSearch: suspend (String) -> Boolean,
+    val observeWorkspaceFiles: (List<String>) -> kotlinx.coroutines.flow.Flow<com.labteto.dshmobile.local.files.LocalWorkspaceFileChange>,
     val remoteGitBranches: (suspend (String) -> List<String>)? = null,
     val compareLocalGit: (suspend (String, Boolean) -> LocalRemoteGitDiffUi)? = null,
     val compareRemoteGit: (suspend (String, String, String) -> LocalRemoteGitDiffUi)? = null,
@@ -132,7 +128,7 @@ internal data class LocalWorkFeatureUiActions(
     val approveIndependentSecurityReview: (suspend (String, String, com.labteto.dshmobile.local.work.LocalSecurityReview, LocalRemoteGitDiffUi) -> Boolean)? = null,
     val conversationFiles: suspend (String) -> LocalConversationFiles,
     val previewWorkspaceFile: suspend (String) -> LocalWorkspaceFilePreview,
-    val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview = { path, _ -> previewWorkspaceFile(path) },
+    val previewWorkspaceFilePage: suspend (String, Long) -> LocalWorkspaceFilePreview,
     val artifactsForUi: (String) -> List<LocalArtifactUiItem>,
     val eventSequenceForUi: (String) -> Long,
     val artifactRevision: (String) -> com.labteto.dshmobile.local.presentation.LocalWorkHistoryRevision?,

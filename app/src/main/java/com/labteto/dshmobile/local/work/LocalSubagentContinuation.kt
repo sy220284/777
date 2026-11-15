@@ -14,10 +14,9 @@ internal const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_EVENT = "subagent/history-c
 internal const val LOCAL_SUBAGENT_INBOX_CLAIM_EVENT = "subagent/inbox-claimed"
 /** Durable evidence: a model reply was returned after an exact Inbox message reached the submitted model input. */
 internal const val LOCAL_SUBAGENT_INBOX_MODEL_REPLY_EVENT = "subagent/inbox-model-reply"
-private const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION = 2
+private const val LOCAL_SUBAGENT_HISTORY_CHECKPOINT_VERSION = 3
 private const val LOCAL_SUBAGENT_INBOX_CLAIM_VERSION = 1
 private const val MAX_CLAIMED_MESSAGE_IDS = 256
-private const val MAX_TERMINAL_OUTPUT_CHARS = 65_536
 
 /** Only the root run can open a new request slice for waiting children. */
 internal fun canResumeSubagentAtRootSlice(
@@ -62,9 +61,9 @@ internal fun encodeLocalSubagentHistoryCheckpoint(
     put("step", step.coerceAtLeast(0))
     softStepLimit?.takeIf { it > 0 }?.let { put("soft_step_limit", it) }
     put("history", JsonArray(history))
-    put("enabled_optional_tools", JsonArray(enabledOptionalTools.sorted().take(48).map(::JsonPrimitive)))
+    put("enabled_optional_tools", JsonArray(enabledOptionalTools.sorted().map(::JsonPrimitive)))
     terminalOutput?.takeIf { it.isNotBlank() && subagentHistoryAllowsCompletedResult(history) }?.let {
-        put("terminal_output", it.takeLast(MAX_TERMINAL_OUTPUT_CHARS))
+        put("terminal_output", it)
         resultId?.let { id -> put("result_id", id); put("result_first", resultFirst) }
     }
     put(
@@ -208,7 +207,7 @@ internal fun decodeLocalSubagentHistoryCheckpoint(
     val enabledTools = rawEnabledTools?.map { element ->
         val name = (element as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
         name?.takeIf { it.isNotBlank() && it.length <= 128 } ?: return null
-    }?.takeIf { it.size <= 48 }?.toSet()
+    }?.takeIf { version >= 3 || it.size <= 48 }?.toSet()
         ?: if (version == 1) emptySet() else return null
     return LocalSubagentHistoryCheckpoint(
         history = history,

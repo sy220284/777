@@ -4,7 +4,22 @@ import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
 
+/** Standalone child is rendered alongside Team members from the existing Job ledger. */
+data class LocalAgentChildUiState(
+    val id: String,
+    val label: String,
+    val status: String,
+    val continuable: Boolean,
+    val pendingMessageCount: Int = 0,
+    val canMessage: Boolean = false,
+) {
+    val canResume: Boolean
+        get() = continuable && status in setOf("interrupted", "dormant", "waiting_slice") &&
+            (pendingMessageCount > 0 || status == "waiting_slice")
+}
+
 data class LocalAgentTeamUiState(
+    val standaloneAgents: List<LocalAgentChildUiState> = emptyList(),
     val members: List<LocalAgentTeamMemberUiState> = emptyList(),
     val tasks: List<LocalAgentTeamTaskUiState> = emptyList(),
     val pendingMessageCount: Int = 0,
@@ -13,7 +28,7 @@ data class LocalAgentTeamUiState(
     val rebuilding: Boolean = false,
 ) {
     val visible: Boolean
-        get() = rebuilding || members.isNotEmpty() || tasks.isNotEmpty() || failure != null
+        get() = rebuilding || members.isNotEmpty() || tasks.isNotEmpty() || failure != null || standaloneAgents.isNotEmpty()
     val runningMemberCount: Int
         get() = members.count { it.activity == "running" }
     val stoppingMemberCount: Int
@@ -34,9 +49,20 @@ data class LocalAgentTeamUiState(
         }
 
     fun withJobs(jobs: List<LocalJobInfo>): LocalAgentTeamUiState {
-        if (members.isEmpty()) return this
         val byId = jobs.associateBy(LocalJobInfo::id)
         return copy(
+            standaloneAgents = jobs.filter { info ->
+                info.isAgent && !LocalAgentTeamContract.isTeamJobId(info.id)
+            }.map { info ->
+                LocalAgentChildUiState(
+                    id = info.id,
+                    label = info.label.removePrefix("子代理："),
+                    status = info.status,
+                    continuable = info.continuable,
+                    pendingMessageCount = info.pendingMessageCount,
+                    canMessage = info.canMessage,
+                )
+            },
             members = members.map { member ->
                 val jobStatus = byId[member.jobId]?.status
                 // Only an admitted active member derives activity from its Child Job.

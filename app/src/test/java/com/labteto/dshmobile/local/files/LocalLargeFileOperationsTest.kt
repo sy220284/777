@@ -200,6 +200,24 @@ class LocalLargeFileOperationsTest {
         assertEquals(512L * 1024L * 1024L, result.file.bytes)
     }
 
+    @Test fun boundedRawPagesKnowExactEOFWithoutAnExtraEmptyRead() {
+        val expected = "12345678".toByteArray()
+        root.resolve("exact.bin").writeBytes(expected)
+        val first = workspace.readRawPageWithEnd("exact.bin", 0, 4)
+        assertArrayEquals(expected.copyOfRange(0, 4), first.bytes)
+        assertFalse(first.complete)
+        val last = workspace.readRawPageWithEnd("exact.bin", 4, 4)
+        assertArrayEquals(expected.copyOfRange(4, 8), last.bytes)
+        assertTrue(last.complete)
+        val empty = workspace.readRawPageWithEnd("exact.bin", 8, 4)
+        assertTrue(empty.complete)
+        assertEquals(0, empty.bytes.size)
+        assertArrayEquals(expected, workspace.readRawPage("exact.bin", 0, 8))
+        val partial = workspace.readRawPageWithEnd("exact.bin", 6, 4)
+        assertTrue(partial.complete)
+        assertArrayEquals(expected.copyOfRange(6, 8), partial.bytes)
+    }
+
     @Test fun largeToolArtifactsAreStoredWithoutFormerFiveMiBCeiling() {
         val content = "abcd-".repeat(1_300_000)
         val path = workspace.writeToolArtifact(".dsh/queries/large.txt", content)

@@ -140,6 +140,7 @@ fun SyFullScreenDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
             dismissOnBackPress = true,
             dismissOnClickOutside = true,
         ),

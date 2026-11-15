@@ -63,7 +63,7 @@ internal fun remainingOptionalToolDefinitionBudget(
     val capacity = (remainingOperationalTokens.toLong() -
         coreDefinitionTokens.coerceAtLeast(0)).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     return minOf(
-        requestedDefinitionTokens.coerceIn(0, LocalToolRouter.MAX_OPTIONAL_TOOL_PROMPT_TOKENS),
+        requestedDefinitionTokens.coerceAtLeast(0),
         if (preserveToolSurface) capacity else capacity / 4,
     )
 }

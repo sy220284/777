@@ -36,7 +36,7 @@ object LocalToolCatalog {
             "expected_revision" to string("file_version 返回的 revision 或 absent"),
             "content" to string("替换后的全部 UTF-8 内容"),
         ), listOf("path", "expected_revision", "content")))
-        add(tool("read_chunk", "按字节偏移读取大文件，返回有界 Base64 页和下一字节位置", properties(
+        add(tool("read_chunk", "按字节偏移读取大文件：complete=true 表示读取结束；complete=false 时按 next_byte 续读有界 Base64 页", properties(
             "path" to string("工作区文件路径"),
             "start_byte" to integerRange("起始字节偏移，默认 0", min = 0),
             "max_bytes" to integerRange("读取字节数，最大 49152", 1, 49152),
@@ -165,7 +165,7 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "从实时注册表发现扩展。已知名称可用 select:工具名1,工具名2，一次指定最多 128 个，并聚焦本轮可选工具清单；自动标出本轮预计可用、已加载、缺失及待加载工具，并给出超出定义预算时下一批精确选择命令。已装入本轮模型工具表的 MCP/GitHub 等扩展可直接加入 code_mode_run，串联前序执行结果；仍须逐步经过实际连接与权限审批。", properties(
+        add(tool("capability_search", "从实时注册表发现扩展。已知名称可用 select:工具名1,工具名2，按照真实任务需要指定工具名称，由实际注册状态及模型定义预算决定本轮装入范围，并聚焦当前任务的可选工具候选。结果区分已注册、已选择候选与定义预算不足；以下一模型请求最终提供的工具表为实际可用依据。进入该工具表的 MCP/GitHub 扩展可参与 code_mode_run，仍须逐步经过真实连接与权限审批。", properties(
             "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
         ), listOf("query")))
         add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
@@ -201,19 +201,46 @@ object LocalToolCatalog {
             "description" to string("目标和完成标准"),
             "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("按用户要求交付的工作区相对文件路径；讨论任务填空数组")) },
             "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("按用户要求执行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },
-            "review_requirements" to buildJsonObject { put("type", "array"); put("items", string("仅任务明确要求时填写 code（独立代码审查）和/或 security（独立安全审查）；其他任务为 []。审查观点、人工确认与真实测试分别结算")) },
+            "review_requirements" to buildJsonObject {
+                put("type", "array")
+                put("items", buildJsonObject {
+                    put("type", "string")
+                    put("description", "用户明确要求独立审查时选择 code 或 security")
+                    put("enum", buildJsonArray { add(JsonPrimitive("code")); add(JsonPrimitive("security")) })
+                })
+            },
         ), listOf("description", "artifact_paths", "verification_commands")))
         add(tool("get_goal", "读取当前会话目标", properties()))
         add(tool("update_goal", "更新当前 Work Goal 状态。完成前依据原目标真实执行已声明的验收命令并核验当前成果版本；命令未执行、最新失败、缺少退出码、文件缺失和版本变化会分别说明修复动作。受阻时保留已完成进度，按具体错误恢复后继续结算。", properties(
-            "status" to string("active、paused、completed 或 blocked"),
+            "status" to buildJsonObject {
+                put("type", "string")
+                put("description", "active、paused、completed 或 blocked")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("active")); add(JsonPrimitive("paused"))
+                    add(JsonPrimitive("completed")); add(JsonPrimitive("blocked"))
+                })
+            },
             "note" to string("状态说明"),
         ), listOf("status")))
-        add(tool("work_finding", "从真实工具回执记录调查发现；提出假说、补充依据、推翻错误判断，或列出当前目标的发现。仅在遇到有价值的新线索时调用；发现记录不等于已独立验证", properties(
-            "action" to string("record 新发现、revise 修改已有发现、list 列出当前目标记录"),
-            "finding_id" to string("revise 必填：由 record 返回的发现 ID"),
-            "summary" to string("record/revise 必填：基于来源的具体观察或假说，8—500 字"),
+        add(tool("work_finding", "从真实回执管理调查发现：record 新发现、revise 修订或否定、retract 撤回过时发现、list 查看。retract 仅需 finding_id，原始证据保留审计；重新采用时创建新发现。", properties(
+            "action" to buildJsonObject {
+                put("type", "string")
+                put("description", "record 新发现、revise 修改已有发现、retract 撤回已有发现、list 列出当前目标记录")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("record")); add(JsonPrimitive("revise"))
+                    add(JsonPrimitive("retract")); add(JsonPrimitive("list"))
+                })
+            },
+            "finding_id" to string("revise/retract 必填：当前目标内由 record 返回的发现 ID"),
+            "summary" to string("record/revise 必填：基于来源的具体观察或假说，8—500 字；retract 可选撤回原因，最多 500 字"),
             "source_call_id" to string("record/revise 必填：当前目标已成功完成的真实工具调用 ID"),
-            "status" to string("hypothesis 初步假说、supported 有来源支持、rejected 已被调查推翻"),
+            "status" to buildJsonObject {
+                put("type", "string")
+                put("description", "hypothesis 初步假说、supported 有来源支持、rejected 已被调查推翻")
+                put("enum", buildJsonArray {
+                    add(JsonPrimitive("hypothesis")); add(JsonPrimitive("supported")); add(JsonPrimitive("rejected"))
+                })
+            },
             "next_action" to string("准备补查或验证的下一步；可选"),
         ), listOf("action")))
         add(tool("ask_user_question", "暂停当前轮次并向用户询问无法自行确定的选择", properties(
@@ -531,8 +558,9 @@ object LocalToolCatalog {
             "limit" to integer("单页最多返回条数，默认 50，最大 100"),
             "after_sequence" to integer("可选分页游标；继续上一页时传结果末尾提示的事件序号"),
         ), listOf("query")))
-        add(tool("session_search", "跨本机历史会话搜索事件", properties(
+        add(tool("session_search", "跨当前项目或会话链分页搜索历史事件；返回 next_cursor 时继续检索，直到没有游标", properties(
             "query" to string("搜索内容"),
+            "cursor" to string("可选；上页返回的 next_cursor，继续检索后续会话"),
         ), listOf("query")))
         add(tool("memory_search", "搜索当前会话允许作用域内的长期记忆", properties(
             "query" to string("搜索内容"),

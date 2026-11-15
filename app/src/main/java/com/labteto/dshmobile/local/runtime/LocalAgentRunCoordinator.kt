@@ -31,8 +31,8 @@ import kotlinx.serialization.json.put
 internal const val LOCAL_AGENT_RUN_CHECKPOINT_EVENT = "agent/run-checkpoint"
 internal const val LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT = "agent/subagent-run-checkpoint"
 internal const val LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT = "agent/automation-run-checkpoint"
-private const val LOCAL_AGENT_RUN_CHECKPOINT_VERSION = 2
-private const val MAX_RECOVERY_INPUT_CHARS = 8_000
+internal const val LOCAL_AGENT_RUN_INPUT_EVENT = "agent/run-input"
+private const val LOCAL_AGENT_RUN_CHECKPOINT_VERSION = 3
 
 internal enum class LocalAgentRunKind {
     FOREGROUND,
@@ -179,13 +179,23 @@ internal class LocalAgentRunCoordinator(
             resourceBudget = resourceBudget,
             toolNames = toolNames.distinct().sorted(),
             contextChars = contextChars.coerceAtLeast(0),
-            input = input.take(MAX_RECOVERY_INPUT_CHARS),
-            memoryInput = memoryInput.take(MAX_RECOVERY_INPUT_CHARS),
+            input = input,
+            memoryInput = memoryInput,
             startedAt = now(),
             parentRunId = parentRunId,
             agentId = agentId,
         )
         runOwners.claim(context.ownership()) {
+            val log = eventLogFor(sessionId)
+            // Store the complete user task exactly once. A checkpoint is a small execution
+            // cursor; repeating long prompts on every tool/model step inflates the event log.
+            // Recovery links the two durable facts by run ID.
+            log.append(LOCAL_AGENT_RUN_INPUT_EVENT, buildJsonObject {
+                put("run_id", context.runId)
+                put("run_kind", context.kind.name.lowercase())
+                put("input", context.input)
+                put("memory_input", context.memoryInput)
+            })
             append(
                 context = context,
                 status = LocalAgentRunCheckpointStatus.RUNNING,
@@ -312,6 +322,18 @@ internal class LocalAgentRunCoordinator(
         val requiresExecutableRecovery =
             status == LocalAgentRunCheckpointStatus.RUNNING.name.lowercase() ||
                 status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()
+        // Version 3 owns complete inputs in a single event. Missing evidence blocks
+        // recovery explicitly rather than silently resuming a shortened/new task.
+        val durableInputs = if (version >= 3 && requiresExecutableRecovery) {
+            log.latestMatching(setOf(LOCAL_AGENT_RUN_INPUT_EVENT)) { input ->
+                input["run_id"]?.jsonPrimitive?.contentOrNull == runId
+            }?.data ?: return LocalAgentRunRecoveryDecision(
+                runId = runId,
+                blockedReason = "原任务输入记录缺失，请核对历史消息后手动继续。",
+                blockedCode = "RECOVERY_INPUT_MISSING",
+                route = route,
+            )
+        } else null
         if (version < 2 && requiresExecutableRecovery) {
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
@@ -365,6 +387,7 @@ internal class LocalAgentRunCoordinator(
         }
         if (status == LocalAgentRunCheckpointStatus.RECOVERY_QUEUED.name.lowercase()) {
             val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
+                ?: return recoveryContextFailure(runId, route)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
@@ -379,13 +402,14 @@ internal class LocalAgentRunCoordinator(
 
         if (kind != LocalAgentRunKind.FOREGROUND) {
             val continuation = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
+                ?: return recoveryContextFailure(runId, route)
             return LocalAgentRunRecoveryDecision(
                 runId = runId,
                 queuedInput = QueuedAgentInput(
                     id = "run-recovery:$runId",
                     content = continuation,
-                    memoryInput = data["memory_input"]?.jsonPrimitive?.contentOrNull
-                        ?: data["input"]?.jsonPrimitive?.contentOrNull
+                    memoryInput = (durableInputs ?: data)["memory_input"]?.jsonPrimitive?.contentOrNull
+                        ?: (durableInputs ?: data)["input"]?.jsonPrimitive?.contentOrNull
                         ?: continuation,
                 ),
                 route = route,
@@ -419,10 +443,12 @@ internal class LocalAgentRunCoordinator(
             if (durableTurnEnd != null && durableTurnEnd.sequence > event.sequence) return null
         }
 
-        val originalInput = data["memory_input"]?.jsonPrimitive?.contentOrNull
-            ?: data["input"]?.jsonPrimitive?.contentOrNull
+        val inputEvidence = durableInputs ?: data
+        val originalInput = inputEvidence["memory_input"]?.jsonPrimitive?.contentOrNull
+            ?: inputEvidence["input"]?.jsonPrimitive?.contentOrNull
             ?: ""
         val continuationPrompt = recoveryContinuationPrompt(log, recoveryUsageMode, contextPolicy)
+            ?: return recoveryContextFailure(runId, route)
         val continuation = QueuedAgentInput(
             id = "run-recovery:$runId",
             content = continuationPrompt,
@@ -431,25 +457,35 @@ internal class LocalAgentRunCoordinator(
         return LocalAgentRunRecoveryDecision(runId = runId, queuedInput = continuation, route = route)
     }
 
+    private fun recoveryContextFailure(
+        runId: String,
+        route: LocalAgentRunRouteIdentity?,
+    ): LocalAgentRunRecoveryDecision = LocalAgentRunRecoveryDecision(
+        runId = runId,
+        blockedReason = "恢复上下文生成失败，已保留上次任务与执行记录；请检查诊断信息后手动继续。",
+        blockedCode = "RECOVERY_CONTEXT_FAILED",
+        route = route,
+    )
+
     private fun recoveryContinuationPrompt(
         log: LocalSessionEventLog,
         usageMode: LocalUsageMode?,
         contextPolicy: LocalAgentRunRecoveryContextPolicy?,
-    ): String {
+    ): String? {
         val policy = contextPolicy ?: return RECOVERY_CONTINUATION_PROMPT
-        val modelHistory = log.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)
-            ?.let { event -> ModelHistoryCheckpointCodec().decode(event.data) }
-            .orEmpty()
         return runCatching {
+            val modelHistory = log.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)
+                ?.let { event -> ModelHistoryCheckpointCodec().decode(event.data) }
+                .orEmpty()
             policy.decorate(
                 LocalAgentRunRecoveryContextInput(
                     usageMode = usageMode,
                     modelHistory = modelHistory,
                     basePrompt = RECOVERY_CONTINUATION_PROMPT,
                 ),
-            )
+            ).takeIf(String::isNotBlank) ?: error("工作恢复上下文为空")
         }.onFailure { AppLog.failure("AgentRecovery", "decorate_recovery_prompt", it) }
-            .getOrDefault(RECOVERY_CONTINUATION_PROMPT)
+            .getOrNull()
     }
     fun markRecoveryQueued(
         sessionId: String,
@@ -529,8 +565,6 @@ internal class LocalAgentRunCoordinator(
                     put("max_virtual_displays", budget.maxVirtualDisplays)
                     put("max_language_servers", budget.maxLanguageServers)
                 }
-                put("input", context.input)
-                put("memory_input", context.memoryInput)
                 put("started_at", context.startedAt)
                 put("updated_at", now())
                 step?.let { put("step", it) }
@@ -539,7 +573,7 @@ internal class LocalAgentRunCoordinator(
                 toolCallCount?.let { put("tool_call_count", it) }
                 completionReason?.let { put("completion_reason", it) }
                 sideEffect?.takeIf(String::isNotBlank)?.let { put("side_effect", it) }
-                answer?.let { put("answer", it.take(MAX_RECOVERY_OUTPUT_CHARS)) }
+                answer?.let { put("answer", it) }
                 reason?.takeIf(String::isNotBlank)?.let { put("reason", it.take(2_000)) }
             },
         )
@@ -623,8 +657,10 @@ internal class LocalAgentRunCoordinator(
             val latest = log.latest(eventType(kind)) ?: return@retire false
             if (latest.data["run_id"]?.jsonPrimitive?.contentOrNull != runId) return@retire false
             log.append(eventType(kind), buildJsonObject {
+                // Status updates preserve the version of the original checkpoint.
+                // Legacy v2 inputs remain embedded in that checkpoint; upgrading only
+                // the marker would demand a nonexistent v3 run-input event on recovery.
                 latest.data.forEach { (key, value) -> put(key, value) }
-                put("version", LOCAL_AGENT_RUN_CHECKPOINT_VERSION)
                 put("run_id", runId)
                 put("session_id", sessionId)
                 put("status", status.name.lowercase())
@@ -644,7 +680,6 @@ internal class LocalAgentRunCoordinator(
         if (kind == LocalAgentRunKind.SUBAGENT) "child:${agentId ?: runId}" else kind.name.lowercase()
 
     private companion object {
-        const val MAX_RECOVERY_OUTPUT_CHARS = 20_000
         const val RECOVERY_CONTINUATION_PROMPT =
             "继续执行上次因系统中断而停止的任务。先核对已有结果，再从安全位置继续；不要重复已完成且可能产生副作用的操作。"
     }

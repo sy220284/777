@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.work
 
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
+
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,13 +31,13 @@ class LocalWorkFormContinuationPolicyTest {
         assertTrue(hasOutstandingWorkReplyForm(log))
         // Automatic continuation and a tool result do not constitute a user submission.
         log.append("tool/result", buildJsonObject { put("id", "tool-1") })
-        log.append(com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE,
+        log.append(LOCAL_AGENT_INBOX_EVENT_TYPE,
             encodeLocalAgentInboxEvent("queued", emptyList()))
         assertTrue(hasOutstandingWorkReplyForm(log))
         log.close()
         val reopened = LocalSessionEventLog(file, Json, sessionId = "s")
         assertTrue(hasOutstandingWorkReplyForm(reopened))
-        reopened.append(com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE,
+        reopened.append(LOCAL_AGENT_INBOX_EVENT_TYPE,
             encodeLocalAgentInboxEvent("queued", emptyList(),
                 listOf(QueuedAgentInput(content = "真实表单答案", id = "submitted-1"))))
         assertFalse(hasOutstandingWorkReplyForm(reopened))
@@ -52,7 +54,7 @@ class LocalWorkFormContinuationPolicyTest {
         val log = LocalSessionEventLog(File(temporary.root, "prequeued.events.jsonl"),
             Json, sessionId = "s")
         fun userQueued(id: String) {
-            log.append(com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE,
+            log.append(LOCAL_AGENT_INBOX_EVENT_TYPE,
                 encodeLocalAgentInboxEvent("queued",
                     listOf(QueuedAgentInput(content = "用户先前排队的消息", id = id)),
                     listOf(QueuedAgentInput(content = "用户先前排队的消息", id = id))))

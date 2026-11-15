@@ -10,12 +10,14 @@ import com.labteto.dshmobile.harness.session.SessionRepairResult
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
 import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
 import com.labteto.dshmobile.local.work.LocalWorkCheckpoint
+import com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_INPUT_EVENT
 import com.labteto.dshmobile.local.runtime.LOCAL_AGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LOCAL_SUBAGENT_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCheckpointStatus
 import com.labteto.dshmobile.local.runtime.LocalAgentRunCoordinator
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
+import com.labteto.dshmobile.local.runtime.LocalAgentRunRecoveryContextPolicy
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.work.LocalWorkRecoveryContextPolicy
 import java.io.File
@@ -243,6 +245,27 @@ class LocalAgentRunCoordinatorTest {
             assertEquals("已经完成的后台结果", decision!!.completedOutput)
             assertNull(decision.queuedInput)
             assertNull(decision.blockedReason)
+        }
+    }
+
+    @Test
+    fun completeAutomationOutputSurvivesRecoveryWithoutTwentyThousandCharacterCutoff() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8,
+                input = "生成完整成果", memoryInput = "生成完整成果",
+                kind = LocalAgentRunKind.AUTOMATION,
+            )
+            val longAnswer = "完整报告内容".repeat(5_000)
+            coordinator.recordEvent(context, AgentEvent.TurnCompleted(context.runId, 2, longAnswer))
+            val checkpoint = requireNotNull(log.latest(LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT))
+            assertEquals(longAnswer, checkpoint.data["answer"]?.toString()?.trim('"'))
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val decision = requireNotNull(cold.recoveryDecision(
+                "s1", SessionRepairResult(), LocalAgentRunKind.AUTOMATION))
+            assertEquals(longAnswer, decision.completedOutput)
         }
     }
 
@@ -644,8 +667,101 @@ class LocalAgentRunCoordinatorTest {
             assertEquals("account-a", decision.route?.profileId)
             assertEquals("credential-a", decision.route?.credentialRef)
             assertEquals("original-route", decision.route?.fingerprint)
-            assertEquals("original", log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT)?.data?.get("memory_input")
+            assertNull("执行检查点仅保存进度游标，不重复大段输入",
+                log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT)?.data?.get("memory_input"))
+            assertEquals("original", log.latest(LOCAL_AGENT_RUN_INPUT_EVENT)?.data?.get("memory_input")
                 ?.toString()?.trim('"'))
+        }
+    }
+
+    @Test
+    fun longUserInstructionSurvivesColdRecoveryWithoutRepeatedCheckpointCopies() {
+        withCoordinator { coordinator, log ->
+            val instruction = "审计并修复全部功能与执行链路；".repeat(1_500) + "最后验收完整结果"
+            val memory = "记住全部要求：" + instruction
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8,
+                input = instruction, memoryInput = memory,
+            )
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 2))
+            val inputs = log.eventsOfTypesAfter(-1L, setOf(LOCAL_AGENT_RUN_INPUT_EVENT))
+            val checkpoints = log.eventsOfTypesAfter(-1L, setOf(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            assertEquals(1, inputs.size)
+            assertEquals(instruction, inputs.single().data["input"]?.toString()?.trim('"'))
+            assertEquals(memory, inputs.single().data["memory_input"]?.toString()?.trim('"'))
+            assertTrue(checkpoints.size >= 3)
+            assertTrue(checkpoints.all { "input" !in it.data && "memory_input" !in it.data })
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val recovered = requireNotNull(cold.recoveryDecision("s1", SessionRepairResult()))
+            assertEquals(memory, recovered.queuedInput?.memoryInput)
+        }
+    }
+
+    @Test
+    fun invalidWorkRecoveryContextBlocksResumeInsteadOfFallingBackToGenericInstruction() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8,
+                input = "复杂工作原始指令", memoryInput = "复杂工作原始指令",
+            )
+            coordinator.recordEvent(context, AgentEvent.StepStarted(context.runId, 1))
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val broken = LocalAgentRunRecoveryContextPolicy {
+                error("模型历史损坏：无法恢复可信上下文")
+            }
+            val result = requireNotNull(cold.recoveryDecision(
+                "s1", SessionRepairResult(), contextPolicy = broken))
+            assertEquals("RECOVERY_CONTEXT_FAILED", result.blockedCode)
+            assertNull(result.queuedInput)
+        }
+    }
+
+    @Test
+    fun queuedLegacyRunRetainsCheckpointVersionAndOriginalInputContract() {
+        withCoordinator { coordinator, log ->
+            log.append(LOCAL_AGENT_RUN_CHECKPOINT_EVENT, buildJsonObject {
+                put("version", 2)
+                put("run_id", "legacy-run")
+                put("session_id", "s1")
+                put("status", "running")
+                put("phase", "step_started")
+                put("mode", "work")
+                put("model", "deepseek-flash")
+                put("base_url", "https://api.deepseek.com")
+                put("profile_id", "historical-profile")
+                put("input", "历史完整指令")
+                put("memory_input", "历史完整上下文")
+            })
+            coordinator.markRecoveryQueued("s1", "legacy-run")
+            val checkpoint = requireNotNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            assertEquals("2", checkpoint.data["version"]?.toString())
+            val recovered = requireNotNull(coordinator.recoveryDecision("s1", SessionRepairResult()))
+            assertNull(recovered.blockedReason)
+            assertEquals("run-recovery:legacy-run", recovered.queuedInput?.id)
+        }
+    }
+
+    @Test
+    fun missingOriginalInputBlocksResumeInsteadOfInventingAReplacement() {
+        withCoordinator { coordinator, log ->
+            val context = coordinator.start(
+                "s1", LocalUsageMode.WORK, "deepseek-flash", "https://api.deepseek.com",
+                planMode = false, policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                safeAutoApprovalEnabled = false, maxSteps = 8,
+                input = "原任务", memoryInput = "原任务",
+            )
+            val checkpoint = requireNotNull(log.latest(LOCAL_AGENT_RUN_CHECKPOINT_EVENT))
+            log.clear()
+            log.append(LOCAL_AGENT_RUN_CHECKPOINT_EVENT, checkpoint.data)
+            val cold = LocalAgentRunCoordinator(eventLogFor = { log })
+            val decision = requireNotNull(cold.recoveryDecision("s1", SessionRepairResult()))
+            assertEquals("RECOVERY_INPUT_MISSING", decision.blockedCode)
+            assertNull(decision.queuedInput)
         }
     }
 

@@ -22,6 +22,15 @@ class McpWorkerWireTest {
         assertFalse(McpWorkerWire.validResponseSize("x".repeat(8 * 1024 * 1024 + 1)))
     }
 
+    @Test fun protocolNegotiationFailureUsesSafeCategoryWithoutLeakingDetails() {
+        val failure = com.labteto.dshmobile.interop.mcp.McpProtocolNegotiationException()
+        assertTrue(mcpWorkerSafeFailureCode(failure) == "MCP_PROTOCOL_NEGOTIATION_FAILED")
+        assertTrue(mcpWorkerSafeFailureCode(IllegalArgumentException("unrelated")) == "IllegalArgumentException")
+        assertTrue(mcpWorkerSafeFailureCode(IllegalArgumentException(
+            "服务返回正文包含 MCP initialize 缺少 protocolVersion；secret=do-not-leak")) ==
+            "IllegalArgumentException")
+    }
+
     @Test fun transportHasNoAutomaticCallReplayAndUsesOnlyPrivateWorkerProcess() {
         val type = McpPluginWorkerTransport::class.java
         assertTrue(com.labteto.dshmobile.interop.mcp.McpTransport::class.java.isAssignableFrom(type))

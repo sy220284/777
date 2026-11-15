@@ -17,6 +17,19 @@ import org.junit.Before
 import org.junit.Test
 
 class LocalWorkspaceTest {
+    @Test fun interruptedFilenameSearchStopsAndAllowsFreshSearch() {
+        workspace.write("命中.txt", "内容")
+        try {
+            Thread.currentThread().interrupt()
+            assertThrows(java.io.InterruptedIOException::class.java) {
+                workspace.searchWorkspacePage("命中")
+            }
+        } finally {
+            Thread.interrupted()
+        }
+        assertEquals(listOf("命中.txt"), workspace.searchWorkspacePage("命中").files.map { it.path })
+    }
+
     @Test
     fun projectDirectoryMutationWaitsForExistingWorkspaceWriterGate() {
         val entered = CountDownLatch(1)
@@ -228,6 +241,26 @@ class LocalWorkspaceTest {
         assertEquals(235, results.toSet().size)
         assertTrue(results.all { it.startsWith("任务/搜索目录/报告-") })
         assertEquals(results.take(96), workspace.searchWorkspacePage("报告", 0, 96).files.map { it.path })
+    }
+
+    @Test
+    fun fileBrowserSearchPagesPastTenThousandMatchesWithoutSilentlyLosingResults() {
+        val folder = root.resolve("任务/大型文档目录").apply { mkdirs() }
+        repeat(10_024) { index ->
+            Files.createFile(folder.resolve("报告-${index.toString().padStart(5, '0')}.md").toPath())
+        }
+        val results = mutableSetOf<String>()
+        var offset: Int? = 0
+        while (offset != null) {
+            val page = workspace.searchWorkspacePage("报告", offset, 128)
+            assertTrue(page.files.size <= 128)
+            assertTrue(page.files.all { results.add(it.path) })
+            offset = page.nextOffset
+        }
+        assertEquals(10_024, results.size)
+        assertTrue("最后一页必须包含旧上限后的文件", results.any { it.endsWith("报告-10023.md") })
+        // An explicit small result limit bounds memory while still scanning all filenames.
+        assertEquals(3, workspace.searchWorkspaceFileNames("报告", 3).size)
     }
 
     @Test
@@ -513,6 +546,18 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun deeplyNestedFilesRemainDiscoverableWithoutSilentDepthClamping() {
+        var nested = root.resolve("deep")
+        repeat(36) { nested = nested.resolve("layer").apply { mkdirs() } }
+        val file = nested.resolve("target.txt").apply { writeText("needle-below-32") }
+        val path = file.relativeTo(root).invariantSeparatorsPath
+        assertTrue(workspace.glob("**/target.txt").contains(path))
+        assertTrue(workspace.search("needle-below-32").contains(path))
+        assertTrue(workspace.list("deep", depth = 40).contains(path))
+        assertThrows(IllegalArgumentException::class.java) { workspace.list("deep", depth = 0) }
+    }
+
+    @Test
     fun globAndListCanPagePastLegacyFourHundredResultLimit() {
         val directory = root.resolve("many")
         directory.mkdirs()
@@ -521,10 +566,12 @@ class LocalWorkspaceTest {
         }
         val firstList = workspace.list("many")
         assertTrue(firstList.contains("目录扫描未完"))
+        assertTrue(firstList.contains("next_cursor="))
         val listCursor = Regex("""cursor=(\d+)""").find(firstList)!!.groupValues[1].toInt()
         assertTrue(workspace.list("many", cursor = listCursor).contains("item-0414.txt"))
         val firstGlob = workspace.glob("*.txt", "many")
         assertTrue(firstGlob.contains("目录扫描未完"))
+        assertTrue(firstGlob.contains("next_cursor="))
         val globCursor = Regex("""cursor=(\d+)""").find(firstGlob)!!.groupValues[1].toInt()
         assertTrue(workspace.glob("*.txt", "many", cursor = globCursor).contains("item-0414.txt"))
     }
@@ -563,6 +610,7 @@ class LocalWorkspaceTest {
         root.resolve("rows.txt").writeText(text)
         val first = workspace.search("needle")
         assertTrue(first.contains("搜索未完成"))
+        assertTrue(first.contains("next_cursor="))
         val cursor = Regex("""cursor="([^"]+)"""").find(first)!!.groupValues[1]
         val second = workspace.search("needle", cursor = cursor)
         assertTrue(second.contains("rows.txt:250: needle row 250"))

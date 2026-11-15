@@ -56,7 +56,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
         synchronized(state.foregroundRunHandle.lock) {
             val applied = when (command) {
                 is AutomationUiCommand.Create -> {
-                    if (!validAutomationCommandSchedule(
+                    if (command.schedule.prompt.isBlank() || !validAutomationCommandSchedule(
                             command.schedule.mode, command.schedule.scheduleType,
                             command.schedule.firstRunAt, command.schedule.recurringMinutes,
                             System.currentTimeMillis(), command.schedule.silenceMinutes,
@@ -71,7 +71,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
                     create(command.schedule)
                 }
                 is AutomationUiCommand.Update -> {
-                    if (!validAutomationCommandSchedule(
+                    if (command.schedule.prompt.isBlank() || !validAutomationCommandSchedule(
                             command.schedule.mode, command.schedule.scheduleType,
                             command.schedule.firstRunAt, command.schedule.recurringMinutes,
                             System.currentTimeMillis(), command.schedule.silenceMinutes,
@@ -89,6 +89,8 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
                         ?: return AutomationUiReceipt.Rejected(UiAutomationRejection.MISSING)
                     if (task.scheduleGeneration != command.expectedGeneration)
                         return AutomationUiReceipt.Rejected(UiAutomationRejection.STALE_TASK)
+                    if (task.mode != AutomationMode.CHAT)
+                        return AutomationUiReceipt.Rejected(UiAutomationRejection.INVALID_INPUT)
                     with(command.policy) { updateChatPolicy(task, quietHoursEnabled, quietStartHour, quietStartMinute,
                         quietEndHour, quietEndMinute, proactiveMinGapMinutes, proactiveMaxUnanswered, notify) }
                 }
@@ -100,7 +102,11 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
             if (applied) AutomationUiReceipt.Applied()
             else AutomationUiReceipt.Rejected(UiAutomationRejection.OWNER_REJECTED)
         }
-    } catch (failure: Exception) { AutomationUiReceipt.Failed(failure.message) }
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (failure: Exception) {
+        AppLog.failure("TaskScheduling", "submit_automation_command", failure)
+        AutomationUiReceipt.Failed(failure.message)
+    }
 
     override suspend fun planAndSave(command: PlanChatAutomationCommand): AutomationUiReceipt {
         val captured = snapshot()
@@ -162,15 +168,12 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
         proactiveMaxUnanswered: Int,
         notify: Boolean? = null,
         expectedGeneration: Long,
-    ): Boolean = runCatching {
-        scheduler.updateTask(
+    ): Boolean = scheduler.updateTask(
             id, prompt, firstRunAt, recurringMinutes, scheduleType, silenceMinutes,
             windowStartMinuteOfDay, windowEndMinuteOfDay, quietHoursEnabled,
             quietStartHour, quietStartMinute, quietEndHour, quietEndMinute,
             proactiveMinGapMinutes, proactiveMaxUnanswered, notify, expectedGeneration,
         )
-    }.onFailure { AppLog.failure("TaskScheduling", "update_scheduled_task", it) }
-        .getOrDefault(false).also { if (it) Unit }
     private fun createAt(
         prompt: String,
         firstRunAt: Long,
@@ -189,25 +192,10 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
         proactiveMaxUnanswered: Int = LocalAutomationPolicyProjection.defaults.proactiveMaxUnanswered,
         notify: Boolean = true,
     ): Boolean {
-        val now = System.currentTimeMillis()
-        if (prompt.isBlank()) return false
-        if (scheduleType !in setOf(AutomationScheduleType.SILENCE, AutomationScheduleType.WINDOW) &&
-            firstRunAt <= now
-        ) return false
-        val minimumRecurringMinutes = if (mode == AutomationMode.CHAT) 60L else 15L
-        if (recurringMinutes != null && recurringMinutes < minimumRecurringMinutes) return false
-        if (scheduleType == AutomationScheduleType.SILENCE &&
-            (silenceMinutes == null || silenceMinutes < LocalAutomationPolicyProjection.minimumSilenceMinutes)
-        ) return false
-        if (scheduleType == AutomationScheduleType.WINDOW &&
-            (windowStartMinuteOfDay == null || windowEndMinuteOfDay == null ||
-                windowStartMinuteOfDay !in 0 until 24 * 60 ||
-                windowEndMinuteOfDay !in 0 until 24 * 60 ||
-                windowStartMinuteOfDay == windowEndMinuteOfDay)
-        ) return false
+        // The public submit command has already validated schedule and session identity.
+        // Only the scheduler performs the durable mutation; exceptions propagate to
+        // AutomationUiReceipt.Failed with their actual cause.
         val snapshot = state.state.value
-        if (mode == AutomationMode.CHAT && !canPlanChat(snapshot)) return false
-        return runCatching {
             val id = newAutomationTaskId()
             val targetSessionId = snapshot.sessionId.takeIf { mode == AutomationMode.CHAT }
             val actorName = snapshot.chat.chatPersona.name.takeIf {
@@ -239,9 +227,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
                     scheduleType,
                 )
             }
-            Unit
-        }.onFailure { AppLog.failure("TaskScheduling", "create_scheduled_task", it) }
-            .isSuccess
+        return true
     }
     private fun updateChatPolicy(
         task: AutomationTask,
@@ -253,8 +239,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
         proactiveMinGapMinutes: Long,
         proactiveMaxUnanswered: Int,
         notify: Boolean,
-    ): Boolean = runCatching {
-        scheduler.updateChatInteractionPolicy(
+    ): Boolean = scheduler.updateChatInteractionPolicy(
             id = task.id,
             quietHoursEnabled = quietHoursEnabled,
             quietStartHour = quietStartHour,
@@ -266,11 +251,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
             notify = notify,
             expectedGeneration = task.scheduleGeneration,
         )
-    }.onFailure { AppLog.failure("TaskScheduling", "update_chat_policy", it) }
-        .getOrDefault(false).also { if (it) Unit }
 
-    private fun canPlanChat(snapshot: LocalHarnessState) = snapshot.usageMode == LocalUsageMode.CHAT &&
-        !snapshot.chat.groupChat.enabled && snapshot.sessionId.isNotBlank()
 }
 
 @dagger.Module

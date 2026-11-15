@@ -163,8 +163,8 @@ internal class LocalToolSchemaProjection(
         val requestedOptionalTokens = visibleTools.asSequence()
             .filter { it.exposure == ToolExposure.OPTIONAL && it.name in enabled }
             .sumOf { estimateModelTokens(it.schema.toString()) }
-        // Keep the normal cache-friendly budget, but expand to the 24k declared ceiling
-        // when the task explicitly loads more tools and the route has genuine spare tokens.
+        // Keep the normal cache-friendly budget; explicit selection may use the route's
+        // actual spare tokens rather than an unrelated fixed schema ceiling.
         val requestedDefinitionTokens = maxOf(
             LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS, requestedOptionalTokens,
         )

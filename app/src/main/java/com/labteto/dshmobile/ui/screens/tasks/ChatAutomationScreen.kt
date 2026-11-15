@@ -274,7 +274,7 @@ internal fun ChatAutomationScreen(
 
             state.plannerError?.let {
                 Text(
-                    stringResource(it.messageRes()),
+                    state.plannerFailureReason ?: stringResource(it.messageRes()),
                     modifier = Modifier.padding(horizontal = SyMetric.gapSection),
                     style = DsType.small13.withReadingWeight(),
                     color = colors.dangerInk,

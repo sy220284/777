@@ -1,7 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.interaction.LocalApproval
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
@@ -9,6 +9,7 @@ import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.interaction.LocalInteractionStatePort
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
+import com.labteto.dshmobile.local.tools.LocalRunToolSelection
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
@@ -48,10 +49,9 @@ internal class LocalWorkRunBinding(
     /** Exact live tool bodies, including question waits; settled by the shared execution boundary. */
     val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
-    val enabledOptionalTools = linkedSetOf<String>()
+    val enabledOptionalTools = LocalRunToolSelection()
     /** Per-run MCP registrations discovered after a model step, not a global permission grant. */
     internal val mcpDiscovery = LocalWorkRunMcpDiscovery()
-    internal val toolPriority = LocalWorkToolPriority()
     internal val workflowAdmission = kotlinx.coroutines.sync.Mutex()
     /** Not an extra queue: monotonic signal for committed, explicitly steered Work inputs. */
     val steeringRevision = MutableStateFlow(0L)

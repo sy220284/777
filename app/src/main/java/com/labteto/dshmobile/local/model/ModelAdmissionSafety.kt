@@ -11,22 +11,6 @@ import javax.net.ssl.SSLException
 import okhttp3.RequestBody
 import okio.BufferedSink
 
-/**
- * Request admission is deliberately independent from provider-specific error codes.
- *
- * NOT_SENT means the complete request body was never handed to the transport and exact replay is
- * safe. MAYBE_ADMITTED begins once the complete body has been written: the provider may already be
- * doing inference even if no response headers arrive. ADMITTED begins only after a successful HTTP
- * response is accepted. REJECTED is an explicit non-success HTTP response.
- */
-internal enum class LocalModelAdmissionState {
-    NOT_APPLICABLE,
-    NOT_SENT,
-    REJECTED,
-    MAYBE_ADMITTED,
-    ADMITTED,
-}
-
 internal class LocalModelAdmissionTracker {
     @Volatile
     private var state: LocalModelAdmissionState = LocalModelAdmissionState.NOT_SENT

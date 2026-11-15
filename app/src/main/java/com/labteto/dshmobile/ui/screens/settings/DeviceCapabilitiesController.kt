@@ -3,6 +3,8 @@ package com.labteto.dshmobile.ui.screens.settings
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.app.NotificationManager
+import android.service.notification.NotificationListenerService
 import android.net.Uri
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
@@ -42,10 +44,11 @@ internal class DeviceCapabilitiesController(
         ) == 1 && enabledAccessibility.any {
             ComponentName.unflattenFromString(it) == accessibilityComponent
         }
+        val listenerComponent = ComponentName(appContext, HarnessNotificationListenerService::class.java)
         _state.value = readDeviceCapabilityState(appContext).copy(
             accessibilityGranted = accessibilityGranted,
-            notificationAccessGranted = appContext.packageName in
-                NotificationManagerCompat.getEnabledListenerPackages(appContext),
+            notificationAccessGranted = appContext.getSystemService(NotificationManager::class.java)
+                .isNotificationListenerAccessGranted(listenerComponent),
             postingNotifications = NotificationManagerCompat.from(appContext).areNotificationsEnabled(),
         )
     }
@@ -76,6 +79,22 @@ internal class DeviceCapabilitiesController(
         appContext.startActivity(
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+    }
+
+    /** Repair the actual listener connection without sending an already-authorized user
+     * back to Android Settings. Requesting a bind is asynchronous: readiness is verified
+     * independently by refresh() and never assumed from this call.
+     */
+    fun repairNotificationAccess() {
+        refresh()
+        when (notificationAccessRepair(_state.value.notificationAccessGranted, _state.value.notifications)) {
+            NotificationAccessRepair.OPEN_SYSTEM_SETTINGS -> openNotificationAccessSettings()
+            NotificationAccessRepair.REQUEST_REBIND ->
+                NotificationListenerService.requestRebind(
+                    ComponentName(appContext, HarnessNotificationListenerService::class.java),
+                )
+            NotificationAccessRepair.READY -> Unit
+        }
     }
 }
 

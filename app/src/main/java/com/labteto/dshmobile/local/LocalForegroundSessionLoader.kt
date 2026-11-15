@@ -6,7 +6,7 @@ import com.labteto.dshmobile.harness.agent.AgentInputQueue
 import com.labteto.dshmobile.harness.session.FutureSessionVersionException
 import com.labteto.dshmobile.harness.session.ModelHistoryCheckpointCodec
 import com.labteto.dshmobile.harness.session.SessionRepairResult
-import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
+import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.LocalAgentRuntimeSettings
 import com.labteto.dshmobile.local.agent.decodeLocalAgentInboxPending
 import com.labteto.dshmobile.local.context.ContextComposer

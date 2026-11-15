@@ -82,6 +82,14 @@ internal interface LocalAgentControlPort {
     suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String
     suspend fun workflow(binding: LocalWorkRunBinding, request: LocalAgentWorkflowRequest): String
     suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding)
+    /** Unified read/control boundary for every child, using the same Job registration. */
+    fun agents(sessionId: String): List<LocalAgentChildSnapshot>
+    fun teamSnapshot(sessionId: String): LocalAgentTeamUiState
+    fun teamReadOutput(sessionId: String, memberId: String, jobId: String): String
+    fun teamSendMessage(sessionId: String, memberId: String, text: String, jobId: String): String
+    fun teamInterruptMember(sessionId: String, memberId: String, jobId: String): String
+    fun teamInterruptAll(sessionId: String, jobIds: Set<String>): String
+    fun teamReassignTask(sessionId: String, taskId: String, revision: Int, memberId: String?): String
     fun list(sessionId: String): String
     fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String
     fun send(
@@ -95,6 +103,8 @@ internal interface LocalAgentControlPort {
      * authorizes control over another session or an unrelated background process.
      */
     fun inspect(sessionId: String, agentId: String): String
+    /** Complete committed result, read from the same durable checkpoint used for recovery. */
+    fun output(sessionId: String, agentId: String): String
     /** Bounded cancellation-aware long poll for changes to one owned Agent. */
     suspend fun watch(sessionId: String, agentId: String, afterCursor: String, maxWaitMs: Int): String
     /** Stop this Activation without deleting the resumable Agent identity/Inbox. */
@@ -112,6 +122,7 @@ internal class LocalWorkAgentControlRuntime(
     private val subagents: LocalWorkSubagentRuntime,
     private val persistentJobs: LocalPersistentJobRecoveryCoordinator,
     private val teams: LocalAgentTeamRuntime,
+    private val spawns: LocalAgentSpawnController,
 ) : LocalAgentControlPort {
     // Team stop remains an AgentControl adapter; Team owns the durable stop fact.
     override suspend fun executeTeam(binding: LocalWorkRunBinding, call: LocalToolCall): String? {
@@ -124,8 +135,6 @@ internal class LocalWorkAgentControlRuntime(
         }
         return teams.execute(call, binding)
     }
-
-    private val spawns = LocalAgentSpawnController(subagents, persistentJobs)
 
     override suspend fun delegate(binding: LocalWorkRunBinding, request: LocalAgentDispatchRequest): String =
         spawns.delegate(binding, request)
@@ -149,6 +158,19 @@ internal class LocalWorkAgentControlRuntime(
     override suspend fun resumePendingWorkflows(binding: LocalWorkRunBinding) {
         subagents.resumePendingWorkflows(binding)
     }
+
+    override fun agents(sessionId: String): List<LocalAgentChildSnapshot> = registry.snapshots(sessionId)
+    override fun teamSnapshot(sessionId: String): LocalAgentTeamUiState = teams.uiState(sessionId)
+    override fun teamReadOutput(sessionId: String, memberId: String, jobId: String): String =
+        teams.outputForUi(sessionId, memberId, jobId)
+    override fun teamSendMessage(sessionId: String, memberId: String, text: String, jobId: String): String =
+        teams.sendUiMessage(sessionId, memberId, text, jobId)
+    override fun teamInterruptMember(sessionId: String, memberId: String, jobId: String): String =
+        teams.interruptUiMember(sessionId, memberId, jobId)
+    override fun teamInterruptAll(sessionId: String, jobIds: Set<String>): String =
+        teams.interruptAllUi(sessionId, jobIds)
+    override fun teamReassignTask(sessionId: String, taskId: String, revision: Int, memberId: String?): String =
+        teams.reassignUiTask(sessionId, taskId, revision, memberId)
 
     override fun list(sessionId: String): String = registry.list(sessionId)
     override fun tree(binding: LocalWorkRunBinding, maxNodes: Int): String {
@@ -179,6 +201,8 @@ internal class LocalWorkAgentControlRuntime(
 
     override fun inspect(sessionId: String, agentId: String): String =
         lifecycle.inspect(sessionId, agentId)
+    override fun output(sessionId: String, agentId: String): String =
+        persistentJobs.agentOutput(sessionId, agentId)
 
     override suspend fun watch(
         sessionId: String,

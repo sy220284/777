@@ -61,6 +61,20 @@ class LocalToolCatalogTest {
     }
 
     @Test
+    fun sessionSearchAndChunkReadExposeTruthfulPaginationContracts() {
+        val byName = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val session = byName.getValue("session_search").jsonObject["function"]!!.jsonObject
+        val searchParams = session["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        assertTrue("cursor" in searchParams)
+        assertTrue(session["description"]!!.jsonPrimitive.content.contains("next_cursor"))
+        val chunk = byName.getValue("read_chunk").jsonObject["function"]!!.jsonObject
+        assertTrue(chunk["description"]!!.jsonPrimitive.content.contains("complete=true"))
+        assertTrue(chunk["description"]!!.jsonPrimitive.content.contains("next_byte"))
+    }
+
+    @Test
     fun workflowAndSubagentExposeAdvancedRoutingOptions() {
         val functions = LocalToolCatalog.specs.associateBy {
             it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
@@ -141,6 +155,40 @@ class LocalToolCatalogTest {
 
         assertTrue("after_sequence" in messages)
         assertTrue("after_sequence" in wait)
+    }
+
+    @Test
+    fun workFindingActionAndStatusUseExactRuntimeEnumerations() {
+        val tool = LocalToolCatalog.specs.single {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == "work_finding"
+        }
+        val properties = tool.jsonObject["function"]!!.jsonObject["parameters"]!!
+            .jsonObject["properties"]!!.jsonObject
+        assertEquals(setOf("record", "revise", "retract", "list"),
+            properties.getValue("action").jsonObject.getValue("enum").jsonArray
+                .map { it.jsonPrimitive.content }.toSet())
+        assertEquals(setOf("hypothesis", "supported", "rejected"),
+            properties.getValue("status").jsonObject.getValue("enum").jsonArray
+                .map { it.jsonPrimitive.content }.toSet())
+    }
+
+    @Test
+    fun goalStatusAndReviewTypeSchemasMatchTheRuntimeContract() {
+        val byName = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        fun properties(name: String) = byName.getValue(name).jsonObject["function"]!!
+            .jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+
+        assertEquals(setOf("active", "paused", "completed", "blocked"),
+            properties("update_goal").getValue("status").jsonObject.getValue("enum")
+                .jsonArray.map { it.jsonPrimitive.content }.toSet())
+        assertEquals(setOf("code", "security"),
+            properties("create_goal").getValue("review_requirements").jsonObject
+                .getValue("items").jsonObject.getValue("enum")
+                .jsonArray.map { it.jsonPrimitive.content }.toSet())
+        assertTrue(byName.getValue("capability_search").jsonObject["function"]!!
+            .jsonObject.getValue("description").jsonPrimitive.content.contains("候选"))
     }
 
     @Test

@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.tools
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,8 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.labteto.dshmobile.ui.shenyan.SyFullScreenDialog
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -33,13 +31,7 @@ internal fun ExtensionDetailPage(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LocalSyColors.current
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
-    ) {
+    SyFullScreenDialog(onDismiss = onDismiss) {
         Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 SyTopBar(title = title, onBack = onDismiss,

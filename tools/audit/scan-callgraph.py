@@ -59,7 +59,25 @@ for path in paths:
             r"(?m)^(?:(?:internal|private|public|protected|lateinit|const)\s+)*(?:val|var)\s+(?:[\w?.<>]+\.)?([A-Za-z_]\w*)\b",
             content,
         )))
+        # Kotlin callable references (Foo::method / ::function) are real usages even
+        # without an import or a function-call parenthesis. Treat them as call
+        # candidates, not authoritative compiler-resolved call sites.
         row["call_tokens"] = collections.Counter(re.findall(r"\b([A-Za-z_]\w*)\s*\(", content))
+        row["call_tokens"].update(
+            symbol for symbol in re.findall(r"(?<!:):{2}\s*([A-Za-z_]\w*)\b", content)
+            if symbol != "class"  # Kotlin ::class denotes a type token, not a call.
+        )
+        # Kotlin allows a call with a trailing lambda and no parentheses:
+        # runSuspendResult { ... }. Missing this edge can misclassify a live
+        # coroutine/cancellation boundary as dead code.
+        row["call_tokens"].update(
+            symbol for symbol in re.findall(r"\b([A-Za-z_]\w*)\s*\{", content)
+            if symbol not in {
+                "if", "else", "when", "for", "while", "try", "catch",
+                "finally", "do", "fun", "class", "interface", "object",
+                "init", "constructor", "get", "set",
+            }
+        )
         by_pkg[row["package"]].add(path)
         for name in row["declarations"] + row["properties"]:
             by_symbol[row["package"] + "." + name].add(path)
@@ -174,23 +192,29 @@ for frm, tos in edges.items():
 hot = sorted(((incoming[r["path"]], r["path"]) for r in records if r["kind"] == "production"), reverse=True)
 orphans = sorted(r["path"] for r in records if r["kind"] == "production" and incoming[r["path"]] == 0)
 mismatches = sorted(r["path"] for r in records if r["potential_package_mismatch"])
-# 跨产品域内部引用只作为复核候选，不能以文件夹名判断违约。
+# 按架构 3.0 的产品所有权分类。local/tools 是 Shared Tool Capability，
+# 并不等于产品 ToolsFeature；按文件夹名混为一谈会把合法 Work→工具引用误报为跨 Feature。
+# 所有候选仍须审查实际符号、公开 Port 与运行时装配关系。
+def owned_feature(path):
+    match = re.search(r"/local/(chat|work|automation)/", path)
+    return match.group(1) if match else None
+
 crossfeature = []
 for frm, tos in edges.items():
     if "/src/main/" not in frm:
         continue
-    a = re.search(r"/local/(chat|work|tools|automation)/", frm)
-    if not a:
+    from_feature = owned_feature(frm)
+    if not from_feature:
         continue
     for to in tos:
-        b = re.search(r"/local/(chat|work|tools|automation)/", to)
-        if b and a.group(1) != b.group(1):
+        to_feature = owned_feature(to)
+        if to_feature and from_feature != to_feature:
             crossfeature.append({"from": frm, "to": to})
 
 result = {
     "schema": "777-static-callgraph-v1",
     "commit": revision,
-    "method": "全 tracked 文件遍历；Kotlin/Java 词法 import 与调用标识符候选；非编译器/运行时精确解析",
+    "method": "全 tracked 文件遍历；Kotlin/Java 词法 import、括号调用、方法引用与尾随 lambda 调用候选；非编译器/运行时精确解析",
     "counts": counts, "modules": modules,
     "import_edges": sum(map(len, edges.values())),
     "call_candidate_edges": sum(map(len, call_edges.values())),
@@ -210,7 +234,7 @@ md = [
     f"- Git 提交：\x60{revision}\x60",
     f"- Git 跟踪文件数：{len(paths)}；实际可读取文件：{len(records)}",
     f"- 生产源码：{counts.get('production',0)}；测试源码：{counts.get('test',0)}；支撑代码：{counts.get('support-code',0)}；非代码：{counts.get('non-code',0)}",
-    f"- 静态 import 关系：{result['import_edges']}；直接标识符调用候选关系：{result['call_candidate_edges']}",
+    f"- 静态 import 关系：{result['import_edges']}；调用及 Kotlin 方法引用/尾随 lambda 候选关系：{result['call_candidate_edges']}",
     "",
     "**证据边界**：这是逐文件文本索引，不是 Kotlin/Java 编译器调用图；重载、扩展函数、反射、依赖注入、动态分派与运行时入口无法仅由词法解析证明。所有未引用、跨域、循环、未解析结果均是复核候选，不直接断言缺陷。",
     "",

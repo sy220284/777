@@ -83,7 +83,7 @@ internal fun PermissionSetupFlow(
         try {
             when (feature) {
                 PermissionSetupFeature.SCREEN_CONTROL -> controller.openAccessibilitySettings()
-                PermissionSetupFeature.NOTIFICATION_READ -> controller.openNotificationAccessSettings()
+                PermissionSetupFeature.NOTIFICATION_READ -> controller.repairNotificationAccess()
                 PermissionSetupFeature.TASK_ALERTS -> {
                     if (!forceAppSettings && notificationGrantAction(Build.VERSION.SDK_INT, feature in visited) ==
                         NotificationGrantAction.REQUEST_RUNTIME) {
@@ -224,6 +224,9 @@ internal fun PermissionSetupFlow(
                             text = stringResource(when {
                                 feature == PermissionSetupFeature.TASK_ALERTS && feature in visited ->
                                     R.string.permission_setup_open_notifications
+                                feature == PermissionSetupFeature.NOTIFICATION_READ &&
+                                    status == PermissionSetupStatus.AUTHORIZED_WAITING ->
+                                    R.string.permission_setup_rebind_notification
                                 feature in visited -> R.string.permission_setup_open_again
                                 else -> R.string.permission_setup_open
                             }),

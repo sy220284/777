@@ -100,6 +100,10 @@ internal class LocalPersistentJobRecoveryCoordinator(
     private val mergeWorkspace: suspend (String, String, String, List<String>, suspend () -> Unit) -> JsonObject,
 ) {
     private val lock = Any()
+    internal fun agentOutput(sessionId: String, agentId: String): String {
+        val registration = LocalAgentRegistry(jobs).resolveOwned(sessionId, agentId)
+        return readLocalAgentOutput(eventLogFor(sessionId), registration)
+    }
     private val pendingRecoverySessions = linkedSetOf<String>()
     private val rootAdmittedSessions = linkedSetOf<String>()
     /** Explicit per-Agent resumes stay distinct from session-wide crash recovery. */

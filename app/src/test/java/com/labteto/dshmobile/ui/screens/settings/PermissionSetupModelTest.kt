@@ -11,6 +11,17 @@ class PermissionSetupModelTest {
         assertEquals(NotificationGrantAction.OPEN_APP_SETTINGS, notificationGrantAction(32, false))
     }
 
+    @Test fun notificationRepairUsesPreciseGrantAndConnectionState() {
+        assertEquals(NotificationAccessRepair.OPEN_SYSTEM_SETTINGS,
+            notificationAccessRepair(granted = false, connected = false))
+        assertEquals(NotificationAccessRepair.REQUEST_REBIND,
+            notificationAccessRepair(granted = true, connected = false))
+        assertEquals(NotificationAccessRepair.READY,
+            notificationAccessRepair(granted = true, connected = true))
+        assertEquals(NotificationAccessRepair.OPEN_SYSTEM_SETTINGS,
+            notificationAccessRepair(granted = false, connected = true))
+    }
+
     @Test fun skippedCanBeRevisitedOnExplicitRetry() {
         val chosen = listOf(PermissionSetupFeature.NOTIFICATION_READ)
         assertNull(nextPermissionSetupIndex(chosen, 0,

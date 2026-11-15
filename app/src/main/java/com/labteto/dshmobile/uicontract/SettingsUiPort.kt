@@ -50,6 +50,7 @@ interface SettingsUiPort {
     val chatStyleGuardBuiltInPhrases: List<String>
     val approvalMode: StateFlow<LocalApprovalMode>
     fun memoryContext(): LocalSettingsMemoryContext
+    fun executionPolicySummary(): UiExecutionPolicySnapshot
     fun configureApprovalMode(mode: LocalApprovalMode)
     suspend fun refreshChatGpt()
     suspend fun connectChatGpt(existingAccountId: String? = null, requestPlanConsent: Boolean = false)
@@ -139,7 +140,8 @@ fun SettingsUiPort.submit(command: SettingsUiCommand): SettingsUiReceipt = try {
         is SettingsUiCommand.SaveModel -> return SettingsUiReceipt.Rejected
     }
     SettingsUiReceipt.Applied
-} catch (failure: Exception) { SettingsUiReceipt.Failed(failure.message) }
+} catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+catch (failure: Exception) { SettingsUiReceipt.Failed(failure.message) }
 
 suspend fun SettingsUiPort.save(command: SettingsUiCommand.SaveModel): SettingsUiReceipt = try {
     saveModel(command.apiKey, command.model, command.baseUrl, command.protocol, command.profileId,

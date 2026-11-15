@@ -68,6 +68,25 @@ class LocalWorkBuiltinToolRuntimeTest {
     }
 
     @Test
+    fun longQuestionAndAllChoicesReachApprovalUiWithoutSilentTruncation() {
+        val question = "请完整核查以下所有情况：" + "真实用户输入".repeat(600)
+        val choices = (1..12).map { "选项-$it" }
+        val parsed = workQuestionFromArgs("ask-long", buildJsonObject {
+            put("question", question)
+            put("options", JsonArray(choices.map(::JsonPrimitive)))
+        })
+        assertEquals(question, parsed.question)
+        assertEquals(choices, parsed.options)
+    }
+
+    @Test
+    fun emptyQuestionFailsBeforeOpeningAnUnanswerableUserDialog() {
+        assertTrue(runCatching {
+            workQuestionFromArgs("empty-question", buildJsonObject { put("question", "   ") })
+        }.isFailure)
+    }
+
+    @Test
     fun explicitEmptyAcceptanceAndDeclaredVerifiersRemainValid() {
         assertEquals(
             emptyList<String>() to emptyList<String>(),

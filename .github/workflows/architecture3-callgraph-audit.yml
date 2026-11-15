@@ -1,0 +1,95 @@
+name: 777 架构 3.0 全仓调用关系审计
+
+'on':
+  pull_request:
+    paths:
+      - '.github/workflows/architecture3-callgraph-audit.yml'
+      - 'tools/audit/scan-callgraph.py'
+      - 'tools/audit/check-app-server-contract.py'
+      - 'app/src/main/**'
+      - 'core/src/main/**'
+      - 'harness-core/src/main/**'
+      - 'harness-device-android/src/main/**'
+      - 'harness-interop/src/main/**'
+      - 'harness-runtime-android/src/main/**'
+      - 'docs/audits/777-architecture3-full-scope-20261115.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  code-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出实际待审代码
+        uses: actions/checkout@v4
+      - name: 全仓源码与调用候选扫描
+        run: python3 tools/audit/scan-callgraph.py
+      - name: 验证 Kotlin 方法引用也进入全仓调用图
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("build/callgraph-audit/callgraph.json").read_text(encoding="utf-8"))
+          caller = "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt"
+          target = "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolScopeProjection.kt"
+          files = {row["path"]: row for row in data["files"]}
+          assert target in files[caller]["call_edges"], (
+              "Kotlin HarnessTool::forReadOnlyModelScope 方法引用丢失：只读权限投影被误判为无调用者"
+          )
+          # Kotlin also permits invoking suspend helper functions as
+          # runSuspendResult { ... } with no parentheses.
+          gallery = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalPersonaGalleryUiController.kt"
+          helper = "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalSuspendResult.kt"
+          assert helper in files[gallery]["call_edges"], (
+              "Kotlin 尾随 lambda 调用丢失：实际使用的协程取消安全封装被误判为无调用者"
+          )
+          print("KOTLIN_METHOD_REFERENCE_AND_LAMBDA_OK")
+          PY
+      - name: 校验架构所有权及运行性能约束
+        run: |
+          python3 .github/scripts/check-local-architecture-boundaries.py
+          python3 .github/scripts/check-local-performance-invariants.py
+      - name: 六大功能统一接口与工具发现契约检查
+        run: python3 tools/audit/check-app-server-contract.py
+      - name: 输出全仓证据摘要
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('build/callgraph-audit/callgraph.json').read_text(encoding='utf-8'))
+          print('SCANNED_COMMIT=' + data['commit'])
+          print('SCANNED_FILES=' + str(sum(data['counts'].values())))
+          print('SCANNED_PRODUCTION=' + str(data['counts'].get('production', 0)))
+          print('SCANNED_TESTS=' + str(data['counts'].get('test', 0)))
+          for key in ('import_edges', 'call_candidate_edges'):
+              print(key.upper() + '=' + str(data[key]))
+          for key in ('cross_feature_review_candidates','strongly_connected_components','unreferenced_production_candidates','unresolved_internal_imports'):
+              print(key.upper() + '=' + str(len(data[key])))
+          print('PACKAGE_MISMATCH_START')
+          for path in data['package_mismatch']:
+              print(path)
+          print('PACKAGE_MISMATCH_END')
+          print('STATIC_CYCLES_START')
+          for group in data['strongly_connected_components'][:30]:
+              print(' <-> '.join(group))
+          print('STATIC_CYCLES_END')
+          print('CROSS_FEATURE_CANDIDATES_START')
+          for item in data['cross_feature_review_candidates'][:100]:
+              print(item['from'] + ' -> ' + item['to'])
+          print('CROSS_FEATURE_CANDIDATES_END')
+          print('TOP_IMPORT_TARGETS_START')
+          for item in data['top_import_targets'][:30]:
+              print(str(item['incoming']) + ' ' + item['path'])
+          print('TOP_IMPORT_TARGETS_END')
+          PY
+      - name: 保存逐文件完整证据
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture3-full-callgraph
+          path: |
+            build/callgraph-audit/
+            build/app-server-audit/
+          retention-days: 30

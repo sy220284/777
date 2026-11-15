@@ -30,6 +30,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class McpToolBridgePluginTest {
+    @Test
+    fun genericMcpIntentPreselectsOnlyReadOnlyServerDiscovery() = runBlocking {
+        val plugin = McpToolBridgePlugin(http = OkHttpClient(), json = Json)
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            val names = listOf("mcp_http_connect", "mcp_stdio_connect",
+                "mcp_server_list", "mcp_lifecycle_events", "mcp_reconnect",
+                "mcp_disconnect")
+            fun selected(term: String) = names.filter { name ->
+                term in requireNotNull(registry.context.tools.get(name))
+                    .metadata.discoveryKeywords
+            }
+            assertEquals(listOf("mcp_server_list"), selected("mcp"))
+            assertEquals(listOf("mcp_reconnect"), selected("重连MCP"))
+            assertEquals(listOf("mcp_disconnect"), selected("断开MCP"))
+        } finally {
+            plugin.uninstall(registry.context)
+        }
+    }
+
     @Test fun resourceOnlyAndFullToolCapacityUseOneConnection() = runBlocking {
         for (toolCount in listOf(0, 128)) {
             var connections = 0
@@ -99,6 +120,10 @@ class McpToolBridgePluginTest {
         try {
             plugin.connectHttpFromUi(registry.context, "selftest", "https://example.com/mcp")
             assertEquals(listOf("mcp_selftest_echo"), plugin.serverSnapshots().single().tools)
+            val remoteKeywords = requireNotNull(registry.context.tools.get("mcp_selftest_echo"))
+                .metadata.discoveryKeywords
+            assertTrue("mcp_selftest_echo" in remoteKeywords)
+            assertFalse("仅提到 MCP 不应预选全部远端工具", "mcp" in remoteKeywords)
             val result = registry.context.tools.execute("mcp_selftest_echo",
                 buildJsonObject { }, context = ToolContext(approval = { true }))
             assertFalse(result.isError)

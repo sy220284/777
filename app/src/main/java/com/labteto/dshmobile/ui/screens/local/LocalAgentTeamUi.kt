@@ -44,6 +44,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.work.LocalAgentTeamMemberUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamTaskUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamUiState
+import com.labteto.dshmobile.local.work.LocalAgentChildUiState
+import com.labteto.dshmobile.uicontract.UiWorkAgentOperation
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
@@ -179,7 +181,8 @@ internal fun LocalAgentTeamStatusBar(
                     StateDot(teamDotState(team, launchPending), size = 8.dp)
                     Column(Modifier.weight(1f)) {
                         Text(
-                            stringResource(R.string.local_team_title),
+                            if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty()) "子智能体"
+                            else stringResource(R.string.local_team_title),
                             style = DsType.std14Strong.withReadingWeight(),
                             color = colors.text,
                         )
@@ -210,7 +213,7 @@ internal fun LocalAgentTeamStatusBar(
                         )
                     }
                 }
-                if (team.visible && team.members.isNotEmpty()) {
+                if (team.visible && (team.members.isNotEmpty() || team.standaloneAgents.isNotEmpty())) {
                     Column(
                         modifier = Modifier.padding(
                             start = SyMetric.gapLg,
@@ -245,7 +248,16 @@ internal fun LocalAgentTeamStatusBar(
                                     )
                                 }
                             }
-                        val hidden = team.members.size - MAX_INLINE_TEAM_MEMBERS
+                        if (team.members.isEmpty()) {
+                            team.standaloneAgents.take(MAX_INLINE_TEAM_MEMBERS).forEach { agent ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                                    StateDot(if (agent.status == "running") StateDotState.Running else StateDotState.Idle, size = 6.dp)
+                                    Text(agent.label, style = DsType.caption11Strong.withReadingWeight(), color = colors.text)
+                                    Text(agent.status, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                                }
+                            }
+                        }
+                        val hidden = (team.members.size + team.standaloneAgents.size) - MAX_INLINE_TEAM_MEMBERS
                         if (hidden > 0) {
                             Text(
                                 stringResource(R.string.local_team_more_assistants, hidden),
@@ -267,6 +279,7 @@ internal fun LocalAgentTeamSheet(
     onSendMemberMessage: suspend (String, String) -> LocalWorkUiActionResult,
     onStopMember: suspend (String) -> LocalWorkUiActionResult,
     onStopAll: suspend () -> LocalWorkUiActionResult,
+    onAgentOperation: suspend (String, UiWorkAgentOperation, String?) -> LocalWorkUiActionResult,
     onLeadFollowup: (String) -> Unit,
     onDismiss: () -> Unit,
     onCollapse: () -> Unit = onDismiss,
@@ -284,7 +297,8 @@ internal fun LocalAgentTeamSheet(
     }
 
     SyResponsiveSheet(
-        title = stringResource(R.string.local_team_title),
+        title = if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty()) "子智能体"
+            else stringResource(R.string.local_team_title),
         scrollable = true,
         subtitle = if (team.rebuilding) stringResource(R.string.common_loading) else stringResource(
             R.string.local_team_sheet_summary,
@@ -313,24 +327,33 @@ internal fun LocalAgentTeamSheet(
                 Text(stringResource(R.string.common_loading), style = DsType.std14Strong, color = colors.textSecondary)
                 return@Column
             }
-            TeamProgressBlock(team)
+            if (team.members.isNotEmpty() || team.tasks.isNotEmpty()) TeamProgressBlock(team)
             SyButton(
                 text = stringResource(R.string.local_team_collapse_after_view),
                 onClick = onCollapse,
                 variant = SyButtonVariant.Ghost,
                 size = SyButtonSize.Small,
             )
-            Text(
-                stringResource(R.string.local_team_readonly_hint),
-                style = DsType.caption11, color = colors.textSecondary,
-            )
-            SyButton(
-                text = stringResource(R.string.local_team_lead_followup),
-                onClick = { onLeadFollowup("") },
-                variant = SyButtonVariant.Ghost,
-                size = SyButtonSize.Small,
-            )
+            if (team.members.isNotEmpty() || team.tasks.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.local_team_readonly_hint),
+                    style = DsType.caption11, color = colors.textSecondary,
+                )
+                SyButton(
+                    text = stringResource(R.string.local_team_lead_followup),
+                    onClick = { onLeadFollowup("") },
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                )
+            }
 
+            if (team.standaloneAgents.isNotEmpty()) {
+                Text("独立子智能体", style = DsType.small13Strong.withReadingWeight(), color = colors.textTertiary)
+                team.standaloneAgents.forEach { agent ->
+                    StandaloneAgentRow(agent, onAgentOperation, toast.second)
+                }
+            }
+            if (team.members.isNotEmpty() || team.tasks.isNotEmpty() || team.failure != null) {
             Text(
                 stringResource(if (team.provisioningMemberCount > 0) R.string.local_team_recruit_title else R.string.local_team_assistants),
                 style = DsType.small13Strong.withReadingWeight(),
@@ -373,6 +396,7 @@ internal fun LocalAgentTeamSheet(
                 }
             }
 
+            }
             if (team.tasks.isNotEmpty()) {
                 Text(
                     stringResource(R.string.local_team_tasks),
@@ -856,20 +880,27 @@ private fun teamSummary(team: LocalAgentTeamUiState, launchPending: Boolean): St
         stringResource(R.string.local_team_all_completed)
     team.members.isNotEmpty() ->
         stringResource(R.string.local_team_waiting_task)
+    team.standaloneAgents.isNotEmpty() ->
+        "${team.standaloneAgents.size} 个独立子智能体"
     else ->
         stringResource(R.string.local_team_matching_members)
 }
 
 private fun teamDotState(team: LocalAgentTeamUiState, launchPending: Boolean): StateDotState = when {
     team.rebuilding -> StateDotState.Idle
-    team.failure != null || team.failedMemberCount > 0 -> StateDotState.Error
+    team.failure != null || team.failedMemberCount > 0 ||
+        team.standaloneAgents.any { it.status == "failed" } -> StateDotState.Error
     launchPending || team.provisioningMemberCount > 0 || team.runningMemberCount > 0 ->
         StateDotState.Running
     team.stoppingMemberCount > 0 -> StateDotState.Warning
     team.tasks.isNotEmpty() && team.completedTaskCount == team.tasks.size ->
         StateDotState.Done
+    team.members.isEmpty() && team.standaloneAgents.isNotEmpty() &&
+        team.standaloneAgents.all { it.status == "completed" } -> StateDotState.Done
     team.blockedTaskCount > 0 ->
         StateDotState.Warning
+    team.standaloneAgents.any { it.status == "running" } -> StateDotState.Running
+    team.standaloneAgents.any { it.status == "interrupted" } -> StateDotState.Warning
     else ->
         StateDotState.Idle
 }
@@ -1011,3 +1042,126 @@ private fun TeamMemberWorksite(member: LocalAgentTeamMemberUiState, output: Stri
         }
     }
 }
+
+/** One presentation for a standalone child; Team uses the same Job/Agent control owner. */
+@Composable
+private fun StandaloneAgentRow(
+    agent: LocalAgentChildUiState,
+    onOperation: suspend (String, UiWorkAgentOperation, String?) -> LocalWorkUiActionResult,
+    onFeedback: (String) -> Unit,
+) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val scope = rememberCoroutineScope()
+    var expanded by rememberSaveable(agent.id) { mutableStateOf(false) }
+    var draft by rememberSaveable(agent.id) { mutableStateOf("") }
+    var detail by remember(agent.id) { mutableStateOf("") }
+    var busy by remember(agent.id) { mutableStateOf(false) }
+    var confirmClose by remember(agent.id) { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+        androidx.compose.material3.Surface(
+            onClick = { expanded = !expanded },
+            shape = DsShapes.block,
+            border = BorderStroke(1.dp, colors.border),
+            color = androidx.compose.ui.graphics.Color.Transparent,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            ) {
+                StateDot(if (agent.status == "running") StateDotState.Running else StateDotState.Idle, size = 8.dp)
+                Text(agent.label, modifier = Modifier.weight(1f), style = DsType.std14Strong, color = colors.text)
+                Text(standaloneAgentStatusLabel(agent.status), style = DsType.caption11, color = colors.textSecondary)
+                Icon(if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
+                    contentDescription = null, tint = colors.textTertiary)
+            }
+        }
+        if (expanded) {
+            fun perform(operation: UiWorkAgentOperation, message: String? = null) {
+                if (busy) return
+                busy = true
+                scope.launch {
+                    try {
+                        val result = onOperation(agent.id, operation, message)
+                        detail = result.message
+                        if (result.accepted) onFeedback(result.message)
+                        else onFeedback("操作未完成：" + result.message)
+                        if (result.accepted && operation == UiWorkAgentOperation.SEND_MESSAGE) draft = ""
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        detail = failure.message ?: "子智能体操作失败"
+                        onFeedback("操作未完成：" + detail)
+                    } finally { busy = false }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                SyButton(text = "查看结果", enabled = !busy, onClick = { perform(UiWorkAgentOperation.INSPECT) },
+                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
+                if (agent.status == "running") {
+                    SyButton(text = "暂停", enabled = !busy && agent.continuable,
+                        onClick = { perform(UiWorkAgentOperation.INTERRUPT) },
+                        variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
+                } else if (agent.canResume) {
+                    SyButton(text = "继续", enabled = !busy,
+                        onClick = { perform(UiWorkAgentOperation.RESUME) },
+                        variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
+                }
+                SyButton(text = "关闭", enabled = !busy, onClick = { confirmClose = true },
+                    variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                verticalAlignment = Alignment.CenterVertically) {
+                SyTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f),
+                    enabled = !busy && agent.canMessage, singleLine = true, placeholder = { Text("给子智能体发送消息") })
+                SyButton(text = "发送", enabled = draft.isNotBlank() && !busy && agent.canMessage,
+                    onClick = { perform(UiWorkAgentOperation.SEND_MESSAGE, draft) },
+                    size = SyButtonSize.Small)
+            }
+            if (detail.isNotBlank()) SelectionContainer {
+                Text(detail, color = colors.textSecondary, style = DsType.caption11)
+            }
+        }
+    }
+    if (confirmClose) {
+        SyDialog(title = "关闭子智能体", onDismiss = { if (!busy) confirmClose = false }) {
+            Text("关闭后会终止该子智能体及其待处理消息。", style = DsType.small13, color = colors.textSecondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                SyButton(text = "取消", onClick = { confirmClose = false }, variant = SyButtonVariant.Ghost)
+                SyButton(text = "确认关闭", onClick = {
+                    confirmClose = false
+                    if (!busy) {
+                        busy = true
+                        scope.launch {
+                            try {
+                                val result = onOperation(agent.id, UiWorkAgentOperation.CLOSE, null)
+                                detail = result.message
+                                onFeedback(if (result.accepted) result.message else "操作未完成：" + result.message)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                detail = failure.message ?: "关闭子智能体失败"
+                                onFeedback("操作未完成：" + detail)
+                            } finally { busy = false }
+                        }
+                    }
+                })
+            }
+        }
+    }
+}
+
+@Composable
+private fun standaloneAgentStatusLabel(status: String): String = stringResource(
+    when (status) {
+        "running" -> R.string.local_team_state_thinking
+        "stopping" -> R.string.local_team_state_stopping
+        "waiting_slice", "waiting" -> R.string.local_team_state_waiting
+        "dormant", "idle" -> R.string.local_team_state_offwork
+        "interrupted", "cancelled" -> R.string.local_team_state_stopped
+        "completed" -> R.string.local_team_state_task_done
+        "failed" -> R.string.local_team_state_failed
+        "killed" -> R.string.local_team_state_dismissed
+        else -> R.string.local_team_state_waiting
+    },
+)
