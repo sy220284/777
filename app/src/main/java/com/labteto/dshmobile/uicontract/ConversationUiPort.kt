@@ -172,6 +172,13 @@ data class UiQueuedUserSnapshot(
 )
 
 /** Queue operations have owner identity checks and durable admission; UI receives only receipts. */
+/** Queue commands are admitted by the existing Chat/Work owner under its session lock. */
+sealed interface UiQueuedUserCommand {
+    data class Edit(val identity: UiSessionIdentity, val messageId: String, val text: String) : UiQueuedUserCommand
+    data class Remove(val identity: UiSessionIdentity, val messageId: String) : UiQueuedUserCommand
+    data class Reorder(val identity: UiSessionIdentity, val orderedIds: List<String>) : UiQueuedUserCommand
+}
+
 interface UiQueuedUserPort {
     fun snapshot(): UiQueuedUserSnapshot
     fun edit(identity: UiSessionIdentity, messageId: String, replacement: String): UiCommandReceipt

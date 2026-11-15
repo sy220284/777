@@ -17,6 +17,7 @@ sealed interface UiAppServerCommand {
     data class Automation(val command: AutomationUiCommand) : UiAppServerCommand
     data class Tools(val command: ToolsUiCommand) : UiAppServerCommand
     data class Settings(val command: SettingsUiCommand) : UiAppServerCommand
+    data class Queue(val command: UiQueuedUserCommand) : UiAppServerCommand
 }
 sealed interface UiAppServerReply {
     data class Chat(val receipt: UiCommandReceipt) : UiAppServerReply
@@ -26,6 +27,7 @@ sealed interface UiAppServerReply {
     data class Automation(val receipt: AutomationUiReceipt) : UiAppServerReply
     data class Tools(val receipt: ToolsUiReceipt) : UiAppServerReply
     data class Settings(val receipt: SettingsUiReceipt) : UiAppServerReply
+    data class Queue(val receipt: UiCommandReceipt) : UiAppServerReply
 }
 
 /** Typed query envelope: one App Server entry for state reads, same owner-issued snapshots. */
@@ -34,6 +36,7 @@ sealed interface UiAppServerRead {
     data object Work : UiAppServerRead
     data object Sessions : UiAppServerRead
     data object Agents : UiAppServerRead
+    data object QueuedUsers : UiAppServerRead
     data object Automations : UiAppServerRead
     data object Settings : UiAppServerRead
     /** Null query lists registered capabilities, nonblank query uses live discovery ranking. */
@@ -44,6 +47,7 @@ sealed interface UiAppServerState {
     data class Work(val snapshot: WorkConversationSceneSnapshot) : UiAppServerState
     data class Sessions(val snapshot: UiSessionsSnapshot) : UiAppServerState
     data class Agents(val snapshot: UiWorkTeamSnapshot) : UiAppServerState
+    data class QueuedUsers(val snapshot: UiQueuedUserSnapshot) : UiAppServerState
     data class Automations(val snapshot: UiAutomationSnapshot) : UiAppServerState
     data class Settings(val snapshot: UiSettingsSnapshot) : UiAppServerState
     data class Capabilities(val registered: List<UiToolCapabilitySnapshot>) : UiAppServerState
@@ -61,6 +65,7 @@ interface AppServerUiPort {
     val workRead: WorkReadUiPort
     val files: FilesUiPort
     val attachments: AttachmentUiPort
+    val queuedUsers: UiQueuedUserPort
     fun manifest(): UiAppServerManifest
     /** Read one Feature owner without activating any unrelated owner. */
     fun read(query: UiAppServerRead): UiAppServerState

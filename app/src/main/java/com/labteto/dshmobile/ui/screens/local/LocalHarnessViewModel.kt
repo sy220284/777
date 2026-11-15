@@ -130,7 +130,7 @@ class LocalHarnessViewModel @Inject constructor(
     fun setNetworkSearchEnabled(enabled: Boolean) = toolsUi.setNetworkSearchEnabled(enabled)
     val state = runtime.state
     val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
-    internal val queuedUserPort = conversationPorts.queuedUsers
+    internal val queuedUserPort get() = appServer.queuedUsers
     val shellState = state.projectShellState(viewModelScope)
     val chatSurfaceState = state.projectChatSurfaceState(viewModelScope)
     val workSurfaceState = state.projectWorkSurfaceState(viewModelScope)

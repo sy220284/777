@@ -33,3 +33,7 @@
 ## 文件与附件边界
 
 新增 `AppServerUiPort.files` 与 `AppServerUiPort.attachments`。工作区目录、搜索、预览、下载发布由已存在的 `FilesUiPort / LocalSessionFilesRuntime` 执行；用户明确选择的手机附件经 `AttachmentUiPort` 的会话身份验证导入。旧的同类 UI 调用统一转向上述契约，端口移除运行中已具备能力的“默认不支持”实现。
+
+## 排队消息的统一入口
+
+`AppServerUiPort.queuedUsers` 暴露与 Chat/Work 共用的 `UiQueuedUserPort`。客户端可通过 `read(QueuedUsers)` 获取当前会话排队消息，或提交 `UiAppServerCommand.Queue(Edit/Remove/Reorder)`。调用复用同一 `LocalConversationUiPortComposition`，原始会话身份、运行中消息状态、队列修改和存储写入继续由 Chat/Work Owner 原子校验。

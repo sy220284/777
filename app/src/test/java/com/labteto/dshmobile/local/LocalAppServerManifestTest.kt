@@ -32,6 +32,9 @@ import com.labteto.dshmobile.uicontract.UiCommandReceipt
 import com.labteto.dshmobile.uicontract.UiSessionIdentity
 import com.labteto.dshmobile.uicontract.UiAppServerCommand
 import com.labteto.dshmobile.uicontract.UiAppServerReply
+import com.labteto.dshmobile.uicontract.UiQueuedUserCommand
+import com.labteto.dshmobile.uicontract.UiQueuedUserPort
+import com.labteto.dshmobile.uicontract.UiQueuedUserSnapshot
 import com.labteto.dshmobile.uicontract.UiAppServerRead
 import com.labteto.dshmobile.uicontract.UiAppServerState
 import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
@@ -42,6 +45,55 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 
 class LocalAppServerManifestTest {
+    @Test fun queueReadAndCommandsUseExistingOwnerOnlyWithExactIdentity() = runBlocking {
+        val identity = UiSessionIdentity("queue-session", "active", 2L, null, null)
+        val calls = mutableListOf<String>()
+        val queuePort = java.lang.reflect.Proxy.newProxyInstance(
+            UiQueuedUserPort::class.java.classLoader, arrayOf(UiQueuedUserPort::class.java)
+        ) { _, method, args ->
+            calls += method.name
+            when (method.name) {
+                "snapshot" -> UiQueuedUserSnapshot(identity, emptyList())
+                "edit", "remove", "reorder" -> {
+                    assertEquals(identity, args?.firstOrNull())
+                    UiCommandReceipt.Accepted
+                }
+                else -> error("unexpected queue method ${method.name}")
+            }
+        } as UiQueuedUserPort
+        val server = LocalAppServer(
+            chatOwner = Provider { error("Chat must stay dormant") },
+            workOwner = Provider { error("Work must stay dormant") },
+            sessionOwner = Provider { error("Session must stay dormant") },
+            agentOwner = Provider { error("Agent must stay dormant") },
+            automationOwner = Provider { error("Automation must stay dormant") },
+            toolsOwner = Provider { error("Tools must stay dormant") },
+            settingsOwner = Provider { error("Settings must stay dormant") },
+            filesOwner = Provider { error("Files must stay dormant") },
+            attachmentsOwner = Provider { error("Attachments must stay dormant") },
+            queuedUserOwner = Provider { queuePort },
+            workReadOwner = Provider { error("Work read must stay dormant") },
+        )
+        assertEquals(
+            UiAppServerState.QueuedUsers(UiQueuedUserSnapshot(identity, emptyList())),
+            server.read(UiAppServerRead.QueuedUsers),
+        )
+        assertEquals(
+            UiAppServerReply.Queue(UiCommandReceipt.Accepted),
+            server.submit(UiAppServerCommand.Queue(UiQueuedUserCommand.Edit(identity, "q1", "rewrite"))),
+        )
+        assertEquals(
+            UiAppServerReply.Queue(UiCommandReceipt.Accepted),
+            server.submit(UiAppServerCommand.Queue(UiQueuedUserCommand.Remove(identity, "q1"))),
+        )
+        assertEquals(
+            UiAppServerReply.Queue(UiCommandReceipt.Accepted),
+            server.submit(UiAppServerCommand.Queue(UiQueuedUserCommand.Reorder(identity, listOf("q2", "q1")))),
+        )
+        assertEquals(listOf("snapshot", "edit", "remove", "reorder"), calls)
+    }
+
+
     @Test fun scopedNoticesActivateOnlyRequestedFeatureOwner() = runBlocking {
         val calls = mutableListOf<String>()
         val tools = Proxy.newProxyInstance(
@@ -64,6 +116,7 @@ class LocalAppServerManifestTest {
             settingsOwner = Provider { error("Settings initialized unexpectedly") },
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
+            queuedUserOwner = Provider { error("Queue owner must stay lazy") },
             workReadOwner = Provider { error("WorkRead initialized unexpectedly") },
         )
         val stream = server.noticesFor(setOf(UiAppServerFeature.TOOLS))
@@ -106,6 +159,7 @@ class LocalAppServerManifestTest {
             settingsOwner = Provider { activated += "settings"; settings },
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
+            queuedUserOwner = Provider { error("Queue owner must stay lazy") },
             workReadOwner = Provider { error("Work Read owner accessed by another Feature") },
         )
         assertEquals(UiAppServerState.Settings(settingsSnapshot), server.read(UiAppServerRead.Settings))
@@ -150,6 +204,7 @@ class LocalAppServerManifestTest {
             settingsOwner = owner("settings", settings),
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
+            queuedUserOwner = Provider { error("Queue owner must stay lazy") },
             workReadOwner = Provider { error("reading owner must remain lazy") },
         )
         // Manifest and notification-flow acquisition must have no hidden initialization.
@@ -219,6 +274,7 @@ class LocalAppServerManifestTest {
             settingsOwner = Provider { port },
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
+            queuedUserOwner = Provider { error("Queue owner must stay lazy") },
             workReadOwner = Provider { error("read was not requested") },
         )
         assertThrows(kotlinx.coroutines.CancellationException::class.java) {
@@ -248,6 +304,7 @@ class LocalAppServerManifestTest {
             settingsOwner = Provider { error("settings unexpectedly initialized") },
             filesOwner = Provider { error("Files owner must stay lazy") },
             attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
+            queuedUserOwner = Provider { error("Queue owner must stay lazy") },
             workReadOwner = Provider { error("work read unexpectedly initialized") },
         )
         assertEquals(6, server.manifest().endpoints.size)

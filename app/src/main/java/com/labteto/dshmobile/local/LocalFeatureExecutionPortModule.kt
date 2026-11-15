@@ -49,6 +49,12 @@ internal object LocalFeatureExecutionPortModule {
     @Singleton
     fun provideWorkConversationUiPort(composition: LocalConversationUiPortComposition):
         com.labteto.dshmobile.uicontract.WorkConversationUiPort = composition.work
+
+    /** Queue snapshot and mutation are the same owner adapter used by Chat and Work. */
+    @Provides
+    @Singleton
+    fun provideQueuedUserUiPort(composition: LocalConversationUiPortComposition):
+        com.labteto.dshmobile.uicontract.UiQueuedUserPort = composition.queuedUsers
     @Provides
     @Singleton
     fun providePersonaPortraitUiPort(owner: com.labteto.dshmobile.local.chat.LocalPersonaPortraitOwner):

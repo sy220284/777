@@ -16,6 +16,8 @@ import com.labteto.dshmobile.uicontract.UiAppServerCommand
 import com.labteto.dshmobile.uicontract.UiAppServerReply
 import com.labteto.dshmobile.uicontract.UiAppServerRead
 import com.labteto.dshmobile.uicontract.UiAppServerState
+import com.labteto.dshmobile.uicontract.UiQueuedUserPort
+import com.labteto.dshmobile.uicontract.UiQueuedUserCommand
 import com.labteto.dshmobile.uicontract.WorkAgentUiPort
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
@@ -61,6 +63,7 @@ internal class LocalAppServer @Inject constructor(
     private val workReadOwner: Provider<WorkReadUiPort>,
     private val filesOwner: Provider<FilesUiPort>,
     private val attachmentsOwner: Provider<AttachmentUiPort>,
+    private val queuedUserOwner: Provider<UiQueuedUserPort>,
 ) : AppServerUiPort {
     override val chat: ChatUiPort get() = chatOwner.get()
     override val work: WorkConversationUiPort get() = workOwner.get()
@@ -72,6 +75,7 @@ internal class LocalAppServer @Inject constructor(
     override val workRead: WorkReadUiPort get() = workReadOwner.get()
     override val files: FilesUiPort get() = filesOwner.get()
     override val attachments: AttachmentUiPort get() = attachmentsOwner.get()
+    override val queuedUsers: UiQueuedUserPort get() = queuedUserOwner.get()
 
     override fun manifest(): UiAppServerManifest = localAppServerManifest()
 
@@ -80,6 +84,7 @@ internal class LocalAppServer @Inject constructor(
         UiAppServerRead.Work -> UiAppServerState.Work(work.snapshot())
         UiAppServerRead.Sessions -> UiAppServerState.Sessions(session.snapshot())
         UiAppServerRead.Agents -> UiAppServerState.Agents(agents.snapshot())
+        UiAppServerRead.QueuedUsers -> UiAppServerState.QueuedUsers(queuedUsers.snapshot())
         UiAppServerRead.Automations -> UiAppServerState.Automations(automation.snapshot())
         UiAppServerRead.Settings -> UiAppServerState.Settings(settings.initialState)
         is UiAppServerRead.Capabilities -> {
@@ -126,6 +131,11 @@ internal class LocalAppServer @Inject constructor(
         is UiAppServerCommand.Agent -> UiAppServerReply.Agent(agents.submit(command.command))
         is UiAppServerCommand.Automation -> UiAppServerReply.Automation(automation.submit(command.command))
         is UiAppServerCommand.Tools -> UiAppServerReply.Tools(tools.submit(command.command))
+        is UiAppServerCommand.Queue -> UiAppServerReply.Queue(when (val action = command.command) {
+            is UiQueuedUserCommand.Edit -> queuedUsers.edit(action.identity, action.messageId, action.text)
+            is UiQueuedUserCommand.Remove -> queuedUsers.remove(action.identity, action.messageId)
+            is UiQueuedUserCommand.Reorder -> queuedUsers.reorder(action.identity, action.orderedIds)
+        })
         is UiAppServerCommand.Settings -> UiAppServerReply.Settings(
             when (val request = command.command) {
                 is SettingsUiCommand.SaveModel -> settings.save(request)
