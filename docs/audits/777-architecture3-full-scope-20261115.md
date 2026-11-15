@@ -185,11 +185,11 @@ Session EventLog 为历史和恢复唯一持久源，分页/检查点/投影从�
 
 全仓 CI 输出的 `unreferenced_production_candidates` 是 **没有被显式 import 命中的文件**，不能用作“死代码清单”。在 2026-11-15 的审计产物上，283 个候选中，有 252 个仍存在其他文件的词法调用候选，仅 31 个暂时没有观察到调用候选。
 
-进一步源码复查发现，`LocalToolScopeProjection.kt` 的 `HarnessTool.forReadOnlyModelScope` 通过 `HarnessTool::forReadOnlyModelScope` 被 `LocalToolSchemaProjection` 真实调用（规划模式和只读子任务需要）；原扫描器仅识别带括号调用，漏掉这种 Kotlin 方法引用。现已将方法引用纳入调用候选，并在同一全仓 CI 中断言这条安全约束路径必须被扫描到。该文件保留。
+进一步源码复查发现，`LocalToolScopeProjection.kt` 的 `HarnessTool.forReadOnlyModelScope` 通过 `HarnessTool::forReadOnlyModelScope` 被 `LocalToolSchemaProjection` 真实调用（规划模式和只读子任务需要）；原扫描器仅识别带括号调用，漏掉这种 Kotlin 方法引用。现已将方法引用纳入调用候选，并在同一全仓 CI 中断言这条安全约束路径必须被扫描到。该文件保留。Kotlin 无括号尾随 lambda 调用也必须纳入调用候选，以真实编译反向校验词法结果。
 
-对未被调用且没有 Manifest/注入/公开合同入口的文件，已按真实定义、同名搜索、用途和所有权完成具体删除判定：
+对未被调用且没有 Manifest/注入/公开合同入口的文件，已按真实定义、同名搜索、用途和所有权完成逐项删除判定；编译发现的漏判已恢复：
 - `LocalHarnessConfigurationComponents.kt`：旧的双模型配置 Compose 页面，现行 UI 没有入口；
-- `LocalSuspendResult.kt`：无任何消费者的私有协程结果封装；
+- `LocalSuspendResult.kt`：进一步 JVM 编译发现被 `LocalPersonaGalleryUiController` 通过 `runSuspendResult { ... }` 使用；**保留并将尾随 lambda 纳入扫描识别**。
 - `WorkflowStage.kt`：未被引用的旧展示状态文字表；
 - `LocalPersonaAuthoringUiProjection.kt`：未被调用的重复 Persona 转换封装，原 Chat `authoringDraft/applyTo` 仍保留。
 
