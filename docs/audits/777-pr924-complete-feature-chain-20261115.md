@@ -121,3 +121,11 @@ CI 回归复核：此前一次执行的 3569 项 JVM 测试中有 2 项失败，
 - **运行时回归**：`AutomationPlannerUiControllerTest` 覆盖单次规划提交、过期任务拒绝和真实失败原因；`TaskManagementOperationTest` 覆盖遗失回执不重放、操作拒绝、受理后列表刷新失败以及取消传播。已有 Android 设备互动、插件和持久化回归由 CI 对最新 HEAD 执行。
 
 安全与恢复仍由当前 Automation Task Store 代次、Session Owner、系统调度器和真实设备授权负责。UI 持有加载/提示状态，不新增任务事实源、定时任务或第二套队列。最新 CI 的完成状态以对应源提交实际工作流回执为准。
+
+## Work 规划审批与用户提问保真（2026-11-15）
+
+完整审批链：`exit_plan_mode` 提交完整计划 → `LocalInteractionCoordinator.awaitQuestion` → `LocalPlanReviewCard` 展示与复制 → 用户批准 → `plan/approved` 与 `WorkState.plan` 同步保存 → 后续执行读取已批准版本。
+
+本轮去除计划审批文本前 8,000 字符和批准记录前 20 条的无提示裁剪。审批页显示的完整计划与实际批准、事件落盘和执行状态中的计划保持一致。普通 `ask_user_question` 同样完整转发问题与全部选项至既有 UI，删除 2,000 字和 6 选项的静默裁剪；真实输入有效性仍由既有工具参数契约负责。
+
+新增 `LocalWorkPlanModeCoordinatorTest.longPlanApprovalShowsEveryCharacterAndPersistsAllSteps`（40 步、超过 8,000 字）及 `LocalWorkBuiltinToolRuntimeTest.longQuestionAndAllChoicesReachApprovalUiWithoutSilentTruncation`（长问题、12 个选项）。这些改动使用现有 Work/Interaction/Session Owner，未新增审批账本或第二类任务执行器。

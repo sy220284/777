@@ -111,7 +111,7 @@ internal suspend fun exitWorkPlanMode(
     val answer = interactions.awaitQuestion(
         LocalQuestion(
             callId = call.id,
-            question = "Harness 已完成计划，是否批准并进入执行模式？\n\n${plan.take(8_000)}",
+            question = "Harness 已完成计划，是否批准并进入执行模式？\n\n$plan",
             options = listOf("批准并进入执行模式", "继续规划", "重新生成方案"),
         ),
     )
@@ -125,7 +125,6 @@ internal suspend fun exitWorkPlanMode(
     val approvedPlan = plan.lines()
         .map(String::trim)
         .filter(String::isNotEmpty)
-        .take(20)
 
     commitApprovedWorkPlan(state, approvedPlan) { items ->
         eventLog.append("plan/approved", buildJsonObject {

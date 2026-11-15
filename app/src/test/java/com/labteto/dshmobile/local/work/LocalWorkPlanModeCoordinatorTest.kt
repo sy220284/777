@@ -78,6 +78,45 @@ class LocalWorkPlanModeCoordinatorTest {
     }
 
     @Test
+    fun longPlanApprovalShowsEveryCharacterAndPersistsAllSteps() = runTest {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(sessionId = "complete-plan", loading = false,
+            usageMode = LocalUsageMode.WORK))
+        val logs = LocalSessionEventLogRegistry(
+            File(temporary.root, "complete-plan-logs").apply { mkdirs() }, json,
+        )
+        var work = LocalWorkState(planMode = true)
+        val port = object : LocalWorkStatePort {
+            override fun snapshot() = work
+            override fun update(transform: (LocalWorkState) -> LocalWorkState) {
+                work = transform(work)
+            }
+        }
+        val plan = (1..40).joinToString("\n") { index ->
+            "第${index}步：" + "需要保留完整验收要求".repeat(35)
+        }
+        assertTrue(plan.length > 8_000)
+        val call = LocalToolCall("long-plan-approval", "exit_plan_mode", buildJsonObject {}, "{}")
+        val pending = async {
+            exitWorkPlanMode(call, plan, port, runtime.foregroundInteractions,
+                logs.get("complete-plan"), persist = {})
+        }
+        runCurrent()
+        val question = requireNotNull(runtime.state.value.work.pendingQuestion)
+        assertTrue("审批必须展示完整方案", question.question.endsWith(plan))
+        assertTrue(runtime.foregroundInteractions.answerQuestion(question.callId, "批准并进入执行模式"))
+        assertEquals(APPROVED_PLAN_TOOL_RESULT, pending.await())
+        assertFalse(work.planMode)
+        assertEquals(40, work.plan.size)
+        assertEquals(plan.lines().map(String::trim), work.plan)
+        val approved = requireNotNull(logs.get("complete-plan").latest("plan/approved"))
+        val saved = requireNotNull(approved.data["items"] as? JsonArray)
+        assertEquals(40, saved.size)
+        assertEquals(work.plan.last(), saved.last().jsonPrimitive.content)
+        logs.clearAndEvict(setOf("complete-plan"))
+    }
+
+    @Test
     fun planModeCommitsInWorkBoundaryAndUpdatesForegroundPrompt() {
         val fixture = fixture()
         fixture.runtime.foregroundRunHandle.modelHistory.prepend(buildJsonObject {

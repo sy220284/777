@@ -74,17 +74,7 @@ internal class LocalWorkBuiltinToolRuntime(
                     "$receipt；目标已通过验收，手机下载交付将在本轮结束时处理"
                 else receipt
             }
-            "ask_user_question" -> run.interactions.awaitQuestion(
-                LocalQuestion(
-                    callId = call.id,
-                    question = args.string("question").take(2_000),
-                    options = args["options"]
-                        ?.jsonArray
-                        ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-                        .orEmpty()
-                        .take(6),
-                ),
-            )
+            "ask_user_question" -> run.interactions.awaitQuestion(workQuestionFromArgs(call.id, args))
             else -> error("未覆盖的 Work builtin：${call.name}")
         }
     }
@@ -102,6 +92,15 @@ internal class LocalWorkBuiltinToolRuntime(
         )
     }
 }
+
+/** Preserve the model's entire question and choice set for the real approval UI. */
+internal fun workQuestionFromArgs(callId: String, args: JsonObject): LocalQuestion = LocalQuestion(
+    callId = callId,
+    question = args.string("question"),
+    options = args["options"]?.jsonArray
+        ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+        .orEmpty(),
+)
 
 /**
  * The model tool contract requires both acceptance arrays, even when explicitly empty.
