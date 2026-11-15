@@ -138,7 +138,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.tools.ExtensionMarketplaceUiTest,com.labteto.dshmobile.ui.screens.tools.ExtensionCredentialsUiTest,com.labteto.dshmobile.ui.screens.tools.ExtensionOAuthCallbackUiTest --stacktrace --console=plain
+          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest,com.labteto.dshmobile.local.tools.LocalMcpCredentialStoreAndroidTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthCallbackAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerCallerAndroidTest --stacktrace --console=plain
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
