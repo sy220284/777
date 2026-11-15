@@ -1471,6 +1471,7 @@ fun ToolsScreen(
                                         >(
                                             initialValue = null,
                                             showToolDirectory, toolDirectoryQuery, capabilityRevision,
+                                            state.localPlugins, state.servers, state.skills,
                                         ) {
                                             if (showToolDirectory) {
                                                 delay(120)

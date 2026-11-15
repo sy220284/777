@@ -66,6 +66,13 @@ assert "appServer.media" in read(source / "ui/screens/local/LocalHarnessViewMode
 assert "appServer.usage" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.memory" in read(source / "ui/screens/settings/SettingsViewModel.kt")
 assert "appServer.pricing" in read(source / "ui/screens/settings/SettingsViewModel.kt")
+media_contract = read(contracts / "MediaUiPort.kt")
+for prohibited in (
+    "Boolean = false", "UiMediaAsset? = null",
+    'MediaUiReceipt.Failed("Image download recovery is unavailable")',
+    'MediaUiReceipt.Failed("Export is not available")',
+):
+    assert prohibited not in media_contract, f"Fake fallback in required Media owner contract: {prohibited}"
 work_feature = read(source / "ui/screens/local/LocalFeatureUiActions.kt")
 for required in (
     "saveWorkspaceFileToDownloads", "publishedWorkspaceFile", "workspaceDirectory",

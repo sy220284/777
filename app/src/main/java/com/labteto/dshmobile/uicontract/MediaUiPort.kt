@@ -45,16 +45,14 @@ interface MediaUiPort {
     fun offers(profiles: List<LocalModelProfile>): List<LocalMediaOffer>
     fun canRefresh(task: LocalMediaVideoTask, offer: LocalMediaOffer): Boolean
     /** Compare credential at the Owner; never claim a past paid route is safe from a display ID alone. */
-    suspend fun hasMatchingCredential(offer: LocalMediaOffer, expectedSignature: String?): Boolean = false
+    suspend fun hasMatchingCredential(offer: LocalMediaOffer, expectedSignature: String?): Boolean
     fun asset(id: String): UiMediaAsset?
     /** Deny references to different sessions, including media created before scope enforcement. */
-    fun assetForSession(id: String, sessionId: String): UiMediaAsset? = null
+    fun assetForSession(id: String, sessionId: String): UiMediaAsset?
     /** Explicit non-billable fetch of a previously generated image; never submit generation again. */
-    suspend fun retrySessionImageDownload(id: String, sessionId: String): MediaUiReceipt =
-        MediaUiReceipt.Failed("Image download recovery is unavailable")
+    suspend fun retrySessionImageDownload(id: String, sessionId: String): MediaUiReceipt
     /** User-picked SAF output. Owner rechecks session and local file at copy time. */
-    suspend fun exportToSessionAsset(id: String, sessionId: String, output: OutputStream): MediaUiReceipt =
-        MediaUiReceipt.Failed("Export is not available")
+    suspend fun exportToSessionAsset(id: String, sessionId: String, output: OutputStream): MediaUiReceipt
     suspend fun voices(offer: LocalMediaOffer): List<LocalMediaVoice>
     suspend fun submit(command: MediaUiCommand): MediaUiReceipt
 }

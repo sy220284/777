@@ -149,6 +149,8 @@ class LocalConversationUiPortComposition @Inject internal constructor(
                     LocalUsageMode.CHAT -> chatOwner.editAndResendUserMessage(messageId, replacement)
                     LocalUsageMode.WORK -> workOwner.editAndResendUserMessage(messageId, replacement)
                 }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (failure: Exception) {
                 return@synchronized UiCommandReceipt.Failed(
                     "排队消息修改失败：" + (failure.message ?: failure.javaClass.simpleName),
@@ -194,6 +196,8 @@ class LocalConversationUiPortComposition @Inject internal constructor(
             try {
                 if (mutation(current.usageMode)) UiCommandReceipt.Accepted
                 else UiCommandReceipt.NotAdmitted
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (failure: Exception) {
                 UiCommandReceipt.Failed(
                     "排队操作失败：" + (failure.message ?: failure.javaClass.simpleName),
