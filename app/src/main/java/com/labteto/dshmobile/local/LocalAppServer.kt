@@ -1,7 +1,25 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.feature.LocalFeatureCatalog
-import com.labteto.dshmobile.uicontract.*
+import com.labteto.dshmobile.uicontract.AppServerUiPort
+import com.labteto.dshmobile.uicontract.AutomationUiPort
+import com.labteto.dshmobile.uicontract.ChatUiPort
+import com.labteto.dshmobile.uicontract.SessionUiPort
+import com.labteto.dshmobile.uicontract.SettingsUiPort
+import com.labteto.dshmobile.uicontract.SettingsUiCommand
+import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
+import com.labteto.dshmobile.uicontract.UiAppServerEndpoint
+import com.labteto.dshmobile.uicontract.UiAppServerFeature
+import com.labteto.dshmobile.uicontract.UiAppServerManifest
+import com.labteto.dshmobile.uicontract.UiAppServerNotice
+import com.labteto.dshmobile.uicontract.UiAppServerCommand
+import com.labteto.dshmobile.uicontract.UiAppServerReply
+import com.labteto.dshmobile.uicontract.WorkAgentUiPort
+import com.labteto.dshmobile.uicontract.WorkConversationUiPort
+import com.labteto.dshmobile.uicontract.WorkReadUiPort
+import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
+import com.labteto.dshmobile.uicontract.save
+import com.labteto.dshmobile.uicontract.submit
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
