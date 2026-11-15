@@ -470,7 +470,7 @@ internal class LocalWorkAgentTurnExecutor(
                             estimateModelTokens(workPromptContext.skill)
                     var historyCompacted = false
                     val recoveryNeedsBudget = binding.enabledOptionalTools
-                        .hasBudgetOmittedRecoveryCandidate(preliminarySelection.omittedReasons)
+                        .hasBudgetOmittedRecoveryCandidate(preliminarySelection.budgetOmittedNames)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep) ||
                         recoveryNeedsBudget) {
                         LocalWorkSummarySettings.attach(context)
