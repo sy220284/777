@@ -25,7 +25,11 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 
@@ -43,31 +47,40 @@ internal fun localAppServerManifest() = UiAppServerManifest(
 /** Android-local app-server: one discoverable API to existing Feature Ports, not a new daemon. */
 @Singleton
 internal class LocalAppServer @Inject constructor(
-    conversation: LocalConversationUiPortComposition,
-    override val session: SessionUiPort,
-    override val agents: WorkAgentUiPort,
-    override val automation: AutomationUiPort,
-    override val tools: ToolsManagementUiPort,
-    override val settings: SettingsUiPort,
-    override val workRead: WorkReadUiPort,
+    private val conversationOwner: Provider<LocalConversationUiPortComposition>,
+    private val sessionOwner: Provider<SessionUiPort>,
+    private val agentOwner: Provider<WorkAgentUiPort>,
+    private val automationOwner: Provider<AutomationUiPort>,
+    private val toolsOwner: Provider<ToolsManagementUiPort>,
+    private val settingsOwner: Provider<SettingsUiPort>,
+    private val workReadOwner: Provider<WorkReadUiPort>,
 ) : AppServerUiPort {
-    override val chat: ChatUiPort = conversation.chat
-    override val work: WorkConversationUiPort = conversation.work
+    override val chat: ChatUiPort get() = conversationOwner.get().chat
+    override val work: WorkConversationUiPort get() = conversationOwner.get().work
+    override val session: SessionUiPort get() = sessionOwner.get()
+    override val agents: WorkAgentUiPort get() = agentOwner.get()
+    override val automation: AutomationUiPort get() = automationOwner.get()
+    override val tools: ToolsManagementUiPort get() = toolsOwner.get()
+    override val settings: SettingsUiPort get() = settingsOwner.get()
+    override val workRead: WorkReadUiPort get() = workReadOwner.get()
 
     override fun manifest(): UiAppServerManifest = localAppServerManifest()
 
-    override val notices = merge(
-        chat.snapshots.map { UiAppServerNotice(UiAppServerFeature.CHAT, it.identity) },
-        work.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) },
-        session.snapshots.map { UiAppServerNotice(UiAppServerFeature.SHELL, it.identity) },
-        agents.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) },
-        automation.snapshots.map { UiAppServerNotice(UiAppServerFeature.AUTOMATION, it.context.identity) },
-        tools.serverChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-        tools.skillChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-        tools.networkSearchEnabled.map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-        tools.deepSeekSearchPreferred.map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-        settings.state.map { UiAppServerNotice(UiAppServerFeature.SETTINGS) },
-    )
+    /** Subscribing, not constructing the client, activates change streams of the owners. */
+    override val notices: Flow<UiAppServerNotice> = flow {
+        emitAll(merge(
+            chat.snapshots.map { UiAppServerNotice(UiAppServerFeature.CHAT, it.identity) },
+            work.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) },
+            session.snapshots.map { UiAppServerNotice(UiAppServerFeature.SHELL, it.identity) },
+            agents.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) },
+            automation.snapshots.map { UiAppServerNotice(UiAppServerFeature.AUTOMATION, it.context.identity) },
+            tools.serverChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
+            tools.skillChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
+            tools.networkSearchEnabled.map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
+            tools.deepSeekSearchPreferred.map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
+            settings.state.map { UiAppServerNotice(UiAppServerFeature.SETTINGS) },
+        ))
+    }
 
     override suspend fun submit(command: UiAppServerCommand): UiAppServerReply = when (command) {
         is UiAppServerCommand.Chat -> UiAppServerReply.Chat(chat.submit(command.command))
