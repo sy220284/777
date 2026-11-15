@@ -225,6 +225,10 @@ internal class LocalWorkAgentTurnExecutor(
             }
             val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
             var outputLimitHasProgress = false
+            // AgentTurnEngine emits TurnFailed and then rethrows the same model exception.
+            // Once the event has settled the failure, the enclosing catch must not enqueue
+            // another continuation or overwrite the already queued recovery with an error.
+            var failureSettledInEvent = false
             val repliesByStep = mutableMapOf<Int, LocalModelReply>()
             val uiDefinitionsByStep = mutableMapOf<Int, String?>()
             val replyFormHandlingByStep = mutableMapOf<Int,
@@ -1027,6 +1031,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 }
                                 workModelHistoryRuntime.persist(binding)
                             }
+                            failureSettledInEvent = true
                         }
                         is AgentEvent.TurnCancelled -> {
                             settlePendingTools("cancelled")
@@ -1077,16 +1082,20 @@ internal class LocalWorkAgentTurnExecutor(
                 // TurnCancelled durably records and projects the visible stop message.
             } catch (error: Exception) {
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
-                val modelError = error as? LocalModelException
-                val queued = if (modelError != null && !waitingForReplyFormSubmission) {
-                    queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
-                } else {
-                    false
+                if (!failureSettledInEvent) {
+                    // Exceptional failures before TurnFailed was fully persisted still need
+                    // recovery. The usual event path has already committed the only Inbox
+                    // continuation and must remain the authoritative settlement.
+                    val modelError = error as? LocalModelException
+                    val queued = if (modelError != null && !waitingForReplyFormSubmission) {
+                        queueAutomaticWorkContinuation(binding, runContext.runId, modelError, uiSourceMessageId)
+                    } else {
+                        false
+                    }
+                    if (!queued) {
+                        binding.state.update { it.copy(error = error.message ?: "本机执行失败") }
+                    }
                 }
-                if (!queued) {
-                    binding.state.update { it.copy(error = error.message ?: "本机执行失败") }
-                }
-                // TurnFailed has already settled tool side effects and checkpointed model-visible state.
             } finally {
                 binding.interactions.cancelAll()
                 binding.state.update {
