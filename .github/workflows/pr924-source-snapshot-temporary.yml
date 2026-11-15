@@ -1,0 +1,27 @@
+name: PR 924 源码快照临时导出
+on:
+  push:
+    branches:
+      - audit/architecture3-full-callgraph-20261115
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: 打包当前提交的全部受追踪文件
+        shell: bash
+        run: |
+          git ls-files -z | tar --null -T - -czf "$RUNNER_TEMP/pr924-source.tar.gz"
+          echo "tracked=$(git ls-files | wc -l)"
+          sha256sum "$RUNNER_TEMP/pr924-source.tar.gz"
+      - name: 发布仅供本次审计使用的快照
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr924-source-snapshot
+          path: ${{ runner.temp }}/pr924-source.tar.gz
+          retention-days: 3
+          if-no-files-found: error
