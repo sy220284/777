@@ -30,9 +30,22 @@ class ChatUnifiedTurnContextTest {
         }.exceptionOrNull()
         assertTrue(rejected is IllegalStateException)
         assertTrue(rejected?.message.orEmpty().contains("无法直接读取本轮图片"))
-        requireChatImageInputSupported(listOf(image, nextText), tool)
-        assertFalse(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(listOf(image, nextText)))
-        assertTrue(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(listOf(nextText, image)))
+        // Separate dialogue turns by an assistant reply. Consecutive user messages
+        // belong to the same active input batch and must retain all their images.
+        val assistant = kotlinx.serialization.json.buildJsonObject {
+            put("role", "assistant")
+            put("content", "已收到图片")
+        }
+        requireChatImageInputSupported(listOf(image, assistant, nextText), tool)
+        assertFalse(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(
+            listOf(image, assistant, nextText),
+        ))
+        assertTrue(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(
+            listOf(nextText, assistant, image),
+        ))
+        assertTrue(com.labteto.dshmobile.local.model.hasActiveLocalUserImages(
+            listOf(image, nextText),
+        ))
     }
 
     @Test
