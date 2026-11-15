@@ -5,6 +5,8 @@ import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.session.LocalSessionTranscriptPager
+import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
+import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.session.projectSessionTranscriptTail
 import com.labteto.dshmobile.local.session.projectLocalTranscriptRuntimeIndexTail
 import com.labteto.dshmobile.local.session.LocalTranscriptRuntimeIndex
@@ -135,6 +137,63 @@ class LocalQueuedUserMessageEditorTest {
             assertFalse(editor.reorder(listOf("user-1")))
             assertEquals(listOf("user-2", "user-1"), queue.snapshot().map { it.id })
         }
+
+    @Test fun longTranscriptKeepsOriginalOrderAcrossPagesAndPersistsOnlyOneDelta() {
+        val directory = Files.createTempDirectory("queue-long-transcript-").toFile()
+        val log = LocalSessionEventLog(directory.resolve("long.events.jsonl"), json)
+        val queue = AgentInputQueue()
+        try {
+            val original = (0 until 360).map { id ->
+                LocalHarnessMessage(
+                    id = "history-$id", role = "user", content = "历史内容-$id",
+                    createdAt = id.toLong(),
+                )
+            }
+            queue.offer(QueuedAgentInput(
+                id = "history-12", content = "历史内容-12",
+                memoryInput = "历史内容-12",
+                modelMessage = buildJsonObject {
+                    put("role", "user")
+                    put("content", "历史内容-12")
+                },
+            ))
+            log.append("chat/active-transcript", buildJsonObject {
+                put("transcript", encodeTranscriptMessages(original))
+            })
+            val editor = LocalQueuedUserMessageEditor(log, queue)
+            val updated = requireNotNull(editor.edit("history-12", "修订后仍在原位置"))
+            val delta = requireNotNull(log.latest(LOCAL_AGENT_INBOX_EVENT_TYPE))
+            assertTrue("消息变更不应再复制整段历史", delta.data.toString().length < 2_000)
+            assertFalse("transcript" in delta.data)
+
+            fun pagedMessages(): List<LocalHarnessMessage> {
+                val pages = mutableListOf<List<LocalHarnessMessage>>()
+                var cursor: LocalTranscriptPageCursor? = null
+                do {
+                    val page = LocalSessionTranscriptPager(log).page(cursor = cursor, limit = 23)
+                    pages += page.messages
+                    cursor = page.nextCursor
+                } while (cursor != null)
+                return pages.asReversed().flatten()
+            }
+            assertEquals(updated.messages, pagedMessages())
+            assertEquals(updated.messages, projectSessionTranscriptTail(
+                emptyList(), log.snapshot(), sequenceExclusive = -1L,
+            ).messages)
+            assertEquals(updated.transcriptIndex, projectLocalTranscriptRuntimeIndexTail(
+                LocalTranscriptRuntimeIndex(), log.snapshot(), sequenceExclusive = -1L,
+            ))
+            val removed = requireNotNull(editor.remove("history-12"))
+            assertEquals(359, removed.messages.size)
+            assertEquals(removed.messages, pagedMessages())
+            assertEquals(removed.messages, projectSessionTranscriptTail(
+                emptyList(), log.snapshot(), sequenceExclusive = -1L,
+            ).messages)
+        } finally {
+            log.close()
+            directory.deleteRecursively()
+        }
+    }
 
     @Test fun missingQueuedIdDoesNotMutateEventLogOrQueue() =
         withQueue { log, queue, editor ->
