@@ -5,7 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.labteto.dshmobile.harness.session.SessionEvent
-import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
+import com.labteto.dshmobile.local.attachment.SqliteAssetEventIndex
 import com.labteto.dshmobile.local.model.LocalRequestMessageSurfaceState
 import com.labteto.dshmobile.local.model.encodeLocalRequestMessageSurface
 import com.labteto.dshmobile.local.model.stableJsonSha256
@@ -60,7 +60,7 @@ class SqliteSessionEventDatabase(
         )
         createCheckpointTable(db)
         createVisibleEventIndex(db)
-        SqliteLocalAssetCatalog.createSchema(db)
+        SqliteAssetEventIndex.createSchema(db)
         searchBlockIndex.createSchema(db)
         createRequestMigrationMarker(db)
     }
@@ -92,7 +92,7 @@ class SqliteSessionEventDatabase(
             )
         }
         createVisibleEventIndex(db)
-        SqliteLocalAssetCatalog.createSchema(db)
+        SqliteAssetEventIndex.createSchema(db)
         searchBlockIndex.createSchema(db)
         createRequestMigrationMarker(db)
         migrateLegacyRequestMessages(db)
@@ -265,7 +265,7 @@ class SqliteSessionEventDatabase(
                     put("payload", payload.toString())
                     put("visible_hint", if (isVisibleTranscriptCandidate(type, payload)) 1 else 0)
                 })
-                SqliteLocalAssetCatalog.indexCommittedMessageAssets(
+                SqliteAssetEventIndex.indexCommittedMessageAssets(
                     database, sessionId, sequence, type, payload,
                 )
                 SessionEvent(sequence, type, createdAt, payload)
