@@ -12,6 +12,7 @@ import android.os.Message
 import android.os.Messenger
 import android.os.ParcelFileDescriptor
 import com.labteto.dshmobile.interop.mcp.McpHttpException
+import com.labteto.dshmobile.interop.mcp.McpProtocolNegotiationException
 import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.interop.mcp.McpTerminationSource
 import com.labteto.dshmobile.interop.mcp.McpTransport
@@ -213,6 +214,8 @@ internal class McpPluginWorkerTransport(
                 }
                 if (response.getBoolean("transport_error"))
                     throw IOException("MCP worker transport failed ($error); outcome unknown")
+                if (error == "MCP_PROTOCOL_NEGOTIATION_FAILED")
+                    throw McpProtocolNegotiationException()
                 throw IllegalStateException("MCP worker refused request ($error)")
             }
             return response
