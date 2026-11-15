@@ -15,6 +15,12 @@ import org.junit.Test
 
 class LocalChatPostTurnJobOwnerTest {
     @Test
+    fun freshConversationTurnPreservesPendingStateButRewritingHistoryPreemptsIt() {
+        assertFalse(shouldPreemptDirectChatRefresh(null))
+        assertTrue(shouldPreemptDirectChatRefresh("previous-assistant-message"))
+    }
+
+    @Test
     fun runningConsolidationContinuesAndCoalescesNewSignals() = runBlocking {
         LocalChatPostTurnJobOwner.cancelAndJoin()
         val unblock = CompletableDeferred<Unit>()
