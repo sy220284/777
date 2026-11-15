@@ -150,7 +150,11 @@ internal class LocalWorkTurnToolRuntime(
         // reactivate them; the current exact choice is never silently expanded.
         val newMcpTools = binding.mcpDiscovery.observe(registry)
         if (!exactFocus) {
-            execution.prioritizeRunCreatedMcpTools(newMcpTools, binding.enabledOptionalTools)
+            execution.prioritizeRunCreatedMcpTools(
+                newMcpTools,
+                activeTask ?: binding.workState.snapshot().goal?.description.orEmpty(),
+                binding.enabledOptionalTools,
+            )
             execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
         }
         val enabled = synchronized(binding.enabledOptionalTools) {
