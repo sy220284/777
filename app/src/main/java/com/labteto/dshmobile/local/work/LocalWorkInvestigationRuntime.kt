@@ -191,7 +191,7 @@ internal object LocalWorkInvestigationRuntime {
                 recentSources[identity] = value
             }
         }
-        val findings = lastFindings.values.filter { it.text("status") != "rejected" }.takeLast(4)
+        val findings = lastFindings.values.filter { it.text("status") !in setOf("rejected", "retracted") }.takeLast(4)
         val sources = recentSources.values.toList().takeLast(5)
         // The latest reading of a source decides whether a continuation cursor is still open.
         // Earlier pages must not keep requesting a cursor after a later page finished.

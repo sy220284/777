@@ -164,7 +164,7 @@ class LocalToolCatalogTest {
         }
         val properties = tool.jsonObject["function"]!!.jsonObject["parameters"]!!
             .jsonObject["properties"]!!.jsonObject
-        assertEquals(setOf("record", "revise", "list"),
+        assertEquals(setOf("record", "revise", "retract", "list"),
             properties.getValue("action").jsonObject.getValue("enum").jsonArray
                 .map { it.jsonPrimitive.content }.toSet())
         assertEquals(setOf("hypothesis", "supported", "rejected"),

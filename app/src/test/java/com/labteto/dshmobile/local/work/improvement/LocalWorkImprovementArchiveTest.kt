@@ -56,6 +56,16 @@ class LocalWorkImprovementArchiveTest {
             assertFalse(document.contains("发现重复实现"))
             assertTrue(workspace.readRaw("自我改进/00-自我改进总览.md")
                 .contains("当前保留的调查发现：1"))
+            log.append("work/finding", buildJsonObject {
+                put("finding_id", "finding-1")
+                put("goal_id", "goal-1")
+                put("status", "retracted")
+            })
+            archive.refresh()
+            document = workspace.readRaw("自我改进/07-调查发现.md")
+            assertFalse(document.contains("找到已存在的公共组件"))
+            assertTrue(workspace.readRaw("自我改进/00-自我改进总览.md")
+                .contains("当前保留的调查发现：0"))
         }
 
     @Test

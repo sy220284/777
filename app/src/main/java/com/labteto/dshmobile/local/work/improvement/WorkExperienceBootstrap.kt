@@ -139,8 +139,11 @@ internal object WorkExperienceBootstrap {
                 "work/finding" -> {
                     val id = (event.data["finding_id"] as? JsonPrimitive)?.contentOrNull
                     val status = (event.data["status"] as? JsonPrimitive)?.contentOrNull
-                    if (!id.isNullOrBlank() && status in setOf("hypothesis", "supported", "rejected")) {
-                        currentFindings[id] = status.orEmpty()
+                    if (!id.isNullOrBlank()) {
+                        when (status) {
+                            "retracted" -> currentFindings.remove(id)
+                            "hypothesis", "supported", "rejected" -> currentFindings[id] = status
+                        }
                     }
                 }
                 "goal/transition-rejected" -> rejections++

@@ -129,6 +129,28 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun retractedFindingLeavesNextRequestContextAndChangesProgressIdentity() {
+        val log = log()
+        try {
+            log.append("work/finding", buildJsonObject {
+                put("goal_id", "goal-a"); put("finding_id", "finding-old")
+                put("status", "supported")
+                put("summary", "这个错误的长期处理方向会影响后续执行")
+            })
+            val before = LocalWorkInvestigationRuntime.progressIdentity(log, "goal-a")
+            assertTrue(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("错误的长期处理方向"))
+            log.append("work/finding", buildJsonObject {
+                put("goal_id", "goal-a"); put("finding_id", "finding-old")
+                put("status", "retracted")
+                put("summary", "这个错误的长期处理方向会影响后续执行")
+            })
+            assertFalse(LocalWorkInvestigationRuntime.context(log, "goal-a", "turn-a")
+                .contains("错误的长期处理方向"))
+            assertFalse(before == LocalWorkInvestigationRuntime.progressIdentity(log, "goal-a"))
+        } finally { log.close() }
+    }
+
     @Test fun activeFindingUpdatesRequestContextAndItsLatestStateChangesProgressIdentity() {
         val log = log()
         try {

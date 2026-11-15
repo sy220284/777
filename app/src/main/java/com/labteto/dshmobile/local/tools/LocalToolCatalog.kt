@@ -222,16 +222,17 @@ object LocalToolCatalog {
             },
             "note" to string("状态说明"),
         ), listOf("status")))
-        add(tool("work_finding", "从真实工具回执记录调查发现；提出假说、补充依据、推翻错误判断，或列出当前目标的发现。仅在遇到有价值的新线索时调用；发现记录不等于已独立验证", properties(
+        add(tool("work_finding", "从真实回执管理调查发现：record 新发现、revise 修订或否定、retract 撤回过时发现、list 查看。retract 仅需 finding_id，原始证据保留审计；重新采用时创建新发现。", properties(
             "action" to buildJsonObject {
                 put("type", "string")
-                put("description", "record 新发现、revise 修改已有发现、list 列出当前目标记录")
+                put("description", "record 新发现、revise 修改已有发现、retract 撤回已有发现、list 列出当前目标记录")
                 put("enum", buildJsonArray {
-                    add(JsonPrimitive("record")); add(JsonPrimitive("revise")); add(JsonPrimitive("list"))
+                    add(JsonPrimitive("record")); add(JsonPrimitive("revise"))
+                    add(JsonPrimitive("retract")); add(JsonPrimitive("list"))
                 })
             },
-            "finding_id" to string("revise 必填：由 record 返回的发现 ID"),
-            "summary" to string("record/revise 必填：基于来源的具体观察或假说，8—500 字"),
+            "finding_id" to string("revise/retract 必填：当前目标内由 record 返回的发现 ID"),
+            "summary" to string("record/revise 必填：基于来源的具体观察或假说，8—500 字；retract 可选撤回原因，最多 500 字"),
             "source_call_id" to string("record/revise 必填：当前目标已成功完成的真实工具调用 ID"),
             "status" to buildJsonObject {
                 put("type", "string")
