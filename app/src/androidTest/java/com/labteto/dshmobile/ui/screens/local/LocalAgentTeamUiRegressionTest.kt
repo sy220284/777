@@ -11,6 +11,8 @@ import androidx.compose.ui.test.performScrollTo
 import com.labteto.dshmobile.local.work.LocalAgentTeamMemberUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamTaskUiState
 import com.labteto.dshmobile.local.work.LocalAgentTeamUiState
+import com.labteto.dshmobile.local.work.LocalAgentChildUiState
+import com.labteto.dshmobile.uicontract.UiWorkAgentOperation
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -18,6 +20,43 @@ import org.junit.Test
 
 class LocalAgentTeamUiRegressionTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun standaloneChildUsesTheExistingCollaborationSheetAndUnifiedCommand() {
+        var lastOperation: UiWorkAgentOperation? = null
+        compose.setContent {
+            DshTheme {
+                LocalAgentTeamSheet(
+                    team = LocalAgentTeamUiState(standaloneAgents = listOf(
+                        LocalAgentChildUiState("child-1", "检索助手", "running", true, canMessage = true),
+                    )),
+                    onMemberOutput = { "" },
+                    onSendMemberMessage = { _, _ -> LocalWorkUiActionResult(true, "已发送") },
+                    onStopMember = { LocalWorkUiActionResult(true, "已停止") },
+                    onStopAll = { LocalWorkUiActionResult(true, "已停止") },
+                    onAgentOperation = { _, op, _ ->
+                        lastOperation = op
+                        LocalWorkUiActionResult(true, "已接纳")
+                    },
+                    onLeadFollowup = {}, onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("检索助手").performScrollTo().performClick()
+        compose.onNodeWithText("暂停").performScrollTo().performClick()
+        compose.waitUntil(5_000) { lastOperation == UiWorkAgentOperation.INTERRUPT }
+        compose.onNodeWithText("让主智能体处理异常…").assertDoesNotExist()
+    }
+
+    @Test
+    fun dormantStandaloneWithoutPendingInputDoesNotOfferInvalidResume() {
+        setSheet(LocalAgentTeamUiState(standaloneAgents = listOf(
+            LocalAgentChildUiState("child-2", "资料助手", "dormant", true, pendingMessageCount = 0),
+        )))
+        compose.onNodeWithText("资料助手").performScrollTo().performClick()
+        compose.onNodeWithText("继续").assertDoesNotExist()
+        compose.onNodeWithText("发送").assertIsNotEnabled()
+    }
 
     @Test
     fun rebuildingPreservesExpandedMemberUntilASettledRemoval() {

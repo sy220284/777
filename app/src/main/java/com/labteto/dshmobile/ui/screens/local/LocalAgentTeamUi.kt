@@ -181,7 +181,8 @@ internal fun LocalAgentTeamStatusBar(
                     StateDot(teamDotState(team, launchPending), size = 8.dp)
                     Column(Modifier.weight(1f)) {
                         Text(
-                            stringResource(R.string.local_team_title),
+                            if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty()) "子智能体"
+                            else stringResource(R.string.local_team_title),
                             style = DsType.std14Strong.withReadingWeight(),
                             color = colors.text,
                         )
@@ -296,7 +297,8 @@ internal fun LocalAgentTeamSheet(
     }
 
     SyResponsiveSheet(
-        title = stringResource(R.string.local_team_title),
+        title = if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty()) "子智能体"
+            else stringResource(R.string.local_team_title),
         scrollable = true,
         subtitle = if (team.rebuilding) stringResource(R.string.common_loading) else stringResource(
             R.string.local_team_sheet_summary,
@@ -886,12 +888,15 @@ private fun teamSummary(team: LocalAgentTeamUiState, launchPending: Boolean): St
 
 private fun teamDotState(team: LocalAgentTeamUiState, launchPending: Boolean): StateDotState = when {
     team.rebuilding -> StateDotState.Idle
-    team.failure != null || team.failedMemberCount > 0 -> StateDotState.Error
+    team.failure != null || team.failedMemberCount > 0 ||
+        team.standaloneAgents.any { it.status == "failed" } -> StateDotState.Error
     launchPending || team.provisioningMemberCount > 0 || team.runningMemberCount > 0 ->
         StateDotState.Running
     team.stoppingMemberCount > 0 -> StateDotState.Warning
     team.tasks.isNotEmpty() && team.completedTaskCount == team.tasks.size ->
         StateDotState.Done
+    team.members.isEmpty() && team.standaloneAgents.isNotEmpty() &&
+        team.standaloneAgents.all { it.status == "completed" } -> StateDotState.Done
     team.blockedTaskCount > 0 ->
         StateDotState.Warning
     team.standaloneAgents.any { it.status == "running" } -> StateDotState.Running
@@ -1066,7 +1071,7 @@ private fun StandaloneAgentRow(
             ) {
                 StateDot(if (agent.status == "running") StateDotState.Running else StateDotState.Idle, size = 8.dp)
                 Text(agent.label, modifier = Modifier.weight(1f), style = DsType.std14Strong, color = colors.text)
-                Text(agent.status, style = DsType.caption11, color = colors.textSecondary)
+                Text(standaloneAgentStatusLabel(agent.status), style = DsType.caption11, color = colors.textSecondary)
                 Icon(if (expanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
                     contentDescription = null, tint = colors.textTertiary)
             }
@@ -1145,3 +1150,18 @@ private fun StandaloneAgentRow(
         }
     }
 }
+
+@Composable
+private fun standaloneAgentStatusLabel(status: String): String = stringResource(
+    when (status) {
+        "running" -> R.string.local_team_state_thinking
+        "stopping" -> R.string.local_team_state_stopping
+        "waiting_slice", "waiting" -> R.string.local_team_state_waiting
+        "dormant", "idle" -> R.string.local_team_state_offwork
+        "interrupted", "cancelled" -> R.string.local_team_state_stopped
+        "completed" -> R.string.local_team_state_task_done
+        "failed" -> R.string.local_team_state_failed
+        "killed" -> R.string.local_team_state_dismissed
+        else -> R.string.local_team_state_waiting
+    },
+)
