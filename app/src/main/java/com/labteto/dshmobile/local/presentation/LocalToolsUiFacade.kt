@@ -185,6 +185,7 @@ class LocalToolsUiFacade @Inject internal constructor(
         task, githubConfigured, networkSearchEnabled,
         showModelStatus, modelConfigured, mcpToolsAvailable, pluginsInstalled,
         accessibilityActive, notificationAccessActive,
+        tools.requiredDeviceCapabilitiesForTask(task),
     )
     override suspend fun configureGitHub(token: String) { tools.configureGitHub(token) }
     override suspend fun clearGitHub() = tools.clearGitHub()
