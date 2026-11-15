@@ -62,6 +62,7 @@ class LocalHarnessViewModel @Inject constructor(
 ) : ViewModel() {
     private val teamUi get() = appServer.agents
     private val workReadUi get() = appServer.workRead
+    private val filesUi get() = appServer.files
     private val settingsUi get() = appServer.settings
 
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
@@ -409,29 +410,29 @@ class LocalHarnessViewModel @Inject constructor(
         return securityReviewFacade.approve(sessionId, repository, review, diff)
     }
 
-    suspend fun importWorkspaceFile(uri: Uri): String = runtime.session.importWorkspaceFileForUi(uri)
-    internal suspend fun publishedWorkspaceFile(path: String) = runtime.session.publishedWorkspaceFileForUi(path)
-    internal suspend fun saveWorkspaceFileToDownloads(path: String) = runtime.session.saveWorkspaceFileToDownloadsForUi(path)
+    suspend fun importWorkspaceFile(uri: Uri): String = filesUi.importWorkspaceFile(uri)
+    internal suspend fun publishedWorkspaceFile(path: String) = filesUi.publishedWorkspaceFile(path)
+    internal suspend fun saveWorkspaceFileToDownloads(path: String) = filesUi.saveWorkspaceFileToDownloads(path)
     internal suspend fun publishedWorkspaceFileForSession(sessionId: String, path: String) =
-        runtime.session.publishedWorkspaceFileForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+        filesUi.publishedWorkspaceFile(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
     internal suspend fun saveWorkspaceFileToDownloadsForSession(sessionId: String, path: String) =
-        runtime.session.saveWorkspaceFileToDownloadsForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
-    suspend fun workspaceFiles() = runtime.session.workspaceFilesForUi()
-    suspend fun workspaceDirectory(path: String) = runtime.session.workspaceDirectoryForUi(path)
-    suspend fun workspaceDirectoryPage(path: String, offset: Int) = runtime.session.workspaceDirectoryPageForUi(path, offset)
-    suspend fun searchWorkspaceFiles(query: String) = runtime.session.searchWorkspaceFilesForUi(query)
-    suspend fun searchWorkspacePage(query: String, offset: Int) = runtime.session.searchWorkspacePageForUi(query, offset)
-    suspend fun stopWorkspaceSearch(query: String) = runtime.session.stopWorkspaceSearchForUi(query)
+        filesUi.saveWorkspaceFileToDownloads(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+    suspend fun workspaceFiles() = filesUi.workspaceFiles()
+    suspend fun workspaceDirectory(path: String) = filesUi.workspaceDirectory(path)
+    suspend fun workspaceDirectoryPage(path: String, offset: Int) = filesUi.workspaceDirectoryPage(path, offset)
+    suspend fun searchWorkspaceFiles(query: String) = filesUi.searchWorkspaceFiles(query)
+    suspend fun searchWorkspacePage(query: String, offset: Int) = filesUi.searchWorkspacePage(query, offset)
+    suspend fun stopWorkspaceSearch(query: String) = filesUi.stopWorkspaceSearch(query)
     internal fun observeWorkspaceFiles(paths: List<String>) =
-        runtime.session.observeWorkspaceFilesForUi(paths)
-    suspend fun conversationFiles(sessionId: String) = runtime.session.conversationFilesForUi(sessionId)
+        filesUi.observeWorkspaceFiles(paths)
+    suspend fun conversationFiles(sessionId: String) = filesUi.conversationFiles(sessionId)
     suspend fun previewWorkspaceFileForSession(sessionId: String, path: String) =
-        runtime.session.previewWorkspaceFileForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
+        filesUi.previewWorkspaceFile(workProjectUi.relocatedReadPath(sessionId, path) ?: path)
     suspend fun previewWorkspaceFilePageForSession(sessionId: String, path: String, offset: Long) =
-        runtime.session.previewWorkspaceFilePageForUi(workProjectUi.relocatedReadPath(sessionId, path) ?: path, offset)
-    suspend fun previewWorkspaceFile(path: String) = runtime.session.previewWorkspaceFileForUi(path)
+        filesUi.previewWorkspaceFilePage(workProjectUi.relocatedReadPath(sessionId, path) ?: path, offset)
+    suspend fun previewWorkspaceFile(path: String) = filesUi.previewWorkspaceFile(path)
     suspend fun previewWorkspaceFilePage(path: String, offset: Long) =
-        runtime.session.previewWorkspaceFilePageForUi(path, offset)
+        filesUi.previewWorkspaceFilePage(path, offset)
     internal fun workEventChangesForUi(sessionId: String) = runtime.work.workEventChangesForUi(sessionId)
     internal fun workArtifactFileChangesForUi(sessionId: String, paths: List<String>) =
         runtime.work.workArtifactFileChangesForUi(sessionId, paths)

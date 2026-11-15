@@ -63,6 +63,8 @@ class LocalAppServerManifestTest {
             automationOwner = Provider { error("Automation initialized unexpectedly") },
             toolsOwner = Provider { tools },
             settingsOwner = Provider { error("Settings initialized unexpectedly") },
+            filesOwner = Provider { error("Files owner must stay lazy") },
+            attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             workReadOwner = Provider { error("WorkRead initialized unexpectedly") },
         )
         val stream = server.noticesFor(setOf(UiAppServerFeature.TOOLS))
@@ -103,6 +105,8 @@ class LocalAppServerManifestTest {
             automationOwner = Provider { error("Automation owner accessed by another Feature") },
             toolsOwner = Provider { activated += "tools"; tools },
             settingsOwner = Provider { activated += "settings"; settings },
+            filesOwner = Provider { error("Files owner must stay lazy") },
+            attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             workReadOwner = Provider { error("Work Read owner accessed by another Feature") },
         )
         assertEquals(UiAppServerState.Settings(settingsSnapshot), server.read(UiAppServerRead.Settings))
@@ -145,6 +149,8 @@ class LocalAppServerManifestTest {
             automationOwner = owner("automation", automation),
             toolsOwner = owner("tools", tools),
             settingsOwner = owner("settings", settings),
+            filesOwner = Provider { error("Files owner must stay lazy") },
+            attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             workReadOwner = Provider { error("reading owner must remain lazy") },
         )
         // Manifest and notification-flow acquisition must have no hidden initialization.
@@ -212,6 +218,8 @@ class LocalAppServerManifestTest {
             automationOwner = Provider { error("automation was not requested") },
             toolsOwner = Provider { error("tools was not requested") },
             settingsOwner = Provider { port },
+            filesOwner = Provider { error("Files owner must stay lazy") },
+            attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             workReadOwner = Provider { error("read was not requested") },
         )
         assertThrows(kotlinx.coroutines.CancellationException::class.java) {
@@ -239,6 +247,8 @@ class LocalAppServerManifestTest {
             automationOwner = Provider { error("automation unexpectedly initialized") },
             toolsOwner = Provider { error("tools unexpectedly initialized") },
             settingsOwner = Provider { error("settings unexpectedly initialized") },
+            filesOwner = Provider { error("Files owner must stay lazy") },
+            attachmentsOwner = Provider { error("Attachment owner must stay lazy") },
             workReadOwner = Provider { error("work read unexpectedly initialized") },
         )
         assertEquals(6, server.manifest().endpoints.size)

@@ -19,6 +19,8 @@ import com.labteto.dshmobile.uicontract.UiAppServerState
 import com.labteto.dshmobile.uicontract.WorkAgentUiPort
 import com.labteto.dshmobile.uicontract.WorkConversationUiPort
 import com.labteto.dshmobile.uicontract.WorkReadUiPort
+import com.labteto.dshmobile.uicontract.FilesUiPort
+import com.labteto.dshmobile.uicontract.AttachmentUiPort
 import com.labteto.dshmobile.uicontract.UI_CONTRACT_VERSION
 import com.labteto.dshmobile.uicontract.save
 import com.labteto.dshmobile.uicontract.submit
@@ -57,6 +59,8 @@ internal class LocalAppServer @Inject constructor(
     private val toolsOwner: Provider<ToolsManagementUiPort>,
     private val settingsOwner: Provider<SettingsUiPort>,
     private val workReadOwner: Provider<WorkReadUiPort>,
+    private val filesOwner: Provider<FilesUiPort>,
+    private val attachmentsOwner: Provider<AttachmentUiPort>,
 ) : AppServerUiPort {
     override val chat: ChatUiPort get() = chatOwner.get()
     override val work: WorkConversationUiPort get() = workOwner.get()
@@ -66,6 +70,8 @@ internal class LocalAppServer @Inject constructor(
     override val tools: ToolsManagementUiPort get() = toolsOwner.get()
     override val settings: SettingsUiPort get() = settingsOwner.get()
     override val workRead: WorkReadUiPort get() = workReadOwner.get()
+    override val files: FilesUiPort get() = filesOwner.get()
+    override val attachments: AttachmentUiPort get() = attachmentsOwner.get()
 
     override fun manifest(): UiAppServerManifest = localAppServerManifest()
 

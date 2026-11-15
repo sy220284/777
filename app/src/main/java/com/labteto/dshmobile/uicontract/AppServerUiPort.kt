@@ -59,6 +59,8 @@ interface AppServerUiPort {
     val tools: ToolsManagementUiPort
     val settings: SettingsUiPort
     val workRead: WorkReadUiPort
+    val files: FilesUiPort
+    val attachments: AttachmentUiPort
     fun manifest(): UiAppServerManifest
     /** Read one Feature owner without activating any unrelated owner. */
     fun read(query: UiAppServerRead): UiAppServerState
