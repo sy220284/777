@@ -414,11 +414,11 @@ class LocalWorkInvestigationRuntimeTest {
             assertEquals(5, observations.size)
             assertEquals(5, observations.map { it.data["source_key"] }.toSet().size)
             val sources = observations.map { it.data["source"].toString() }
-            assertTrue(sources.any { "repo#PR-923" in it })
-            assertTrue(sources.any { "repo#PR-924/src/Engine.kt" in it })
+            assertTrue(sources.any { "repo#PR923" in it })
+            assertTrue(sources.any { "repo#PR924/src/Engine.kt" in it })
             val context = LocalWorkInvestigationRuntime.context(log, "goal-pr-evidence", "turn-a")
-            assertTrue(context.contains("repo#PR-923"))
-            assertTrue(context.contains("repo#PR-924"))
+            assertTrue(context.contains("repo#PR923"))
+            assertTrue(context.contains("repo#PR924"))
         } finally { log.close() }
     }
 

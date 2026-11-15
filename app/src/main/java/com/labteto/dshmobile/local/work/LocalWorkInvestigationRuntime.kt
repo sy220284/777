@@ -46,8 +46,6 @@ internal object LocalWorkInvestigationRuntime {
     private fun sourceName(name: String, args: JsonObject): String {
         val path = args.text("path").ifBlank { args.text("file_path") }
         val repo = args.text("repository_full_name").ifBlank { args.text("repo_full_name") }
-        val prNumber = args.text("pr_number")
-        val resource = if (repo.isNotBlank() && prNumber.isNotBlank()) "$repo#PR$prNumber" else repo
         val ref = args.text("ref")
         val url = args.text("url").substringBefore('?').substringBefore('#')
         val pr = args.text("pr_number")
@@ -58,7 +56,7 @@ internal object LocalWorkInvestigationRuntime {
             name == "tool_output_read" -> "结果回执:" + args.text("call_id")
             name == "archive_read" && path.isNotBlank() -> path + "!" + args.text("member")
             repo.isNotBlank() && pr.isNotBlank() ->
-                "$repo#PR-$pr" + if (path.isNotBlank()) "/$path" else ""
+                "$repo#PR$pr" + if (path.isNotBlank()) "/$path" else ""
             repo.isNotBlank() && issue.isNotBlank() -> "$repo#issue-$issue"
             repo.isNotBlank() && path.isNotBlank() ->
                 if (ref.isBlank()) "$repo/$path" else "$repo@$ref/$path"
