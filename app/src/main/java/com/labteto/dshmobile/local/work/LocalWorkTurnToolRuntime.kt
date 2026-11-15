@@ -86,9 +86,15 @@ internal class LocalWorkTurnToolRuntime(
         // 此时最新用户消息已从 PendingInput 队列写进历史，首轮集群标记才可靠。
         val history = binding.runHandle.modelHistory.snapshot()
         val teamMode = isLocalAgentTeamTurn(history)
+        val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
+        val newTask = !activeTask.isNullOrBlank() && binding.toolPriority.isNewTask(activeTask)
+        if (newTask) binding.enabledOptionalTools.beginNewTask()
+        // Explicit select: owns the visible optional surface for this task. Discoverability,
+        // registration and per-call approval continue to use their existing shared owners.
+        val exactFocus = binding.enabledOptionalTools.exactFocus
         // A user attachment is authoritative even if their text is merely "analyse this".
         // Surface read-only archive tools for that turn without permanently enlarging CORE.
-        if (latestUserTurnHasArchive(history)) {
+        if (!exactFocus && latestUserTurnHasArchive(history)) {
             synchronized(binding.enabledOptionalTools) {
                 val requested = listOf("archive_list", "archive_read")
                     .filter { registry.get(it) != null }
@@ -101,23 +107,21 @@ internal class LocalWorkTurnToolRuntime(
         // A connection or plugin install can register new tools during this run.
         // Re-evaluate only the active user's task before each model step; newly registered
         // capabilities become available automatically without restarting or editing tool maps.
-        val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
-        if (!activeTask.isNullOrBlank() && binding.toolPriority.isNewTask(activeTask)) {
-            // Pre-activate task-relevant capabilities once per real task. Subsequent model
-            // steps keep the user's explicit capability_search focus instead of re-adding
-            // all speculative tools and growing the schema surface indefinitely.
+        if (newTask) {
+            // Only a genuinely new user task may replace explicit discovery priorities.
             execution.enableTaskRelevantOptionalTools(
-                activeTask, binding.enabledOptionalTools, prioritize = true,
+                requireNotNull(activeTask), binding.enabledOptionalTools, prioritize = true,
             )
         }
-        // Newly connected MCP tools cannot enter the step that connected them. Make them
-        // candidates for the NEXT model request, without changing approval or tool access.
-        execution.prioritizeRunCreatedMcpTools(
-            binding.mcpDiscovery.observe(registry), binding.enabledOptionalTools,
-        )
-        execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
+        // Observe registrations even while explicitly focused. A future user task can
+        // reactivate them; the current exact choice is never silently expanded.
+        val newMcpTools = binding.mcpDiscovery.observe(registry)
+        if (!exactFocus) {
+            execution.prioritizeRunCreatedMcpTools(newMcpTools, binding.enabledOptionalTools)
+            execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
+        }
         val enabled = synchronized(binding.enabledOptionalTools) {
-            if (teamMode) {
+            if (teamMode && !exactFocus) {
                 val priority = listOf(
                     "team_task_create", "team_task_list", "team_task_update", "team_messages",
                     "team_wait_for_message", "team_members", "team_task_get",

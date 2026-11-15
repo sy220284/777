@@ -61,7 +61,6 @@ class LocalHarnessViewModel @Inject constructor(
     private val sectionStore: LocalSessionSectionUiFacade,
     private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
     private val securityReviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentSecurityReviewUiFacade,
-    private val sampleCoordinator: com.labteto.dshmobile.local.model.LocalConversationSampleCoordinator,
     private val workProjectUi: com.labteto.dshmobile.local.presentation.LocalWorkProjectsUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -265,7 +264,7 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun generateReplySuggestions(): Boolean = runtime.chat.generateReplySuggestions()
 
     internal suspend fun sampleSession(sessionId: String, prompt: String) =
-        sampleCoordinator.sample(sessionId, prompt)
+        sessionUi.sampleSession(sessionId, prompt)
     internal suspend fun diaryEntries(subjectKey: String): List<ChatDiaryEntry> =
         withContext(Dispatchers.IO) { runtime.chat.diaryEntries(subjectKey) }
     internal suspend fun correctDiaryEntry(

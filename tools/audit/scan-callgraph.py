@@ -174,17 +174,23 @@ for frm, tos in edges.items():
 hot = sorted(((incoming[r["path"]], r["path"]) for r in records if r["kind"] == "production"), reverse=True)
 orphans = sorted(r["path"] for r in records if r["kind"] == "production" and incoming[r["path"]] == 0)
 mismatches = sorted(r["path"] for r in records if r["potential_package_mismatch"])
-# 跨产品域内部引用只作为复核候选，不能以文件夹名判断违约。
+# 按架构 3.0 的产品所有权分类。local/tools 是 Shared Tool Capability，
+# 并不等于产品 ToolsFeature；按文件夹名混为一谈会把合法 Work→工具引用误报为跨 Feature。
+# 所有候选仍须审查实际符号、公开 Port 与运行时装配关系。
+def owned_feature(path):
+    match = re.search(r"/local/(chat|work|automation)/", path)
+    return match.group(1) if match else None
+
 crossfeature = []
 for frm, tos in edges.items():
     if "/src/main/" not in frm:
         continue
-    a = re.search(r"/local/(chat|work|tools|automation)/", frm)
-    if not a:
+    from_feature = owned_feature(frm)
+    if not from_feature:
         continue
     for to in tos:
-        b = re.search(r"/local/(chat|work|tools|automation)/", to)
-        if b and a.group(1) != b.group(1):
+        to_feature = owned_feature(to)
+        if to_feature and from_feature != to_feature:
             crossfeature.append({"from": frm, "to": to})
 
 result = {

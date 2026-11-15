@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.LocalRunToolSelection
 import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
 import com.labteto.dshmobile.local.work.LocalWorkGoalAcceptanceRejectedException
@@ -331,6 +332,9 @@ internal class LocalToolExecutionCoordinator(
             target.clear()
             target.addAll(selected)
             target.addAll(previous)
+            // A run-scoped exact choice must survive later schema projections:
+            // pinned tools and MCP hints can never silently expand it.
+            if (exactNames != null && target is LocalRunToolSelection) target.markExactFocus()
             target.toSet()
         }
         val selection = LocalToolRouter.selectSchemas(
