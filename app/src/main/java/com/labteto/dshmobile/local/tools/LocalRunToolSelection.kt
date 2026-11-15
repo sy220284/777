@@ -14,15 +14,26 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
     /** Explicit select: wins over automatic pins and task hints until the task changes. */
     @Synchronized fun markExactFocus() {
         pendingForNextStep.clear()
+        awaitingCapacityCheck.clear()
         exactFocus = true
     }
 
     /** A model attempt at a registered but unexposed optional tool may prepare a later step. */
     private val pendingForNextStep = linkedSetOf<String>()
+    private val awaitingCapacityCheck = linkedSetOf<String>()
+
+    @Synchronized fun hasBudgetOmittedRecoveryCandidate(
+        omittedReasons: Map<String, String>,
+    ): Boolean = awaitingCapacityCheck.any { name ->
+        omittedReasons[name]?.let { it.contains("Token") || it.contains("预算") } == true
+    }
+
+    @Synchronized fun finishCapacityCheck() { awaitingCapacityCheck.clear() }
 
     @Synchronized fun requestForNextStep(name: String): Boolean {
         if (exactFocus && name !in this) return false
         pendingForNextStep += name
+        awaitingCapacityCheck += name
         return true
     }
 
@@ -49,6 +60,7 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
     @Synchronized fun resetTask() {
         lastTask = null
         pendingForNextStep.clear()
+        awaitingCapacityCheck.clear()
     }
 
     /** An explicit CORE-only select is a valid empty optional set, not an unprepared task. */
@@ -58,6 +70,7 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
     @Synchronized fun beginNewTask() {
         exactFocus = false
         pendingForNextStep.clear()
+        awaitingCapacityCheck.clear()
     }
 
     override fun clear() {
