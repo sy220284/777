@@ -49,19 +49,20 @@ class LocalHarnessViewModel @Inject constructor(
     private val sessionUi: LocalSessionUiFacade,
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
-    private val teamUi: com.labteto.dshmobile.uicontract.WorkAgentUiPort,
-    private val workReadUi: com.labteto.dshmobile.uicontract.WorkReadUiPort,
+    private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val documentMedia: com.labteto.dshmobile.uicontract.MediaUiPort,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
-    private val settingsUi: com.labteto.dshmobile.uicontract.SettingsUiPort,
     private val sectionStore: LocalSessionSectionUiFacade,
     private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
     private val securityReviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentSecurityReviewUiFacade,
     private val workProjectUi: com.labteto.dshmobile.local.presentation.LocalWorkProjectsUiFacade,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+    private val teamUi get() = appServer.agents
+    private val workReadUi get() = appServer.workRead
+    private val settingsUi get() = appServer.settings
 
     internal suspend fun installedSkillDisplayNames(): Map<String, String> =
         toolsUi.installedSkills().associate { it.name to it.displayName }

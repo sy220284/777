@@ -167,9 +167,10 @@ internal class ToolsOperationGate {
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
-    private val localTools: ToolsManagementUiPort,
+    private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+    private val localTools: ToolsManagementUiPort get() = appServer.tools
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
     private val _agentBackendStatus = MutableStateFlow("正在读取执行器设置")

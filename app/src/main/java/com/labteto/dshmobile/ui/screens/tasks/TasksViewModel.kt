@@ -49,9 +49,10 @@ data class TasksUiState(
 /** UI projection and interaction state; AutomationUiPort owns all task validation and writes. */
 @HiltViewModel
 class TasksViewModel @Inject constructor(
-    private val automation: AutomationUiPort,
+    private val appServer: com.labteto.dshmobile.uicontract.AppServerUiPort,
     localRuntime: LocalTaskRuntime,
 ) : ViewModel() {
+    private val automation: AutomationUiPort get() = appServer.automation
     val harnessState: StateFlow<LocalHarnessTaskState> = localRuntime.state.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
