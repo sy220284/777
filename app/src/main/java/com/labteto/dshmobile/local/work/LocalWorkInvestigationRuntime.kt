@@ -18,8 +18,8 @@ internal object LocalWorkInvestigationRuntime {
     private const val SOURCE_EVENT = "work/source-observed"
     private const val FINDING_EVENT = "work/finding"
     private const val WINDOW = 320
-    private val searchTools = setOf("grep", "glob", "list_files", "web_search")
-    private val partialTools = setOf("read", "read_chunk", "tool_output_read")
+    private val searchTools = setOf("grep", "glob", "list_files", "web_search", "archive_list")
+    private val partialTools = setOf("read", "read_chunk", "tool_output_read", "archive_read")
     private val documentTools = setOf("web_fetch", "file_inspect")
 
     private fun JsonObject.text(key: String): String =
@@ -29,6 +29,7 @@ internal object LocalWorkInvestigationRuntime {
         (get(key) as? JsonPrimitive)?.intOrNull
 
     private fun sourceKind(name: String): String? = when {
+        name == "archive_list" -> "listing"
         name in searchTools || name == "mcp__GitHub__search" -> "search"
         name in partialTools || name == "mcp__GitHub__fetch_file" -> "slice"
         name in documentTools || name == "mcp__GitHub__fetch_pr" ||
@@ -39,10 +40,11 @@ internal object LocalWorkInvestigationRuntime {
     private fun sourceName(name: String, args: JsonObject): String {
         val path = args.text("path").ifBlank { args.text("file_path") }
         val repo = args.text("repository_full_name").ifBlank { args.text("repo_full_name") }
-        val ref = args.text("ref").take(48)
+        val ref = args.text("ref")
         val url = args.text("url").substringBefore('?').substringBefore('#')
         val value = when {
             name == "tool_output_read" -> "结果回执:" + args.text("call_id")
+            name == "archive_read" && path.isNotBlank() -> path + "!" + args.text("member")
             repo.isNotBlank() && path.isNotBlank() ->
                 if (ref.isBlank()) "$repo/$path" else "$repo@$ref/$path"
             path.isNotBlank() -> path
@@ -50,17 +52,23 @@ internal object LocalWorkInvestigationRuntime {
             repo.isNotBlank() -> repo
             else -> name
         }
-        return value.replace("\n", " ").take(160)
+        val visible = value.replace("\n", " ")
+        return if (visible.length <= 160) visible else visible.take(96) + "…" + visible.takeLast(63)
     }
 
     private fun region(kind: String, args: JsonObject): String {
         if (kind == "search") return "search-only"
+        if (kind == "listing") return "cursor:" + args.text("cursor").ifBlank { "0" }
         val first = args.number("start_line")
         val last = args.number("end_line")
         if (first != null || last != null) return "lines:${first ?: 1}-${last ?: "default"}"
         val offset = args.number("start_byte")
         val max = args.number("max_bytes")
         if (offset != null || max != null) return "bytes:${offset ?: 0}+${max ?: "default"}"
+        val charOffset = args.text("start_char")
+        val maxChars = args.text("max_chars")
+        if (charOffset.isNotBlank() || maxChars.isNotBlank())
+            return "chars:${charOffset.ifBlank { "0" }}+${maxChars.ifBlank { "default" }}"
         return if (kind == "slice") "range-unspecified" else "document"
     }
 
@@ -68,11 +76,38 @@ internal object LocalWorkInvestigationRuntime {
         MessageDigest.getInstance("SHA-256").digest(content.toByteArray(Charsets.UTF_8))
             .take(10).joinToString("") { "%02x".format(it) }
 
+    /**
+     * Source identity uses complete original coordinates. The 160-character display
+     * preview is not an evidence key: long Git refs and URL query variants can have
+     * identical previews while identifying different resources.
+     */
+    private fun sourceIdentity(toolName: String, args: JsonObject): String = digest(
+        listOf("tool", toolName, "repo", args.text("repository_full_name"),
+            args.text("repo_full_name"), "path", args.text("path"), args.text("file_path"),
+            "ref", args.text("ref"), "url", args.text("url"), "call", args.text("call_id"),
+            "query", args.text("query"), "pattern", args.text("pattern"),
+            "member", args.text("member"), "prefix", args.text("prefix"))
+            .joinToString("\u0000")
+    )
+
+    private fun JsonObject.sourceIdentityOrLegacy(): String =
+        text("source_key").ifBlank { text("source") }
+
     private fun hasContinuationMarker(name: String, output: String): Boolean {
         if (name !in partialTools && name !in searchTools && name != "mcp__GitHub__fetch_file") return false
-        val tail = output.takeLast(1_200)
-        return Regex("(?i)(next_start_line|next_start_char|next_byte|next_cursor|next_offset)\\s*[:=]\\s*[\\\"']?[^\\s,}]+")
-            .containsMatchIn(tail)
+        // Archive and chunk tools put machine-readable pagination facts in the
+        // first two header lines. Inspecting only the tail of a 40k-character
+        // archive page misses its cursor; matching source text is also unsafe.
+        val metadata = if (name in setOf("archive_list", "archive_read", "read_chunk")) {
+            output.lineSequence().take(2).joinToString(" ")
+        } else output.takeLast(1_200)
+        if (metadata.contains("complete=true", ignoreCase = true)) return false
+        return Regex("""(?i)(next_start_line|next_start_char|next_byte|next_cursor|next_offset)\s*[:=]\s*["']?([^\s,}；]+)""")
+            .findAll(metadata)
+            .any { match ->
+                val value = match.groupValues[2].trim('"', '\'').lowercase()
+                value.isNotBlank() && value !in setOf("none", "null", "false", "-1")
+            }
     }
 
     fun observe(
@@ -103,6 +138,7 @@ internal object LocalWorkInvestigationRuntime {
             put("result_sequence", resultSequence)
             put("tool_name", toolName)
             put("source", source)
+            put("source_key", sourceIdentity(toolName, args))
             put("region", region)
             put("kind", kind)
             put("output_fingerprint", digest(output))
@@ -151,7 +187,7 @@ internal object LocalWorkInvestigationRuntime {
                 val id = value.text("finding_id")
                 if (id.isNotBlank()) lastFindings[id] = value
             } else {
-                val identity = value.text("source") + "|" + value.text("region")
+                val identity = value.sourceIdentityOrLegacy() + "|" + value.text("region")
                 recentSources[identity] = value
             }
         }
@@ -161,7 +197,7 @@ internal object LocalWorkInvestigationRuntime {
         // Earlier pages must not keep requesting a cursor after a later page finished.
         val latestBySource = linkedMapOf<String, JsonObject>()
         recentSources.values.forEach { value ->
-            if (value.text("kind") != "search") latestBySource[value.text("source")] = value
+            if (value.text("kind") != "search") latestBySource[value.sourceIdentityOrLegacy()] = value
         }
         val pendingReads = latestBySource.values.filter { it.text("has_next") == "true" }.takeLast(2)
         if (findings.isEmpty() && sources.isEmpty()) return ""
@@ -246,7 +282,7 @@ internal object LocalWorkInvestigationRuntime {
             val value = event.data
             if (value.text("goal_id") != goalId) return@forEachOfTypesAfter
             if (event.type == SOURCE_EVENT) {
-                observations += value.text("source") + "|" + value.text("region") +
+                observations += value.sourceIdentityOrLegacy() + "|" + value.text("region") +
                     "|" + value.text("output_fingerprint")
             } else {
                 val id = value.text("finding_id")

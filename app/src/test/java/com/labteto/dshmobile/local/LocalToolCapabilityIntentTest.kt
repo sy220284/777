@@ -108,6 +108,43 @@ class LocalToolCapabilityIntentTest {
         assertFalse(latestUserTurnHasArchive(listOf(onlyImage)))
     }
 
+    @Test
+    fun multimodalUserTextOverridesEarlierTaskIntentAndIsVisibleToToolDiscovery() {
+        val mixed = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject { put("type", "text"); put("text", "请检查本地压缩包") })
+                add(buildJsonObject { put("type", "local_file_ref"); put("name", "sources.zip") })
+                add(buildJsonObject { put("type", "input_text"); put("text", "然后点击 Android 界面") })
+            })
+        }
+        val history = listOf(message("user", "检查 GitHub PR 924"), mixed)
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(history) ==
+            "请检查本地压缩包\n然后点击 Android 界面")
+        assertFalse("旧任务的 GitHub 不应重新启用",
+            LocalToolCapabilityIntent.from("继续", history).requestsGitHub)
+        assertTrue(LocalToolCapabilityIntent.from("继续", listOf(buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject { put("type", "text"); put("text", "检查 GitHub PR") })
+            })
+        })).requestsGitHub)
+    }
+
+    @Test
+    fun mediaOnlyUserTurnDoesNotFallBackToOldTaskText() {
+        val mediaOnly = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject { put("type", "local_image_ref"); put("name", "picture.png") })
+            })
+        }
+        val history = listOf(message("user", "检查 GitHub PR"), mediaOnly)
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(history) == "本轮用户包含非文本附件")
+        assertFalse(LocalToolCapabilityIntent.from("继续", history).requestsGitHub)
+    }
+
+
     private fun message(role: String, content: String) = buildJsonObject {
         put("role", role)
         put("content", content)

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.tools
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -22,8 +23,11 @@ internal data class LocalToolCapabilityIntent(
             val recent = if (current == null &&
                 input.trim().lowercase() in CONTINUATION_COMMANDS
             ) {
-                meaningfulUserInputs(history).take(4)
-                    .mapNotNull(::githubIntentSignal).firstOrNull()
+                // Continue the latest substantive user task. A non-GitHub request
+                // must stop older GitHub mentions from resurrecting tool schemas.
+                meaningfulUserInputs(history)
+                    .firstOrNull { it.trim().lowercase() !in CONTINUATION_COMMANDS }
+                    ?.let(::githubIntentSignal)
             } else null
             return LocalToolCapabilityIntent(
                 requestsGitHub = current ?: recent ?: false,
@@ -37,8 +41,24 @@ internal data class LocalToolCapabilityIntent(
         private fun meaningfulUserInputs(history: List<JsonObject>): Sequence<String> =
             history.asReversed().asSequence()
                 .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "user" }
-                .mapNotNull { message -> (message["content"] as? JsonPrimitive)?.contentOrNull }
+                .mapNotNull { message -> userIntentText(message["content"]) }
                 .filterNot(::isSyntheticCheckpoint)
+
+        /**
+         * Multimodal user turns carry text as ordered blocks, not one JsonPrimitive.
+         * Reading only string content would resurrect a previous task's tools for a
+         * perfectly valid text+attachment request. Media-only input is still a new turn.
+         */
+        private fun userIntentText(content: JsonElement?): String? = when (content) {
+            is JsonPrimitive -> content.contentOrNull
+            is JsonArray -> content.mapNotNull { node ->
+                val part = node as? JsonObject ?: return@mapNotNull null
+                val type = (part["type"] as? JsonPrimitive)?.contentOrNull
+                if (type !in setOf("text", "input_text")) return@mapNotNull null
+                (part["text"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+            }.joinToString("\n").ifBlank { "本轮用户包含非文本附件" }
+            else -> null
+        }
 
         private fun isSyntheticCheckpoint(content: String): Boolean =
             "<work-checkpoint>" in content ||

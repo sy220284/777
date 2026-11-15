@@ -61,6 +61,20 @@ class LocalToolCatalogTest {
     }
 
     @Test
+    fun sessionSearchAndChunkReadExposeTruthfulPaginationContracts() {
+        val byName = LocalToolCatalog.specs.associateBy {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }
+        val session = byName.getValue("session_search").jsonObject["function"]!!.jsonObject
+        val searchParams = session["parameters"]!!.jsonObject["properties"]!!.jsonObject
+        assertTrue("cursor" in searchParams)
+        assertTrue(session["description"]!!.jsonPrimitive.content.contains("next_cursor"))
+        val chunk = byName.getValue("read_chunk").jsonObject["function"]!!.jsonObject
+        assertTrue(chunk["description"]!!.jsonPrimitive.content.contains("complete=true"))
+        assertTrue(chunk["description"]!!.jsonPrimitive.content.contains("next_byte"))
+    }
+
+    @Test
     fun workflowAndSubagentExposeAdvancedRoutingOptions() {
         val functions = LocalToolCatalog.specs.associateBy {
             it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content

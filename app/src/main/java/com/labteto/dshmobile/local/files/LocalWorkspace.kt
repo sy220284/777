@@ -71,6 +71,9 @@ data class LocalWorkspaceSearchPage(
     val nextOffset: Int?,
 )
 
+/** One bounded random-access byte page and its true EOF fact from the same file read. */
+internal data class LocalWorkspaceRawPage(val bytes: ByteArray, val complete: Boolean)
+
 /** Sandboxed filesystem and shell provider for the on-device Harness. */
 class LocalWorkspace(
     private val root: File,
@@ -341,17 +344,30 @@ class LocalWorkspace(
         return file.length()
     }
 
-    /** Binary-safe paged raw read. The file size never determines allocation size. */
-    fun readRawPage(relativePath: String, offset: Long, maxBytes: Int = 64 * 1024): ByteArray {
+    /** Binary-safe paged raw read; retained for callers needing only bytes. */
+    fun readRawPage(relativePath: String, offset: Long, maxBytes: Int = 64 * 1024): ByteArray =
+        readRawPageWithEnd(relativePath, offset, maxBytes).bytes
+
+    /**
+     * Read a page and determine its EOF from one consistent file descriptor.
+     * Exact-multiple files complete on their final real page, without an empty
+     * follow-up request or a second potentially stale size observation.
+     */
+    internal fun readRawPageWithEnd(
+        relativePath: String,
+        offset: Long,
+        maxBytes: Int = 64 * 1024,
+    ): LocalWorkspaceRawPage {
         require(offset >= 0L && maxBytes in 1..1024 * 1024) { "分页读取参数无效" }
         val file = resolve(relativePath)
         require(file.isFile) { "文件不存在：" + relativePath }
         java.io.RandomAccessFile(file, "r").use { source ->
-            require(offset <= source.length()) { "字节偏移超出文件末尾" }
+            val length = source.length()
+            require(offset <= length) { "字节偏移超出文件末尾" }
             source.seek(offset)
-            val bytes = ByteArray(minOf(maxBytes.toLong(), source.length() - offset).toInt())
+            val bytes = ByteArray(minOf(maxBytes.toLong(), length - offset).toInt())
             source.readFully(bytes)
-            return bytes
+            return LocalWorkspaceRawPage(bytes, complete = offset + bytes.size == length)
         }
     }
 

@@ -260,6 +260,37 @@ class LocalWorkInvestigationRuntimeTest {
         } finally { log.close() }
     }
 
+    @Test fun longGitRefsAndQueryVariantsRetainIndependentSourceIdentities() {
+        val log = log()
+        try {
+            val prefix = "feature/" + "prefix".repeat(20)
+            fun read(id: String, ref: String) {
+                val declaration = log.append("tool/call", buildJsonObject { put("id", id) })
+                val result = log.append("tool/result", buildJsonObject {
+                    put("id", id); put("is_error", false)
+                })
+                LocalWorkInvestigationRuntime.observe(
+                    log, "goal-long-ref", "turn-a", id, "mcp__GitHub__fetch_file",
+                    buildJsonObject {
+                        put("repository_full_name", "owner/repo")
+                        put("path", "src/Engine.kt")
+                        put("ref", ref)
+                    }, declaration.sequence, result.sequence, "same bytes", false,
+                )
+            }
+            read("long-a", prefix + "-branch-a")
+            val first = LocalWorkInvestigationRuntime.progressIdentity(log, "goal-long-ref")
+            read("long-b", prefix + "-branch-b")
+            val second = LocalWorkInvestigationRuntime.progressIdentity(log, "goal-long-ref")
+            assertFalse("不同的长分支不应被当作重复读取", first == second)
+            val sources = log.eventsOfTypesAfter(-1L, setOf("work/source-observed"))
+            assertEquals(2, sources.size)
+            assertFalse(sources[0].data["source_key"] == sources[1].data["source_key"])
+            assertFalse(sources[0].data["source"] == sources[1].data["source"])
+        } finally { log.close() }
+    }
+
+
     @Test fun unidentifiedReadIsNotRecordedAsGroundedSourceCoverage() {
         val log = log()
         try {
@@ -272,6 +303,51 @@ class LocalWorkInvestigationRuntimeTest {
             assertTrue(log.eventsOfTypesAfter(-1L, setOf("work/source-observed")).isEmpty())
         } finally { log.close() }
     }
+
+    @Test fun archivePagesAndByteReadsOnlyRequestContinuationWhileReallyIncomplete() {
+        val log = log()
+        try {
+            fun record(id: String, name: String, args: kotlinx.serialization.json.JsonObject, output: String) {
+                val declaration = log.append("tool/call", buildJsonObject { put("id", id); put("name", name) })
+                val result = log.append("tool/result", buildJsonObject { put("id", id); put("is_error", false) })
+                LocalWorkInvestigationRuntime.observe(log, "archive-goal", "turn-a", id, name, args,
+                    declaration.sequence, result.sequence, output, false)
+            }
+            val listing = buildJsonObject { put("path", "sources.zip") }
+            record("archive-list-a", "archive_list", listing, "next_cursor=40；文件")
+            assertTrue("未结束的归档清单应提示继续",
+                LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")
+                    .contains("【仍有未读完的材料】"))
+            record("archive-list-b", "archive_list", listing, "next_cursor=none；全部结束")
+            val memberFirst = buildJsonObject {
+                put("path", "sources.zip"); put("member", "src/Engine.kt")
+                put("start_char", 0); put("max_chars", 100)
+            }
+            val memberLast = buildJsonObject {
+                put("path", "sources.zip"); put("member", "src/Engine.kt")
+                put("start_char", 100); put("max_chars", 100)
+            }
+            record("archive-read-a", "archive_read", memberFirst,
+                "complete=false\nnext_char=100\n" + "x".repeat(3_000) + "complete=true")
+            assertTrue(LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")
+                .contains("仍有未读完的材料"))
+            record("archive-read-b", "archive_read", memberLast, "complete=true")
+            assertFalse(LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")
+                .contains("【仍有未读完的材料】"))
+            val bytes = buildJsonObject { put("path", "huge.bin"); put("start_byte", 0) }
+            record("chunk-a", "read_chunk", bytes, "complete=false；next_byte=49152")
+            val lastBytes = buildJsonObject { put("path", "huge.bin"); put("start_byte", 49152) }
+            record("chunk-b", "read_chunk", lastBytes, "complete=true；本页字节=0")
+            val results = log.eventsOfTypesAfter(-1L, setOf("work/source-observed"))
+            val finishedList = results.single { it.data["source_call_id"].toString().contains("archive-list-b") }
+            assertTrue(finishedList.data["has_next"].toString() == "false")
+            val finishedChunk = results.single { it.data["source_call_id"].toString().contains("chunk-b") }
+            assertTrue(finishedChunk.data["has_next"].toString() == "false")
+            assertFalse(LocalWorkInvestigationRuntime.context(log, "archive-goal", "turn-a")
+                .contains("【仍有未读完的材料】"))
+        } finally { log.close() }
+    }
+
 
     @Test fun unknownSourceResultAndFailedReadDoNotCreateEvidence() {
         val log = log()

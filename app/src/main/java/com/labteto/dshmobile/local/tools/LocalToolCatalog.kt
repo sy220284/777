@@ -36,7 +36,7 @@ object LocalToolCatalog {
             "expected_revision" to string("file_version 返回的 revision 或 absent"),
             "content" to string("替换后的全部 UTF-8 内容"),
         ), listOf("path", "expected_revision", "content")))
-        add(tool("read_chunk", "按字节偏移读取大文件，返回有界 Base64 页和下一字节位置", properties(
+        add(tool("read_chunk", "按字节偏移读取大文件：complete=true 表示读取结束；complete=false 时按 next_byte 续读有界 Base64 页", properties(
             "path" to string("工作区文件路径"),
             "start_byte" to integerRange("起始字节偏移，默认 0", min = 0),
             "max_bytes" to integerRange("读取字节数，最大 49152", 1, 49152),
@@ -557,8 +557,9 @@ object LocalToolCatalog {
             "limit" to integer("单页最多返回条数，默认 50，最大 100"),
             "after_sequence" to integer("可选分页游标；继续上一页时传结果末尾提示的事件序号"),
         ), listOf("query")))
-        add(tool("session_search", "跨本机历史会话搜索事件", properties(
+        add(tool("session_search", "跨当前项目或会话链分页搜索历史事件；返回 next_cursor 时继续检索，直到没有游标", properties(
             "query" to string("搜索内容"),
+            "cursor" to string("可选；上页返回的 next_cursor，继续检索后续会话"),
         ), listOf("query")))
         add(tool("memory_search", "搜索当前会话允许作用域内的长期记忆", properties(
             "query" to string("搜索内容"),
