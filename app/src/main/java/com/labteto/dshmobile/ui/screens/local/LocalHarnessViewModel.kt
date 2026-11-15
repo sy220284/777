@@ -50,6 +50,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val toolsUi: LocalToolsUiFacade,
     private val usageUi: com.labteto.dshmobile.local.presentation.LocalUsageUiFacade,
     private val teamUi: com.labteto.dshmobile.uicontract.WorkAgentUiPort,
+    private val workReadUi: com.labteto.dshmobile.uicontract.WorkReadUiPort,
     private val documentFactory: com.labteto.dshmobile.local.presentation.LocalUiDocumentUiPortFactory,
     private val documentMedia: com.labteto.dshmobile.uicontract.MediaUiPort,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
@@ -433,19 +434,19 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun workEventChangesForUi(sessionId: String) = runtime.work.workEventChangesForUi(sessionId)
     internal fun workArtifactFileChangesForUi(sessionId: String, paths: List<String>) =
         runtime.work.workArtifactFileChangesForUi(sessionId, paths)
-    internal fun artifactRevisionForUi(sessionId: String) = runtime.work.artifactRevisionForUi(sessionId)
-    internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>) = runtime.work.refreshArtifactFilesForUi(sessionId, items)
-    internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem) = runtime.work.inspectArtifactForUi(sessionId, item)
-    fun artifactsForUi(sessionId: String) = runtime.work.artifactsForUi(sessionId)
+    internal fun artifactRevisionForUi(sessionId: String) = workReadUi.artifactRevisionForUi(sessionId)
+    internal fun refreshArtifactFilesForUi(sessionId: String, items: List<com.labteto.dshmobile.local.presentation.LocalArtifactUiItem>) = workReadUi.refreshArtifactFilesForUi(sessionId, items)
+    internal fun inspectArtifactForUi(sessionId: String, item: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem) = workReadUi.inspectArtifactForUi(sessionId, item)
+    fun artifactsForUi(sessionId: String) = workReadUi.artifactsForUi(sessionId)
     fun historyPageForUi(sessionId: String, cursor: com.labteto.dshmobile.local.presentation.LocalWorkHistoryCursor?) =
-        runtime.work.historyPageForUi(sessionId, cursor)
+        workReadUi.historyPageForUi(sessionId, cursor)
 
     fun artifactHistoryForUi(sessionId: String, eventLimit: Int) =
-        runtime.work.artifactsForUi(sessionId, eventLimit)
-    fun toolActivitiesForUi(sessionId: String) = runtime.work.toolActivitiesForUi(sessionId)
+        workReadUi.artifactsForUi(sessionId, eventLimit)
+    fun toolActivitiesForUi(sessionId: String) = workReadUi.toolActivitiesForUi(sessionId)
     fun toolEvidenceForUi(sessionId: String, callId: String, sequence: Long) =
-        runtime.work.toolEvidenceForUi(sessionId, callId, sequence)
-    internal fun requirementEvidenceForUi(sessionId: String) = runtime.work.requirementEvidenceForUi(sessionId)
+        workReadUi.toolEvidenceForUi(sessionId, callId, sequence)
+    internal fun requirementEvidenceForUi(sessionId: String) = workReadUi.requirementEvidenceForUi(sessionId)
     fun linkRequirementEvidenceForUi(
         sessionId: String, target: com.labteto.dshmobile.local.presentation.LocalRequirementUiTarget,
         artifact: com.labteto.dshmobile.local.presentation.LocalArtifactUiItem,
@@ -454,7 +455,7 @@ class LocalHarnessViewModel @Inject constructor(
         val prepared = runtime.work.prepareRequirementEvidenceForUi(sessionId, target.index, target.content, artifact) ?: return false
         return runtime.work.commitRequirementEvidenceForUi(prepared)
     }
-    fun eventSequenceForUi(sessionId: String) = runtime.work.eventSequenceForUi(sessionId)
+    fun eventSequenceForUi(sessionId: String) = workReadUi.eventSequenceForUi(sessionId)
     /** Resolve the current binding before every team action; never reuse a stale job identity. */
     internal fun teamMemberOutput(jobId: String): String {
         val snapshot = teamUi.snapshot()
