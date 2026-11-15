@@ -64,5 +64,7 @@ interface AppServerUiPort {
     fun read(query: UiAppServerRead): UiAppServerState
     /** Notifications invalidate owner snapshots; no shadow EventLog or global sequence is created. */
     val notices: Flow<UiAppServerNotice>
+    /** Observe only requested features without initializing other feature owners. */
+    fun noticesFor(features: Set<UiAppServerFeature>): Flow<UiAppServerNotice>
     suspend fun submit(command: UiAppServerCommand): UiAppServerReply
 }

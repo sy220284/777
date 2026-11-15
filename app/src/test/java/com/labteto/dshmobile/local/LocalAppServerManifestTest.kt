@@ -37,8 +37,40 @@ import com.labteto.dshmobile.uicontract.UiAppServerRead
 import com.labteto.dshmobile.uicontract.UiAppServerState
 import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import org.junit.Assert.assertThrows
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
+import com.labteto.dshmobile.uicontract.UiAppServerFeature
 
 class LocalAppServerManifestTest {
+    @Test fun scopedNoticesActivateOnlyRequestedFeatureOwner() = runBlocking {
+        val calls = mutableListOf<String>()
+        val tools = Proxy.newProxyInstance(
+            ToolsManagementUiPort::class.java.classLoader, arrayOf(ToolsManagementUiPort::class.java)
+        ) { _, method, _ ->
+            calls += method.name
+            when (method.name) {
+                "serverChanges", "skillChanges" -> flowOf(Unit)
+                "getNetworkSearchEnabled", "getDeepSeekSearchPreferred" -> MutableStateFlow(false)
+                else -> error("Unexpected tool callback " + method.name)
+            }
+        } as ToolsManagementUiPort
+        val server = LocalAppServer(
+            chatOwner = Provider { error("Chat initialized unexpectedly") },
+            workOwner = Provider { error("Work initialized unexpectedly") },
+            sessionOwner = Provider { error("Session initialized unexpectedly") },
+            agentOwner = Provider { error("Agent initialized unexpectedly") },
+            automationOwner = Provider { error("Automation initialized unexpectedly") },
+            toolsOwner = Provider { tools },
+            settingsOwner = Provider { error("Settings initialized unexpectedly") },
+            workReadOwner = Provider { error("WorkRead initialized unexpectedly") },
+        )
+        val stream = server.noticesFor(setOf(UiAppServerFeature.TOOLS))
+        assertTrue(calls.isEmpty())
+        assertEquals(UiAppServerFeature.TOOLS, stream.first().feature)
+        assertTrue("serverChanges" in calls)
+    }
+
 
     @Test fun typedReadQueriesOnlyActivateRequestedOwner() {
         val activated = mutableListOf<String>()

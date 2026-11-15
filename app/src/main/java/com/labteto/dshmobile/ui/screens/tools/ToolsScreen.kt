@@ -176,6 +176,8 @@ class ToolsViewModel @Inject constructor(
     private val localTools: ToolsManagementUiPort get() = appServer.tools
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
+    private val _capabilityRevision = MutableStateFlow(0L)
+    val capabilityRevision: StateFlow<Long> = _capabilityRevision.asStateFlow()
     private val _agentBackendStatus = MutableStateFlow("正在读取执行器设置")
     val agentBackendStatus: StateFlow<String> = _agentBackendStatus.asStateFlow()
     fun refreshAgentBackend() { viewModelScope.launch {
@@ -306,6 +308,10 @@ class ToolsViewModel @Inject constructor(
 
     init {
         refresh()
+        viewModelScope.launch {
+            appServer.noticesFor(setOf(com.labteto.dshmobile.uicontract.UiAppServerFeature.TOOLS))
+                .collect { _capabilityRevision.value += 1L }
+        }
         viewModelScope.launch {
             localTools.skillChanges().collectLatest {
                 // A directory may be created just before its SKILL.md is written.
@@ -1210,6 +1216,7 @@ fun ToolsScreen(
         }
     }
     val networkSearchEnabled by viewModel.networkSearchEnabled.collectAsStateWithLifecycle()
+    val capabilityRevision by viewModel.capabilityRevision.collectAsStateWithLifecycle()
     val deepSeekSearchPreferred by viewModel.deepSeekSearchPreferred.collectAsStateWithLifecycle()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val approvalMode by settingsViewModel.approvalMode.collectAsStateWithLifecycle()
@@ -1459,8 +1466,7 @@ fun ToolsScreen(
                                             modifier = Modifier.fillMaxWidth().testTag("tool-directory-search"),
                                         )
                                         val discovered = remember(
-                                            toolDirectoryQuery, state.servers, state.skills,
-                                            state.localPlugins, networkSearchEnabled,
+                                            toolDirectoryQuery, capabilityRevision,
                                         ) { viewModel.discoverCapabilities(toolDirectoryQuery) }
                                         Text(
                                             "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",

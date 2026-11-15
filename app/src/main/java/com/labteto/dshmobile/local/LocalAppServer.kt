@@ -84,20 +84,33 @@ internal class LocalAppServer @Inject constructor(
         }
     }
 
-    /** Subscribing, not constructing the client, activates change streams of the owners. */
-    override val notices: Flow<UiAppServerNotice> = flow {
-        emitAll(merge(
-            chat.snapshots.map { UiAppServerNotice(UiAppServerFeature.CHAT, it.identity) },
-            work.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) },
-            session.snapshots.map { UiAppServerNotice(UiAppServerFeature.SHELL, it.identity) },
-            agents.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) },
-            automation.snapshots.map { UiAppServerNotice(UiAppServerFeature.AUTOMATION, it.context.identity) },
-            tools.serverChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-            tools.skillChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-            tools.networkSearchEnabled.map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-            tools.deepSeekSearchPreferred.map { UiAppServerNotice(UiAppServerFeature.TOOLS) },
-            settings.state.map { UiAppServerNotice(UiAppServerFeature.SETTINGS) },
-        ))
+    /** Subscriptions activate only their selected Feature Owners. */
+    override val notices: Flow<UiAppServerNotice> = noticesFor(UiAppServerFeature.entries.toSet())
+
+    override fun noticesFor(features: Set<UiAppServerFeature>): Flow<UiAppServerNotice> = flow {
+        val selected: List<Flow<UiAppServerNotice>> = buildList {
+            if (UiAppServerFeature.SHELL in features)
+                add(session.snapshots.map { UiAppServerNotice(UiAppServerFeature.SHELL, it.identity) })
+            if (UiAppServerFeature.CHAT in features)
+                add(chat.snapshots.map { UiAppServerNotice(UiAppServerFeature.CHAT, it.identity) })
+            if (UiAppServerFeature.WORK in features) {
+                add(work.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) })
+                add(agents.snapshots.map { UiAppServerNotice(UiAppServerFeature.WORK, it.identity) })
+            }
+            if (UiAppServerFeature.AUTOMATION in features)
+                add(automation.snapshots.map {
+                    UiAppServerNotice(UiAppServerFeature.AUTOMATION, it.context.identity)
+                })
+            if (UiAppServerFeature.TOOLS in features) {
+                add(tools.serverChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) })
+                add(tools.skillChanges().map { UiAppServerNotice(UiAppServerFeature.TOOLS) })
+                add(tools.networkSearchEnabled.map { UiAppServerNotice(UiAppServerFeature.TOOLS) })
+                add(tools.deepSeekSearchPreferred.map { UiAppServerNotice(UiAppServerFeature.TOOLS) })
+            }
+            if (UiAppServerFeature.SETTINGS in features)
+                add(settings.state.map { UiAppServerNotice(UiAppServerFeature.SETTINGS) })
+        }
+        if (selected.isNotEmpty()) emitAll(merge(*selected.toTypedArray()))
     }
 
     override suspend fun submit(command: UiAppServerCommand): UiAppServerReply = when (command) {
