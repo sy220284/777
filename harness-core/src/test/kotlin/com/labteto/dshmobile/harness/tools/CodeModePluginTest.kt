@@ -319,7 +319,7 @@ class CodeModePluginTest {
                     put("count", buildJsonObject { put("type", "integer") })
                     put("action", buildJsonObject {
                         put("type", "string")
-                        put("enum", buildJsonArray { add("inspect"); add("list") })
+                        put("enum", buildJsonArray { add(JsonPrimitive("inspect")); add(JsonPrimitive("list")) })
                     })
                 },
                 required = setOf("count", "action"),
@@ -571,7 +571,7 @@ class CodeModePluginTest {
         val plan = buildJsonObject { put("steps", buildJsonArray {
             add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
             add(buildJsonObject { put("tool", "consume"); put("args", buildJsonObject {
-                put("value", buildJsonObject { put("\\$step_result", 1); put("path", "identifier") })
+                put("value", buildJsonObject { put("\$step_result", 1); put("path", "identifier") })
             }) })
         }) }
         val result = registry.execute("code_mode_run", plan)
@@ -598,7 +598,7 @@ class CodeModePluginTest {
         val script = buildJsonObject { put("steps", buildJsonArray {
             add(buildJsonObject { put("tool", "produce"); put("args", buildJsonObject {}) })
             add(buildJsonObject { put("tool", "consume"); put("args", buildJsonObject {
-                put("value", buildJsonObject { put("\\$step_result", 1); put("path", "body") })
+                put("value", buildJsonObject { put("\$step_result", 1); put("path", "body") })
             }) })
         }) }
         val result = registry.execute("code_mode_run", script)
