@@ -360,7 +360,7 @@ internal class LocalToolExecutionCoordinator(
         }.toSet()
         val omittedNames = matches.map(HarnessTool::name).filterNot(projected::contains)
         return buildString {
-            appendLine("找到 ${matches.size} 个扩展工具，${matches.size - omittedNames.size} 个已装入下一模型步骤。")
+            appendLine("找到 ${matches.size} 个扩展工具，${matches.size - omittedNames.size} 个通过初步定义预算筛选；实际可用状态以下一次模型请求的工具表为准。")
             if (alreadyBuiltIn.isNotEmpty()) appendLine(
                 "内置工具可直接调用：" + alreadyBuiltIn.joinToString(", "))
             if (exactNames != null) appendLine(
@@ -372,7 +372,7 @@ internal class LocalToolExecutionCoordinator(
             matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
                 append("- ").append(tool.name)
                 if (tool.name in projected) {
-                    append(if (tool.name in previouslyEnabled) " [已加载]" else " [下一步可用]")
+                    append(if (tool.name in previouslyEnabled) " [已选候选]" else " [下一步候选]")
                 }
                 selection.omittedReasons[tool.name]?.let { reason ->
                     append(" [当前未装入：").append(reason).append("]")
