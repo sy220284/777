@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.session
 import com.labteto.dshmobile.local.agent.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.LOCAL_QUEUED_USER_TIMELINE_ACTION
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
@@ -58,6 +59,13 @@ internal fun projectLocalTranscriptRuntimeIndexTail(
         .filter { event -> event.sequence > sequenceExclusive }
         .sortedBy(LocalSessionEventLog.Event::sequence)
         .forEach { event ->
+            val delta = decodeQueuedUserTranscriptDelta(event.data)
+            if (delta != null) {
+                val encoded = event.data["transcript_index"]
+                    ?: error("持久消息变更缺少会话索引")
+                current = Json.decodeFromJsonElement(LocalTranscriptRuntimeIndex.serializer(), encoded)
+                return@forEach
+            }
             val decoded = decodeTranscriptMessages(event.data) ?: return@forEach
             if (event.type == "chat/active-transcript" || event.type == "work/active-transcript" ||
                 (event.type == LOCAL_AGENT_INBOX_EVENT_TYPE &&

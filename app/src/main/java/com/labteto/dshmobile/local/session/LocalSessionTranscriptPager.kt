@@ -19,6 +19,8 @@ internal data class LocalTranscriptPageCursor(
     val resumeMessageIndex: Int? = null,
     val resumeActiveTranscript: Boolean = false,
     val suppressedMessageIds: Set<String> = emptySet(),
+    /** Newest change for each original message until its historical row is consumed. */
+    val pendingDeltas: Map<String, LocalQueuedUserTranscriptDelta> = emptyMap(),
 )
 
 internal data class LocalTranscriptPage(
@@ -51,6 +53,7 @@ internal class LocalSessionTranscriptPager(
         val scanPageSize = eventPageSize.coerceIn(1, MAX_EVENT_PAGE_SIZE)
         val collectedNewestFirst = ArrayList<LocalHarnessMessage>(messageLimit)
         val suppressed = cursor?.suppressedMessageIds?.toMutableSet() ?: linkedSetOf()
+        val pendingDeltas = cursor?.pendingDeltas?.toMutableMap() ?: linkedMapOf()
         var beforeSequenceExclusive = cursor?.beforeSequenceExclusive ?: Long.MAX_VALUE
 
         cursor?.resumeEventSequence?.let { sequence ->
@@ -66,6 +69,7 @@ internal class LocalSessionTranscriptPager(
                     decoded = decoded,
                     startIndex = startIndex,
                     suppressed = suppressed,
+                    pendingDeltas = pendingDeltas,
                     output = collectedNewestFirst,
                     limit = messageLimit,
                 )
@@ -79,11 +83,13 @@ internal class LocalSessionTranscriptPager(
                                 resumeMessageIndex = nextIndex,
                                 resumeActiveTranscript = cursor.resumeActiveTranscript,
                                 suppressedMessageIds = suppressed.toSet(),
+                                pendingDeltas = pendingDeltas.toMap(),
                             )
                             cursor.resumeActiveTranscript -> null
                             else -> LocalTranscriptPageCursor(
                                 beforeSequenceExclusive = sequence,
                                 suppressedMessageIds = suppressed.toSet(),
+                                pendingDeltas = pendingDeltas.toMap(),
                             )
                         },
                     )
@@ -113,12 +119,15 @@ internal class LocalSessionTranscriptPager(
                     }
                 }
 
+                val delta = decodeQueuedUserTranscriptDelta(event.data)
+                if (delta != null) pendingDeltas.putIfAbsent(delta.messageId, delta)
                 val decoded = decodeTranscriptMessages(event.data)
                 warnUndecodableTranscript(event, decoded)
                 val activeTranscript = (
                     event.type == "chat/active-transcript" ||
                         event.type == "work/active-transcript" ||
                         (event.type == LOCAL_AGENT_INBOX_EVENT_TYPE &&
+                            "transcript_delta" !in event.data &&
                             (event.data["action"] as? JsonPrimitive)?.contentOrNull ==
                                 LOCAL_QUEUED_USER_TIMELINE_ACTION) ||
                         event.type == "session/transcript-projection-baseline" ||
@@ -128,6 +137,7 @@ internal class LocalSessionTranscriptPager(
                     decoded = decoded,
                     startIndex = decoded?.lastIndex ?: -1,
                     suppressed = suppressed,
+                    pendingDeltas = pendingDeltas,
                     output = collectedNewestFirst,
                     limit = messageLimit,
                 )
@@ -142,11 +152,13 @@ internal class LocalSessionTranscriptPager(
                                 resumeMessageIndex = nextIndex,
                                 resumeActiveTranscript = activeTranscript,
                                 suppressedMessageIds = suppressed.toSet(),
+                                pendingDeltas = pendingDeltas.toMap(),
                             )
                             activeTranscript -> null
                             else -> LocalTranscriptPageCursor(
                                 beforeSequenceExclusive = event.sequence,
                                 suppressedMessageIds = suppressed.toSet(),
+                                pendingDeltas = pendingDeltas.toMap(),
                             )
                         },
                     )
@@ -182,6 +194,7 @@ internal class LocalSessionTranscriptPager(
         decoded: List<LocalHarnessMessage>?,
         startIndex: Int,
         suppressed: MutableSet<String>,
+        pendingDeltas: MutableMap<String, LocalQueuedUserTranscriptDelta>,
         output: MutableList<LocalHarnessMessage>,
         limit: Int,
     ): Int {
@@ -189,8 +202,13 @@ internal class LocalSessionTranscriptPager(
         var index = startIndex
         while (index >= 0 && output.size < limit) {
             val message = decoded[index]
+            val rewritten = pendingDeltas.remove(message.id)
             if (!suppressed.remove(message.id)) {
-                output += message
+                when {
+                    rewritten == null -> output += message
+                    rewritten.replacement != null -> output += rewritten.replacement
+                    // A removed user message stays absent at its original position.
+                }
             }
             index -= 1
         }

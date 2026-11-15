@@ -192,7 +192,7 @@ class SqliteSessionEventDatabase(
     }
 
     private fun isVisibleTranscriptCandidate(type: String, data: JsonObject): Boolean =
-        "transcript" in data ||
+        "transcript" in data || "transcript_delta" in data ||
             (type == "assistant/message" && "replaces" in data) ||
             type == "chat/active-transcript" || type == "work/active-transcript" ||
             type == "session/transcript-projection-baseline" ||
