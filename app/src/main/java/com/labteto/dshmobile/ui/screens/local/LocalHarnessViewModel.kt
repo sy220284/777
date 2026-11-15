@@ -5,8 +5,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
-import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
@@ -56,8 +54,7 @@ class LocalHarnessViewModel @Inject constructor(
     private val documentMedia: com.labteto.dshmobile.uicontract.MediaUiPort,
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val conversationPorts: com.labteto.dshmobile.local.LocalConversationUiPortComposition,
-    private val approvalPreferences: LocalApprovalPreferences,
-    private val networkSearchSettings: LocalNetworkSearchSettings,
+    private val settingsUi: com.labteto.dshmobile.uicontract.SettingsUiPort,
     private val sectionStore: LocalSessionSectionUiFacade,
     private val reviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentCodeReviewUiFacade,
     private val securityReviewFacade: com.labteto.dshmobile.local.presentation.LocalIndependentSecurityReviewUiFacade,
@@ -125,9 +122,9 @@ class LocalHarnessViewModel @Inject constructor(
     internal fun consumePreparedDocumentDraft(sessionId: String): String? =
         nativeDocuments.consumePreparedDraft(sessionId)
 
-    val approvalMode = approvalPreferences.approvalMode
-    val networkSearchEnabled = networkSearchSettings.enabled
-    fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
+    val approvalMode = settingsUi.approvalMode
+    val networkSearchEnabled = toolsUi.networkSearchEnabled
+    fun setNetworkSearchEnabled(enabled: Boolean) = toolsUi.setNetworkSearchEnabled(enabled)
     val state = runtime.state
     val streamingState = runtime.streamingState; internal val sendFeedbackState = runtime.sendFeedbackState
     internal val queuedUserPort = conversationPorts.queuedUsers

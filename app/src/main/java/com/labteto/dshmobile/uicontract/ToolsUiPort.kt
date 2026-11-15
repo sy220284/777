@@ -162,6 +162,11 @@ interface ToolsUiPort {
 /** Full management surface consumed by the Tools feature UI.
  * The Compose ViewModel depends on this contract, never the runtime facade implementation. */
 interface ToolsManagementUiPort : ToolsUiPort {
+    /** Live Tool-owner settings; the UI does not hold the underlying preferences object. */
+    val networkSearchEnabled: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val deepSeekSearchPreferred: kotlinx.coroutines.flow.StateFlow<Boolean>
+    fun setNetworkSearchEnabled(enabled: Boolean)
+    fun setDeepSeekSearchPreferred(enabled: Boolean)
     fun skillChanges(): kotlinx.coroutines.flow.Flow<Unit>
     suspend fun agentBackendStatus(): String
     suspend fun probeAgentBackend(): String

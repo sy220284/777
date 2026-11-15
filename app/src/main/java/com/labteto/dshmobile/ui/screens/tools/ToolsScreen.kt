@@ -65,7 +65,6 @@ import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
-import com.labteto.dshmobile.local.tools.LocalNetworkSearchSettings
 import com.labteto.dshmobile.local.network.requiresAndroid17LocalNetworkPermission
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -170,7 +169,6 @@ internal class ToolsOperationGate {
 class ToolsViewModel @Inject constructor(
     private val localTools: ToolsManagementUiPort,
     @ApplicationContext private val appContext: Context,
-    private val networkSearchSettings: LocalNetworkSearchSettings,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsUiState())
     val state: StateFlow<ToolsUiState> = _state.asStateFlow()
@@ -219,11 +217,11 @@ class ToolsViewModel @Inject constructor(
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { _agentBackendStatus.value = "撤销失败，请重试；原授权状态未确认" }
     } }
-    val networkSearchEnabled: StateFlow<Boolean> = networkSearchSettings.enabled
-    val deepSeekSearchPreferred: StateFlow<Boolean> = networkSearchSettings.deepSeekPreferred
+    val networkSearchEnabled: StateFlow<Boolean> = localTools.networkSearchEnabled
+    val deepSeekSearchPreferred: StateFlow<Boolean> = localTools.deepSeekSearchPreferred
 
-    fun setNetworkSearchEnabled(enabled: Boolean) = networkSearchSettings.setEnabled(enabled)
-    fun setDeepSeekSearchPreferred(enabled: Boolean) = networkSearchSettings.setDeepSeekPreferred(enabled)
+    fun setNetworkSearchEnabled(enabled: Boolean) = localTools.setNetworkSearchEnabled(enabled)
+    fun setDeepSeekSearchPreferred(enabled: Boolean) = localTools.setDeepSeekSearchPreferred(enabled)
     private val operationGate = ToolsOperationGate()
     private val requestedCodexLogos = mutableSetOf<String>()
     private var mcpLoginJob: kotlinx.coroutines.Job? = null
