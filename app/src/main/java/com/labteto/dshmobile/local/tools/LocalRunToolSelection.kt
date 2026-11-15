@@ -23,10 +23,8 @@ internal class LocalRunToolSelection : LinkedHashSet<String>() {
     private val awaitingCapacityCheck = linkedSetOf<String>()
 
     @Synchronized fun hasBudgetOmittedRecoveryCandidate(
-        omittedReasons: Map<String, String>,
-    ): Boolean = awaitingCapacityCheck.any { name ->
-        omittedReasons[name]?.let { it.contains("Token") || it.contains("预算") } == true
-    }
+        budgetOmittedNames: Set<String>,
+    ): Boolean = awaitingCapacityCheck.any { it in budgetOmittedNames }
 
     @Synchronized fun finishCapacityCheck() {
         awaitingCapacityCheck.clear()
