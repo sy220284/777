@@ -209,7 +209,7 @@ internal class LocalWorkTurnToolRuntime(
     internal fun names(
         policy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding,
-    ): List<String> = schemas.names(schemas(policy, binding))
+    ): List<String> = schemas.names(selectSchemas(policy, binding).schemas)
 
     /** Pure read proven by the registered tool contract, not by its display name alone. */
     internal fun isParallel(name: String): Boolean =
