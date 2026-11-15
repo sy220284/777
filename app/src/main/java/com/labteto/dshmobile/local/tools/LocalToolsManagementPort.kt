@@ -26,6 +26,8 @@ internal interface LocalToolsManagementPort {
     fun activeToolHookIds(): List<String> = emptyList()
     fun installedPluginIds(): List<String>
     fun capabilityCatalogue(): List<LocalToolCatalogueEntry>
+    /** Task-only hint from registered tool contracts; does not grant permission. */
+    fun requiredDeviceCapabilitiesForTask(task: String): Set<com.labteto.dshmobile.harness.tools.ToolDeviceRequirement> = emptySet()
     fun validateCapabilityDraft(
         name: String, expectedSchema: kotlinx.serialization.json.JsonObject,
         argumentsJson: String,
