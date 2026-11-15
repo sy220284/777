@@ -7,6 +7,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -18,6 +20,31 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GitHubConnectorPluginTest {
+    @Test
+    fun githubResponseRetainsHeadersAndMakesJsonBodyMachineReadable() = runBlocking {
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK").header("ETag", "revision-1")
+                .body("""{"repository":{"full_name":"owner/repo"},"count":2}"""
+                    .toResponseBody(JSON_MEDIA))
+                .build()
+        }.build()
+        val plugins = PluginRegistry()
+        plugins.install(GitHubConnectorPlugin(
+            http, Json, { "github_pat_test_secret_1234567890" }, "https://api.github.test",
+        ))
+        val actual = plugins.context.tools.execute(
+            "github_api_get", buildJsonObject { put("path", "/repos/owner/repo") },
+        )
+        assertFalse(actual.isError)
+        assertTrue(actual.content.contains("HTTP: 200"))
+        assertTrue(actual.content.contains("ETag: revision-1"))
+        val typed = requireNotNull(actual.structuredResult)
+        assertEquals("owner/repo", typed.jsonObject.getValue("repository")
+            .jsonObject.getValue("full_name").jsonPrimitive.content)
+        assertEquals("2", typed.jsonObject.getValue("count").jsonPrimitive.content)
+    }
+
     @Test
     fun githubHttpErrorsPreserveActionableStatusAndDoNotReplayMutations() = runBlocking {
         val cases = listOf(
