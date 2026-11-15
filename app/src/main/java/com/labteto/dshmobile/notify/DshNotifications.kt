@@ -10,7 +10,6 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -40,6 +39,29 @@ class DshNotifications @Inject constructor(
                     android.Manifest.permission.POST_NOTIFICATIONS,
                 ) == PackageManager.PERMISSION_GRANTED)
 
+    /** The manifest launcher is the single activity routing authority, even after UI changes. */
+    private val launcherComponent by lazy {
+        requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName)?.component) {
+            "通知无法打开应用：AndroidManifest 未声明主启动界面"
+        }
+    }
+
+    /** Build an explicit local-only intent without making Notification infrastructure own the UI. */
+    internal fun localSessionOpenIntent(sessionId: String?, notificationKey: String): Intent =
+        Intent().apply {
+            component = launcherComponent
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = android.net.Uri.Builder()
+                .scheme("dshmobile")
+                .authority("host")
+                .appendPath("local-notification")
+                .appendPath(notificationKey)
+                .build()
+            sessionId?.takeIf(String::isNotBlank)?.let {
+                putExtra(EXTRA_LOCAL_SESSION_ID, it)
+            }
+        }
+
     @android.annotation.SuppressLint("MissingPermission")
     fun postLocalSession(
         id: Int,
@@ -53,18 +75,7 @@ class DshNotifications @Inject constructor(
         if (!canPost()) return
         val now = LocalTime.now()
         if (!shouldDeliverLocalNotification(settings, kind, now.hour * 60 + now.minute)) return
-        val open = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.Builder()
-                .scheme("dshmobile")
-                .authority("host")
-                .appendPath("local-notification")
-                .appendPath(notificationKey)
-                .build()
-            sessionId?.takeIf(String::isNotBlank)?.let {
-                putExtra(EXTRA_LOCAL_SESSION_ID, it)
-            }
-        }
+        val open = localSessionOpenIntent(sessionId, notificationKey)
         val pending = PendingIntent.getActivity(
             context,
             id,
