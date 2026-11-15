@@ -645,7 +645,6 @@ UI 设计同时受性能约束。
 ```text
 LocalHarnessScreen.kt
 LocalHarnessStateContent.kt
-LocalWorkStateContent.kt
 LocalConversationHeaders.kt
 LocalWorkSurfaceComponents.kt
 LocalHarnessMessageComponents.kt
