@@ -42,7 +42,7 @@ internal class DeviceCapabilitiesController(
         ) == 1 && enabledAccessibility.any {
             ComponentName.unflattenFromString(it) == accessibilityComponent
         }
-        _state.value = readDeviceCapabilityState().copy(
+        _state.value = readDeviceCapabilityState(appContext).copy(
             accessibilityGranted = accessibilityGranted,
             notificationAccessGranted = appContext.packageName in
                 NotificationManagerCompat.getEnabledListenerPackages(appContext),
@@ -80,10 +80,13 @@ internal class DeviceCapabilitiesController(
 }
 
 /** Same read-only owner probe for Settings and task-specific handoff hints. */
-internal fun readDeviceCapabilityState(): DeviceCapabilitiesState = DeviceCapabilitiesState(
+internal fun readDeviceCapabilityState(context: Context? = null): DeviceCapabilitiesState = DeviceCapabilitiesState(
     loading = false,
     accessibility = HarnessAccessibilityService.active() != null,
     notifications = HarnessNotificationListenerService.active() != null,
-    // Availability of the API does not imply a captured screen or user MediaProjection grant.
-    virtualDisplay = true,
+    // Feature detection is separate from per-target launch authorization. Never claim
+    // support before checking the device's secondary-activity display capability.
+    virtualDisplay = context?.packageManager?.hasSystemFeature(
+        android.content.pm.PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS,
+    ) == true,
 )
