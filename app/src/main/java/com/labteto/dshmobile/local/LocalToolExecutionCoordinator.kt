@@ -302,14 +302,24 @@ internal class LocalToolExecutionCoordinator(
             name !in alreadyBuiltIn && matches.none { it.name == name }
         }
         if (matches.isEmpty()) {
-            if (exactNames != null) return buildString {
+            if (exactNames != null) {
+                // Selecting only CORE tools is still an exact focus: clear prior OPTIONAL
+                // schemas without treating the built-in tool as unavailable.
+                if (alreadyBuiltIn.isNotEmpty()) synchronized(target) {
+                    target.clear()
+                    if (target is LocalRunToolSelection) target.markExactFocus()
+                }
+                return buildString {
                 if (alreadyBuiltIn.isNotEmpty()) appendLine(
                     "以下是内置工具，无需加载即可直接调用：" + alreadyBuiltIn.joinToString(", "))
                 if (unavailableNames.isNotEmpty()) appendLine(
                     "指定工具当前无法加载：" + unavailableNames.joinToString(", "))
                 if (unavailableNames.isNotEmpty()) append(
                     "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
-            }.trimEnd()
+                if (alreadyBuiltIn.isNotEmpty()) append(
+                    "本轮已仅保留选定内置工具，之前启用的可选扩展已退出模型工具表。")
+                }.trimEnd()
+            }
             // Don't bounce the user back to guess an internal capability name.
             return "实时工具表没有精确匹配的扩展能力。请勿猜测调用不存在的工具，也不必因此放弃任务。\n" +
                 "在允许联网与写入的 Work 中，可先用 web_search / GitHub 查找可复用实现，" +
@@ -329,12 +339,15 @@ internal class LocalToolExecutionCoordinator(
             // Unselected tools remain installed in ToolRegistry and can be reselected.
             val previous = if (exactNames == null) target.filterNot { it in selected }
                 else emptyList()
+            val previouslyFocused = target is LocalRunToolSelection && target.exactFocus
             target.clear()
             target.addAll(selected)
             target.addAll(previous)
-            // A run-scoped exact choice must survive later schema projections:
-            // pinned tools and MCP hints can never silently expand it.
-            if (exactNames != null && target is LocalRunToolSelection) target.markExactFocus()
+            // Explicit select: stays in force on this real task. A later natural-language
+            // discovery may add matching tools, but cannot re-enable automatic unrelated pins.
+            if ((exactNames != null || previouslyFocused) && target is LocalRunToolSelection) {
+                target.markExactFocus()
+            }
             target.toSet()
         }
         val selection = LocalToolRouter.selectSchemas(
