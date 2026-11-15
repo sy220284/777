@@ -322,6 +322,27 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
+    fun exactSelectionReplacesOldSchemaExposureWithoutUnregisteringTools() {
+        val registry = ToolRegistry().apply {
+            listOf("old_lookup", "next_lookup", "other_lookup").forEach { name ->
+                register(tool(name = name, access = ToolAccess.READ_ONLY,
+                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
+                    family = "可选工具", keywords = setOf("查询")) { ToolResult("ok") })
+            }
+        }
+        val coordinator = coordinator(registry)
+        coordinator.enableOptionalTools(listOf("old_lookup", "other_lookup"))
+        coordinator.searchCapabilities("select:next_lookup")
+        assertEquals(listOf("next_lookup"), coordinator.enabledOptionalSnapshot().toList())
+        assertFalse(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
+            .contains("old_lookup"))
+        assertEquals("old_lookup", registry.get("old_lookup")?.name)
+        coordinator.searchCapabilities("select:old_lookup,next_lookup")
+        assertEquals(listOf("old_lookup", "next_lookup"),
+            coordinator.enabledOptionalSnapshot().toList())
+    }
+
+    @Test
     fun exactMultiToolSelectionLoadsOnlyNamedRegisteredToolsInOneStep() {
         val registry = ToolRegistry().apply {
             listOf("mcp_lookup", "github_status", "unrelated_search").forEach { name ->

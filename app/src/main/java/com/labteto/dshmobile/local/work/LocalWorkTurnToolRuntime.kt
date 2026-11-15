@@ -83,12 +83,12 @@ internal class LocalWorkTurnToolRuntime(
         // Re-evaluate only the active user's task before each model step; newly registered
         // capabilities become available automatically without restarting or editing tool maps.
         val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
-        if (!activeTask.isNullOrBlank()) {
-            // The first/new user task may re-rank. Repeating the same task must not undo
-            // an explicit capability_search selection from the previous model step.
+        if (!activeTask.isNullOrBlank() && binding.toolPriority.isNewTask(activeTask)) {
+            // Pre-activate task-relevant capabilities once per real task. Subsequent model
+            // steps keep the user's explicit capability_search focus instead of re-adding
+            // all speculative tools and growing the schema surface indefinitely.
             execution.enableTaskRelevantOptionalTools(
-                activeTask, binding.enabledOptionalTools,
-                prioritize = binding.toolPriority.isNewTask(activeTask),
+                activeTask, binding.enabledOptionalTools, prioritize = true,
             )
         }
         // Newly connected MCP tools cannot enter the step that connected them. Make them

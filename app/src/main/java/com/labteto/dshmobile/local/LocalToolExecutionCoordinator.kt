@@ -322,7 +322,11 @@ internal class LocalToolExecutionCoordinator(
             // Explicitly discovered capabilities outrank speculative pre-activation. This changes
             // the next tool surface intentionally, so the request projection can update its cache generation.
             val selected = matches.map(HarnessTool::name)
-            val previous = target.filterNot { it in selected }
+            // select: is an exact active tool surface, not a permanent union of every
+            // earlier discovery. Plain-language discovery still keeps prior choices.
+            // Unselected tools remain installed in ToolRegistry and can be reselected.
+            val previous = if (exactNames == null) target.filterNot { it in selected }
+                else emptyList()
             target.clear()
             target.addAll(selected)
             target.addAll(previous)
@@ -342,7 +346,7 @@ internal class LocalToolExecutionCoordinator(
             if (alreadyBuiltIn.isNotEmpty()) appendLine(
                 "内置工具可直接调用：" + alreadyBuiltIn.joinToString(", "))
             if (exactNames != null) appendLine(
-                "本轮只会调用实际装入的工具；已装入的可直接使用，无需再次搜索。")
+                "已按 select: 将本轮可选工具聚焦到指定名称；其它工具仍可重新选择，已装入的可直接使用。")
             if (unavailableNames.isNotEmpty()) appendLine(
                 "指定但未能加载：" + unavailableNames.joinToString(", ") + "（未注册、被关闭或不是可选扩展；不会改用相似工具）"
             )
@@ -519,7 +523,6 @@ internal class LocalToolExecutionCoordinator(
                         processExitCode = childResult.processExitCode,
                         fileVersions = childResult.fileVersions,
                         richContent = childResult.richContent,
-                        structuredResult = childResult.structuredResult,
                     ) to (childResult.executionId != null)
                 }
             } else null
@@ -692,7 +695,6 @@ internal class LocalToolExecutionCoordinator(
                 processExitCode = result.processExitCode,
                 fileVersions = result.fileVersions,
                 richContent = result.richContent,
-                structuredResult = result.structuredResult,
                 executionId = executionIdentity.executionId.takeIf { executionStarted },
                 sideEffect = if (executionStarted && !readLike) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             )
@@ -740,7 +742,6 @@ internal class LocalToolExecutionCoordinator(
             processExitCode = result.processExitCode,
             fileVersions = result.fileVersions,
             richContent = result.richContent,
-            structuredResult = result.structuredResult,
             executionId = executionIdentity.executionId.takeIf { executionStarted },
         )
     }
