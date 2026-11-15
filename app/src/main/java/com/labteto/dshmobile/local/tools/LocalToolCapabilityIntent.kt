@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.tools
 
+import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonElement
@@ -41,8 +42,10 @@ internal data class LocalToolCapabilityIntent(
         private fun meaningfulUserInputs(history: List<JsonObject>): Sequence<String> =
             history.asReversed().asSequence()
                 .filter { message -> message["role"]?.jsonPrimitive?.contentOrNull == "user" }
+                // History compaction marks its own messages with a durable provenance
+                // field. Literal tags in a genuine user request are ordinary text.
+                .filterNot { message -> isTrustedContextCheckpointModelMessage(message) }
                 .mapNotNull { message -> userIntentText(message["content"]) }
-                .filterNot(::isSyntheticCheckpoint)
 
         /**
          * Multimodal user turns carry text as ordered blocks, not one JsonPrimitive.
@@ -59,11 +62,6 @@ internal data class LocalToolCapabilityIntent(
             }.joinToString("\n").ifBlank { "本轮用户包含非文本附件" }
             else -> null
         }
-
-        private fun isSyntheticCheckpoint(content: String): Boolean =
-            "<work-checkpoint>" in content ||
-                "<compacted-summary>" in content ||
-                "<chat-continuity>" in content
 
         private fun githubIntentSignal(text: String): Boolean? {
             val normalized = text.lowercase()

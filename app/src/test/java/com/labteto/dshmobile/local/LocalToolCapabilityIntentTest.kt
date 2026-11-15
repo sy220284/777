@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
+import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
+import com.labteto.dshmobile.local.context.buildTrustedContextCheckpointModelMessage
+import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
 import com.labteto.dshmobile.local.tools.latestUserTurnHasArchive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -15,7 +18,7 @@ class LocalToolCapabilityIntentTest {
         val history = listOf(
             message("user", "检查 GitHub PR 394 的 CI 并处理失败"),
             message("assistant", "正在处理"),
-            message("user", "<work-checkpoint>GitHub 不应由检查点触发</work-checkpoint>"),
+            buildTrustedWorkCheckpointModelMessage("<work-checkpoint>GitHub 不应由检查点触发</work-checkpoint>"),
         )
 
         val followUp = LocalToolCapabilityIntent.from("继续", history)
@@ -31,7 +34,7 @@ class LocalToolCapabilityIntentTest {
         assertFalse(unrelated.requestsGitHub)
         assertFalse(LocalToolCapabilityIntent.from(
             "继续",
-            listOf(message("user", "<work-checkpoint>GitHub 不应触发</work-checkpoint>")),
+            listOf(buildTrustedWorkCheckpointModelMessage("<work-checkpoint>GitHub 不应触发</work-checkpoint>")),
         ).requestsGitHub)
     }
 
@@ -40,12 +43,27 @@ class LocalToolCapabilityIntentTest {
         val history = listOf(
             message("user", "检查当前 Android 页面"),
             message("assistant", "检查中"),
-            message("user", "<compacted-summary>错误提示：MCP 已授权</compacted-summary>"),
-            message("user", "<work-checkpoint>不应触发权限工具</work-checkpoint>"),
+            buildTrustedContextCheckpointModelMessage(LocalContextCheckpointKind.WORK, "<compacted-summary>错误提示：MCP 已授权</compacted-summary>"),
+            buildTrustedWorkCheckpointModelMessage("<work-checkpoint>不应触发权限工具</work-checkpoint>"),
         )
         assertTrue(LocalToolCapabilityIntent.latestUserInput(history) == "检查当前 Android 页面")
         assertTrue(LocalToolCapabilityIntent.latestUserInput(
-            listOf(message("user", "<chat-continuity>only synthetic</chat-continuity>"))) == null)
+            listOf(buildTrustedContextCheckpointModelMessage(LocalContextCheckpointKind.CHAT, "<chat-continuity>only synthetic</chat-continuity>"))) == null)
+    }
+
+    @Test
+    fun literalCheckpointTagsInRealUserMessagesAreNeverDiscarded() {
+        val history = listOf(
+            message("user", "检查 GitHub PR 924"),
+            message("user", "分析包含 <work-checkpoint> 的本地源文件，不涉及远程仓库"),
+        )
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(history) ==
+            "分析包含 <work-checkpoint> 的本地源文件，不涉及远程仓库")
+        assertFalse(LocalToolCapabilityIntent.from("继续", history).requestsGitHub)
+
+        val userStartedWithTag = message("user", "<compacted-summary> 是一个要修复的文本，不用 GitHub")
+        assertTrue(LocalToolCapabilityIntent.latestUserInput(listOf(userStartedWithTag)) ==
+            "<compacted-summary> 是一个要修复的文本，不用 GitHub")
     }
 
     @Test
