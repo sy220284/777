@@ -60,6 +60,15 @@ assert "appServer.agents" in read(source / "ui/screens/local/LocalHarnessViewMod
 assert "appServer.files" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.attachments.import" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
 assert "appServer.queuedUsers" in read(source / "ui/screens/local/LocalHarnessViewModel.kt")
+work_feature = read(source / "ui/screens/local/LocalFeatureUiActions.kt")
+for required in (
+    "saveWorkspaceFileToDownloads", "publishedWorkspaceFile", "workspaceDirectory",
+    "workspaceDirectoryPage", "searchWorkspaceFiles", "searchWorkspacePage",
+    "stopWorkspaceSearch", "observeWorkspaceFiles", "previewWorkspaceFilePage",
+):
+    match = re.search(r"val " + required + r": [^\n]+", work_feature)
+    assert match, f"Missing Work UI action: {required}"
+    assert " = " not in match.group(0), f"Silent default Work UI adapter: {required}"
 assert "composition.queuedUsers" in read(local / "LocalFeatureExecutionPortModule.kt")
 
 # All actual UI contracts are inspected; potential unused ports are reported, never deleted from names alone.

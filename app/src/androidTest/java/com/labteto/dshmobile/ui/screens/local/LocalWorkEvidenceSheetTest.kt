@@ -171,8 +171,20 @@ class LocalWorkEvidenceSheetTest {
         workState = MutableStateFlow(LocalWorkUiState(sessionId = "work-1")),
         agentAction = { _, _, _ -> error("证据清单展示不应触发智能体操作") },
         workspaceFiles = { emptyList() },
+        saveWorkspaceFileToDownloads = { error("Evidence-only test cannot publish workspace files") },
+        publishedWorkspaceFile = { error("Evidence-only test cannot query published files") },
+        workspaceDirectory = { error("Evidence-only test cannot browse directories") },
+        workspaceDirectoryPage = { _, _ -> error("Evidence-only test cannot page directories") },
+        searchWorkspaceFiles = { error("Evidence-only test cannot search files") },
+        searchWorkspacePage = { _, _ -> error("Evidence-only test cannot page searches") },
+        stopWorkspaceSearch = { error("Evidence-only test cannot cancel searches") },
+        observeWorkspaceFiles = { error("Evidence-only test cannot subscribe to workspace changes") },
         conversationFiles = { error("not used by evidence sheet") },
         previewWorkspaceFile = { previewReads.incrementAndGet(); error("history opened file preview") },
+        previewWorkspaceFilePage = { _, _ ->
+            previewReads.incrementAndGet()
+            error("Evidence-only test opened paginated workspace preview")
+        },
         artifactsForUi = { emptyList() },
         eventSequenceForUi = { 0L },
         artifactRevision = { null },
