@@ -161,16 +161,14 @@ internal class LocalWorkProgressCoordinator(
         note: String?,
     ): String = commitWorkMutation {
         require(status in setOf("active", "paused", "completed", "blocked")) { "目标状态无效" }
-        val updated = resolveWorkGoalUpdate(state.snapshot(), status, note, eventLog, workspaceRoot, executingToolId)
+        val (updated, delivery) = resolveWorkGoalUpdate(
+            state.snapshot(), status, note, eventLog, workspaceRoot, executingToolId,
+        )
         // Goal revision and event count must describe actual transitions. A duplicate
         // goal/state event poisons later proof that this Run authored every revision.
         if (state.snapshot().goal == updated) return@commitWorkMutation "目标状态未变化：$status"
-        val delivery = if (status == "completed") localWorkDeliveryEvidence(eventLog, updated, workspaceRoot, executingToolId) else null
         eventLog.append("goal/state", buildJsonObject {
             workGoalEvent(updated).forEach { (key, value) -> put(key, value) }
-            put("description", updated.description)
-            put("status", updated.status)
-            updated.note?.let { put("note", it) }
             executingToolId?.let { put("origin_execution_id", it) }
             delivery?.successfulToolCallId?.let { put("executed_tool_call_id", it) }
             delivery?.artifactCallId?.let { put("artifact_tool_call_id", it) }
