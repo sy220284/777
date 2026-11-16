@@ -1042,6 +1042,29 @@ class LocalWorkspace(
         return "[技能专项资料：$name/$resource；主规则版本=$current]\n$page"
     }
 
+    /** Search only this selected skill's reference corpus using the shared paged search.
+     * No new index or copied knowledge base is created; the original file remains the source.
+     */
+    internal fun searchSkillReferences(
+        name: String, query: String, skillRevision: String, cursor: String? = null,
+    ): String {
+        val rules = skillFile(name)
+        val current = "sha256:" + fingerprint(rules)
+        require(skillRevision == current) { "技能规则已更新，请重新读取 $name 的 SKILL.md" }
+        val references = File(rules.parentFile, "references")
+        if (!references.exists()) return "[技能 $name 暂无 references/ 专项资料]"
+        require(!Files.isSymbolicLink(references.toPath()) && references.isDirectory) {
+            "技能专项资料目录不是有效目录"
+        }
+        val result = search(query, ".dsh/skills/$name/references", cursor = cursor)
+        check("sha256:" + fingerprint(rules) == current) {
+            "资料检索期间核心规则发生变化，请重新读取技能"
+        }
+        return "[技能专项知识检索：$name；主规则版本=$current]\n" +
+            result.replace("再次调用 grep，保持 query/path/regex 不变并传入 cursor=",
+                "继续调用 skill(name=$name, reference_query=$query, revision=$current, cursor=")
+    }
+
     /** Catalogs only need front matter; one unreadable skill cannot disable all other skills. */
     internal fun skillMetadata(name: String): LocalSkillMetadata {
         val file = skillFile(name)

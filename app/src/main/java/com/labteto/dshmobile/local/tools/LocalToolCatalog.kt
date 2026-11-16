@@ -256,6 +256,8 @@ object LocalToolCatalog {
             "query" to string("可选；目录查询"),
             "offset" to integer("可选；目录续读游标"),
             "resource" to string("可选；SKILL.md 所引用的 references/、scripts/ 或 assets/ 内相对路径"),
+            "reference_query" to string("可选；在当前技能 references/ 资料库按关键词检索，不预先加载整个知识库；与 resource 二选一"),
+            "cursor" to string("可选；专项资料搜索返回的 next_cursor，保持 reference_query 不变"),
             "revision" to string("读取 SKILL.md 得到的 sha256 规则版本；专项资料读取时必填"),
             "start_line" to integer("专项资料起始行，默认 1"),
             "end_line" to integer("专项资料结束行，默认读取 200 行"),

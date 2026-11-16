@@ -126,13 +126,18 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
 
     private fun skillRequest(name: String, args: kotlinx.serialization.json.JsonObject): String {
         val resource = args.optionalString("resource")?.takeIf(String::isNotBlank)
-            ?: return readAuthorizedSkill(name)
+        val referenceQuery = args.optionalString("reference_query")?.takeIf(String::isNotBlank)
+        if (resource == null && referenceQuery == null) return readAuthorizedSkill(name)
         require(isPinnedSkill(name) || workspace.skillMetadata(name).modelInvocable) {
             "SKILL_USER_ONLY：此技能仅支持用户主动调用"
         }
-        return workspace.readSkillResource(
-            name, resource, args.optionalString("revision").orEmpty(),
+        val revision = args.optionalString("revision").orEmpty()
+        return if (resource != null) workspace.readSkillResource(
+            name, resource, revision,
             args.int("start_line", 1), args.int("end_line", args.int("start_line", 1) + 199),
+        ) else workspace.searchSkillReferences(
+            name, requireNotNull(referenceQuery), revision,
+            args.optionalString("cursor"),
         )
     }
 

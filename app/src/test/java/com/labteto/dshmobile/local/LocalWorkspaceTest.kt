@@ -48,6 +48,23 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun skillKnowledgeSearchFindsRelevantPassageWithoutLoadingOtherSkills() {
+        workspace.write(".dsh/skills/code-audit/SKILL.md",
+            "---\nname: code-audit\ndescription: source review\n---\nSearch references only when needed")
+        workspace.write(".dsh/skills/code-audit/references/db.md",
+            "SQLite background transactions\nLegacy migration verification")
+        workspace.write(".dsh/skills/code-audit/references/ui.md",
+            "Compose focus and navigation")
+        workspace.write(".dsh/skills/other-skill/references/private.md",
+            "Secret migration verification")
+        val revision = workspace.readSkillSnapshot("code-audit").revision
+        val found = workspace.searchSkillReferences("code-audit", "migration", revision)
+        assertTrue(found.contains("Legacy migration verification"))
+        assertFalse(found.contains("Secret migration verification"))
+        assertFalse(found.contains("Compose focus and navigation"))
+    }
+
+    @Test
     fun skillResourcesCannotCrossSkillOwnership() {
         workspace.write(".dsh/skills/my-audit/SKILL.md",
             "---\nname: my-audit\ndescription: Test\n---\n# Test")
