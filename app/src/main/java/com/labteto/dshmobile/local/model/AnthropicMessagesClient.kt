@@ -475,11 +475,12 @@ internal class AnthropicMessagesClient @Inject constructor(
                     .getOrElse { cause ->
                         throw protocolError("Anthropic SSE 包含无法解析的数据帧", requestId, cause)
                     }
-                val eventType = event["type"]?.jsonPrimitive?.contentOrNull
+                val eventType = (event["type"] as? JsonPrimitive)?.contentOrNull
                 lastStreamEventType = eventType?.take(48)
                 streamEventsSeen++
                 LocalMiniMaxPolicy.requireSuccessfulResponse(event)
-                when (eventType) {
+                try {
+                    when (eventType) {
                     "message_start" -> {
                         if (sawMessageStart) throw protocolError("重复 message_start", requestId)
                         sawMessageStart = true
@@ -596,6 +597,11 @@ internal class AnthropicMessagesClient @Inject constructor(
                         if (index !in blocks || !closedBlocks.add(index)) throw protocolError("block stop 无效或重复", requestId)
                     }
                     "ping" -> Unit
+                    }
+                } catch (invalid: IllegalArgumentException) {
+                    // A provider may send the right event type with an invalid field type.
+                    // Turn this into a diagnosed, safe-to-correct protocol failure.
+                    throw protocolError("Anthropic SSE 消息字段类型错误", requestId ?: messageId, invalid)
                 }
             }
         }
