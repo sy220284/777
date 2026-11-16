@@ -65,6 +65,25 @@ class LocalModelToolCallContractTest {
         }
     }
 
+    @Test fun toolFinishWithoutAnyCallIsAContinuableProtocolError() = runBlocking {
+        val error = runCatching { stream(emptyList()) }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED, error?.admissionState)
+        assertTrue(error?.continuationEligible == true)
+
+        val empty = buildJsonObject {
+            put("choices", buildJsonArray {
+                add(buildJsonObject {
+                    put("message", message(emptyList()))
+                    put("finish_reason", "tool_calls")
+                })
+            })
+        }
+        val complete = runCatching { client("").parse(empty.toString()) }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_RESPONSE_PROTOCOL", complete?.code)
+        assertTrue(complete?.continuationEligible == true)
+    }
+
     @Test fun explicitEmptyObjectRemainsValidInAllThreePaths() = runBlocking {
         val calls = listOf(call())
         assertEquals("{}", client("").parse(response(calls)).toolCalls.single().rawArguments)
