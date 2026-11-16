@@ -16,7 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** V5 to V6 upgrades must keep every original sequence, digest and recoverable request. */
+/** Released legacy request surfaces must survive upgrades into the current event schema. */
 @RunWith(AndroidJUnit4::class)
 class SqliteRequestDeltaMigrationAndroidTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -51,7 +51,7 @@ class SqliteRequestDeltaMigrationAndroidTest {
                 db.writableDatabase.version = 5
             }
             SqliteSessionEventDatabase(context, Json, name).use { upgraded ->
-                assertEquals(6, upgraded.readableDatabase.version)
+                assertEquals(7, upgraded.readableDatabase.version)
                 assertTrue(upgraded.needsRequestVacuum())
                 assertEquals(44L, upgraded.latestSequence("work"))
                 var afterBytes = 0L

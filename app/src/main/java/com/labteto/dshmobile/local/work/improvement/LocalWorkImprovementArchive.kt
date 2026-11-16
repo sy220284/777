@@ -47,6 +47,7 @@ internal class LocalWorkImprovementArchive(
     )
     private data class Evaluation(
         val session: String, val sequence: Long, val candidateId: String,
+        val goalId: String, val comparison: String, val sourceReceipt: String,
         val disposition: String, val baselineToolCalls: Int, val candidateToolCalls: Int,
         val baselineTokens: Long, val candidateTokens: Long,
     )
@@ -81,6 +82,18 @@ internal class LocalWorkImprovementArchive(
      * user-requested Work Goal with exactly the same acceptance signature as its source.
      * This never launches an extra side-effectful rollout or changes tool permissions.
      */
+    /**
+     * Only completed, independently test-receipted natural trials count as positive
+     * observations. They support a second user-initiated trial, not a causal A/B claim.
+     */
+    @Synchronized
+    internal fun verifiedNaturalTrialGoalIds(candidateId: String): Set<String> =
+        cached.values.asSequence().flatMap { it.evaluations.asSequence() }
+            .filter { it.candidateId == candidateId && it.disposition == "adoptable" &&
+                it.comparison == "natural_same_acceptance_observational" &&
+                it.sourceReceipt.isNotBlank() && it.goalId.isNotBlank() }
+            .map { it.goalId }.toSet()
+
     @Synchronized
     fun adviceFor(goal: LocalGoal, projectId: String, model: String, profileId: String,
         routeFingerprint: String = ""): WorkImprovementAdvice? {
@@ -100,7 +113,12 @@ internal class LocalWorkImprovementArchive(
             .distinctBy(WorkImprovementAdvice::id).toList()
         val adopted = matches.firstOrNull { it.id in active }
         return adopted?.copy(active = true) ?: matches.firstOrNull {
-            it.id !in used || it.id in usedForThisGoal
+            // A candidate needs two distinct, objectively verified natural goals
+            // before scope-limited promotion. Never replay a task to obtain evidence.
+            val attempts = cached.values.flatMap { fact -> fact.trialGoalIds[it.id].orEmpty() }.toSet()
+            it.id !in used || it.id in usedForThisGoal ||
+                (attempts.size == 1 && goal.id !in attempts &&
+                    verifiedNaturalTrialGoalIds(it.id) == attempts)
         }?.copy(active = false)
     }
 
@@ -491,7 +509,11 @@ internal class LocalWorkImprovementArchive(
                 "work/improvement-evaluation" -> {
                     val candidateId = data.text("candidate_id").orEmpty()
                     if (candidateId.isNotBlank()) addBounded(evaluations, Evaluation(
-                        session, e.sequence, candidateId, data.text("disposition").orEmpty().take(50),
+                        session, e.sequence, candidateId,
+                        data.text("goal_id").orEmpty(),
+                        data.text("comparison").orEmpty().take(70),
+                        data.text("source_receipt").orEmpty().take(120),
+                        data.text("disposition").orEmpty().take(50),
                         data.text("baseline_tool_calls")?.toIntOrNull() ?: 0,
                         data.text("candidate_tool_calls")?.toIntOrNull() ?: 0,
                         data.text("baseline_tokens")?.toLongOrNull() ?: 0L,

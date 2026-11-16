@@ -215,6 +215,57 @@ class LocalWorkImprovementArchiveTest {
     }
 
     @Test
+    fun naturalTrialRequiresTwoDifferentVerifiedGoalsBeforeScopeLimitedAdoption() =
+        withArchive { _, logs, archive ->
+            val source = logs.get("advice-source")
+            source.append("work/improvement-candidate", buildJsonObject {
+                put("id", "trial-evidence-1")
+                put("source_run_id", "baseline-run")
+                put("goal_signature", workGoalComparisonKey(LocalGoal("核验输入",
+                    artifactPaths = listOf("result.md"), verificationCommands = listOf("test"))))
+                put("project_id", "alpha")
+                put("model", "model")
+                put("profile_id", "profile")
+                put("category", "workflow")
+                put("guidance", "检查事实，再调用工具")
+                put("baseline_tool_calls", 6)
+                put("baseline_tool_errors", 0)
+                put("baseline_test_verified", true)
+            })
+            archive.refresh()
+            val first = LocalGoal("核验输入", "active", id = "first",
+                startedAtSequence = 0L, artifactPaths = listOf("result.md"),
+                verificationCommands = listOf("test"))
+            val second = first.copy(id = "second")
+            val third = first.copy(id = "third")
+            val log = logs.get("advice-trials")
+            assertEquals("trial-evidence-1", archive.adviceFor(first, "alpha", "model", "profile")?.id)
+            log.append("work/improvement-trial", buildJsonObject {
+                put("candidate_id", "trial-evidence-1"); put("goal_id", first.id)
+            })
+            archive.refresh()
+            assertEquals(null, archive.adviceFor(second, "alpha", "model", "profile"))
+            log.append("work/improvement-evaluation", buildJsonObject {
+                put("candidate_id", "trial-evidence-1")
+                put("goal_id", first.id)
+                put("disposition", "adoptable")
+                put("comparison", "natural_same_acceptance_observational")
+                put("source_receipt", "real-test-1")
+            })
+            archive.refresh()
+            assertEquals(setOf("first"), archive.verifiedNaturalTrialGoalIds("trial-evidence-1"))
+            assertEquals("trial-evidence-1", archive.adviceFor(second, "alpha", "model", "profile")?.id)
+            log.append("work/improvement-trial", buildJsonObject {
+                put("candidate_id", "trial-evidence-1"); put("goal_id", second.id)
+            })
+            archive.refresh()
+            assertEquals(null, archive.adviceFor(third, "alpha", "model", "profile"))
+            // A separate observationally successful goal permits promotion by the
+            // evaluator, which still checks an actual test receipt and user scope.
+            assertEquals(setOf("first"), archive.verifiedNaturalTrialGoalIds("trial-evidence-1"))
+        }
+
+    @Test
     fun promotedSkillRemainsAnUninstalledDraftInUserWorkspace() = withArchive { workspace, logs, archive ->
         val log = logs.get("sample")
         log.append("work/improvement-candidate", buildJsonObject {

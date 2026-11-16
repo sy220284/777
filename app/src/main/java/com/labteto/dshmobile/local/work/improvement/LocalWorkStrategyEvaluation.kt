@@ -26,6 +26,7 @@ import kotlinx.serialization.json.put
 internal class LocalWorkStrategyEvaluation(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val usage: TokenUsageAnalyticsStore,
+    private val archive: LocalWorkImprovementArchive,
 ) {
     fun evaluate(bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice) {
         val log = bound.eventLog
@@ -124,7 +125,10 @@ internal class LocalWorkStrategyEvaluation(
                     put("comparison", "natural_same_acceptance_observational")
                     put("source_receipt", evidence.testCallId)
                 })
-                if (!advice.active && result.canAdopt) {
+                if (!advice.active && result.canAdopt &&
+                    archive.verifiedNaturalTrialGoalIds(advice.id).any { it != goal.id }) {
+                    // Two separate user goals with objective test/usage receipts; evidence
+                    // remains observational, never a randomized independent A/B trial.
                     // Narrow acceptance only: exact Goal contract, project and model/profile.
                     // Never mutate stable System Prompt, skill files, approvals or tool policy.
                     log.append("work/improvement-adopted", buildJsonObject {
@@ -135,7 +139,7 @@ internal class LocalWorkStrategyEvaluation(
                         put("model", advice.model)
                         put("profile_id", advice.profileId)
                         put("project_id", advice.projectId)
-                        put("evaluation", "verified_narrow_scope")
+                        put("evaluation", "repeated_natural_observations")
                     })
                 } else if (shouldRetireWorkAdvice(
                         active = advice.active,

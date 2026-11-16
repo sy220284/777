@@ -82,7 +82,7 @@ internal class LocalWorkComposition @Inject constructor(
         LocalWorkStrategyLearning(sessionStorage, modelGateway, auxiliaryModel, usageTracker)
     }
     private val improvementEvaluation by lazy {
-        LocalWorkStrategyEvaluation(sessionStorage, usageAnalytics)
+        LocalWorkStrategyEvaluation(sessionStorage, usageAnalytics, improvementArchive)
     }
     private val improvementArchive = LocalWorkImprovementArchive(
         workspace = sessionStorage.files.workspace,

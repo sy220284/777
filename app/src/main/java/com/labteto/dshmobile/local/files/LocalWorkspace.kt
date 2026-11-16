@@ -995,15 +995,19 @@ class LocalWorkspace(
             .sorted()
     }
 
-    /** Full rules, with a byte budget independent of the generic file-preview line limit. */
+    /** Full selected rules, verified with one byte read and one freshness check. */
     fun readSkill(name: String): String {
         val file = skillFile(name)
-        val before = fingerprint(file)
-        val content = file.readText(Charsets.UTF_8).removePrefix("\uFEFF")
+        // Hash the same bytes that are decoded into model guidance: avoid a
+        // separate full-file pre-hash on every step while still detecting
+        // concurrent modification before returning the rules.
+        val contentBytes = file.readBytes()
+        val readHash = MessageDigest.getInstance("SHA-256").digest(contentBytes)
+            .joinToString("") { "%02x".format(it) }
         val after = fingerprint(file)
-        require(before == after) { "技能在读取过程中发生变化，请重新加载" }
+        require(readHash == after) { "技能在读取过程中发生变化，请重新加载" }
         observations.put(file.path, after)
-        return content
+        return String(contentBytes, Charsets.UTF_8).removePrefix("\uFEFF")
     }
 
     /** Catalogs only need front matter; one unreadable skill cannot disable all other skills. */
