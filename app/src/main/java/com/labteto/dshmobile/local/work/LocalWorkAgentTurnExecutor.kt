@@ -227,6 +227,7 @@ internal class LocalWorkAgentTurnExecutor(
             // Preserve the foreground execution owner across app/page switches AND between
             // model-stream recovery turns. A network outage suspends this live Work task.
             if (resumedFailureCode != null && isWorkTransportContinuationCode(resumedFailureCode)) {
+                binding.waitingForTransport.value = true
                 try {
                     awaitWorkTransportRecovery(
                         context = context,
@@ -256,6 +257,7 @@ internal class LocalWorkAgentTurnExecutor(
                         },
                     )
                 } finally {
+                    binding.waitingForTransport.value = false
                     binding.state.update { current ->
                         current.copy(work = current.work.copy(workflowProgress = null))
                     }
