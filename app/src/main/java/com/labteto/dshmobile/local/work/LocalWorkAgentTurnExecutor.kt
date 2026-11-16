@@ -248,6 +248,9 @@ internal class LocalWorkAgentTurnExecutor(
             } else 1
             val continuationParentRunId = binding.continuationParentRunId
             binding.continuationParentRunId = null
+            // PR928's two model gateways are immutable for the whole run.
+            // Build them once and share that same surface with run metadata and all steps.
+            val modelToolSchemas = workTurnToolRuntime.schemas(runPolicy)
             val runContext = agentRunCoordinator.start(
                 sessionId = foregroundSessionId,
                 usageMode = runSnapshot.usageMode,
@@ -268,7 +271,7 @@ internal class LocalWorkAgentTurnExecutor(
                     maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
                     maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
                 ),
-                toolNames = workTurnToolRuntime.names(runPolicy),
+                toolNames = workTurnToolRuntime.names(modelToolSchemas),
                 contextChars = runSnapshot.kernel.contextChars,
                 parentRunId = continuationParentRunId,
             )
@@ -439,9 +442,8 @@ internal class LocalWorkAgentTurnExecutor(
                         // Replace this request's layer, never append catalog updates to history.
                         workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
-                    // The gateway surface is fixed for this run; reuse it for both
-                    // context accounting and the actual model request.
-                    val modelToolSchemas = workTurnToolRuntime.schemas(runPolicy)
+                    // Reuse the run's fixed gateway schema; live registry bindings
+                    // are captured separately at each execution step.
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
                             estimateModelTokens(workPromptContext.dynamic + improvementGuidance +

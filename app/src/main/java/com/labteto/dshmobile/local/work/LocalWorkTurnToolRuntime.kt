@@ -47,8 +47,8 @@ internal class LocalWorkTurnToolRuntime(
     internal fun schemas(policy: LocalAgentRunPolicy): JsonArray =
         schemas.modelSchemas(policy)
 
-    internal fun names(policy: LocalAgentRunPolicy): List<String> =
-        schemas.names(schemas(policy))
+    internal fun names(modelSchemas: JsonArray): List<String> =
+        schemas.names(modelSchemas)
 
     /** Pure read proven by the registered tool contract, not by its display name alone. */
     internal fun isParallel(name: String): Boolean =
