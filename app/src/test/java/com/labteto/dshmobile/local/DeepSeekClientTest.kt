@@ -74,6 +74,26 @@ class DeepSeekClientTest {
     }
 
     @Test
+    fun chatCompletionsReassemblesMultilineEventAndAdjacentDone() = runBlocking {
+        val response = "data: {\"choices\":[\n" +
+            "data: {\"delta\":{\"content\":\"跨行成功\"},\"finish_reason\":\"stop\"}]}\n" +
+            "data: [DONE]\n"
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(response.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val reply = DeepSeekClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+            apiKey = "mock-token", baseUrl = "https://example.com/v1", model = "model",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "检查分帧")
+            }), tools = JsonArray(emptyList()),
+        )
+        assertEquals("跨行成功", reply.content)
+    }
+
+    @Test
     fun reasoningOverrideMatchesEachProviderWireContract() = runBlocking {
         val requests = mutableListOf<String>()
         val http = OkHttpClient.Builder().addInterceptor { chain ->
