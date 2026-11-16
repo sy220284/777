@@ -434,6 +434,8 @@ class AnthropicMessagesClientTest {
         assertTrue(malformed.continuationEligible)
         assertEquals(LocalModelAdmissionState.ADMITTED, malformed.admissionState)
         assertEquals(LocalModelFailureOrigin.STREAM_PARSE, malformed.origin)
+        assertEquals("message_stop:tool_use", malformed.lastStreamEventType)
+        assertTrue((malformed.streamEventsSeen ?: 0) >= 5)
 
         // Actual 777.400 diagnostic: all three MiniMax calls ended while building
         // the unified tool_call wrapper: {"name": "bash", "arguments":
