@@ -15,8 +15,8 @@ class WorkspacePatchPolicyTest {
             val init = ProcessBuilder("git", "init", "-q")
                 .directory(directory).start()
             assertEquals(0, init.waitFor())
-            directory.resolve("a.txt").writeText("alpha\\n".replace("\\n", "\n"))
-            directory.resolve("b.txt").writeText("beta\\n".replace("\\n", "\n"))
+            directory.resolve("a.txt").writeText("alpha\n")
+            directory.resolve("b.txt").writeText("beta\n")
             fun apply(patch: String): Pair<Int, String> {
                 val process = ProcessBuilder(
                     "git", "apply", "--verbose", "--whitespace=nowarn", "-",
