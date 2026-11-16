@@ -46,7 +46,7 @@ class LocalKimiCompatibilityTest {
                 assertEquals("https://api.kimi.com/coding/v1/chat/completions", preset.chatEndpoint)
                 val wired = mutableSetOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE)
                 assertEquals(wired, LocalModelPresets.clientCapabilitiesFor(id, endpoint))
-                if (id in setOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
+                if (id != "k3-256k") {
                     wired += LocalModelCapability.VIDEO
                 }
                 assertEquals(wired, LocalModelPresets.clientCapabilitiesFor(
@@ -221,7 +221,7 @@ class LocalKimiCompatibilityTest {
                 )))
             assertTrue(durable.toString().contains(LOCAL_FILE_REF))
             assertFalse(durable.toString().contains("base64"))
-            for (id in listOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
+            for (id in listOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
                 val materialized = prepareLocalMultimodalMessages(listOf(durable), root,
                     LocalImageInputMode.NATIVE, model = id, baseUrl = cn,
                     profile = LocalModelProfile("legacy-$id", id, cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
