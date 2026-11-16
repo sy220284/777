@@ -125,6 +125,7 @@ internal class OpenAiResponsesAdapter @Inject constructor(
             temperature = request.temperature,
             reasoningEffort = request.reasoningEffort,
             planSharing = request.route.authKind == LocalModelAuthKind.CHATGPT_PLAN,
+            maxTokens = request.maxTokens,
             promptCacheComparisonResponseId = request.promptCacheComparisonResponseId,
             promptCacheKey = request.promptCacheKey,
             promptCacheTtl = request.promptCacheTtl,
