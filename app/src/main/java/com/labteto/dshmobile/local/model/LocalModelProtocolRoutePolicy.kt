@@ -79,19 +79,19 @@ internal object LocalModelProtocolRoutePolicy {
      * A saved key may follow an explicit MiniMax M3 protocol switch on the exact same
      * official HTTPS origin. Never authorize crossing regions, providers or proxy hosts.
      */
-    fun sameCredentialOrigin(previous: String, next: String): Boolean {
+    fun sameCredentialOrigin(previous: String, next: String): Boolean = runCatching {
         val old = normalizeModelBaseUrl(previous)
         val current = normalizeModelBaseUrl(next)
-        if (old == current) return true
+        if (old == current) return@runCatching true
         val miniMax = LocalMiniMaxPolicy.isOfficial(old) && LocalMiniMaxPolicy.isOfficial(current)
         val deepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(old) &&
             DeepSeekChatRequestPolicy.isOfficialOrigin(current)
-        if (!miniMax && !deepSeek) return false
+        if (!miniMax && !deepSeek) return@runCatching false
         val a = URI(old)
         val b = URI(current)
-        return a.host.equals(b.host, true) &&
+        a.host.equals(b.host, true) &&
             (if (a.port == -1) 443 else a.port) == (if (b.port == -1) 443 else b.port)
-    }
+    }.getOrDefault(false)
 
     private fun isOfficialOpenAi(model: String, baseUrl: String): Boolean = runCatching {
         val url = URI(normalizeModelBaseUrl(baseUrl))
