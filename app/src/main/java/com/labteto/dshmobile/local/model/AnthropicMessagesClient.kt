@@ -701,10 +701,10 @@ internal class AnthropicMessagesClient @Inject constructor(
                 val input = if (inputJson.isNotEmpty()) {
                     runCatching { json.parseToJsonElement(inputJson.toString()).jsonObject }
                         .getOrElse { cause ->
-                            throw protocolErrorStatic("tool_use 参数不是合法 JSON 对象", requestId, cause)
+                            throw malformedToolArgumentsErrorStatic(requestId, cause)
                         }
                 } else {
-                    initialInput ?: throw protocolErrorStatic("tool_use input 缺失或不是对象", requestId)
+                    initialInput ?: throw malformedToolArgumentsErrorStatic(requestId)
                 }
                 buildJsonObject {
                     rawStart.forEach { (key, value) ->
@@ -916,6 +916,20 @@ internal class AnthropicMessagesClient @Inject constructor(
             cause = cause,
             origin = LocalModelFailureOrigin.STREAM_PARSE,
         )
+
+        /** Malformed model arguments cannot authorize tool execution; resume from saved history. */
+        fun malformedToolArgumentsErrorStatic(requestId: String?, cause: Throwable? = null) =
+            LocalModelException(
+                code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
+                message = "模型生成的 tool_use 参数不是合法 JSON 对象，本次工具调用尚未执行",
+                retryable = false,
+                cause = cause,
+                requestId = requestId,
+                providerCode = "malformed_tool_use_arguments",
+                admissionState = LocalModelAdmissionState.ADMITTED,
+                continuationEligible = true,
+                origin = LocalModelFailureOrigin.STREAM_PARSE,
+            )
 
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         const val CLAUDE_API_VERSION = "2026-10-21"
