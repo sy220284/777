@@ -6,7 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTextInput
@@ -465,10 +465,10 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("文档-000.md").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNode(hasScrollAction()).performScrollToIndex(68)
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(68)
         compose.waitUntil(5_000) { pageRequests.contains(96) }
         compose.waitForIdle()
-        compose.onNode(hasScrollAction()).performScrollToIndex(124)
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(124)
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("文档-124.md").fetchSemanticsNodes().isNotEmpty()
         }
@@ -508,10 +508,10 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("报告-000.md").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNode(hasScrollAction()).performScrollToIndex(68)
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(68)
         compose.waitUntil(5_000) { offsets.contains(1) }
         compose.waitForIdle()
-        compose.onNode(hasScrollAction()).performScrollToIndex(124)
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(124)
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("报告-124.md").fetchSemanticsNodes().isNotEmpty()
         }
