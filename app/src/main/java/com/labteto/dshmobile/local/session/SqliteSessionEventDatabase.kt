@@ -384,6 +384,12 @@ class SqliteSessionEventDatabase(
                         put("payload", payload.toString())
                         put("visible_hint", if (isVisibleTranscriptCandidate(event.type, event.data)) 1 else 0)
                     })
+                    // Legacy sessions may be imported after the ordered historical
+                    // backfill cursor passed their IDs. Index their references
+                    // in this same migration transaction so they cannot be lost.
+                    SqliteAssetEventIndex.indexCommittedMessageAssets(
+                        db, sessionId, event.sequence, event.type, payload,
+                    )
                     expected++
                 }
                 check(expected - 1L == historicalLatest) {

@@ -39,7 +39,14 @@ internal fun toolArgumentContractSummary(schema: kotlinx.serialization.json.Json
     val required = (parameters["required"] as? kotlinx.serialization.json.JsonArray)
         ?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }.orEmpty()
     val properties = parameters["properties"] as? kotlinx.serialization.json.JsonObject
-    val fields = properties?.entries.orEmpty().take(12).joinToString("，") { (name, element) ->
+    // Model recovery must see every real schema field, especially a required
+    // field that happens to appear after a large optional property set.
+    // Tool admission has already rejected execution, so no side effect can be retried here.
+    val fields = properties?.entries.orEmpty().sortedWith(
+        compareByDescending<Map.Entry<String, kotlinx.serialization.json.JsonElement>> {
+            it.key in required
+        }.thenBy { it.key },
+    ).joinToString("，") { (name, element) ->
         val detail = element as? kotlinx.serialization.json.JsonObject
         val type = (detail?.get("type") as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
             ?: "schema"

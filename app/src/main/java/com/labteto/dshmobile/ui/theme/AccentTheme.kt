@@ -43,9 +43,9 @@ object AccentPalettes {
 }
 
 /**
- * Keep one readable ink on every actual primary button fill (normal, pressed and
- * gradient). A single per-palette preferred foreground can fail WCAG on several
- * saturated light accents. Preserve the preferred ink when it already passes.
+ * Derive one readable ink from the selected primary hue before tinting the
+ * gradient and hover. This keeps every action fill on the same contrast-safe
+ * side of the luminance range while retaining the user's chosen hue.
  */
 internal fun readableAccentForeground(preferred: Color, fills: List<Color>): Color {
     require(fills.isNotEmpty())
@@ -75,23 +75,18 @@ fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
     val accent = if (dark) palette.darkAccent else palette.lightAccent
     val preferredOn = if (dark) palette.onDark else palette.onLight
     val tertiary = if (dark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.12f)
-    val primaryHover = accent.copy(alpha = 0.85f)
+    // Foreground selection is made against the user's actual hue. Secondary
+    // action fills move slightly *toward* the contrast-safe pole rather than
+    // becoming translucent over a different luminance surface.
+    val on = readableAccentForeground(preferredOn, listOf(accent))
+    val toward = if (on.luminance() < 0.5f) Color.White else Color.Black
+    val primaryHover = lerp(accent, toward, 0.08f)
     // Only light-mode generic hover is accent-tinted; dark generic hover stays neutral.
     val interactionHover = if (dark) this.hover else accent.copy(alpha = 0.06f)
     val interactionPressed = accent.copy(alpha = if (dark) 0.24f else 0.19f)
     val interactionActive = accent.copy(alpha = if (dark) 0.14f else 0.15f)
     // Nudge the first gradient stop away from the accent while preserving foreground contrast.
-    val brandGradientStart = lerp(
-        accent,
-        if (preferredOn.luminance() < 0.5f) Color.White else Color.Black,
-        0.10f,
-    )
-    val on = readableAccentForeground(preferredOn, listOf(
-        accent,
-        brandGradientStart,
-        primaryHover.compositeOver(bgLayer2),
-        primaryHover.compositeOver(bgLayer3),
-    ))
+    val brandGradientStart = lerp(accent, toward, 0.10f)
     val dimmedPrimary = accent.copy(alpha = 0.30f).compositeOver(bgLayer2)
     return copy(
         brandPrimary = brandGradientStart,
