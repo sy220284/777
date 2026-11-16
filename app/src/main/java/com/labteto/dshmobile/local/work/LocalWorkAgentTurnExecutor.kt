@@ -226,12 +226,12 @@ internal class LocalWorkAgentTurnExecutor(
             }
             // Preserve the foreground execution owner across app/page switches AND between
             // model-stream recovery turns. A network outage suspends this live Work task.
-            if (continuation != null && isWorkTransportContinuationCode(continuation.failureCode)) {
+            if (resumedFailureCode != null && isWorkTransportContinuationCode(resumedFailureCode)) {
                 try {
                     awaitWorkTransportRecovery(
                         context = context,
                         baseUrl = selectedRoute.baseUrl,
-                        continuationIndex = continuation.index,
+                        continuationIndex = resumedContinuationIndex,
                         onWaiting = { reason ->
                             binding.state.update { current ->
                                 current.copy(
@@ -249,8 +249,8 @@ internal class LocalWorkAgentTurnExecutor(
                             }
                             runEventLog.append("work/transport-waiting", buildJsonObject {
                                 put("source_message_id", uiSourceMessageId)
-                                put("failure_code", continuation.failureCode)
-                                put("continuation_index", continuation.index)
+                                put("failure_code", resumedFailureCode)
+                                put("continuation_index", resumedContinuationIndex)
                                 put("reason", reason)
                             })
                         },
@@ -262,7 +262,7 @@ internal class LocalWorkAgentTurnExecutor(
                 }
                 runEventLog.append("work/transport-resumed", buildJsonObject {
                     put("source_message_id", uiSourceMessageId)
-                    put("continuation_index", continuation.index)
+                    put("continuation_index", resumedContinuationIndex)
                 })
             }
             val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
@@ -300,7 +300,10 @@ internal class LocalWorkAgentTurnExecutor(
                 )
             } else 1
             val continuationParentRunId = binding.continuationParentRunId
+            val resumedFailureCode = continuation?.failureCode ?: binding.continuationFailureCode
+            val resumedContinuationIndex = continuation?.index ?: binding.automaticContinuationCount
             binding.continuationParentRunId = null
+            binding.continuationFailureCode = null
             val runContext = agentRunCoordinator.start(
                 sessionId = foregroundSessionId,
                 usageMode = runSnapshot.usageMode,
