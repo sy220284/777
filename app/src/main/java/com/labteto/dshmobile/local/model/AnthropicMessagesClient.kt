@@ -959,7 +959,13 @@ internal class AnthropicMessagesClient @Inject constructor(
             message = detail,
             retryable = false,
             requestId = requestId,
-            cause = cause,
+            // Parser exceptions may include complete provider frame contents.
+            cause = cause?.let {
+                IllegalArgumentException("Anthropic SSE protocol parse failure: " + it::class.java.simpleName)
+            },
+            providerCode = "invalid_anthropic_stream_protocol",
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
             origin = LocalModelFailureOrigin.STREAM_PARSE,
         )
 
