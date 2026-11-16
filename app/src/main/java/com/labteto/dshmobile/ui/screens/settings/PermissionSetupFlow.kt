@@ -85,8 +85,12 @@ internal fun PermissionSetupFlow(
                 PermissionSetupFeature.SCREEN_CONTROL -> controller.openAccessibilitySettings()
                 PermissionSetupFeature.NOTIFICATION_READ -> controller.repairNotificationAccess()
                 PermissionSetupFeature.BACKGROUND_EXECUTION -> {
-                    if (forceAppSettings || feature in visited) controller.openAppDetails()
-                    else controller.requestContinuousWorkBatteryExemption()
+                    when {
+                        state.backgroundRestricted -> controller.openAppDetails()
+                        forceAppSettings || feature in visited ->
+                            controller.openBatteryOptimizationSettings()
+                        else -> controller.requestContinuousWorkBatteryExemption()
+                    }
                 }
                 PermissionSetupFeature.TASK_ALERTS -> {
                     if (!forceAppSettings && notificationGrantAction(Build.VERSION.SDK_INT, feature in visited) ==
