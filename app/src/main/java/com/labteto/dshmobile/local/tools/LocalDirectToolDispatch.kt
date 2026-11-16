@@ -4,7 +4,6 @@ import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalRecursiveReadOnlyToolScope
 import com.labteto.dshmobile.local.runtime.SUBAGENT_EXCLUDED_TOOLS
-import com.labteto.dshmobile.local.work.LocalAgentTeamContract
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.local.model.LocalToolCall
@@ -17,6 +16,12 @@ import kotlinx.serialization.json.jsonPrimitive
 
 internal const val DIRECT_TOOL_CALL = "tool_call"
 internal const val DIRECT_TOOL_SEARCH = "tool_search"
+
+/** Shared immutable member-tool contract. Team feature and tool scope consume one source. */
+internal val DIRECT_TEAM_MEMBER_TOOL_NAMES = setOf(
+    "team_send_message", "team_respond_shutdown", "team_ack_message",
+    "team_messages", "team_task_list", "team_task_get", "team_task_update",
+)
 
 /** Resolves the single model-facing call to an exact registered tool invocation. */
 internal fun LocalToolCall.directToolTarget(): LocalToolCall? {
@@ -54,13 +59,13 @@ internal class LocalSubagentExecutionScope(
         // Team members only own their explicitly defined member commands; nested delegation
         // is enabled solely when the runner has acquired the delegation admission.
         if (name in SUBAGENT_EXCLUDED_TOOLS) {
-            val memberTool = capabilities.teamManaged && name in LocalAgentTeamContract.MEMBER_TOOL_NAMES
+            val memberTool = capabilities.teamManaged && name in DIRECT_TEAM_MEMBER_TOOL_NAMES
             val nestedTool = name == "subagent" && canDelegateNested
             if (!memberTool && !nestedTool) return false
         }
         if (capabilities.toolAllowlist != null && name !in capabilities.toolAllowlist) return false
         if (capabilities.teamManaged && tool.exposure == ToolExposure.OPTIONAL &&
-            name !in LocalAgentTeamContract.MEMBER_TOOL_NAMES &&
+            name !in DIRECT_TEAM_MEMBER_TOOL_NAMES &&
             name !in capabilities.initialOptionalTools) return false
         return LocalRecursiveReadOnlyToolScope.permits(name, capabilities)
     }
