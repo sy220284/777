@@ -51,6 +51,11 @@ class OpenAiResponsesClient @Inject constructor(
         // readTimeout still bounds idle sockets; the coroutine cancels the call when work stops.
         .callTimeout(0, TimeUnit.SECONDS)
         .build()
+    // DeepSeek may legitimately keep a thinking request pending for up to ten minutes.
+    // Preserve its established long-request transport window after moving to Responses.
+    private val deepSeekResponsesHttp = modelHttp.newBuilder()
+        .readTimeout(12, TimeUnit.MINUTES)
+        .build()
 
     suspend fun completeStreaming(
         accessToken: String,
@@ -142,7 +147,10 @@ class OpenAiResponsesClient @Inject constructor(
         }
 
         try {
-            withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
+            val requestHttp = if (!planSharing && DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)) {
+                deepSeekResponsesHttp
+            } else modelHttp
+            withCancellableModelResponse(requestHttp.newCall(request), admissionTracker) { response ->
                 val requestId = response.header("x-request-id")
                     ?: response.header("openai-request-id")
                 val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))
