@@ -167,9 +167,7 @@ class ToolRegistry private constructor(
             val function = (schema as? JsonObject)?.get("function") as? JsonObject
             (function?.get("name") as? JsonPrimitive)?.content
         }.toSet()
-        val directChildren = if ("tool_call" in names) registered.filter { (name, tool) ->
-            name != "tool_call" && tool.exposure != ToolExposure.INTERNAL
-        } else emptyMap()
+        // A direct call binds the actual handler at invocation time, not at model sampling.
         val codeModeChildren = if ("code_mode_run" in names || "tool_call" in names) {
             registered.filter { (name, tool) ->
                 name != "code_mode_run" && name != "tool_call" &&
@@ -178,7 +176,7 @@ class ToolRegistry private constructor(
                         (tool.exposure == ToolExposure.OPTIONAL && name in names))
             }
         } else emptyMap()
-        return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren, directChildren)
+        return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren)
     }
     internal fun schemas(): JsonArray = JsonArray(
         tools.snapshot().values
@@ -257,7 +255,7 @@ class ToolRegistry private constructor(
             val codeAllowed = code != null && code.snapshot === sampled &&
                 code.registration === tool && sampled.codeModeChild(name) === tool
             val directAllowed = direct != null && direct.snapshot === sampled &&
-                direct.registration === tool && sampled.directChild(name) === tool
+                direct.registration === tool
             if (!codeAllowed && !directAllowed) return registrationChanged(name)
         }
         validateToolInput(tool, input)?.let { problem ->
