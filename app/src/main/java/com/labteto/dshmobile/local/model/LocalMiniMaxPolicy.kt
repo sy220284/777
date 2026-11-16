@@ -29,6 +29,24 @@ internal object LocalMiniMaxPolicy {
     fun needsLegacyReasoningSplit(model: String): Boolean =
         !model.equals("MiniMax-M3.1-Flash", ignoreCase = true)
 
+    /** M3 Messages video blocks only accept MP4/AVI/MOV/MKV, unlike Kimi's wider list. */
+    fun videoMediaType(name: String, mediaType: String): String? {
+        val extensionType = when (name.substringAfterLast('.', "").lowercase()) {
+            "mp4" -> "video/mp4"
+            "avi" -> "video/x-msvideo"
+            "mov" -> "video/quicktime"
+            "mkv" -> "video/x-matroska"
+            else -> return null
+        }
+        val declared = mediaType.substringBefore(';').trim().lowercase()
+        return extensionType.takeIf { declared in setOf("", "application/octet-stream", extensionType) }
+    }
+
+    fun nativeVideoSupported(model: String, baseUrl: String, protocol: LocalModelProtocol): Boolean =
+        isOfficial(baseUrl) &&
+            protocol == LocalModelProtocol.ANTHROPIC_MESSAGES &&
+            model.lowercase() in setOf("minimax-m3", "minimax-m3.1-flash", "minimax-m3.1-flash-preview")
+
     /** Authentication is rejected by the provider; this is not proof that the header was omitted. */
     fun authenticationFailureHint(): String =
         "MiniMax 鉴权失败（HTTP 401）：服务端拒绝当前 API 密钥。请确认密钥由当前接口对应的官方开放平台签发、仍有效且具有模型调用权限；请勿混用其他产品或套餐凭据。"
