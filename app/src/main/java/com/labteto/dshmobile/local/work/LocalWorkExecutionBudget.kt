@@ -258,10 +258,15 @@ internal fun shouldAutoContinueWorkFailure(
     automaticContinuationCount: Int,
     pendingInputs: Int,
 ): Boolean =
-    com.labteto.dshmobile.local.agent.DEFAULT_AGENT_CONTINUATION_POLICY.allows(
-        error = error,
-        completedContinuations = automaticContinuationCount,
-    ) && pendingInputs == 0
+    pendingInputs == 0 && (
+        // Transport outages must not exhaust a user's task continuation allowance.
+        // Every new request is checkpoint-addressed and paced before admission.
+        isWorkTransportInterruption(error) ||
+            com.labteto.dshmobile.local.agent.DEFAULT_AGENT_CONTINUATION_POLICY.allows(
+                error = error,
+                completedContinuations = automaticContinuationCount,
+            )
+    )
 
 internal class LocalWorkExecutionControl(
     val budget: LocalWorkExecutionBudget = LocalWorkExecutionBudget(),
