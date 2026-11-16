@@ -1,6 +1,8 @@
 """Isolated fake-adb checks for video finalization and automatic rollover."""
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import time
@@ -70,6 +72,21 @@ class VideoTest(unittest.TestCase):
             self.assertGreaterEqual(len(receipt['clips']),2)
             self.assertTrue(all((root/'videos'/x['file']).exists() for x in receipt['clips']))
             self.assertEqual(json.loads((root/'videos'/'manifest.json').read_text())['name'],'main-tour')
+
+
+    def test_cli_preserves_video_when_wrapped_test_fails(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            adb = root / 'adb'
+            adb.write_text(ADB_STUB)
+            adb.chmod(0o755)
+            env = dict(os.environ, FAKE_ADB_STORE=str(root / 'remote'))
+            command = [sys.executable, str(Path(__file__).with_name('device_video.py')),
+                       '--name', 'extension-market', '--output', str(root / 'output'),
+                       '--adb', str(adb), '--', sys.executable, '-c', 'import sys;sys.exit(7)']
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=35)
+            self.assertEqual(result.returncode, 7, result.stderr)
+            self.assertTrue((root / 'output' / 'extension-market' / 'part-001.mp4').exists())
 
 if __name__=='__main__':
     unittest.main()

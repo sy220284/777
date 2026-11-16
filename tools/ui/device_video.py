@@ -131,3 +131,36 @@ class DeviceVideoRecorder:
         if self._errors or not self._clips:
             raise RuntimeError("；".join(self._errors) or "没有录到可播放的 MP4 视频")
         return receipt
+
+
+def main():
+    """Record any other emulator test command, retaining video even when it fails."""
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser(description="录制 Android 模拟器测试全过程")
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--adb", default="adb")
+    parser.add_argument("command", nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    command = args.command[1:] if args.command[:1] == ["--"] else args.command
+    if not command:
+        parser.error("需要提供要执行的测试命令")
+    recorder = DeviceVideoRecorder(args.output / args.name, args.name, adb=args.adb)
+    status = 1
+    video_error = False
+    try:
+        recorder.start()
+        status = subprocess.run(command).returncode
+    finally:
+        try:
+            receipt = recorder.stop()
+            print(f"UI 视频录制完成：{args.name}，{len(receipt['clips'])} 段", flush=True)
+        except Exception as error:
+            video_error = True
+            print(f"UI 视频未完整保存：{error}", file=sys.stderr, flush=True)
+    return status or int(video_error)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
