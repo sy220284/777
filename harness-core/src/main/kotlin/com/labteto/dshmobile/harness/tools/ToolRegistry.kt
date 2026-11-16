@@ -168,11 +168,10 @@ class ToolRegistry private constructor(
             (function?.get("name") as? JsonPrimitive)?.content
         }.toSet()
         // A direct call binds the actual handler at invocation time, not at model sampling.
-        val codeModeChildren = if ("code_mode_run" in names || "tool_call" in names) {
+        val codeModeChildren = if ("code_mode_run" in names && "tool_call" !in names) {
             registered.filter { (name, tool) ->
-                name != "code_mode_run" && name != "tool_call" &&
-                    tool.exposure != ToolExposure.INTERNAL &&
-                    ("tool_call" in names || tool.exposure == ToolExposure.CORE ||
+                name != "code_mode_run" && tool.exposure != ToolExposure.INTERNAL &&
+                    (tool.exposure == ToolExposure.CORE ||
                         (tool.exposure == ToolExposure.OPTIONAL && name in names))
             }
         } else emptyMap()
@@ -253,7 +252,8 @@ class ToolRegistry private constructor(
             val code = currentCoroutineContext()[CodeModeStepScope]
             val direct = currentCoroutineContext()[DirectToolStepScope]
             val codeAllowed = code != null && code.snapshot === sampled &&
-                code.registration === tool && sampled.codeModeChild(name) === tool
+                code.registration === tool &&
+                (sampled.registration("tool_call") != null || sampled.codeModeChild(name) === tool)
             val directAllowed = direct != null && direct.snapshot === sampled &&
                 direct.registration === tool
             if (!codeAllowed && !directAllowed) return registrationChanged(name)
