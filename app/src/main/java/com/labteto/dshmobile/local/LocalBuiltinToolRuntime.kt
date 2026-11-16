@@ -30,6 +30,7 @@ import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runInterruptible
+import com.labteto.dshmobile.local.files.LocalWorkspace
 import com.labteto.dshmobile.local.files.executionLocalWorkspace
 import com.labteto.dshmobile.local.tools.boolean
 import com.labteto.dshmobile.local.tools.int
@@ -152,14 +153,15 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
 
     internal suspend fun executeResult(call: LocalToolCall, allowMutation: Boolean, executionSessionId: String?): com.labteto.dshmobile.harness.tools.ToolResult {
         val workspace = executionLocalWorkspace(this.workspace)
-        val captured = executionSessionId?.let(workRuns::get)?.aggregateSnapshot() ?: runtimeStateStore.state.value
+        val binding = executionSessionId?.let(workRuns::get)
+        val captured = binding?.aggregateSnapshot() ?: runtimeStateStore.state.value
         if (captured.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) return com.labteto.dshmobile.harness.tools.ToolResult(
             "当前处于规划模式，只能检查和制定方案", isError = true, errorCode = "PLAN_MODE_BLOCKED")
         if (call.name in setOf("bash", "run_shell")) {
             require(allowMutation) { "该子任务处于只读模式" }
             return LocalShellTool.executeResult(call.arguments, workspace, jobs, executionSessionId)
         }
-        val output = execute(call, allowMutation, executionSessionId)
+        val output = execute(call, allowMutation, executionSessionId, binding, captured, workspace)
         if (call.name == "apply_patch") {
             val code = when {
                 output.startsWith("[apply_patch][CHECK_FAILED]") -> "PATCH_CHECK_FAILED"
@@ -171,27 +173,25 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         return com.labteto.dshmobile.harness.tools.ToolResult(output)
     }
 
-    internal suspend fun execute(
+    private suspend fun execute(
         call: LocalToolCall,
         allowMutation: Boolean,
         executionSessionId: String?,
+        binding: LocalWorkRunBinding?,
+        state: LocalHarnessState,
+        workspace: LocalWorkspace,
     ): String {
         // Resolve the heavy registry/plugin composition only for tools that use it.
         // Work-owned, file and process built-ins can execute through their direct owners.
         val root by lazy(LazyThreadSafetyMode.NONE) { tools.get() }
-        val workspace = executionLocalWorkspace(this.workspace)
         // Ordinary file, shell and device tools do not construct web or workshop owners.
         val webTools by lazy(LazyThreadSafetyMode.NONE) { root.webTools.atWorkspace(workspace) }
         val extensionWorkshop by lazy(LazyThreadSafetyMode.NONE) {
             if (workspace === this.workspace) this.extensionWorkshop else LocalExtensionWorkshop(workspace)
         }
         val args = call.arguments
-        val binding = executionSessionId?.let(workRuns::get)
-        val state = binding?.aggregateSnapshot() ?: runtimeStateStore.state.value
         val boundSessionId = binding?.sessionId ?: executionSessionId ?: runtimeStateStore.currentSessionId
-        if (state.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
-            return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
-        }
+        // Admission and plan mode were checked once in executeResult; reuse that snapshot.
         // Directly route known Work-owned tools. A shared file/web/device call must not
         // construct the full Work feature (team lifecycle, recovery and archives).
         if (call.name in LOCAL_WORK_BUILTIN_TOOL_NAMES) {
