@@ -13,8 +13,15 @@ import kotlinx.serialization.json.put
 /** Official MiniMax compatibility contract; shared by controls and both wire protocols. */
 internal object LocalMiniMaxPolicy {
     fun isOfficial(baseUrl: String): Boolean = runCatching {
-        URI(normalizeModelBaseUrl(baseUrl)).host?.lowercase() in
-            setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io")
+        val uri = URI(normalizeModelBaseUrl(baseUrl))
+        uri.scheme.equals("https", ignoreCase = true) &&
+            uri.host?.lowercase() in setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io") &&
+            uri.port in setOf(-1, 443) &&
+            uri.userInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
+            uri.path.trimEnd('/') in setOf(
+                "", "/v1", "/v1/models", "/v1/chat/completions",
+                "/anthropic", "/anthropic/v1", "/anthropic/v1/messages",
+            )
     }.getOrDefault(false)
 
     /** Keep existing OpenAI-compatible profiles on /v1; default Anthropic profiles use /anthropic/v1. */
