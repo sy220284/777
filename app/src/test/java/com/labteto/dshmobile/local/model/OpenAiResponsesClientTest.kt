@@ -182,6 +182,27 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun invalidCompletedResponsesOutputFieldTypeIsCorrectable() = runBlocking {
+        val response = """{"type":"response.completed","response":{"status":"completed","id":"resp-wrong-type","output":[{"type":[]}],"usage":{"input_tokens":2,"output_tokens":1}}}"""
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(("data: " + response + "\n\n").toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val error = runCatching {
+            OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "test", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
+                messages = chatPostTurnModelMessages("验证字段"), tools = JsonArray(emptyList()),
+                planSharing = false,
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", error?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, error?.admissionState)
+        assertTrue(error?.continuationEligible == true)
+        assertFalse(error?.retryable ?: true)
+    }
+
+    @Test
     fun malformedResponsesSseFrameEntersInStepProtocolCorrection() = runBlocking {
         val transport = OkHttpClient.Builder().addInterceptor { chain ->
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
