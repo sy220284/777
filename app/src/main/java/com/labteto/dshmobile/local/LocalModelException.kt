@@ -32,4 +32,6 @@ internal class LocalModelException(
     val toolInputIssue: String? = null,
     val toolInputDeltaCount: Int? = null,
     val toolInputChars: Int? = null,
+    /** Eight SHA-256 bytes of the accumulated provider input; never store raw commands. */
+    val toolInputFingerprint: String? = null,
 ) : Exception(message, cause)
