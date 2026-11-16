@@ -123,17 +123,21 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
      */
     private fun verifyLocalReferences(root: File, document: File) {
         val base = root.canonicalFile.toPath()
-        val markdown = document.readText(Charsets.UTF_8)
-        val links = Regex("""\]\((?:\./)?((?:scripts|references|assets)/[^)\s#]+)(?:#[^)]*)?\)""")
-        for (match in links.findAll(markdown)) {
-            val relative = match.groupValues[1]
-            require(relative.split('/').none { it == "." || it == ".." }) {
-                "技能包包含越界资源链接：$relative"
-            }
-            val target = File(root, relative)
-            require(target.canonicalFile.toPath().startsWith(base) &&
-                !Files.isSymbolicLink(target.toPath()) && target.isFile) {
-                "技能包引用的本地文件不存在或不安全：$relative"
+
+        // The installer only needs links; streaming avoids materializing the full
+        // document a second time after front-matter validation.
+        val links = Regex("""]\((?:\./)?((?:scripts|references|assets)/[^)\s#]+)(?:#[^)]*)?\)""")
+        document.forEachLine(Charsets.UTF_8) { line ->
+            for (match in links.findAll(line)) {
+                val relative = match.groupValues[1]
+                require(relative.split('/').none { it == "." || it == ".." }) {
+                    "技能包包含越界资源链接：$relative"
+                }
+                val target = File(root, relative)
+                require(target.canonicalFile.toPath().startsWith(base) &&
+                    !Files.isSymbolicLink(target.toPath()) && target.isFile) {
+                    "技能包引用的本地文件不存在或不安全：$relative"
+                }
             }
         }
     }

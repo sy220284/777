@@ -111,11 +111,30 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         )
     }
 
-    private fun readAuthorizedSkill(name: String): String =
-        if (pinnedInvocations.current().any {
-                it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
-            }) workspace.readSkill(name)
-        else workspace.readModelSkill(name)
+
+    private fun isPinnedSkill(name: String) = pinnedInvocations.current().any {
+        it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
+    }
+
+    private fun readAuthorizedSkill(name: String): String {
+        val rules = if (isPinnedSkill(name)) workspace.readSkillSnapshot(name)
+            else workspace.readModelSkillSnapshot(name)
+        return "[技能主规则：$name；版本=${rules.revision}]\n" +
+            "专项资料调用 skill(name=$name,resource=references/文件.md,revision=${rules.revision}) 按需读取。\n" +
+            rules.text
+    }
+
+    private fun skillRequest(name: String, args: kotlinx.serialization.json.JsonObject): String {
+        val resource = args.optionalString("resource")?.takeIf(String::isNotBlank)
+            ?: return readAuthorizedSkill(name)
+        require(isPinnedSkill(name) || workspace.skillMetadata(name).modelInvocable) {
+            "SKILL_USER_ONLY：此技能仅支持用户主动调用"
+        }
+        return workspace.readSkillResource(
+            name, resource, args.optionalString("revision").orEmpty(),
+            args.int("start_line", 1), args.int("end_line", args.int("start_line", 1) + 199),
+        )
+    }
 
     internal suspend fun executeResult(call: LocalToolCall, allowMutation: Boolean, executionSessionId: String?): com.labteto.dshmobile.harness.tools.ToolResult {
         val workspace = executionLocalWorkspace(this.workspace)
@@ -474,10 +493,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 args.string("kind"), args.string("id"),
                 root.registry.names().toSet(), root.plugins.installedPluginIds().toSet(),
             )
-            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(::readAuthorizedSkill)
+            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let { skillRequest(it, args) }
                 ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
-            "read_skill" -> readAuthorizedSkill(args.string("name"))
+            "read_skill" -> skillRequest(args.string("name"), args)
             "session_search" -> sessionAccess.search(
                 args.string("query"), boundSessionId, args.optionalString("cursor"),
             )

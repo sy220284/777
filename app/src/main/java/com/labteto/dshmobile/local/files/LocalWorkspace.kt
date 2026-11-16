@@ -995,19 +995,51 @@ class LocalWorkspace(
             .sorted()
     }
 
-    /** Full selected rules, verified with one byte read and one freshness check. */
-    fun readSkill(name: String): String {
+
+    /** One observed rules revision drives the core and on-demand references. */
+    internal data class SkillRuleSnapshot(val text: String, val revision: String)
+
+    fun readSkill(name: String): String = readSkillSnapshot(name).text
+
+    internal fun readSkillSnapshot(name: String): SkillRuleSnapshot {
         val file = skillFile(name)
-        // Hash the same bytes that are decoded into model guidance: avoid a
-        // separate full-file pre-hash on every step while still detecting
-        // concurrent modification before returning the rules.
-        val contentBytes = file.readBytes()
-        val readHash = MessageDigest.getInstance("SHA-256").digest(contentBytes)
-            .joinToString("") { "%02x".format(it) }
+        val bytes = file.readBytes()
+        val readHash = MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
         val after = fingerprint(file)
         require(readHash == after) { "技能在读取过程中发生变化，请重新加载" }
         observations.put(file.path, after)
-        return String(contentBytes, Charsets.UTF_8).removePrefix("\uFEFF")
+        return SkillRuleSnapshot(String(bytes, Charsets.UTF_8).removePrefix("\uFEFF"), "sha256:$after")
+    }
+
+    /** Third disclosure layer: page only the resource named by the activated skill. */
+    internal fun readSkillResource(
+        name: String, resource: String, skillRevision: String,
+        startLine: Int = 1, endLine: Int = startLine + 199,
+    ): String {
+        val rulesFile = skillFile(name)
+        val segments = resource.split('/')
+        require(segments.size >= 2 &&
+            segments.first() in setOf("references", "scripts", "assets") &&
+            segments.all { it.isNotBlank() && it != "." && it != ".." && '\\' !in it }) {
+            "技能资料路径应位于 references/、scripts/ 或 assets/ 文件夹"
+        }
+        var target = rulesFile.parentFile
+        for (segment in segments) {
+            target = File(target, segment)
+            require(!Files.isSymbolicLink(target.toPath())) { "技能资料路径包含符号链接" }
+        }
+        require(target.isFile && target.canonicalFile.toPath().startsWith(
+            rulesFile.parentFile.canonicalFile.toPath())) { "技能资料不存在：$resource" }
+        val current = "sha256:" + fingerprint(rulesFile)
+        require(skillRevision == current) {
+            "技能规则已更新：$name，请先重新读取 SKILL.md 后再加载专项资料"
+        }
+        val page = read(".dsh/skills/$name/$resource", startLine, endLine)
+        check("sha256:" + fingerprint(rulesFile) == current) {
+            "读取专项资料时技能规则发生变化，请重新读取技能"
+        }
+        return "[技能专项资料：$name/$resource；主规则版本=$current]\n$page"
     }
 
     /** Catalogs only need front matter; one unreadable skill cannot disable all other skills. */
@@ -1092,12 +1124,14 @@ class LocalWorkspace(
     }
 
     /** Model tool access must respect user-only metadata; direct user access remains unchanged. */
-    fun readModelSkill(name: String): String {
-        val content = readSkill(name)
-        require(parseLocalSkillMetadata(name.trim(), content).modelInvocable) {
+    fun readModelSkill(name: String): String = readModelSkillSnapshot(name).text
+
+    internal fun readModelSkillSnapshot(name: String): SkillRuleSnapshot {
+        val rules = readSkillSnapshot(name)
+        require(parseLocalSkillMetadata(name.trim(), rules.text).modelInvocable) {
             "SKILL_USER_ONLY：此技能仅支持用户主动调用"
         }
-        return content
+        return rules
     }
 
     /** Validate a deliverable before the model presents it. */

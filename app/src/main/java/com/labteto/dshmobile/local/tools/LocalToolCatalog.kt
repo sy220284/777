@@ -250,10 +250,15 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("question")))
-        add(tool("skill", "列出可由模型调用的技能（支持分页和任务关键词），或读取指定技能的 SKILL.md", properties(
-            "name" to string("可选；填写后精确读取技能规则"),
-            "query" to string("可选；按当前任务内容优先展示相关技能；分页时保持一致"),
-            "offset" to integer("可选；继续上次技能目录的 offset，默认 0"),
+
+        add(tool("skill", "三级渐进技能加载：目录只含元数据，选中后读取 SKILL.md，专项资料在引用时按行读取", properties(
+            "name" to string("可选；读取指定技能的完整核心规则"),
+            "query" to string("可选；目录查询"),
+            "offset" to integer("可选；目录续读游标"),
+            "resource" to string("可选；SKILL.md 所引用的 references/、scripts/ 或 assets/ 内相对路径"),
+            "revision" to string("读取 SKILL.md 得到的 sha256 规则版本；专项资料读取时必填"),
+            "start_line" to integer("专项资料起始行，默认 1"),
+            "end_line" to integer("专项资料结束行，默认读取 200 行"),
         )))
         add(tool("skill_create", "将技能直接写入工作区、安装到真实技能目录并读取校验；不会自动证明执行效果", properties(
             "id" to string("英文技能标识"),
