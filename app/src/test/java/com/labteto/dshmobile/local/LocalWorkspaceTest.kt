@@ -17,6 +17,50 @@ import org.junit.Before
 import org.junit.Test
 
 class LocalWorkspaceTest {
+    @Test
+    fun progressiveSkillCatalogCoreAndReferencesAreLoadedSeparately() {
+        workspace.write(".dsh/skills/android-audit/SKILL.md", """
+            |---
+            |name: android-audit
+            |description: 审计 Android 项目
+            |---
+            |# 核心流程
+            |涉及历史升级时阅读 references/sqlite.md
+        """.trimMargin())
+        workspace.write(".dsh/skills/android-audit/references/sqlite.md",
+            "第一节 数据库事务\n第二节 V6 迁移\n第三节 历史回填")
+        val catalog = workspace.modelSkillCatalog()
+        assertTrue(catalog.contains("android-audit"))
+        assertFalse(catalog.contains("第三节 历史回填"))
+        val rules = workspace.readSkillSnapshot("android-audit")
+        assertTrue(rules.revision.startsWith("sha256:"))
+        assertTrue(rules.text.contains("references/sqlite.md"))
+        assertFalse(rules.text.contains("第三节 历史回填"))
+        val page = workspace.readSkillResource(
+            "android-audit", "references/sqlite.md", rules.revision, 2, 2,
+        )
+        assertTrue(page.contains("第二节 V6 迁移"))
+        assertFalse(page.contains("第三节 历史回填"))
+        workspace.write(".dsh/skills/android-audit/SKILL.md", rules.text + "\n规则更新")
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.readSkillResource("android-audit", "references/sqlite.md", rules.revision)
+        }
+    }
+
+    @Test
+    fun skillResourcesCannotCrossSkillOwnership() {
+        workspace.write(".dsh/skills/my-audit/SKILL.md",
+            "---\nname: my-audit\ndescription: Test\n---\n# Test")
+        val revision = workspace.readSkillSnapshot("my-audit").revision
+        workspace.write(".dsh/skills/other-audit/references/x.md", "other skill")
+        for (resource in listOf("../other-audit/references/x.md",
+            "references/../x.md", "/etc/passwd", "SKILL.md")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                workspace.readSkillResource("my-audit", resource, revision)
+            }
+        }
+    }
+
     @Test fun interruptedFilenameSearchStopsAndAllowsFreshSearch() {
         workspace.write("命中.txt", "内容")
         try {

@@ -86,6 +86,19 @@ class LocalSkillPackageImporterTest {
             assertTrue(root.resolve(".dsh/skills/sample-skill/scripts/verify.py").isFile)
         }
 
+    @Test fun largeReferencedSkillCanBeInstalledWithoutWholeDocumentLinkAllocation() =
+        runInWorkspace { importer, workspace, root ->
+            val body = example + "\n" + "审计说明".repeat(60_000) +
+                "\n[专项规则](references/verified.md)\n"
+            val zipped = archive(
+                "SKILL.md" to body.toByteArray(),
+                "references/verified.md" to "单独查阅的资料".toByteArray(),
+            )
+            assertEquals("sample-skill", importer.install("large-referenced.zip", zipped))
+            assertTrue(workspace.readSkill("sample-skill").contains("审计说明"))
+            assertTrue(root.resolve(".dsh/skills/sample-skill/references/verified.md").isFile)
+        }
+
     @Test fun rejectsTraversalAndDoesNotExposePartialSkill() = runInWorkspace { importer, workspace, root ->
         val zipped = archive(
             "pkg/SKILL.md" to example.toByteArray(),

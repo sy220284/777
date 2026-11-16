@@ -38,7 +38,7 @@ internal fun resolveLocalWorkSkillGuidance(
     // instruction and make a user-pinned skill behave differently on each turn.
 
     val pinnedSkillInstructions = pinnedSkills.joinToString("\n\n") { (name, rules) ->
-        "[已固定技能：$name；规则版本=${rules.revision}]\n" +
+        "[已固定技能：$name]\n[技能规则版本：${rules.revision}]\n" +
             "按需调用 skill(name=$name, resource=相对路径, revision=${rules.revision}) 加载专项资料。\n" +
             rules.text + "\n[技能结束]"
     }
