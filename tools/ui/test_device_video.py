@@ -1,0 +1,75 @@
+"""Isolated fake-adb checks for video finalization and automatic rollover."""
+import json
+import os
+from pathlib import Path
+import tempfile
+import time
+import unittest
+from device_video import DeviceVideoRecorder
+
+ADB_STUB = r'''#!/usr/bin/env python3
+import os,sys,time,signal,shutil
+from pathlib import Path
+store=Path(os.environ['FAKE_ADB_STORE']);store.mkdir(exist_ok=True)
+args=sys.argv[1:]
+if args[:2]==['shell','-n']:args=args[2:]
+if args[0]=='mkdir':sys.exit(0)
+if args[0]=='pidof':
+ f=store/'pid'
+ if f.exists():
+  try:os.kill(int(f.read_text()),0);print(f.read_text());sys.exit(0)
+  except ProcessLookupError:pass
+ sys.exit(1)
+if args[0]=='kill':
+ try:os.kill(int(args[-1]),signal.SIGINT)
+ except ProcessLookupError:pass
+ sys.exit(0)
+if args[0]=='screenrecord':
+ dest=store/Path(args[-1]).name
+ quitting=False
+ def stop(sig,frame):
+  global quitting
+  quitting=True
+ signal.signal(signal.SIGINT,stop)
+ (store/'pid').write_text(str(os.getpid()))
+ end=time.monotonic()+float(args[2])*.01
+ while not quitting and time.monotonic()<end:time.sleep(.025)
+ dest.write_bytes(b'\0\0\0\x18ftypisom'+b'0'*1024)
+ (store/'pid').unlink(missing_ok=True)
+ sys.exit(0)
+if args[0]=='pull':shutil.copyfile(store/Path(args[1]).name, args[2]);sys.exit(0)
+if args[0]=='rm':(store/Path(args[-1]).name).unlink(missing_ok=True);sys.exit(0)
+raise Exception(args)
+'''
+
+class VideoTest(unittest.TestCase):
+    def setup_recorder(self, root, **kwargs):
+        adb=root/'adb'
+        adb.write_text(ADB_STUB)
+        adb.chmod(0o755)
+        os.environ['FAKE_ADB_STORE']=str(root/'remote')
+        return DeviceVideoRecorder(root/'videos','main-tour',adb=str(adb),**kwargs)
+
+    def test_early_stop_finalizes_mp4(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            rec=self.setup_recorder(root)
+            rec.start()
+            time.sleep(.1)
+            receipt=rec.stop()
+            self.assertEqual(len(receipt['clips']),1)
+            self.assertTrue((root/'videos'/'part-001.mp4').exists())
+
+    def test_long_journey_rolls_over_and_keeps_all_parts(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            rec=self.setup_recorder(root,seconds=30)
+            rec.start()
+            time.sleep(1.2)
+            receipt=rec.stop()
+            self.assertGreaterEqual(len(receipt['clips']),2)
+            self.assertTrue(all((root/'videos'/x['file']).exists() for x in receipt['clips']))
+            self.assertEqual(json.loads((root/'videos'/'manifest.json').read_text())['name'],'main-tour')
+
+if __name__=='__main__':
+    unittest.main()
