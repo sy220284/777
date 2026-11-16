@@ -50,7 +50,10 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: python3 tools/ui/device_video.py --name extension-market --output app/build/outputs/ui-audit/videos -- ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest,com.labteto.dshmobile.local.tools.LocalMcpCredentialStoreAndroidTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthCallbackAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerCallerAndroidTest --stacktrace --console=plain
+          script: |
+          set -e
+          ./gradlew --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --console=plain
+          python3 tools/ui/device_video.py --name extension-market --output app/build/outputs/ui-audit/videos -- ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest,com.labteto.dshmobile.local.tools.LocalMcpCredentialStoreAndroidTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthCallbackAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerCallerAndroidTest --stacktrace --console=plain
       - name: 输出失败用例与断言
         if: failure()
         run: |
