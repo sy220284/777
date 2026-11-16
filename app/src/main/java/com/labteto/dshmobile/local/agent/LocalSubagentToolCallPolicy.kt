@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import com.labteto.dshmobile.local.tools.DIRECT_TOOL_CALL
+import com.labteto.dshmobile.local.tools.DIRECT_TEAM_MEMBER_TOOL_NAMES
 import com.labteto.dshmobile.local.tools.DIRECT_TOOL_SEARCH
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -16,6 +17,7 @@ internal class LocalSubagentToolCallPolicy(
     private val virtualScreenId: String?,
     private val stepSurface: LocalModelToolStepSurface,
     private val allowedTools: Set<String>? = null,
+    private val teamManaged: Boolean = false,
 ) {
     fun rejection(call: AgentToolCall, target: AgentToolCall = call): AgentToolResult? {
         val virtualAllowed =
@@ -23,6 +25,10 @@ internal class LocalSubagentToolCallPolicy(
         val requestedScreen = (target.arguments["id"] as? JsonPrimitive)?.contentOrNull
         return when {
             !stepSurface.allows(call.name) -> stepSurface.hiddenCallResult(call.name)
+            teamManaged && target.name.startsWith("team_") &&
+                target.name !in DIRECT_TEAM_MEMBER_TOOL_NAMES ->
+                blocked("团队成员仅可使用成员级命令：" + target.name,
+                    "TEAM_MEMBER_TOOL_SCOPE_BLOCKED", "请由 Lead 执行团队管理操作。")
             allowedTools != null && call.name != DIRECT_TOOL_SEARCH &&
                 !(call.name == DIRECT_TOOL_CALL && target.name == DIRECT_TOOL_CALL) &&
                 target.name !in allowedTools ->
