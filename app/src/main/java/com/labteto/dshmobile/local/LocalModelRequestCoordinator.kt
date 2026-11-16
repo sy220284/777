@@ -736,12 +736,15 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             )
                         }).sequence
                     }
-                    val activePressure = LocalPromptPressureMeter.measure(
-                        messages = activeMessages,
-                        tools = tools,
-                        operationalLimitTokens = operationalLimit,
-                        modelContextWindowTokens = pressure.modelContextWindowTokens,
-                    )
+                    // A normal attempt sends the already measured request surface.
+                    // Only context-overflow recovery replaces messages and needs a new estimate.
+                    val activePressure = if (activeMessages === requestMessages) pressure else
+                        LocalPromptPressureMeter.measure(
+                            messages = activeMessages,
+                            tools = tools,
+                            operationalLimitTokens = operationalLimit,
+                            modelContextWindowTokens = pressure.modelContextWindowTokens,
+                        )
                     val deepSeekMaxTokens = if (
                         runSurface.protocol == com.labteto.dshmobile.local.model.LocalModelProtocol.CHAT_COMPLETIONS
                     ) {
