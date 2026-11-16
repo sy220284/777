@@ -102,7 +102,18 @@ class MainPagesAuditTourTest {
             captureUiAudit(compose, "main-task-editor-keyboard")
             Espresso.pressBack()
             captureUiAudit(compose, "main-task-editor-keyboard-dismissed")
-            back()
+            // A Back press while editing can first dismiss the IME. Ensure the
+            // editor's own Back action is exercised before leaving the task page.
+            val taskRootAction = text(R.string.tasks_new)
+            if (compose.onAllNodesWithContentDescription(taskRootAction)
+                    .fetchSemanticsNodes().isEmpty()) {
+                compose.onNodeWithContentDescription(text(R.string.common_back)).performClick()
+            }
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithContentDescription(taskRootAction)
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            captureUiAudit(compose, "main-task-editor-closed")
         }
         page(R.string.tools_title, "main-tools") {
             compose.onNodeWithText(text(R.string.skills_title)).performClick()
