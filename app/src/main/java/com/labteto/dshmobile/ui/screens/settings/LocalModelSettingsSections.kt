@@ -57,6 +57,7 @@ import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.local.model.LocalModelProtocolRoutePolicy
+import com.labteto.dshmobile.local.model.LocalKimiPolicy
 import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -375,10 +376,11 @@ internal fun LocalModelSettingsCard(
                     )
                     if (!errors.valid) {
                         testStatus = errors.model ?: errors.baseUrl ?: errors.apiKey
-                    } else if (selectedPreset?.provider == "Kimi Code" &&
-                        selectedPreset.model in setOf("k3", "k3.1-pro") &&
+                    } else if (LocalKimiPolicy.supportsContextChoice(model, baseUrl) &&
                         contextWindowTokens.isNotBlank() &&
-                        contextWindowTokens.toIntOrNull() !in setOf(262_144, 1_048_576)
+                        contextWindowTokens.toIntOrNull()?.let {
+                            it in LocalKimiPolicy.selectableContextTokens
+                        } != true
                     ) {
                         testStatus = kimiK3ContextInvalid
                     } else {
@@ -486,15 +488,19 @@ internal fun LocalModelSettingsCard(
                                 color = colors.textTertiary,
                             )
                         }
-                        if (preset.provider == "Kimi Code" && preset.model in setOf("k3", "k3.1-pro")) {
+                        if (LocalKimiPolicy.supportsContextChoice(model, baseUrl)) {
                             SySegmented(
                                 segments = listOf(
                                     SySegment("default", "256K · 默认"),
-                                    SySegment("1048576", "1M · 会员"),
+                                    SySegment(LocalKimiPolicy.extendedContextTokens.toString(), "1M · 会员"),
                                 ),
-                                selectedKey = if (contextWindowTokens == "1048576") "1048576" else "default",
+                                selectedKey = if (contextWindowTokens ==
+                                    LocalKimiPolicy.extendedContextTokens.toString()) {
+                                    LocalKimiPolicy.extendedContextTokens.toString()
+                                } else "default",
                                 onSelect = { choice ->
-                                    contextWindowTokens = if (choice == "1048576") choice else ""
+                                    contextWindowTokens = if (choice ==
+                                        LocalKimiPolicy.extendedContextTokens.toString()) choice else ""
                                     editorGeneration++
                                     testStatus = null
                                 },
