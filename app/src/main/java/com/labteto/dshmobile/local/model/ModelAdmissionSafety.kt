@@ -129,7 +129,13 @@ internal fun LocalModelException.withoutReplayAfterAdmission(): LocalModelExcept
 
 /** Stable release-safe diagnostic category; never depends on R8 class names. */
 internal fun modelFailureKind(error: LocalModelException): String = when {
-    error.code == "ANTHROPIC_TOOL_ARGUMENTS_INVALID" -> "tool_arguments_invalid"
+    error.code == "ANTHROPIC_TOOL_ARGUMENTS_INVALID" ||
+        error.providerCode in setOf("invalid_tool_arguments", "duplicate_tool_call_id") -> "tool_arguments_invalid"
+    error.code == "MODEL_EMPTY_RESPONSE" -> "model_empty_response"
+    error.code in setOf(
+        "ANTHROPIC_PROTOCOL_ERROR", "MODEL_STREAM_PROTOCOL",
+        "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR",
+    ) && error.admissionState == LocalModelAdmissionState.ADMITTED -> "provider_protocol_invalid"
     error.code == "WORK_BUDGET_EXHAUSTED" -> "local_budget"
     error.code in setOf("MODEL_CREDENTIAL_MISSING", "NO_MODEL_CREDENTIAL") -> "credential_missing"
     error.code.startsWith("CHATGPT_PLAN_") && (
