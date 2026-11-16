@@ -41,7 +41,7 @@ internal fun ExtensionCatalogCard(
     accent: Color,
     documentIcon: Int? = null,
     brandLogo: ImageBitmap? = null,
-    statusLabel: String = "",
+    marketState: ExtensionMarketState? = null,
     enabled: Boolean = true,
     tagPrefix: String = "plugin-inventory",
     onOpen: () -> Unit,
@@ -101,19 +101,21 @@ internal fun ExtensionCatalogCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (statusLabel.isNotBlank()) {
+                marketState?.let { state ->
                     Text(
-                        statusLabel,
+                        state.label,
                         modifier = Modifier.testTag("$tagPrefix-status-$id"),
                         style = DsType.caption11.withReadingWeight(),
-                        color = when {
-                            statusLabel.contains("失败") || statusLabel.contains("异常") ||
-                                statusLabel.contains("冲突") -> colors.dangerInk
-                            statusLabel.contains("待") || statusLabel.contains("需要") ||
-                                statusLabel.contains("不可") -> colors.warningInk
-                            statusLabel.contains("已安装") || statusLabel.contains("已连接") ||
-                                statusLabel.contains("已内置") -> colors.successInk
-                            else -> colors.textSecondary
+                        color = when (state.status) {
+                            ExtensionMarketStatus.FAILED -> colors.dangerInk
+                            ExtensionMarketStatus.NEEDS_SETUP,
+                            ExtensionMarketStatus.UNSUPPORTED -> colors.warningInk
+                            ExtensionMarketStatus.INSTALLED,
+                            ExtensionMarketStatus.BUILTIN,
+                            ExtensionMarketStatus.REGISTERED -> colors.successInk
+                            ExtensionMarketStatus.INSTALLABLE,
+                            ExtensionMarketStatus.MANUAL_ONLY,
+                            ExtensionMarketStatus.CONNECTING -> colors.textSecondary
                         },
                     )
                 }
