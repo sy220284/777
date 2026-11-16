@@ -579,6 +579,23 @@ object LocalModelPresets {
         find(model, baseUrl)?.capabilities ?: setOf(LocalModelCapability.TEXT)
 
     /** Capabilities actually encoded by this client's current request/response transports. */
+    /** Settings consumes this Model-owned editing projection instead of provider internals. */
+    fun editorProtocolsFor(model: String, baseUrl: String): List<LocalModelProtocol> =
+        LocalModelProtocolRoutePolicy.supportedProtocols(model, baseUrl)
+
+    fun editorBaseUrlForProtocol(
+        model: String, baseUrl: String, protocol: LocalModelProtocol,
+    ): String = LocalModelProtocolRoutePolicy.baseUrlFor(model, baseUrl, protocol)
+
+    fun editorRequestEndpointFor(
+        model: String, baseUrl: String, protocol: LocalModelProtocol,
+    ): String = LocalModelProtocolRoutePolicy.requestEndpoint(model, baseUrl, protocol)
+
+    fun editorContextWindowOptionsFor(model: String, baseUrl: String): List<Int> =
+        if (LocalKimiPolicy.supportsContextChoice(model, baseUrl)) {
+            LocalKimiPolicy.selectableContextTokens.sorted()
+        } else emptyList()
+
     /** Official aliases and alternate documented protocol roots remain editable as a preset. */
     fun editablePresetFor(model: String, baseUrl: String): LocalModelPreset? {
         val resolved = find(model, baseUrl) ?: return null
