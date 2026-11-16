@@ -176,7 +176,9 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         allowMutation: Boolean,
         executionSessionId: String?,
     ): String {
-        val root = tools.get()
+        // Resolve the heavy registry/plugin composition only for tools that use it.
+        // Work-owned, file and process built-ins can execute through their direct owners.
+        val root by lazy(LazyThreadSafetyMode.NONE) { tools.get() }
         val workspace = executionLocalWorkspace(this.workspace)
         // Ordinary file, shell and device tools do not construct web or workshop owners.
         val webTools by lazy(LazyThreadSafetyMode.NONE) { root.webTools.atWorkspace(workspace) }
