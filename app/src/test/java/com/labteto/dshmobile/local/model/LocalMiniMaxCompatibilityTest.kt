@@ -25,6 +25,12 @@ class LocalMiniMaxCompatibilityTest {
                 assertEquals(true, LocalModelPresets.documentedImageInputSupport("MiniMax-M3.1-Flash", base))
                 assertEquals(204_800, LocalModelPresets.find("MiniMax-M2.5", base)?.contextWindowTokens)
                 assertEquals(false, LocalModelPresets.documentedImageInputSupport("MiniMax-M2.7", base))
+                for (legacy in listOf("MiniMax-M2.7", "MiniMax-M2.7-highspeed")) {
+                    val retained = requireNotNull(LocalModelPresets.find(legacy, base))
+                    assertEquals(base, retained.baseUrl)
+                    assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, retained.protocol)
+                    assertEquals(204_800, retained.contextWindowTokens)
+                }
                 assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", base))
             }
         }
