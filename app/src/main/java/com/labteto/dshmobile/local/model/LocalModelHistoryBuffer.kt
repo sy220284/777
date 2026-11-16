@@ -31,8 +31,7 @@ internal class LocalModelHistoryBuffer {
 
     fun append(message: JsonObject) {
         messages += message
-        encodedChars += measureChars(message)
-        estimatedTokens += measureTokens(message)
+        addMetrics(message)
     }
 
     fun prepend(message: JsonObject) {
@@ -41,19 +40,16 @@ internal class LocalModelHistoryBuffer {
 
     fun insert(index: Int, message: JsonObject) {
         messages.add(index, message)
-        encodedChars += measureChars(message)
-        estimatedTokens += measureTokens(message)
+        addMetrics(message)
     }
 
     fun replaceSystem(message: JsonObject) {
         require(messages.firstOrNull()?.get("role")?.jsonPrimitive?.contentOrNull == "system") {
             "模型历史首条消息不是 system"
         }
-        encodedChars -= measureChars(messages[0])
-        estimatedTokens -= measureTokens(messages[0])
+        addMetrics(messages[0], -1)
         messages[0] = message
-        encodedChars += measureChars(message)
-        estimatedTokens += measureTokens(message)
+        addMetrics(message)
     }
 
     fun reset(values: List<JsonObject> = emptyList()) {
@@ -63,11 +59,21 @@ internal class LocalModelHistoryBuffer {
     }
 
     private fun recalculateMetrics() {
-        encodedChars = messages.sumOf(::measureChars)
-        estimatedTokens = messages.sumOf(::measureTokens)
+        var chars = 0
+        var tokens = 0
+        messages.forEach { message ->
+            val encoded = message.toString()
+            chars += encoded.length
+            tokens += estimateModelTokens(encoded)
+        }
+        encodedChars = chars
+        estimatedTokens = tokens
     }
 
-    private fun measureChars(message: JsonObject): Int = message.toString().length
-
-    private fun measureTokens(message: JsonObject): Int = estimateModelTokens(message.toString())
+    private fun addMetrics(message: JsonObject, sign: Int = 1) {
+        // Serialize once, not once for the character count and again for tokens.
+        val encoded = message.toString()
+        encodedChars += sign * encoded.length
+        estimatedTokens += sign * estimateModelTokens(encoded)
+    }
 }
