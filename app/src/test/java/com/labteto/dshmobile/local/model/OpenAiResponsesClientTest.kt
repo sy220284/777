@@ -2021,6 +2021,59 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun deepSeekNativeCustomPatchMaintainsExecutionAndContinuationIdentity() {
+        val advertised = Json.parseToJsonElement(
+            """[{"type":"function","function":{"name":"apply_patch","description":"应用补丁",
+            "parameters":{"type":"object","properties":{"patch":{"type":"string"}},
+            "required":["patch"]}}}]"""
+        ).jsonArray
+        val patch = "*** Begin Patch\n*** Add File: a.txt\n+hello\n*** End Patch"
+        val payload = client.buildPayload(
+            model = "deepseek-v4-pro",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "写文件") }),
+            tools = advertised, temperature = null, planSharing = false,
+            includeEncryptedReasoning = false, openAiExtensions = false,
+            deepSeekCustomPatch = true,
+        )
+        val native = payload["tools"]!!.jsonArray.single().jsonObject
+        assertEquals("custom", native["type"]!!.jsonPrimitive.content)
+        assertEquals("apply_patch", native["name"]!!.jsonPrimitive.content)
+        assertEquals("text", native["format"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+
+        val completed = Json.parseToJsonElement(
+            """{"id":"native-patch-1","status":"completed","output":[
+                {"type":"custom_tool_call","call_id":"patch-1","name":"apply_patch",
+                 "input":"*** Begin Patch\\n*** Add File: a.txt\\n+hello\\n*** End Patch"}
+            ]}"""
+        ).jsonObject
+        val reply = client.parseCompleted(completed, TokenPromptBreakdown())
+        assertEquals("apply_patch", reply.toolCalls.single().name)
+        assertEquals("patch-1", reply.toolCalls.single().id)
+        assertEquals(patch, reply.toolCalls.single().arguments["patch"]!!.jsonPrimitive.content)
+        val result = buildJsonObject {
+            put("role", "tool"); put("tool_call_id", "patch-1"); put("content", "补丁已应用")
+        }
+        val continuation = client.buildPayload(
+            model = "deepseek-v4-pro",
+            messages = listOf(reply.message, result), tools = advertised,
+            temperature = null, planSharing = false, includeEncryptedReasoning = false,
+            deepSeekCustomPatch = true, openAiExtensions = false,
+        )
+        val history = continuation["input"]!!.jsonArray
+        assertEquals("custom_tool_call", history[0].jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("custom_tool_call_output", history[1].jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("patch-1", history[1].jsonObject["call_id"]!!.jsonPrimitive.content)
+        val otherProvider = client.buildPayload(
+            model = "k3", messages = listOf(buildJsonObject {
+                put("role", "user"); put("content", "写文件")
+            }), tools = advertised, temperature = null, planSharing = false,
+            includeEncryptedReasoning = false, deepSeekCustomPatch = false,
+        )
+        assertEquals("function", otherProvider["tools"]!!.jsonArray.single().jsonObject
+            ["type"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun nonOpenAiResponsesOmitVendorOnlyOptions() {
         val payload = client.buildPayload(
             model = "deepseek-flash",
