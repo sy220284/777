@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
+import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -12,6 +14,15 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 internal class LocalModelHistoryBuffer {
     private val messages = mutableListOf<JsonObject>()
+    private var latestWorkCheckpointIndex = -1
+
+    private fun isWorkCheckpoint(message: JsonObject): Boolean =
+        isTrustedContextCheckpointModelMessage(message, LocalContextCheckpointKind.WORK)
+
+    private fun rebuildWorkCheckpointIndex() {
+        latestWorkCheckpointIndex = messages.indices.reversed()
+            .firstOrNull { isWorkCheckpoint(messages[it]) } ?: -1
+    }
 
     @Volatile
     var encodedChars: Int = 0
@@ -26,20 +37,15 @@ internal class LocalModelHistoryBuffer {
     fun snapshot(): List<JsonObject> = messages.toList()
 
     /**
-     * Read only the live reference window without copying all historical messages.
-     * A trusted checkpoint can precede the recent tail after a long Work session.
-     * Include only the newest matching checkpoint; older checkpoints are superseded.
+     * Read the bounded recent tail and the newest trusted Work checkpoint.
+     * Mutation maintains its index so each tool receipt avoids rescanning history.
      */
-    fun recentWithLatestMatching(
-        limit: Int,
-        matches: (JsonObject) -> Boolean,
-    ): List<JsonObject> {
+    fun recentWithLatestWorkCheckpoint(limit: Int): List<JsonObject> {
         require(limit >= 0) { "最近历史窗口长度不能为负" }
         val start = (messages.size - limit).coerceAtLeast(0)
-        val checkpointIndex = messages.indices.reversed().firstOrNull { matches(messages[it]) }
         return buildList {
-            if (checkpointIndex != null && checkpointIndex < start) {
-                add(messages[checkpointIndex])
+            if (latestWorkCheckpointIndex in 0 until start) {
+                add(messages[latestWorkCheckpointIndex])
             }
             addAll(messages.subList(start, messages.size))
         }
@@ -53,6 +59,7 @@ internal class LocalModelHistoryBuffer {
 
     fun append(message: JsonObject) {
         messages += message
+        if (isWorkCheckpoint(message)) latestWorkCheckpointIndex = messages.lastIndex
         addMetrics(message)
     }
 
@@ -62,6 +69,10 @@ internal class LocalModelHistoryBuffer {
 
     fun insert(index: Int, message: JsonObject) {
         messages.add(index, message)
+        if (latestWorkCheckpointIndex >= index) latestWorkCheckpointIndex++
+        if (isWorkCheckpoint(message) && index > latestWorkCheckpointIndex) {
+            latestWorkCheckpointIndex = index
+        }
         addMetrics(message)
     }
 
@@ -71,12 +82,14 @@ internal class LocalModelHistoryBuffer {
         }
         addMetrics(messages[0], -1)
         messages[0] = message
+        rebuildWorkCheckpointIndex()
         addMetrics(message)
     }
 
     fun reset(values: List<JsonObject> = emptyList()) {
         messages.clear()
         messages += values
+        rebuildWorkCheckpointIndex()
         recalculateMetrics()
     }
 

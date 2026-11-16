@@ -104,6 +104,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -314,15 +315,26 @@ class ToolsViewModel @Inject constructor(
                 .collect { _capabilityRevision.value += 1L }
         }
         viewModelScope.launch {
-            localTools.skillChanges().collectLatest {
-                // A directory may be created just before its SKILL.md is written.
+            // Only real inventory changes reload the affected page state.
+            // Switching tabs continues to reuse the current snapshot.
+            merge(localTools.skillChanges(), localTools.serverChanges()).collectLatest {
+                // A skill directory can be created before SKILL.md is written.
                 delay(220)
                 operationGate.run {
+                    val servers = localTools.servers()
                     val skills = localTools.installedSkills()
                     val presets = localTools.presetSkills()
+                    val plugins = localTools.installedPluginIds()
+                    val activeHookIds = localTools.activeToolHookIds()
+                    val githubConfigured = localTools.githubConfigured()
                     val activeIds = skills.map { it.name }.toSet()
                     _state.value = _state.value.copy(
-                        skills = skills, presets = presets,
+                        servers = servers,
+                        skills = skills,
+                        presets = presets,
+                        localPlugins = plugins,
+                        activeToolHookIds = activeHookIds,
+                        githubConfigured = githubConfigured,
                         pendingSkillUpdates = _state.value.pendingSkillUpdates.filterKeys { it in activeIds },
                         upToDateSkills = _state.value.upToDateSkills.filterTo(mutableSetOf()) { it in activeIds },
                     )

@@ -1,8 +1,6 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
-import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
-import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
 import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -54,9 +52,7 @@ class LocalWorkTypedToolReferenceTest {
             put("content", "result")
         }
         history.append(referencedTool)
-        fun window() = history.recentWithLatestMatching(80) {
-            isTrustedContextCheckpointModelMessage(it, LocalContextCheckpointKind.WORK)
-        }
+        fun window() = history.recentWithLatestWorkCheckpoint(80)
         assertEquals(listOf("recent-tool-call", "kept-old"),
             referencedWorkToolCallIds(window()))
         assertEquals(referencedWorkToolCallIds(history.snapshot()),

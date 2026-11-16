@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.model
 
+import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -42,29 +43,47 @@ class LocalModelHistoryBufferTest {
     @Test
     fun recentReferenceWindowKeepsOnlyTailAndNewestOlderCheckpoint() {
         val buffer = LocalModelHistoryBuffer()
-        buffer.append(message("assistant", "old checkpoint"))
-        buffer.append(message("assistant", "newest checkpoint"))
+        val old = buildTrustedWorkCheckpointModelMessage("old")
+        val newest = buildTrustedWorkCheckpointModelMessage("newest")
+        buffer.append(old)
+        buffer.append(newest)
         repeat(300) { buffer.append(message("tool", "tool-$it")) }
-        val window = buffer.recentWithLatestMatching(80) {
-            it["content"]?.toString()?.contains("checkpoint") == true
-        }
+        val window = buffer.recentWithLatestWorkCheckpoint(80)
         assertEquals(81, window.size)
-        assertEquals("newest checkpoint", window.first()["content"]?.toString()?.trim('"'))
+        assertEquals(newest, window.first())
         assertEquals(buffer.snapshot().takeLast(80), window.drop(1))
-        buffer.append(message("assistant", "active checkpoint"))
-        val active = buffer.recentWithLatestMatching(80) {
-            it["content"]?.toString()?.contains("checkpoint") == true
-        }
-        assertEquals(80, active.size)
-        assertEquals(buffer.snapshot().takeLast(80), active)
+        buffer.append(buildTrustedWorkCheckpointModelMessage("active"))
+        assertEquals(buffer.snapshot().takeLast(80), buffer.recentWithLatestWorkCheckpoint(80))
         buffer.reset(listOf(message("user", "new session")))
-        assertEquals(buffer.snapshot(), buffer.recentWithLatestMatching(80) {
-            it["content"]?.toString()?.contains("checkpoint") == true
-        })
+        assertEquals(buffer.snapshot(), buffer.recentWithLatestWorkCheckpoint(80))
         assertThrows(IllegalArgumentException::class.java) {
-            buffer.recentWithLatestMatching(-1) { false }
+            buffer.recentWithLatestWorkCheckpoint(-1)
         }
-        assertTrue(buffer.recentWithLatestMatching(0) { false }.isEmpty())
+        assertTrue(buffer.recentWithLatestWorkCheckpoint(0).isEmpty())
+    }
+
+    @Test
+    fun checkpointIndexFollowsPrependInsertReplaceAndReset() {
+        val buffer = LocalModelHistoryBuffer()
+        val first = buildTrustedWorkCheckpointModelMessage("first")
+        val latest = buildTrustedWorkCheckpointModelMessage("latest")
+        buffer.append(first)
+        repeat(90) { buffer.append(message("assistant", "old-$it")) }
+        buffer.append(latest)
+        repeat(90) { buffer.append(message("assistant", "recent-$it")) }
+        assertEquals(latest, buffer.recentWithLatestWorkCheckpoint(80).first())
+        buffer.prepend(message("system", "base"))
+        buffer.insert(1, buildTrustedWorkCheckpointModelMessage("earlier"))
+        assertEquals(latest, buffer.recentWithLatestWorkCheckpoint(80).first())
+        buffer.replaceSystem(message("system", "changed"))
+        assertEquals(latest, buffer.recentWithLatestWorkCheckpoint(80).first())
+        buffer.insert(buffer.size, buildTrustedWorkCheckpointModelMessage("after"))
+        assertEquals(buffer.snapshot().takeLast(80), buffer.recentWithLatestWorkCheckpoint(80))
+        buffer.reset(listOf(message("system", "reset"), first) +
+            List(90) { message("assistant", "reset-$it") })
+        assertEquals(first, buffer.recentWithLatestWorkCheckpoint(80).first())
+        buffer.reset()
+        assertTrue(buffer.recentWithLatestWorkCheckpoint(80).isEmpty())
     }
 
     private fun assertMetrics(
