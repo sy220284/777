@@ -64,8 +64,7 @@ class LocalDirectToolDispatchTest {
 
     @Test fun teamChildCanUseOnlyItsMemberCommands() {
         val scope = LocalSubagentExecutionScope(LocalSubagentCapabilities(teamManaged = true), null)
-        assertTrue(scope.canDiscover(registered("team_send_message", ToolExposure.OPTIONAL))
-            .not()) // See optional grant admission below.
+        assertTrue(scope.canDiscover(registered("team_send_message", ToolExposure.OPTIONAL)))
         assertTrue(scope.canDiscover(registered("team_send_message")))
         assertTrue(scope.canDiscover(registered("team_task_update")))
         assertFalse(scope.canDiscover(registered("team_create_member")))
