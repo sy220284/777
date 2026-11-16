@@ -709,7 +709,8 @@ object LocalModelPresets {
                 structuredOutput = false,
                 strictSchema = false,
                 imageInput = image,
-                temperature = preset?.temperatureSupported != false,
+                temperature = preset?.temperatureSupported != false &&
+                    !normalizeModelBaseUrl(baseUrl).startsWith("https://api.anthropic.com/"),
                 maxImageBytes = maxImageBytes,
                 contextWindowTokens = contextWindowTokens,
                 defaultMaxOutputTokens = defaultMaxOutputTokens,
