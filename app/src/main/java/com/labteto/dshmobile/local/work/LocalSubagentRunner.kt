@@ -330,15 +330,15 @@ internal class LocalSubagentRunner(
         )
         var pendingTerminalOutput: String? = null
         val modelToolStepSurface = LocalModelToolStepSurface()
-        val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface, capabilities.toolAllowlist)
-        // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
-        // runtime capability must never make that capability appear in its parent or sibling run.
-        val enabledOptionalTools = admitLocalAgentScopedToolGrants(
-            capabilities, recoveredEnabledOptionalTools,
-        ).toCollection(linkedSetOf())
         val canDelegateNested = !capabilities.allowMutation && !capabilities.continuable &&
             capabilities.depth < capabilities.maxDepth && runCoordinator != null &&
             snapshot.kernel.resources.maxAgents > capabilities.depth
+        val toolCallPolicy = LocalSubagentToolCallPolicy(
+            allowMutation, virtualScreenId, modelToolStepSurface, capabilities.toolAllowlist,
+        )
+        val enabledOptionalTools = admitLocalAgentScopedToolGrants(
+            capabilities, recoveredEnabledOptionalTools,
+        ).toCollection(linkedSetOf())
         fun executionSchemas(mutation: Boolean, virtual: Boolean, enabled: MutableSet<String>): JsonArray {
             val normal = schemas(mutation, virtual, enabled)
             val team = if (capabilities.teamManaged && backgroundJobId != null)
@@ -676,7 +676,7 @@ internal class LocalSubagentRunner(
                         LocalRecursiveReadOnlyToolScope.rejection(targetCall, capabilities)
                             ?: toolCallPolicy.rejection(call, targetCall)
                             ?: withContext(LocalModelRunContext(runProfile) +
-                                LocalSubagentExecutionScope(capabilities, virtualScreenId)) {
+                                LocalSubagentExecutionScope(capabilities, virtualScreenId, canDelegateNested)) {
                             currentCoroutineContext().ensureActive()
                             if (capabilities.teamManaged) {
                                 requireNotNull(requireTeamWorkspaceMutation) {
