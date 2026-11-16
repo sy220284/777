@@ -1355,11 +1355,9 @@ fun ToolsScreen(
                         onAction = viewModel::refresh,
                     )
                     CapabilityCenterTabs(selectedTab) { next ->
-                        if (next != selectedTab) {
-                            selectedTab = next
-                            // Re-read disk-installed skills when returning to this tab.
-                            if (next == 1) viewModel.refresh()
-                        }
+                        // The ViewModel loads on entry and observes skill-file changes.
+                        // Switching tabs must not fetch every plugin, server and skill again.
+                        selectedTab = next
                     }
                     Box(Modifier.weight(1f)) {
                         when (selectedTab) {
