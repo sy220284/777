@@ -229,49 +229,6 @@ internal class LocalWorkAgentTurnExecutor(
                     error = null,
                 )
             }
-            // Preserve the foreground execution owner across app/page switches AND between
-            // model-stream recovery turns. A network outage suspends this live Work task.
-            if (resumedFailureCode != null && isWorkTransportContinuationCode(resumedFailureCode)) {
-                binding.waitingForTransport.value = true
-                try {
-                    awaitWorkTransportRecovery(
-                        context = context,
-                        baseUrl = selectedRoute.baseUrl,
-                        continuationIndex = resumedContinuationIndex,
-                        onWaiting = { reason ->
-                            binding.state.update { current ->
-                                current.copy(
-                                    work = current.work.copy(workflowProgress = LocalWorkflowProgress(
-                                        sessionId = binding.sessionId,
-                                        stage = "恢复连接",
-                                        task = "原任务保持执行，连接恢复后继续",
-                                        completed = 0,
-                                        total = 0,
-                                        blockedReason = reason,
-                                    )),
-                                    kernel = current.kernel.copy(running = true),
-                                    error = null,
-                                )
-                            }
-                            runEventLog.append("work/transport-waiting", buildJsonObject {
-                                put("source_message_id", uiSourceMessageId)
-                                put("failure_code", resumedFailureCode)
-                                put("continuation_index", resumedContinuationIndex)
-                                put("reason", reason)
-                            })
-                        },
-                    )
-                } finally {
-                    binding.waitingForTransport.value = false
-                    binding.state.update { current ->
-                        current.copy(work = current.work.copy(workflowProgress = null))
-                    }
-                }
-                runEventLog.append("work/transport-resumed", buildJsonObject {
-                    put("source_message_id", uiSourceMessageId)
-                    put("continuation_index", resumedContinuationIndex)
-                })
-            }
             val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
             var outputLimitHasProgress = false
             // AgentTurnEngine emits TurnFailed and then rethrows the same model exception.
@@ -331,6 +288,49 @@ internal class LocalWorkAgentTurnExecutor(
                 parentRunId = continuationParentRunId,
             )
             settledRunId = runContext.runId
+            // Preserve the foreground execution owner across app/page switches AND between
+            // model-stream recovery turns. A network outage suspends this live Work task.
+            if (resumedFailureCode != null && isWorkTransportContinuationCode(resumedFailureCode)) {
+                binding.waitingForTransport.value = true
+                try {
+                    awaitWorkTransportRecovery(
+                        context = context,
+                        baseUrl = selectedRoute.baseUrl,
+                        continuationIndex = resumedContinuationIndex,
+                        onWaiting = { reason ->
+                            binding.state.update { current ->
+                                current.copy(
+                                    work = current.work.copy(workflowProgress = LocalWorkflowProgress(
+                                        sessionId = binding.sessionId,
+                                        stage = "恢复连接",
+                                        task = "原任务保持执行，连接恢复后继续",
+                                        completed = 0,
+                                        total = 0,
+                                        blockedReason = reason,
+                                    )),
+                                    kernel = current.kernel.copy(running = true),
+                                    error = null,
+                                )
+                            }
+                            runEventLog.append("work/transport-waiting", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
+                                put("failure_code", resumedFailureCode)
+                                put("continuation_index", resumedContinuationIndex)
+                                put("reason", reason)
+                            })
+                        },
+                    )
+                } finally {
+                    binding.waitingForTransport.value = false
+                    binding.state.update { current ->
+                        current.copy(work = current.work.copy(workflowProgress = null))
+                    }
+                }
+                runEventLog.append("work/transport-resumed", buildJsonObject {
+                    put("source_message_id", uiSourceMessageId)
+                    put("continuation_index", resumedContinuationIndex)
+                })
+            }
             var lastModelError: LocalModelException? = null
             val taskRunId = com.labteto.dshmobile.local.usage.resolveTokenUsageTaskRunId(runEventLog, runContext.runId)
             val progressTracker = LocalAgentProgressTracker()
