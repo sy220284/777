@@ -197,7 +197,7 @@ internal class LocalWorkAgentTurnExecutor(
             // A continuation belongs to the same user task. Keep the already admitted
             // tool selection instead of clearing it and re-discovering from a synthetic
             // "continue" user message. A newly recovered binding starts with no selection.
-            if (binding.continuationParentRunId == null || !binding.enabledOptionalTools.isPreparedForContinuation()) {
+            if (continuationParentRunId == null || !binding.enabledOptionalTools.isPreparedForContinuation()) {
                 workTurnToolRuntime.clear(binding)
                 workTurnToolRuntime.prepare(binding, input)
             }
