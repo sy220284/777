@@ -14,6 +14,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 @Composable
 internal fun LocalModelProtocolPicker(
     protocol: LocalModelProtocol,
+    available: List<LocalModelProtocol> = LocalModelProtocol.entries.toList(),
     onSelect: (LocalModelProtocol) -> Unit,
 ) {
     val names = mapOf(
@@ -29,6 +30,7 @@ internal fun LocalModelProtocolPicker(
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         },
-        items = names.map { (value, name) -> SyMenuItem(name) { onSelect(value) } },
+        items = names.filterKeys { it in available }
+            .map { (value, name) -> SyMenuItem(name) { onSelect(value) } },
     )
 }
