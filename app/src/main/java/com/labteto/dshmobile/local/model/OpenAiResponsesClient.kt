@@ -80,6 +80,7 @@ class OpenAiResponsesClient @Inject constructor(
             maxTokens = maxTokens,
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
+            openAiExtensions = openAiContract,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
@@ -395,6 +396,7 @@ class OpenAiResponsesClient @Inject constructor(
         maxTokens: Int? = null,
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
+        openAiExtensions: Boolean = true,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
@@ -405,7 +407,7 @@ class OpenAiResponsesClient @Inject constructor(
         put("model", model)
         val systemInstructions = responseInstructions(messages)
         if (!planSharing) systemInstructions.takeIf(String::isNotBlank)?.let { put("instructions", it) }
-        put("store", false)
+        if (openAiExtensions) put("store", false)
         put("stream", true)
         if (!planSharing) maxTokens?.let { tokens ->
             require(tokens > 0) { "Responses API 最大输出 Token 数必须大于零" }
@@ -418,18 +420,18 @@ class OpenAiResponsesClient @Inject constructor(
             })
         }
         if (planSharing) put("parallel_tool_calls", false)
-        if (!planSharing) {
+        if (!planSharing && openAiExtensions) {
             promptCacheKey?.trim()?.takeIf(String::isNotBlank)?.let { key ->
                 put("prompt_cache_key", key.take(MAX_PROMPT_CACHE_KEY_CHARS))
             }
         }
         val cacheComparison = promptCacheComparisonResponseId
-            ?.takeIf { !planSharing }
+            ?.takeIf { !planSharing && openAiExtensions }
             ?.trim()
             ?.takeIf(String::isNotBlank)
         val cacheTtl = promptCacheTtl
             ?.trim()
-            ?.takeIf { !planSharing && it in SUPPORTED_PROMPT_CACHE_TTLS }
+            ?.takeIf { !planSharing && openAiExtensions && it in SUPPORTED_PROMPT_CACHE_TTLS }
         if (cacheComparison != null || cacheTtl != null) {
             put("prompt_cache_options", buildJsonObject {
                 cacheComparison?.let { put("comparison_response_id", it.take(512)) }
@@ -770,9 +772,19 @@ class OpenAiResponsesClient @Inject constructor(
                     }
                 }
                 "reasoning" -> {
-                    (obj["summary"] as? JsonArray).orEmpty().forEach { part ->
-                        val p = part as? JsonObject ?: return@forEach
-                        p["text"]?.jsonPrimitive?.contentOrNull?.let(reasoning::append)
+                    // DeepSeek Responses returns full reasoning in content.reasoning_text;
+                    // OpenAI may expose only a summary. Prefer the real native content when present.
+                    val fullText = (obj["content"] as? JsonArray).orEmpty()
+                        .mapNotNull { part ->
+                            val p = part as? JsonObject ?: return@mapNotNull null
+                            if (p["type"]?.jsonPrimitive?.contentOrNull != "reasoning_text") return@mapNotNull null
+                            p["text"]?.jsonPrimitive?.contentOrNull
+                        }.joinToString("")
+                    if (fullText.isNotBlank()) reasoning.append(fullText) else {
+                        (obj["summary"] as? JsonArray).orEmpty().forEach { part ->
+                            val p = part as? JsonObject ?: return@forEach
+                            p["text"]?.jsonPrimitive?.contentOrNull?.let(reasoning::append)
+                        }
                     }
                 }
                 "function_call" -> {
@@ -837,6 +849,7 @@ class OpenAiResponsesClient @Inject constructor(
                     visibleParts.forEach(::add)
                 })
             }
+            settledReasoning?.let { put("reasoning_content", it) }
             if (toolCalls.isNotEmpty()) {
                 put("tool_calls", buildJsonArray {
                     toolCalls.forEach { call ->
