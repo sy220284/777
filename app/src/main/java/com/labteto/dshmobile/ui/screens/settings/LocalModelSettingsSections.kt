@@ -461,23 +461,24 @@ internal fun LocalModelSettingsCard(
                         label = { Text(stringResource(R.string.advanced_endpoint)) },
                         isError = fieldErrors.baseUrl != null,
                         supportingText = { fieldErrors.baseUrl?.let { Text(it) } })
-                    LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
+                    if (selectedPreset == null) {
+                        LocalModelContextWindowField(contextWindowTokens) {
+                            contextWindowTokens = it
+                            editorGeneration++
+                            testStatus = null
+                        }
+                    }
                 } else {
                     Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                     selectedPreset?.let { preset ->
-                        Text(
-                            stringResource(
-                                R.string.local_model_request_endpoint,
-                                when (protocol) {
-                                    LocalModelProtocol.RESPONSES,
-                                    LocalModelProtocol.ANTHROPIC_MESSAGES,
-                                    LocalModelProtocol.CHAT_COMPLETIONS ->
-                                        LocalModelPresets.editorRequestEndpointFor(model, baseUrl, protocol)
-                                },
-                            ),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.textTertiary,
-                        )
+                        if (protocol in advertisedProtocols) {
+                            Text(
+                                stringResource(R.string.local_model_request_endpoint,
+                                    LocalModelPresets.editorRequestEndpointFor(model, baseUrl, protocol)),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.textTertiary,
+                            )
+                        }
                         preset.modelsEndpoint?.let { endpoint ->
                             Text(
                                 stringResource(R.string.local_model_models_endpoint, endpoint),
@@ -485,26 +486,9 @@ internal fun LocalModelSettingsCard(
                                 color = colors.textTertiary,
                             )
                         }
-                        if (contextWindowOptions.size == 2) {
-                            val extended = contextWindowOptions.last().toString()
-                            SySegmented(
-                                segments = listOf(
-                                    SySegment("default", "256K · 默认"),
-                                    SySegment(extended, "1M · 会员"),
-                                ),
-                                selectedKey = if (contextWindowTokens == extended) extended else "default",
-                                onSelect = { choice ->
-                                    contextWindowTokens = if (choice == extended) choice else ""
-                                    editorGeneration++
-                                    testStatus = null
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                stretch = true,
-                            )
-                            Text("K3 / K3.1 Pro 可选择 256K 或 1M；1M 需相应会员权益。",
-                                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
-                        }
-                        val currentInputs = LocalModelPresets.clientCapabilitiesFor(model, baseUrl, protocol)
+                        val currentInputs = if (protocol in advertisedProtocols) {
+                            LocalModelPresets.clientCapabilitiesFor(model, baseUrl, protocol)
+                        } else emptySet()
                         ModelCapabilityTags(currentInputs)
                         if (LocalModelCapability.VIDEO in preset.capabilities) {
                             val status = when {
@@ -521,6 +505,29 @@ internal fun LocalModelSettingsCard(
                                 style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
                     }
+                }
+                if (contextWindowOptions.size == 2) {
+                    val extended = contextWindowOptions.last().toString()
+                    SySegmented(
+                        segments = listOf(
+                            SySegment("default", "256K · 默认"),
+                            SySegment(extended, "1M · 会员"),
+                        ),
+                        selectedKey = if (contextWindowTokens == extended) extended else "default",
+                        onSelect = { choice ->
+                            contextWindowTokens = if (choice == extended) choice else ""
+                            editorGeneration++
+                            testStatus = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        stretch = true,
+                    )
+                    Text("K3 / K3.1 Pro 可选择 256K 或 1M；1M 需相应会员权益。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                }
+                if (protocol !in advertisedProtocols) {
+                    Text("当前保存的协议与官方模型不匹配，请在下方选择支持的协议并重新测试连接。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.dangerInk)
                 }
                 LocalModelProtocolPicker(protocol, available = advertisedProtocols) { selected ->
                     baseUrl = LocalModelPresets.editorBaseUrlForProtocol(model, baseUrl, selected)
