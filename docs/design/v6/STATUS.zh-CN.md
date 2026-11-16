@@ -2,6 +2,13 @@
 
 > **2026-11-16 复核基线** main `73d86a8db525d22336c8ff45fbc7bdd1d2f4f9c9` + PR #926 界面改进（最终增量已完成源码审阅，按用户要求停止编译构建）。这是视觉/业务行为复核台账，而不是历史 38 张示例卡片的浏览器通过计数。下一轮尚未实现的目标见 [V6.4 设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。参照 [现行规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)、[页面清单](current-ui.json) 和 [手机设计投影](mobile/app.html)。
 
+## 2026-11-16 离线原型同源回填与 UI 视觉门禁接线
+
+- **根因**：PR #926 的离线原型改动（选项条滚动规则、工作区操作行、`更多文件操作`／`导入手机文件` 两个弹窗）只落在编译产物 `mobile/app.html`，**没有回填可编辑源** `mobile/index.html` / `mobile/v6.css` / `mobile/v6.js`，导致 `build-standalone.py --check` 必然判定"离线页与设计源分叉"，`check-ui-design-system-boundaries.py` 随之失败。
+- **处理**：把上述三处改动回填到 `v6.css` 与 `v6.js`（分段控件滚动规则追加在样式表末尾，保证层叠顺序与原产物一致），`current-ui.json` 的 `baselineCommit` 更新为 `4e2e208`（含 PR #926 的主线合并提交），离线页由 `build-standalone.py` 重新生成。**PR #926 的原型改进被完整保留，没有被回退。**
+- **门禁接线**：新增 `.github/workflows/ui-visual-gates.yml`，在 PR 上依次执行 `build-standalone.py --check`（离线原型同源）、`check-ui-design-system-boundaries.py`（设计系统边界）、`audit-all-icons.py`（V6.3 图标契约）。此前这三项只有 README 声明的"CI 对照"，**没有任何工作流真正执行**。
+- **验证**：三项门禁本地全部通过（parity / boundary / icons 128 项）。CI 侧由本次新增的工作流承担首轮验证。
+
 ## 2026-11-16 手机阅读与操作空间优化（PR #926）
 
 基线已同步至 main `73d86a8d` / 发布包 777.397。本分支保留七条主路由、21 项设置与各业务原有回调。

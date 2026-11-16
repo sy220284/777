@@ -1,0 +1,28 @@
+name: 777 UI 视觉门禁
+
+'on':
+  pull_request:
+    paths:
+      - '.github/workflows/ui-visual-gates.yml'
+      - '.github/scripts/check-ui-design-system-boundaries.py'
+      - 'docs/design/v6/**'
+      - 'app/src/main/java/com/shenyan/designsystem/**'
+      - 'app/src/main/java/com/labteto/dshmobile/ui/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出实际待审代码
+        uses: actions/checkout@v4
+      - name: 校验 V6 离线原型与可编辑源同源
+        run: python3 docs/design/v6/build-standalone.py --check
+      - name: 校验 UI 设计系统边界
+        run: python3 .github/scripts/check-ui-design-system-boundaries.py
+      - name: 校验 V6.3 图标契约
+        run: python3 docs/design/v6/audit-all-icons.py

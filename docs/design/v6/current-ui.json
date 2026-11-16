@@ -1,9 +1,9 @@
 {
   "schema": "777.v6.current-ui/1",
-  "baselineCommit": "73d86a8db525d22336c8ff45fbc7bdd1d2f4f9c9",
+  "baselineCommit": "4e2e208ba0311915497a43318737cbde4eb3971b",
   "asOf": "2026-11-16",
   "platform": "Android mobile",
-  "sourceOfTruth": "Android Compose，main@73d86a8d + PR #926；最终增量按用户要求完成源码审阅并提交",
+  "sourceOfTruth": "Android Compose，main@4e2e208（已含 PR #926）；原型改动已回填可编辑源，离线页由 build-standalone.py 生成",
   "routes": [
     {
       "id": "HOME",
