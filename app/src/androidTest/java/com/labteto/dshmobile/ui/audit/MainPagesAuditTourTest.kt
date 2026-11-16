@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -95,7 +96,7 @@ class MainPagesAuditTourTest {
         page(R.string.chatlist_workspace_files, "main-workspace")
         page(R.string.tasks_title, "main-tasks-work") {
             compose.onNodeWithContentDescription(text(R.string.tasks_new)).performClick()
-            compose.onNodeWithText(text(R.string.tasks_create_manual)).performClick()
+            compose.onNodeWithTag("menu-item:${text(R.string.tasks_create_manual)}").performClick()
             captureUiAudit(compose, "main-task-editor")
             compose.onAllNodes(hasSetTextAction())[0].performClick().performTextInput("整理本周的阅读笔记和后续研究问题")
             captureUiAudit(compose, "main-task-editor-keyboard")

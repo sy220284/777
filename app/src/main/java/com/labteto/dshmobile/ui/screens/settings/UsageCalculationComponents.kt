@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -120,61 +123,20 @@ internal fun UsageEfficiency(mode: LocalUsageMode, analytics: TokenUsageModeAnal
             stringResource(R.string.usage_mode_work)
         },
     )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-    ) {
-        if (mode == LocalUsageMode.CHAT) {
-            CompactMetric(
-                stringResource(R.string.usage_avg_sent),
-                formatTokens(analytics.averageInputPerTurn),
-                Modifier.weight(1f),
-            )
-            CompactMetric(
-                stringResource(R.string.usage_avg_received),
-                formatTokens(analytics.averageOutputPerTurn),
-                Modifier.weight(1f),
-            )
-        } else {
-            CompactMetric(
-                stringResource(R.string.usage_main_agent),
-                formatTokens(analytics.mainTokens),
-                Modifier.weight(1f),
-            )
-            CompactMetric(
-                stringResource(R.string.usage_subagent),
-                formatTokens(analytics.subagentTokens),
-                Modifier.weight(1f),
-            )
-        }
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-    ) {
-        CompactMetric(
-            if (mode == LocalUsageMode.CHAT) {
-                stringResource(R.string.usage_avg_background)
-            } else {
-                stringResource(R.string.usage_avg_task_input)
-            },
-            if (mode == LocalUsageMode.CHAT) {
-                formatTokens(analytics.averageBackgroundPerTurn)
-            } else {
-                formatTokens(analytics.averageInputPerTurn)
-            },
-            Modifier.weight(1f),
-        )
-        CompactMetric(
-            stringResource(R.string.local_usage_cache_hit_rate),
-            if (analytics.aggregate.cacheMeasuredTokens > 0L) {
-                String.format(Locale.US, "%.1f%%", analytics.aggregate.cacheHitRate * 100.0)
-            } else {
-                stringResource(R.string.usage_no_measured_cache)
-            },
-            Modifier.weight(1f),
-        )
-    }
+    UsageMetricPair(
+        firstLabel = stringResource(if (mode == LocalUsageMode.CHAT) R.string.usage_avg_sent else R.string.usage_main_agent),
+        firstValue = formatTokens(if (mode == LocalUsageMode.CHAT) analytics.averageInputPerTurn else analytics.mainTokens),
+        secondLabel = stringResource(if (mode == LocalUsageMode.CHAT) R.string.usage_avg_received else R.string.usage_subagent),
+        secondValue = formatTokens(if (mode == LocalUsageMode.CHAT) analytics.averageOutputPerTurn else analytics.subagentTokens),
+    )
+    UsageMetricPair(
+        firstLabel = stringResource(if (mode == LocalUsageMode.CHAT) R.string.usage_avg_background else R.string.usage_avg_task_input),
+        firstValue = formatTokens(if (mode == LocalUsageMode.CHAT) analytics.averageBackgroundPerTurn else analytics.averageInputPerTurn),
+        secondLabel = stringResource(R.string.local_usage_cache_hit_rate),
+        secondValue = if (analytics.aggregate.cacheMeasuredTokens > 0L) {
+            String.format(Locale.US, "%.1f%%", analytics.aggregate.cacheHitRate * 100.0)
+        } else stringResource(R.string.usage_no_measured_cache),
+    )
 }
 
 @Composable
@@ -452,6 +414,35 @@ internal fun UsageAggregateHero(
     }
 }
 
+/** Keep the full value; a pair becomes a column when two readable values do not fit. */
+@Composable
+internal fun UsageMetricPair(
+    firstLabel: String, firstValue: String,
+    secondLabel: String, secondValue: String,
+    testTag: String = "usageCompactMetric",
+) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val valueStyle = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum")
+    val widest = with(density) {
+        maxOf(measurer.measure(firstValue, style = valueStyle, softWrap = false).size.width,
+            measurer.measure(secondValue, style = valueStyle, softWrap = false).size.width).toDp()
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if ((widest + SyMetric.gapMd * 2) * 2 + SyMetric.gapMd <= maxWidth) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                CompactMetric(firstLabel, firstValue, Modifier.weight(1f), testTag)
+                CompactMetric(secondLabel, secondValue, Modifier.weight(1f), testTag)
+            }
+        } else {
+            Column(Modifier.fillMaxWidth()) {
+                CompactMetric(firstLabel, firstValue, Modifier.fillMaxWidth(), testTag)
+                CompactMetric(secondLabel, secondValue, Modifier.fillMaxWidth(), testTag)
+            }
+        }
+    }
+}
+
 @Composable
 internal fun CompactMetric(label: String, value: String, modifier: Modifier = Modifier, testTag: String = "usageCompactMetric") {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
@@ -466,8 +457,8 @@ internal fun CompactMetric(label: String, value: String, modifier: Modifier = Mo
             value,
             style = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
             color = colors.text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            softWrap = false,
         )
     }
 }

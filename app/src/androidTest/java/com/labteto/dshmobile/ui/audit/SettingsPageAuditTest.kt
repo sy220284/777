@@ -10,6 +10,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.text.TextLayoutResult
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.Density
@@ -68,6 +77,21 @@ class SettingsPageAuditTest(
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.common_back))
             .assertExists()
         captureScrollableUiAudit(compose, "settings-${destination.name}-${theme.name}-$fontScale-$width", "settings-audit-frame")
+        if (destination == SettingsDestination.PRICING) {
+            val prices = compose.onAllNodes(SemanticsMatcher("complete numeric prices") { node ->
+                node.config.getOrNull(SemanticsProperties.Text)?.any {
+                    it.text.matches(Regex("[0-9]+(\\.[0-9]+)?"))
+                } == true
+            }, useUnmergedTree = true)
+            assertTrue("The real price table must contain values", prices.fetchSemanticsNodes().isNotEmpty())
+            for (index in prices.fetchSemanticsNodes().indices) {
+                val layouts = mutableListOf<TextLayoutResult>()
+                prices[index].performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                assertTrue(layouts.isNotEmpty())
+                assertFalse("Prices must not be clipped", layouts.single().hasVisualOverflow)
+                assertEquals("A decimal price must stay on one reading line", 1, layouts.single().lineCount)
+            }
+        }
     }
 
     companion object {

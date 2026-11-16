@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
@@ -22,6 +23,10 @@ import org.junit.Assert.assertTrue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.automation.AutomationTask
+import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.TokenUsageAggregate
+import com.labteto.dshmobile.local.TokenUsageModeAnalytics
+import com.labteto.dshmobile.ui.screens.settings.UsageEfficiency
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
@@ -99,6 +104,12 @@ class ContentPagesAuditTest(
                                     task = AutomationTask(id = "ui-audit", prompt = "整理本周的阅读记录，并把需要继续研究的主题汇总成一份清晰的清单。",
                                         createdAt = now, nextRunAt = now + 3600000),
                                     onCancel = {}, onPause = {}, onResume = {}, onRunNow = {}, onEdit = {}, onOpenSession = {},
+                                ) else if (page == "usage-content") UsageEfficiency(
+                                    LocalUsageMode.WORK, TokenUsageModeAnalytics(
+                                        mainTokens = 987654321, subagentTokens = 876543210,
+                                        averageInputPerTurn = 12345678,
+                                        aggregate = TokenUsageAggregate(cacheHitTokens = 10000),
+                                    ),
                                 ) else ExtensionCatalogCard(
                                     id = "ui-audit", title = "资料整理与内容检索助手",
                                     description = "查询资料、组织线索，并保留可以继续追溯的原始来源。完整说明可从详情页阅读。",
@@ -112,6 +123,13 @@ class ContentPagesAuditTest(
             }
         }
         captureScrollableUiAudit(compose, "sample-$page-${theme.name}-$fontScale-$width", "content-audit-frame")
+        if (page == "usage-content") {
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText("100.0%", useUnmergedTree = true)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertTrue("Expected the production cache-rate layout", layouts.isNotEmpty())
+            assertFalse("The complete numeric value must remain readable", layouts.single().hasVisualOverflow)
+        }
         if (page == "extension-content") {
             val layouts = mutableListOf<TextLayoutResult>()
             compose.onNodeWithTag("plugin-inventory-title-ui-audit", useUnmergedTree = true)
@@ -123,7 +141,7 @@ class ContentPagesAuditTest(
 
     companion object {
         @JvmStatic @Parameterized.Parameters(name = "{0}-{1}-{2}-{3}dp")
-        fun cases(): List<Array<Any>> = listOf("persona-detail", "persona-presets", "diary-content", "task-content", "extension-content")
+        fun cases(): List<Array<Any>> = listOf("persona-detail", "persona-presets", "diary-content", "task-content", "extension-content", "usage-content")
             .flatMap { page -> listOf(arrayOf<Any>(page, ThemePreference.LIGHT, 1f, 390)) +
                 listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.MATTE_BLACK)
                     .map { arrayOf<Any>(page, it, 2f, 320) } }
