@@ -302,15 +302,16 @@ class LocalWorkRunRegistry internal constructor(
             }
             refreshBindingContextMetrics(binding)
             persistDerivedBinding(binding)
-            successor = startNext(next, binding)
-            binding.runHandle.job = successor
+            val nextJob = startNext(next, binding)
+            successor = nextJob
+            binding.runHandle.job = nextJob
             // A successor may be cancelled before its lazy coroutine body is entered.
             // Register teardown on the Job itself so the shared foreground service lease
             // cannot remain held indefinitely after such a cancellation.
-            successor.invokeOnCompletion {
-                releaseCompletedTurn(binding, successor)
+            nextJob.invokeOnCompletion {
+                releaseCompletedTurn(binding, nextJob)
             }
-            successor
+            nextJob
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             reportPersistenceFailure(binding, "Work 续轮失败，已有输入保留在会话日志", error)
