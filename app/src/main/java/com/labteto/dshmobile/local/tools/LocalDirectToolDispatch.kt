@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 internal const val DIRECT_TOOL_CALL = "tool_call"
 internal const val DIRECT_TOOL_SEARCH = "tool_search"
+private val JSON_NUMBER_LITERAL = Regex("""-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?""")
 
 /** Shared immutable member-tool contract. Team feature and tool scope consume one source. */
 internal val DIRECT_TEAM_MEMBER_TOOL_NAMES = setOf(
@@ -52,7 +53,7 @@ internal fun LocalToolCall.withSchemaTypedNumbers(toolSchema: JsonObject): Local
             "integer", "number" -> {
                 val primitive = value as? JsonPrimitive
                 if (primitive == null || !primitive.isString ||
-                    primitive.content != primitive.content.trim()) {
+                    !JSON_NUMBER_LITERAL.matches(primitive.content)) {
                     value
                 } else {
                     val parsed = runCatching { Json.parseToJsonElement(primitive.content) }
