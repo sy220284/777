@@ -75,6 +75,8 @@ import com.labteto.dshmobile.local.runtime.adaptiveAgentStepLimit
 import com.labteto.dshmobile.local.runtime.nextAdaptiveAgentStepLimit
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
+import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
+import com.labteto.dshmobile.local.tools.directToolTarget
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
@@ -328,7 +330,7 @@ internal class LocalSubagentRunner(
         )
         var pendingTerminalOutput: String? = null
         val modelToolStepSurface = LocalModelToolStepSurface()
-        val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
+        val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface, capabilities.toolAllowlist)
         // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
         // runtime capability must never make that capability appear in its parent or sibling run.
         val enabledOptionalTools = admitLocalAgentScopedToolGrants(
@@ -670,22 +672,20 @@ internal class LocalSubagentRunner(
                         executionFence()
                         ensureTeamRootAuthorization()
                         currentCoroutineContext().ensureActive()
-                        LocalRecursiveReadOnlyToolScope.rejection(call, capabilities)
-                            ?: toolCallPolicy.rejection(call)
-                            ?: if (capabilities.teamManaged && call.name == "capability_search") {
-                                AgentToolResult(
-                                    content = "额外的 MCP、LSP、GitHub 等扩展由主代理评估并显式授权；请向主代理申请所需工具。",
-                                )
-                            } else withContext(LocalModelRunContext(runProfile)) {
+                        val targetCall = call.directToolTarget() ?: call
+                        LocalRecursiveReadOnlyToolScope.rejection(targetCall, capabilities)
+                            ?: toolCallPolicy.rejection(call, targetCall)
+                            ?: withContext(LocalModelRunContext(runProfile) +
+                                LocalSubagentExecutionScope(capabilities, virtualScreenId)) {
                             currentCoroutineContext().ensureActive()
                             if (capabilities.teamManaged) {
                                 requireNotNull(requireTeamWorkspaceMutation) {
                                     "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
-                                }(requireNotNull(backgroundJobId), call.toLocalToolCall())
+                                }(requireNotNull(backgroundJobId), targetCall.toLocalToolCall())
                             }
-                            if (canDelegateNested && call.name == "subagent") {
+                            if (canDelegateNested && targetCall.name == "subagent") {
                                 dispatchLocalNestedSubagent(
-                                    call = call,
+                                    call = targetCall,
                                     parentCapabilities = capabilities,
                                     parentProfileId = runProfile.id,
                                     parentMaxSteps = maxSteps,
@@ -718,9 +718,9 @@ internal class LocalSubagentRunner(
                                     },
                                 )
                             } else if (capabilities.teamManaged &&
-                                LocalAgentTeamContract.isTeamChildControlCall(call.name)) {
+                                LocalAgentTeamContract.isTeamChildControlCall(targetCall.name)) {
                                 requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
-                                    requireNotNull(backgroundJobId), call.toLocalToolCall(),
+                                    requireNotNull(backgroundJobId), targetCall.toLocalToolCall(),
                                 )
                             } else {
                                 val admittedCall = call.toLocalToolCall()
@@ -737,7 +737,7 @@ internal class LocalSubagentRunner(
                                         executionFence()
                                         ensureTeamRootAuthorization()
                                         runContext?.let { runCoordinator?.ensureCurrentOwner(it) }
-                                        check(jobId, admittedCall)
+                                        check(jobId, targetCall.toLocalToolCall())
                                     }) { invoke() }
                                 } else invoke()
                             }
