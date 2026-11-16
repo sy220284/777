@@ -323,11 +323,11 @@ internal class LocalWorkAgentTurnExecutor(
                     agentRunCoordinator.ensureCurrentOwner(runContext)
                     // Persistent history stays compact; user rules, recalled memory and handoff are
                     // assembled per request and are deliberately never written back into runHistory.
-                    var needsContextRefresh = !requestPrepared
-                    if (!requestPrepared) {
+                    val firstRequestPreparation = !requestPrepared
+                    var needsContextRefresh = firstRequestPreparation
+                    if (firstRequestPreparation) {
                         workModelHistoryRuntime.repairInterleavedPromptUpdates(binding)
                         workModelHistoryRuntime.ensureSystemMessage(binding)
-                        if (memoryInput.isNotBlank()) workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
                     }
                     while (true) {
@@ -371,6 +371,11 @@ internal class LocalWorkAgentTurnExecutor(
                             workspacePath = workspacePath,
                             skillGuidance = "",
                         )
+                    }
+                    // Preserve first-request recall semantics: record new memory directives
+                    // after building this request's recalled context, just once per turn.
+                    if (firstRequestPreparation && memoryInput.isNotBlank()) {
+                        workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                     }
                     // An unverified strategy can be tried only on a naturally
                     // requested Goal with the identical acceptance contract as its verified
