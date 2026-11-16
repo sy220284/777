@@ -350,11 +350,14 @@ internal class AnthropicMessagesClient @Inject constructor(
                     val type = block.value["type"]?.jsonPrimitive?.contentOrNull
                     val videoSource = (block.value["video_url"] as? JsonObject)
                         ?.get("url")?.jsonPrimitive?.contentOrNull
+                    val safeType = type?.take(48)?.takeIf { value ->
+                        value.isNotBlank() && value.all { c -> c.isLetterOrDigit() || c == '_' || c == '-' }
+                    } ?: "unknown"
                     if (type != "video_url" || videoSource.isNullOrBlank() ||
                         !LocalMiniMaxPolicy.nativeVideoSupported(route.model, route.baseUrl, route.protocol)) {
                         throw LocalModelException(
                             "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
-                            "当前 Messages 模型无法接收此媒体内容",
+                            "当前 Messages 模型无法接收输入类型 $safeType；请选用支持该附件的模型或通过工作区读取",
                             false,
                             origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
                         )
