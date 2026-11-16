@@ -375,11 +375,11 @@ internal class LocalWorkComposition @Inject constructor(
         workTurnToolRuntime = turnToolRuntime,
         improvementArchive = improvementArchive,
         replyDocuments = replyDocuments,
-        onTurnSettled = { binding, sourceRunId, selectedAdvice ->
+        onTurnSettled = { binding, sourceRunId, selectedAdvice, settledSnapshot ->
             scope.launch {
                 try {
-                    if (selectedAdvice == null) improvementLearning.reflect(binding, sourceRunId)
-                    else improvementEvaluation.evaluate(binding, sourceRunId, selectedAdvice)
+                    if (selectedAdvice == null) improvementLearning.reflect(binding, sourceRunId, settledSnapshot)
+                    else improvementEvaluation.evaluate(binding, sourceRunId, selectedAdvice, settledSnapshot)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Throwable) {

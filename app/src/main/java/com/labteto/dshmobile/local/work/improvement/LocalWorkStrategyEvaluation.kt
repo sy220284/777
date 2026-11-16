@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.work.improvement
 
 import com.labteto.dshmobile.harness.optimization.StrategyComparison
 import com.labteto.dshmobile.harness.optimization.StrategyTrial
+import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageAnalyticsStore
 import com.labteto.dshmobile.local.TokenUsageGroupKind
@@ -28,9 +29,12 @@ internal class LocalWorkStrategyEvaluation(
     private val usage: TokenUsageAnalyticsStore,
     private val archive: LocalWorkImprovementArchive,
 ) {
-    suspend fun evaluate(bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice) {
+    suspend fun evaluate(
+        bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice,
+        settled: LocalHarnessState,
+    ) {
         val log = bound.eventLog
-        val goal = bound.workState.snapshot().goal ?: return
+        val goal = settled.work.goal ?: return
         log.latestMatching(setOf(
             if (advice.active) "work/improvement-applied" else "work/improvement-trial",
         )) {
@@ -39,7 +43,7 @@ internal class LocalWorkStrategyEvaluation(
                 it.value("steering_revision") == bound.steeringRevision.value.toString()
         } ?: return
         val evidence = localWorkDeliveryEvidence(log, goal, File(sessionStorage.files.workspace.path))
-        val current = bound.aggregateSnapshot()
+        val current = settled
         if (current.modelState.model != advice.model ||
             (current.modelState.modelSelection.activeProfileId ?: "") != advice.profileId ||
             current.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() != advice.routeFingerprint ||
@@ -56,7 +60,8 @@ internal class LocalWorkStrategyEvaluation(
                 bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
             )
             try {
-                if (bound.workState.snapshot().goal != goal) return
+                // The turn's captured Goal stays valid even if its successor
+                // has already started. Its original event facts are rechecked below.
                 log.withWriterLease {
                     if (log.latestMatching(setOf("work/improvement-evaluation")) {
                             it.value("run_id") == runId && it.value("candidate_id") == advice.id
@@ -108,7 +113,6 @@ internal class LocalWorkStrategyEvaluation(
             bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
         )
         try {
-            if (bound.workState.snapshot().goal != goal) return
             log.withWriterLease {
                 if (log.latestMatching(setOf("work/improvement-evaluation")) {
                         it.value("run_id") == runId && it.value("candidate_id") == advice.id
