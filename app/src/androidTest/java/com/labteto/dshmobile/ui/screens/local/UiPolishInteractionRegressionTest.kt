@@ -8,6 +8,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
+import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
+import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.ui.shenyan.SyFullScreenDialog
 import com.labteto.dshmobile.ui.theme.DshTheme
 import org.junit.Assert.assertEquals
@@ -24,6 +26,26 @@ class UiPolishInteractionRegressionTest {
             DshTheme {
                 GroupChatMemberPickerSheet(
                     entries = emptyList(),
+                    currentIds = emptyList(),
+                    enabled = true,
+                    onSave = { false },
+                    onCreatePersona = { createRequests++ },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("group-chat-create-persona")
+            .assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, createRequests) }
+    }
+
+    @Test fun oneAvailablePersonaStillOffersCreationOfSecondMember() {
+        var createRequests = 0
+        compose.setContent {
+            DshTheme {
+                GroupChatMemberPickerSheet(
+                    entries = listOf(PersonaGalleryEntry(
+                        "first", PersonaProfile(id = "first", name = "第一位人物"))),
                     currentIds = emptyList(),
                     enabled = true,
                     onSave = { false },

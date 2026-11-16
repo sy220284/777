@@ -134,6 +134,15 @@ internal fun GroupChatMemberPickerSheet(
                 )
             }
         } else {
+            if (entries.size < MIN_GROUP_CHAT_MEMBERS && onCreatePersona != null) {
+                SyButton(
+                    text = "再创建一位人物",
+                    onClick = onCreatePersona,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth().testTag("group-chat-create-persona"),
+                    variant = SyButtonVariant.Ghost,
+                )
+            }
             SyTextField(
                 value = query,
                 onValueChange = { query = it },
