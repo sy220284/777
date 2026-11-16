@@ -25,6 +25,26 @@ internal class LocalModelHistoryBuffer {
 
     fun snapshot(): List<JsonObject> = messages.toList()
 
+    /**
+     * Read only the live reference window without copying all historical messages.
+     * A trusted checkpoint can precede the recent tail after a long Work session.
+     * Include only the newest matching checkpoint; older checkpoints are superseded.
+     */
+    fun recentWithLatestMatching(
+        limit: Int,
+        matches: (JsonObject) -> Boolean,
+    ): List<JsonObject> {
+        require(limit >= 0) { "最近历史窗口长度不能为负" }
+        val start = (messages.size - limit).coerceAtLeast(0)
+        val checkpointIndex = messages.indices.reversed().firstOrNull { matches(messages[it]) }
+        return buildList {
+            if (checkpointIndex != null && checkpointIndex < start) {
+                add(messages[checkpointIndex])
+            }
+            addAll(messages.subList(start, messages.size))
+        }
+    }
+
     fun dropLast(count: Int): List<JsonObject> = messages.dropLast(count)
 
     fun firstOrNull(): JsonObject? = messages.firstOrNull()

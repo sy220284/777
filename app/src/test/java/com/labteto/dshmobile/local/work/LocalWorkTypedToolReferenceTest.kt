@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.local.context.buildTrustedWorkCheckpointModelMessage
+import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
+import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
+import com.labteto.dshmobile.local.model.LocalModelHistoryBuffer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -36,6 +39,35 @@ class LocalWorkTypedToolReferenceTest {
 
     private fun restored(state: LocalWorkCheckpoint): JsonObject =
         buildTrustedWorkCheckpointModelMessage(state.toModelBlock())
+
+    @Test
+    fun compactReferenceWindowMatchesFullHistoryEvenForOldAndCorruptCheckpoints() {
+        val history = LocalModelHistoryBuffer()
+        history.append(restored(blankCheckpoint(toolCallIds = listOf("earliest"))))
+        history.append(restored(blankCheckpoint(toolCallIds = listOf("kept-old"))))
+        repeat(500) { index ->
+            history.append(message("assistant", "unrelated-$index"))
+        }
+        val referencedTool = buildJsonObject {
+            put("role", "tool")
+            put("tool_call_id", "recent-tool-call")
+            put("content", "result")
+        }
+        history.append(referencedTool)
+        fun window() = history.recentWithLatestMatching(80) {
+            isTrustedContextCheckpointModelMessage(it, LocalContextCheckpointKind.WORK)
+        }
+        assertEquals(listOf("recent-tool-call", "kept-old"),
+            referencedWorkToolCallIds(window()))
+        assertEquals(referencedWorkToolCallIds(history.snapshot()),
+            referencedWorkToolCallIds(window()))
+        history.append(buildTrustedWorkCheckpointModelMessage(
+            "<work-checkpoint>\n{invalid json}\n</work-checkpoint>",
+        ))
+        assertEquals(referencedWorkToolCallIds(history.snapshot()),
+            referencedWorkToolCallIds(window()))
+        assertEquals(listOf("recent-tool-call"), referencedWorkToolCallIds(window()))
+    }
 
     @Test
     fun invalidNewestTrustedCheckpointDoesNotResurrectOlderWorkInstructions() {

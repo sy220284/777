@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.work
 import com.labteto.dshmobile.harness.tools.ToolResultRetention
 import com.labteto.dshmobile.local.LocalToolOutputStore
 import com.labteto.dshmobile.local.LocalUsageMode
+import com.labteto.dshmobile.local.context.LocalContextCheckpointKind
+import com.labteto.dshmobile.local.context.isTrustedContextCheckpointModelMessage
 import com.labteto.dshmobile.local.runtime.adaptiveToolResultBudget
 import com.labteto.dshmobile.local.model.projectRecoverableToolResult
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -26,8 +28,10 @@ internal class LocalWorkToolResultRuntime(
         val history = binding.runHandle.modelHistory
         // Reference protection is derived from existing Work history/checkpoints, never a
         // separate authority for task facts. Eviction still honors private storage budgets.
-        val snapshot = history.snapshot()
-        val referencedIds = referencedWorkToolCallIds(snapshot)
+        val referenceWindow = history.recentWithLatestMatching(80) {
+            isTrustedContextCheckpointModelMessage(it, LocalContextCheckpointKind.WORK)
+        }
+        val referencedIds = referencedWorkToolCallIds(referenceWindow)
         toolOutputStore.retainActiveReferences(
             binding.sessionId, referencedIds,
         )
