@@ -95,7 +95,10 @@ class SqliteSessionEventDatabase(
         SqliteAssetEventIndex.createSchema(db)
         searchBlockIndex.createSchema(db)
         createRequestMigrationMarker(db)
-        migrateLegacyRequestMessages(db)
+        // V6 already stores validated request/message-surface deltas with base_surface_seq.
+        // Re-running the V5 full-message migration would reject valid V6 data and
+        // prevent opening the Session database. V7 only adds asset projections.
+        if (oldVersion <= 5) migrateLegacyRequestMessages(db)
     }
 
     /**

@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   migration:
-    name: Android 36 SQLite V6 迁移与搜索回归
+    name: Android 36 SQLite V5/V6→V7 迁移、附件索引与搜索回归
     runs-on: ubuntu-latest
     timeout-minutes: 65
     steps:
@@ -47,7 +47,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest --stacktrace --console=plain
+          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest,com.labteto.dshmobile.local.session.LocalLegacySqliteMigrationAndroidTest,com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalogAndroidTest,com.labteto.dshmobile.local.session.SqliteImageAttachmentGcAndroidTest --stacktrace --console=plain
       - name: 失败时输出真实断言
         if: failure()
         run: |
@@ -56,7 +56,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: session-storage-v6-android-tests
+          name: session-storage-v7-android-tests
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
