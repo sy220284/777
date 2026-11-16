@@ -5,6 +5,9 @@ import com.labteto.dshmobile.harness.session.SessionExecutionContext
 import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
 import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.ToolBindingSnapshot
+import com.labteto.dshmobile.harness.tools.DirectToolStepScope
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolInvocationContext
 import com.labteto.dshmobile.harness.tools.ToolContext
@@ -15,6 +18,9 @@ import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.DIRECT_TOOL_CALL
+import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
+import com.labteto.dshmobile.local.tools.directToolTarget
 import com.labteto.dshmobile.local.tools.LocalRunToolSelection
 import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
@@ -420,6 +426,45 @@ internal class LocalToolExecutionCoordinator(
         onExecutionActive: (Boolean) -> Unit = {},
     ): AgentToolResult {
         val call = original.copy(name = LocalToolPolicy.canonical(original.name))
+        // The single model tool resolves by name at execution time; no optional schema queue.
+        // The real target still passes the original coordinator, approval and audit.
+        if (call.name == DIRECT_TOOL_CALL) {
+            val child = call.directToolTarget() ?: return localToolFailure(
+                "INVALID_TOOL_ARGUMENTS",
+                "tool_call 需要有效的 name 与 JSON 对象 arguments；不允许递归调用入口。",
+                readOnly = false, executionStarted = false,
+            )
+            val handler = registry.get(child.name)
+                ?: return localToolFailure("UNKNOWN_TOOL", "工具未注册：" + child.name,
+                    readOnly = false, executionStarted = false)
+            if (handler.exposure == ToolExposure.INTERNAL) return localToolFailure(
+                "TOOL_SCOPE_BLOCKED", "内部工具不可通过模型调用：" + child.name,
+                readOnly = false, executionStarted = false,
+            )
+            val binding = currentCoroutineContext()[ToolBindingSnapshot]
+            if (binding != null && binding.directChild(child.name) !== handler) {
+                return localToolFailure("TOOL_REGISTRATION_CHANGED",
+                    "工具在当前模型请求之后新增、更新或卸载；请在下一次模型响应中重新调用：" + child.name,
+                    readOnly = false, executionStarted = false)
+            }
+            val delegated = child.copy(id = call.id + "/direct")
+            val invoke: suspend () -> AgentToolResult = {
+                executeScoped(
+                    original = delegated, sessionId = sessionId, allowMutation = allowMutation,
+                    planModeEnabled = planModeEnabled, approval = approval,
+                    beforeExecution = beforeExecution,
+                    observeFileVersions = observeFileVersions,
+                    executionAttributes = executionAttributes + mapOf(
+                        "root_call_id" to (executionAttributes["root_call_id"] ?: call.id),
+                        "direct_tool_name" to child.name,
+                    ),
+                    onExecutionActive = onExecutionActive,
+                )
+            }
+            return if (binding != null) withContext(DirectToolStepScope(binding, handler)) {
+                invoke()
+            } else invoke()
+        }
         if (!isNetworkSearchPermitted(call.name)) return AgentToolResult(
             content = "网络搜索已关闭，请先在能力中心开启网络搜索。",
             isError = true,
@@ -431,8 +476,14 @@ internal class LocalToolExecutionCoordinator(
                 content = "未知工具：" + call.name,
                 isError = true,
                 errorCode = "UNKNOWN_TOOL",
-                recoveryHint = "先使用 capability_search 或检查工具名称。",
+                recoveryHint = "使用 tool_search 查询实时工具名称和参数。",
             )
+        val childScope = currentCoroutineContext()[LocalSubagentExecutionScope]
+        if (childScope != null && !childScope.permits(registered, call.arguments)) {
+            return localToolFailure("SUBAGENT_TOOL_SCOPE_BLOCKED",
+                "子智能体当前授权范围不包含：" + call.name,
+                readOnly = false, executionStarted = false)
+        }
 
         val inspectOnlyCodeMode = call.name == "code_mode_run" &&
             registry.isReadOnlyCodeModePlan(call.arguments)
