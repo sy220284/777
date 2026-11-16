@@ -586,9 +586,11 @@ object LocalModelPresets {
     ): Set<LocalModelCapability> =
         capabilitiesFor(model, baseUrl).filterTo(linkedSetOf()) {
             it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE ||
-                (it == LocalModelCapability.VIDEO &&
-                    protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
-                    LocalKimiPolicy.videoInputSupported(model, baseUrl))
+                (it == LocalModelCapability.VIDEO && (
+                    (protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
+                        LocalKimiPolicy.videoInputSupported(model, baseUrl)) ||
+                    LocalMiniMaxPolicy.nativeVideoSupported(model, baseUrl, protocol)
+                ))
         }
 
     fun maxNativeImageBytesFor(model: String, baseUrl: String): Long =
