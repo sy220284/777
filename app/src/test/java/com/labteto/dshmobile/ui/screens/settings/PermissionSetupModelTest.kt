@@ -96,7 +96,7 @@ class PermissionSetupModelTest {
         assertEquals(1, nextPermissionSetupIndex(chosen, 0, emptySet()) { statuses.getValue(it) })
         assertEquals(2, nextPermissionSetupIndex(chosen, 0,
             setOf(PermissionSetupFeature.NOTIFICATION_READ)) { statuses.getValue(it) })
-        assertNull(nextPermissionSetupIndex(chosen, 3, emptySet()) { statuses.getValue(it) })
+        assertEquals(3, nextPermissionSetupIndex(chosen, 3, emptySet()) { statuses.getValue(it) })
     }
 
     @Test fun allReadyOrSkippedCompletesWithoutAnExtraPrompt() {
