@@ -451,7 +451,9 @@ class AnthropicMessagesClientTest {
         assertEquals("missing_arguments_value", diagnostic?.toolInputIssue)
         assertEquals(1, diagnostic?.toolInputDeltaCount)
         assertTrue((diagnostic?.toolInputChars ?: 0) > 0)
+        assertEquals(16, diagnostic?.toolInputFingerprint?.length)
         assertTrue(diagnostic?.message.orEmpty().contains("arguments 字段"))
+        assertFalse(diagnostic?.cause?.message.orEmpty().contains("bash"))
         assertEquals("message_stop:tool_use", diagnostic?.lastStreamEventType)
 
         val missingDelta = """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta"}}"""
