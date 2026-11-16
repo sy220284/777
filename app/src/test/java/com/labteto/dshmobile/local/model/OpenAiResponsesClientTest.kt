@@ -1965,6 +1965,59 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun deepSeekReasoningTextIsParsedFromTerminalResponseAndPreservedForHistory() {
+        val response = Json.parseToJsonElement(
+            """{"id":"deepseek-finished","status":"completed","output":[
+                {"type":"reasoning","content":[{"type":"reasoning_text","text":"先检查文件"}],
+                 "summary":[{"type":"summary_text","text":"重复摘要"}]},
+                {"type":"message","role":"assistant","content":[{"type":"output_text","text":"已处理"}]}
+            ],"usage":{"input_tokens":9,"output_tokens":12,"output_tokens_details":{"reasoning_tokens":7}}}"""
+        ).jsonObject
+        val parsed = client.parseCompleted(response, TokenPromptBreakdown())
+        assertEquals("先检查文件", parsed.reasoning)
+        assertEquals("已处理", parsed.content)
+        assertEquals("先检查文件", parsed.message["reasoning_content"]?.jsonPrimitive?.content)
+        val persisted = LocalCanonicalModelCodec.canonicalizeReply(
+            parsed, LocalModelAdapterIds.OPENAI_RESPONSES, "same-route"
+        )
+        val restored = LocalCanonicalModelCodec.toHistoryMessage(
+            persisted.canonicalMessage!!
+        )
+        assertEquals("先检查文件", restored["reasoning_content"]?.jsonPrimitive?.content)
+        assertEquals(7L, parsed.usage.reasoningTokens)
+        val exactReplay = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(persisted.canonicalMessage!!),
+            LocalModelAdapterIds.OPENAI_RESPONSES, "same-route"
+        ).single()
+        val lostReplay = LocalCanonicalModelCodec.toLegacyMessages(
+            listOf(persisted.canonicalMessage!!),
+            LocalModelAdapterIds.OPENAI_RESPONSES, "other-route"
+        ).single()
+        assertTrue(exactReplay.toString().contains("_dsh_responses_output"))
+        assertFalse(lostReplay.toString().contains("_dsh_responses_output"))
+    }
+
+    @Test
+    fun nonOpenAiResponsesOmitVendorOnlyOptions() {
+        val payload = client.buildPayload(
+            model = "deepseek-flash",
+            messages = listOf(buildJsonObject { put("role", "user"); put("content", "测试") }),
+            tools = JsonArray(emptyList()),
+            temperature = null, reasoningEffort = "high", planSharing = false,
+            includeEncryptedReasoning = false, openAiExtensions = false,
+            promptCacheKey = "only-openai", promptCacheTtl = "24h",
+            promptCacheComparisonResponseId = "only-openai",
+            maxTokens = 8192,
+        )
+        assertFalse("store" in payload)
+        assertFalse("include" in payload)
+        assertFalse("prompt_cache_key" in payload)
+        assertFalse("prompt_cache_options" in payload)
+        assertEquals("8192", payload["max_output_tokens"]!!.jsonPrimitive.content)
+        assertEquals("high", payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun kimiResponsesRejectsUnimplementedVideoInsteadOfSilentlyDroppingIt() {
         val video = buildJsonObject {
             put("role", "user")
