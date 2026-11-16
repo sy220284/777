@@ -569,6 +569,16 @@ object LocalModelPresets {
                 it.provider == "Kimi Code" && it.model.equals(normalizedModel, ignoreCase = true)
             }?.copy(baseUrl = normalizedBaseUrl)
         }
+        if (DeepSeekChatRequestPolicy.isOfficial(normalizedModel, normalizedBaseUrl)) {
+            return entries.firstOrNull {
+                it.provider == "DeepSeek" && it.model.equals(normalizedModel, ignoreCase = true)
+            }?.copy(
+                baseUrl = normalizedBaseUrl,
+                protocol = if (normalizedBaseUrl.endsWith("/chat/completions")) {
+                    LocalModelProtocol.CHAT_COMPLETIONS
+                } else LocalModelProtocol.RESPONSES,
+            )
+        }
         return (entries + compatibilityMetadata).firstOrNull { preset ->
             preset.model.equals(normalizedModel, ignoreCase = true) &&
                 normalizeModelBaseUrl(preset.baseUrl) == normalizedBaseUrl
@@ -578,7 +588,6 @@ object LocalModelPresets {
     fun capabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
         find(model, baseUrl)?.capabilities ?: setOf(LocalModelCapability.TEXT)
 
-    /** Capabilities actually encoded by this client's current request/response transports. */
     /** Settings consumes this Model-owned editing projection instead of provider internals. */
     fun editorProtocolsFor(model: String, baseUrl: String): List<LocalModelProtocol> =
         LocalModelProtocolRoutePolicy.supportedProtocols(model, baseUrl)
@@ -604,6 +613,7 @@ object LocalModelPresets {
         }
     }
 
+    /** Capabilities actually encoded by this client's current request/response transports. */
     fun clientCapabilitiesFor(
         model: String,
         baseUrl: String,
