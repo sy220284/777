@@ -26,7 +26,7 @@ class LocalModelProfilesTest {
             // Kimi Responses supports text/images; video remains available on explicitly
             // configured Chat Completions routes for video-capable subscription models.
             assertFalse(LocalModelCapability.VIDEO in wired)
-            if (preset.provider == "Kimi Code" && preset.model in setOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
+            if (preset.provider == "Kimi Code" && preset.model != "k3-256k") {
                 assertTrue(LocalModelCapability.VIDEO in LocalModelPresets.clientCapabilitiesFor(
                     preset.model, preset.baseUrl, LocalModelProtocol.CHAT_COMPLETIONS))
             }
