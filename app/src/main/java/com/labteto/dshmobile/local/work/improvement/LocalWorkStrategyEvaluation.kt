@@ -28,7 +28,7 @@ internal class LocalWorkStrategyEvaluation(
     private val usage: TokenUsageAnalyticsStore,
     private val archive: LocalWorkImprovementArchive,
 ) {
-    fun evaluate(bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice) {
+    suspend fun evaluate(bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice) {
         val log = bound.eventLog
         val goal = bound.workState.snapshot().goal ?: return
         log.latestMatching(setOf(
@@ -50,9 +50,11 @@ internal class LocalWorkStrategyEvaluation(
         if (workGoalComparisonKey(goal) != advice.goalSignature || !advice.baselineTestVerified) return
         val (_, failedTools) = workGoalToolMetrics(log, goal)
         if (goal.status == "blocked" && failedTools > 0) {
-            val lease = LocalSessionRuntimeRegistry.tryAcquire(
+            // Wait for the current user turn to release ownership. Losing this
+            // receipt because another turn was briefly active stalls the candidate.
+            val lease = LocalSessionRuntimeRegistry.acquire(
                 bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
-            ) ?: return
+            )
             try {
                 if (bound.workState.snapshot().goal != goal) return
                 log.withWriterLease {
@@ -102,8 +104,9 @@ internal class LocalWorkStrategyEvaluation(
                 setOf(testKey), setOf(testKey), true,
                 failures, tools.toLong(), observedTokens),
         )
-        val lease = LocalSessionRuntimeRegistry.tryAcquire(bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE)
-            ?: return
+        val lease = LocalSessionRuntimeRegistry.acquire(
+            bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+        )
         try {
             if (bound.workState.snapshot().goal != goal) return
             log.withWriterLease {

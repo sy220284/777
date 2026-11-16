@@ -301,7 +301,7 @@ class LocalWorkRunRegistryTest {
         assertNull(oldOwner.runHandle.projectionJob)
         assertFalse(currentJob.isCancelled)
         val beforeVisible = runtime.state.value
-        oldOwner.state.update { it.copy(error = "stale projection") }
+        oldOwner.state.value = oldOwner.state.value.copy(error = "stale projection")
         registry.mirrorVisible(oldOwner)
         assertEquals(beforeVisible, runtime.state.value)
         val oldCursor = runtime.foregroundRunHandle.transcriptProjectionCursor

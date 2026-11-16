@@ -107,9 +107,11 @@ internal class LocalWorkStrategyLearning(
 
         // Acquire the existing Session maintenance lease only at commit time; do not hold
         // it across the provider request or block the user's foreground Work.
-        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.tryAcquire(
+        // A paid reflection that already completed must wait for a valid commit
+        // slot instead of discarding its proposal when the user starts another turn.
+        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.acquire(
             expectedSession, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind.MAINTENANCE,
-        ) ?: return
+        )
         try {
         if (bound.sessionId != expectedSession || bound.workState.snapshot().goal?.id != goal.id ||
             bound.workState.snapshot().goal?.revision != expectedRevision ||
