@@ -1890,7 +1890,7 @@ class OpenAiResponsesClientTest {
             }
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                 .code(200).message("OK")
-                .body(("data: {\"type\":\"response.completed\",\"response\":" + result + "}\\n\\n")
+                .body(("data: {\"type\":\"response.completed\",\"response\":" + result + "}\n\n")
                     .toResponseBody("text/event-stream".toMediaType())).build()
         }.build()
         val native = OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true })
@@ -1934,7 +1934,7 @@ class OpenAiResponsesClientTest {
             posted = Json.parseToJsonElement(Buffer().also {
                 chain.request().body!!.writeTo(it)
             }.readUtf8()).jsonObject
-            val response = """data: {"type":"response.completed","response":{"id":"kimi-1","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"图像已识别"}]}],"usage":{"input_tokens":6,"output_tokens":4}}}""" + "\\n\\n"
+            val response = """data: {"type":"response.completed","response":{"id":"kimi-1","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"图像已识别"}]}],"usage":{"input_tokens":6,"output_tokens":4}}}""" + "\n\n"
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                 .code(200).message("OK").body(response.toResponseBody("text/event-stream".toMediaType())).build()
         }.build()
