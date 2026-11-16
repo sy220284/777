@@ -21,4 +21,4 @@ body[data-theme="dark"] .ico-plate img,body[data-theme="matte"] .ico-plate img{f
 .sheet-grid .utility-glyph{width:24px;height:24px;object-fit:contain}
 body[data-theme="dark"] .utility-glyph,body[data-theme="matte"] .utility-glyph{filter:invert(.89)}
 .phone[data-modal="true"] .topbar,.phone[data-modal="true"] #page,.phone[data-modal="true"] #bottom-dock{pointer-events:none}
-.bottom-sheet:focus-visible{outline:2px solid var(--primary);outline-offset:-3px}
+.bottom-sheet:focus-visible{outline:2px solid var(--primary);outline-offset:-3px}.segmented{overflow-x:auto}.segmented button{flex:1 0 auto;white-space:nowrap;min-width:48px}
