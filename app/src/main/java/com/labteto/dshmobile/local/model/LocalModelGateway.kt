@@ -464,7 +464,12 @@ internal fun prepareLocalModelAdapterRequest(
                 } else maxTokens?.also {
                     require(it > 0) { "Responses API 最大输出 Token 数必须大于零" }
                 }
-                LocalModelProtocol.ANTHROPIC_MESSAGES -> null
+                LocalModelProtocol.ANTHROPIC_MESSAGES -> maxTokens?.also {
+                    require(it > 0) { "Anthropic 最大输出 Token 数必须大于零" }
+                    if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                        require(it <= 524_288) { "MiniMax 最大输出 Token 数为 524288" }
+                    }
+                }
             },
             allowImageGeneration = allowImageGeneration && route.protocol == LocalModelProtocol.RESPONSES,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId
