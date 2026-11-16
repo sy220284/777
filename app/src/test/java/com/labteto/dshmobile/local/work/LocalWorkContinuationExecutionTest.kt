@@ -77,6 +77,24 @@ class LocalWorkContinuationExecutionTest {
         assertEquals(1, binding.runHandle.pendingInputs.size())
     }
 
+    @Test fun invalidToolArgumentsUseBoundedAndSpecificContinuation() = withBinding { binding ->
+        binding.eventLog.append("turn/checkpoint", buildJsonObject { put("kind", "invalid-tool-arguments") })
+        val failure = LocalModelException(
+            code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
+            message = "tool_use 参数不是合法 JSON 对象",
+            retryable = false,
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
+        )
+        assertTrue(queueAutomaticWorkContinuation(binding, "run-invalid", failure, sourceMessageId = "user-invalid"))
+        val queued = binding.runHandle.pendingInputs.snapshot().single()
+        assertEquals(QueuedAgentInputKind.WORK_CONTINUATION, queued.kind)
+        assertTrue(queued.content.contains("重新生成完整、可解析的 JSON 对象参数"))
+        assertTrue(queued.content.contains("已完成的工具副作用不能重复执行"))
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", queued.continuation?.failureCode)
+        assertFalse(queueAutomaticWorkContinuation(binding, "run-invalid", failure))
+    }
+
     @Test fun nonContinuableFailureLeavesInboxUnchanged() = withBinding { binding ->
         val denied = LocalModelException(
             code = "AUTH_REJECTED",
