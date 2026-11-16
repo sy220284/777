@@ -5,6 +5,9 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.local.runtime.SUBAGENT_VIRTUAL_SCREEN_TOOLS
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonPrimitive
+import com.labteto.dshmobile.local.tools.DIRECT_TOOL_CALL
+import com.labteto.dshmobile.local.tools.DIRECT_TOOL_SEARCH
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Owns per-run subagent tool-call scope checks before execution. */
@@ -17,10 +20,12 @@ internal class LocalSubagentToolCallPolicy(
     fun rejection(call: AgentToolCall, target: AgentToolCall = call): AgentToolResult? {
         val virtualAllowed =
             virtualScreenId != null && target.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS
-        val requestedScreen = target.arguments["id"]?.jsonPrimitive?.contentOrNull
+        val requestedScreen = (target.arguments["id"] as? JsonPrimitive)?.contentOrNull
         return when {
             !stepSurface.allows(call.name) -> stepSurface.hiddenCallResult(call.name)
-            allowedTools != null && target.name !in allowedTools ->
+            allowedTools != null && call.name != DIRECT_TOOL_SEARCH &&
+                !(call.name == DIRECT_TOOL_CALL && target.name == DIRECT_TOOL_CALL) &&
+                target.name !in allowedTools ->
                 blocked("子代理工具白名单未授权：" + target.name,
                     "SUBAGENT_TOOL_FILTER_BLOCKED", "仅调用当前子任务获准的工具。")
             !allowMutation && target.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS && !virtualAllowed ->
