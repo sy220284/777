@@ -23,7 +23,7 @@ internal object LocalKimiPolicy {
     /** Kimi Code video input is supported on the subscription models except K3-256K. */
     fun videoInputSupported(model: String, baseUrl: String): Boolean =
         isOfficial(baseUrl) && model.trim().lowercase() in
-            setOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")
+            setOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "kimi-for-coding", "kimi-for-coding-highspeed")
 
     /** Only advertise client-implemented formats, not all server-side formats. */
     fun videoMediaType(name: String, mediaType: String): String? {
