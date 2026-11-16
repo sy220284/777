@@ -310,141 +310,6 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
-    fun exactSelectionReplacesOldSchemaExposureWithoutUnregisteringTools() {
-        val registry = ToolRegistry().apply {
-            listOf("old_lookup", "next_lookup", "other_lookup").forEach { name ->
-                register(tool(name = name, access = ToolAccess.READ_ONLY,
-                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                    family = "可选工具", keywords = setOf("查询")) { ToolResult("ok") })
-            }
-        }
-        val coordinator = coordinator(registry)
-        coordinator.enableOptionalTools(listOf("old_lookup", "other_lookup"))
-        coordinator.searchCapabilities("select:next_lookup")
-        assertEquals(listOf("next_lookup"), coordinator.enabledOptionalSnapshot().toList())
-        assertFalse(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-            .contains("old_lookup"))
-        assertEquals("old_lookup", registry.get("old_lookup")?.name)
-        coordinator.searchCapabilities("select:old_lookup,next_lookup")
-        assertEquals(listOf("old_lookup", "next_lookup"),
-            coordinator.enabledOptionalSnapshot().toList())
-    }
-
-    @Test
-    fun exactMultiToolSelectionLoadsOnlyNamedRegisteredToolsInOneStep() {
-        val registry = ToolRegistry().apply {
-            listOf("mcp_lookup", "github_status", "unrelated_search").forEach { name ->
-                register(tool(name = name, access = ToolAccess.READ_ONLY,
-                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                    family = "扩展", keywords = setOf("公共搜索")) { ToolResult("ok") })
-            }
-        }
-        val coordinator = coordinator(registry)
-        val result = coordinator.searchCapabilities("select:github_status,mcp_lookup,not_installed")
-        assertTrue(result.contains("not_installed"))
-        val selected = coordinator.enabledOptionalSnapshot().toList()
-        assertEquals(listOf("github_status", "mcp_lookup"), selected)
-        assertTrue("github_status" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-        assertTrue("mcp_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-        assertFalse("unrelated_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-        val again = coordinator.searchCapabilities("select:mcp_lookup")
-        assertTrue(again.contains("[已选候选]"))
-    }
-
-    @Test
-    fun coreToolSelectionSaysCallDirectlyWithoutCallingItUnavailable() {
-        val registry = ToolRegistry().apply {
-            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.CORE) { ToolResult("ok") })
-        }
-        val report = coordinator(registry).searchCapabilities("select:read,unregistered_tool")
-        assertTrue(report.contains("内置工具"))
-        assertTrue(report.contains("read"))
-        assertTrue(report.contains("unregistered_tool"))
-        assertFalse(report.contains("指定工具当前无法加载：read"))
-    }
-
-    @Test
-    fun largeExactSelectionExposesReadyBatchAndActionableNextBatch() {
-        val registry = ToolRegistry().apply {
-            repeat(128) { index ->
-                val name = "mcp_batch_$index"
-                val properties = buildJsonObject {
-                    repeat(20) { field ->
-                        put("property_$field", buildJsonObject {
-                            put("type", "string")
-                            put("description", "这一字段对接外部 MCP 的复杂参数说明".repeat(15))
-                        })
-                    }
-                }
-                register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL,
-                    keywords = setOf("批量工具")) { ToolResult("ok") }
-                    .copy(schema = functionToolSchema(name, "扩展工具", properties)))
-            }
-        }
-        val coordinator = coordinator(registry)
-        val all = (0 until 128).map { "mcp_batch_$it" }
-        val report = coordinator.searchCapabilities("select:" + all.joinToString(","))
-        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
-        val omitted = all.filterNot(visible::contains)
-        assertTrue("工具定义实际预算必须仍有效", omitted.isNotEmpty())
-        assertTrue(report.contains("待加载队列"))
-        assertTrue(report.contains("select:" + omitted.joinToString(",")))
-        assertTrue(report.contains("[下一步候选]"))
-        val next = coordinator.searchCapabilities("select:" + omitted.take(2).joinToString(","))
-        val after = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
-        assertTrue(omitted.first() in after)
-        assertTrue(next.contains(omitted.first()))
-    }
-
-    @Test
-    fun exactMultiToolSelectionRejectsInvalidNamesAndKeepsPreviousSelection() {
-        val registry = ToolRegistry().apply {
-            register(tool(name = "mcp_lookup", access = ToolAccess.READ_ONLY,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "扩展", keywords = setOf("公共搜索")) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        coordinator.searchCapabilities("select:mcp_lookup")
-        val before = coordinator.enabledOptionalSnapshot()
-        val error = runCatching { coordinator.searchCapabilities("select:../../private") }.exceptionOrNull()
-        assertTrue(error is IllegalArgumentException)
-        assertEquals(before, coordinator.enabledOptionalSnapshot())
-    }
-
-    @Test
-    fun explicitlyDiscoveredCapabilitySurvivesLaterWorkStepHeuristicRefresh() {
-        val registry = ToolRegistry().apply {
-            register(tool(name = "process_exec", access = ToolAccess.PROCESS,
-                approval = ToolApprovalPolicy.ALWAYS, exposure = ToolExposure.OPTIONAL,
-                family = "运行时", keywords = setOf("执行命令")) { ToolResult("ok") })
-            repeat(300) { index ->
-                register(tool(name = "search_batch_$index", access = ToolAccess.READ_ONLY,
-                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                    family = "搜索扩展", keywords = setOf("代码搜索")) { ToolResult("ok") })
-            }
-        }
-        val coordinator = coordinator(registry)
-        // User task heuristics may select many expensive optional tool definitions first.
-        coordinator.enableTaskRelevantOptionalTools("代码搜索")
-        assertFalse("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-        coordinator.searchCapabilities("process_exec")
-        assertTrue("process_exec" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-
-        // A later Work model step must append task-relevant registered tools without
-        // moving the explicit capability_search choice behind hundreds of heuristic hits.
-        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = false)
-        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-        assertTrue("process_exec" in visible)
-        assertEquals("process_exec", visible.first())
-        // A new user turn deliberately gets to reorder relevance again.
-        coordinator.enableTaskRelevantOptionalTools("代码搜索", prioritize = true)
-        assertEquals("search_batch_0", coordinator.enabledOptionalSnapshot().first())
-    }
-
-
-    @Test
     fun wrongToolArgumentsGetRealSchemaGuidanceBeforeAnyExecutorRuns() = runBlocking {
         var executions = 0
         val tool = tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
@@ -475,43 +340,6 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue(failed.recoveryHint.orEmpty().contains("path"))
         assertTrue(failed.recoveryHint.orEmpty().contains("lines:array"))
         assertTrue(failed.recoveryHint.orEmpty().contains("本轮实际提供"))
-    }
-
-
-    @Test
-    fun registeredOptionalCommandBecomesExecutableAfterModelDiscovery() = runBlocking {
-        var executed = 0
-        val registry = ToolRegistry().apply {
-            register(tool("process_exec", ToolAccess.PROCESS, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "运行时",
-                keywords = setOf("运行命令")) {
-                executed++
-                ToolResult("real-execution-receipt")
-            })
-        }
-        val executor = coordinator(registry)
-        val projection = LocalToolSchemaProjection(registry, executor)
-        val surface = LocalModelToolStepSurface()
-        val policy = localAgentRunPolicy(LocalUsageMode.WORK)
-        val state = com.labteto.dshmobile.local.model.LocalModelState()
-
-        surface.capture(projection.modelSchemas(policy, state, false, emptyList()))
-        assertFalse(surface.allows("process_exec"))
-
-        val discovered = executor.searchCapabilities("process_exec")
-        assertTrue(discovered.contains("process_exec"))
-        surface.capture(projection.modelSchemas(
-            policy, state, false, emptyList(), executor.enabledOptionalSnapshot(),
-        ))
-        assertTrue(surface.allows("process_exec"))
-        val result = executor.executeScoped(
-            LocalToolCall("dynamic-call", "process_exec", JsonObject(emptyMap()), "{}"),
-            sessionId = "work", allowMutation = true, planModeEnabled = false,
-            approval = { _, _, _ -> true },
-        )
-        assertFalse(result.isError)
-        assertEquals("real-execution-receipt", result.content)
-        assertEquals(1, executed)
     }
 
 
@@ -629,418 +457,6 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
-    fun newWorkTaskPreparesOnlyRelevantToolDefinitionsInsteadOfEarlierRequests() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(tool("team_create_member", ToolAccess.AGENT_CONTROL,
-                ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "团队", keywords = setOf("创建团队")) { ToolResult("ok") })
-            register(tool("local_render", ToolAccess.READ_ONLY,
-                ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "界面", keywords = setOf("渲染界面")) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        val history = listOf(buildJsonObject {
-            put("role", "user")
-            put("content", "创建团队")
-        })
-        coordinator.prepareWorkTurnCapabilities("渲染界面", history, { false })
-        val selected = coordinator.enabledOptionalSnapshot()
-        assertTrue("local_render" in selected)
-        assertFalse("team_create_member" in selected)
-    }
-
-    @Test
-    fun pinnedGitHubIsLoadedAcrossTurnsAndNeverBypassesCredentialGate() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(tool("github_list_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
-            register(tool("unrelated_task", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, keywords = setOf("处理")) { ToolResult("ok") })
-        }
-        var pinned = listOf("github")
-        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
-        coordinator.prepareWorkTurnCapabilities("处理当前项目", emptyList(), { true })
-        assertEquals("github_list_prs", coordinator.enabledOptionalSnapshot().first())
-        coordinator.clearTurnCapabilities()
-        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
-        assertTrue("github_list_prs" in coordinator.enabledOptionalSnapshot())
-        coordinator.clearTurnCapabilities()
-        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
-        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
-        pinned = emptyList()
-        coordinator.clearTurnCapabilities()
-        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { true })
-        assertFalse("github_list_prs" in coordinator.enabledOptionalSnapshot())
-    }
-
-    @Test
-    fun pinnedMcpLoadsOnlyRegisteredServiceToolsAheadOfHeuristicTools() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(tool("mcp_figma_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
-            register(tool("mcp_other_get_file", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
-            register(tool("mcp_figma_fake", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("ok") })
-            register(tool("background_job", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, keywords = setOf("设计")) { ToolResult("ok") })
-        }
-        var pinned = listOf("figma")
-        val coordinator = coordinator(registry, pinnedConnectorIds = { pinned })
-        coordinator.prepareWorkTurnCapabilities("设计", emptyList(), { false })
-        val selected = coordinator.enabledOptionalSnapshot().toList()
-        assertEquals("mcp_figma_get_file", selected.first())
-        assertTrue("background_job" in selected)
-        assertFalse("mcp_other_get_file" in selected)
-        assertFalse("mcp_figma_fake" in selected)
-        pinned = emptyList()
-        coordinator.clearTurnCapabilities()
-        coordinator.prepareWorkTurnCapabilities("继续", emptyList(), { false })
-        assertFalse("mcp_figma_get_file" in coordinator.enabledOptionalSnapshot())
-    }
-
-    @Test
-    fun pinnedConnectorRecoversPriorityAfterLaterModelStepHeuristics() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(tool("mcp_figma_frame", ToolAccess.NETWORK, ToolApprovalPolicy.ALWAYS,
-                exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("figma")) { ToolResult("ok") })
-            register(tool("autodiscovered", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, keywords = setOf("查找")) { ToolResult("ok") })
-            register(tool("github_prs", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL, family = "GitHub", keywords = setOf("github")) { ToolResult("ok") })
-        }
-        val c = coordinator(registry, pinnedConnectorIds = { listOf("figma", "github") })
-        c.prepareWorkTurnCapabilities("继续", emptyList(), { false })
-        c.enableTaskRelevantOptionalTools("查找", prioritize = true)
-        assertEquals("autodiscovered", c.enabledOptionalSnapshot().first())
-        c.prioritizePinnedForModelStep()
-        assertEquals("mcp_figma_frame", c.enabledOptionalSnapshot().first())
-        // A fixed but unauthenticated GitHub may never appear during a later model step.
-        assertFalse("github_prs" in c.enabledOptionalSnapshot())
-    }
-
-    @Test
-    fun dynamicallyRegisteredMcpToolsArePromotedWithoutGuessingOrCrossServerLeakage() {
-        val registry = ToolRegistry().apply {
-            repeat(180) { index ->
-                register(tool("older_$index", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL, keywords = setOf("old")) { ToolResult("old") })
-            }
-        }
-        val discovery = com.labteto.dshmobile.local.work.LocalWorkRunMcpDiscovery()
-        assertTrue(discovery.observe(registry).isEmpty())
-        registry.register(tool("mcp_x_twitter_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
-            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("x-twitter")) { ToolResult("post") })
-        registry.register(tool("mcp_other_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
-            exposure = ToolExposure.OPTIONAL, family = "MCP", keywords = setOf("other")) { ToolResult("other") })
-        registry.register(tool("mcp_fake_x_post", ToolAccess.PRIVILEGED, ToolApprovalPolicy.ALWAYS,
-            exposure = ToolExposure.OPTIONAL, family = "Other", keywords = setOf("fake")) { ToolResult("fake") })
-        val created = discovery.observe(registry)
-        assertEquals(listOf("mcp_x_twitter_x_post", "mcp_other_x_post"), created)
-        val coordinator = coordinator(registry)
-        coordinator.enableOptionalTools((0 until 180).map { "older_$it" })
-        coordinator.prioritizeRunCreatedMcpTools(created, "发帖到 x-twitter")
-        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-        assertTrue("mcp_x_twitter_x_post" in visible)
-        assertFalse("无关 MCP 服务不应挤占新增工具预算", "mcp_other_x_post" in visible)
-        assertFalse("mcp_fake_x_post" in visible)
-        assertEquals("mcp_x_twitter_x_post", coordinator.enabledOptionalSnapshot().first())
-        // Every remote capability remains registered and discoverable by exact name.
-        assertEquals("mcp_other_x_post", registry.get("mcp_other_x_post")?.name)
-        assertEquals(created, discovery.observe(registry))
-        registry.unregister("mcp_x_twitter_x_post")
-        assertEquals(listOf("mcp_other_x_post"), discovery.observe(registry))
-    }
-
-    @Test
-    fun pinnedImagegenMakesRealMediaToolsVisibleAcrossStepsWithoutAutoSubmitting() = runBlocking {
-        val registry = ToolRegistry().apply {
-            for (name in listOf("media_image_options", "media_image_create", "media_image_status")) {
-                register(tool(
-                    name, if (name == "media_image_create") ToolAccess.PRIVILEGED else ToolAccess.READ_ONLY,
-                    if (name == "media_image_create") ToolApprovalPolicy.ALWAYS else ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL, family = "媒体创作",
-                    keywords = setOf("生图"),
-                ) { ToolResult("stub") })
-            }
-        }
-        var selected = listOf("imagegen")
-        val coordinator = coordinator(registry, pinnedSkillIds = { selected })
-        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
-        assertTrue("media_image_create" in coordinator.enabledOptionalSnapshot())
-        coordinator.clearTurnCapabilities()
-        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
-        coordinator.prioritizePinnedForModelStep()
-        assertTrue("media_image_options" in coordinator.enabledOptionalSnapshot())
-        selected = emptyList()
-        coordinator.clearTurnCapabilities()
-        coordinator.prepareWorkTurnCapabilities("继续", enableGitHub = false)
-        assertFalse("media_image_create" in coordinator.enabledOptionalSnapshot())
-    }
-
-    @Test
-    fun githubKeywordPreactivationCannotBypassNegationOrCredentialGate() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(tool(
-                name = "github_status",
-                access = ToolAccess.NETWORK,
-                approval = ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL,
-                family = "GitHub",
-                keywords = setOf("github", "pr"),
-            ) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        val history = listOf(buildJsonObject {
-            put("role", "user")
-            put("content", "检查 GitHub PR")
-        })
-        var credentialReads = 0
-        coordinator.prepareWorkTurnCapabilities("不使用github，继续本地工作", history, { credentialReads++; true })
-        assertEquals(0, credentialReads)
-        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
-        coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { false })
-        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
-        val detached = linkedSetOf<String>()
-        coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { true }, detached)
-        assertEquals(setOf("github_status"), detached)
-        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
-        // Explicit discovery remains available even without automatic pre-activation.
-        assertTrue(coordinator.searchCapabilities("github").contains("github_status"))
-    }
-
-    @Test
-    fun explicitlyDiscoveredToolTakesPrecedenceOverEarlierOptionalBudget() {
-        val registry = ToolRegistry().apply {
-            repeat(300) { index ->
-                register(tool(name = "background_$index", access = ToolAccess.READ_ONLY,
-                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                    family = "后台扩展", keywords = setOf("background")) { ToolResult("ok") })
-            }
-            register(tool(name = "critical_lookup", access = ToolAccess.READ_ONLY,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "精确发现", keywords = setOf("critical")) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        coordinator.enableOptionalTools((0 until 300).map { "background_$it" })
-        assertFalse("critical_lookup" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-        val response = coordinator.searchCapabilities("critical_lookup")
-        assertTrue(response.contains("critical_lookup"))
-        assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).contains("critical_lookup"))
-    }
-
-    @Test
-    fun currentTaskReordersPreviouslySelectedToolsAheadOfOlderWork() {
-        val registry = ToolRegistry().apply {
-            repeat(200) { index ->
-                register(tool(name = "older_$index", access = ToolAccess.READ_ONLY,
-                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                    family = "旧工具", keywords = setOf("旧任务")) { ToolResult("ok") })
-            }
-            register(tool(name = "current_task_tool", access = ToolAccess.READ_ONLY,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "新任务", keywords = setOf("现在处理")) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        coordinator.enableOptionalTools((0 until 200).map { "older_$it" } + "current_task_tool")
-        coordinator.enableTaskRelevantOptionalTools("现在处理这个问题")
-        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-        assertEquals("current_task_tool", visible.first())
-    }
-
-    @Test
-    fun genericCategoryDoesNotPreactivateUnrelatedToolsInRealCoordinator() {
-        val registry = ToolRegistry().apply {
-            register(tool(name = "team_spawn", access = ToolAccess.AGENT_CONTROL,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "智能体", keywords = setOf("创建团队")) { ToolResult("ok") })
-            register(tool(name = "team_stop", access = ToolAccess.AGENT_CONTROL,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "智能体", keywords = setOf("停止团队")) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        coordinator.enableTaskRelevantOptionalTools("了解智能体架构")
-        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
-
-        coordinator.enableTaskRelevantOptionalTools("创建团队")
-        assertEquals(setOf("team_spawn"), coordinator.enabledOptionalSnapshot())
-        assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-            .contains("team_spawn"))
-        assertTrue(coordinator.searchCapabilities("停止团队").contains("team_stop"))
-        assertTrue(coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-            .contains("team_stop"))
-    }
-
-    @Test
-    fun disabledNetworkToolsRemainDiscoverableButNotCallable() {
-        val registry = ToolRegistry().apply {
-            register(tool(name = "web_search", access = ToolAccess.NETWORK,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "网络", keywords = setOf("联网")) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry, networkSearchEnabled = { false })
-        val directory = coordinator.searchCapabilities("能力目录")
-        assertTrue(directory.contains("web_search（当前设置已关闭）"))
-        assertTrue(coordinator.capabilitySummary().contains("运行策略关闭：web_search"))
-        assertFalse("web_search" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-        coordinator.searchCapabilities("联网")
-        assertFalse("web_search" in coordinator.enabledOptionalSnapshot())
-    }
-
-    @Test
-    fun unknownCapabilityOffersAnExecutableBootstrapPathWithoutPretendingRegistration() {
-        val coordinator = coordinator(ToolRegistry())
-        val result = coordinator.searchCapabilities("尚未实现的 X 平台连接器")
-        assertTrue(result.contains("没有精确匹配"))
-        assertTrue(result.contains("GitHub"))
-        assertTrue(result.contains("MCP stdio"))
-        assertTrue(result.contains("下一模型步骤"))
-        assertFalse(coordinator.enabledOptionalSnapshot().any { it.startsWith("mcp_") })
-    }
-
-    @Test
-    fun newlyRegisteredTaskToolsTakePriorityOverOlderOptionalSchemas() {
-        val registry = ToolRegistry().apply {
-            repeat(300) { index ->
-                register(tool(name = "old_$index", access = ToolAccess.READ_ONLY,
-                    approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                    family = "后台", keywords = setOf("旧任务")) { ToolResult("ok") })
-            }
-        }
-        val coordinator = coordinator(registry)
-        coordinator.enableOptionalTools((0 until 300).map { "old_$it" })
-        registry.register(tool(name = "new_capability", access = ToolAccess.READ_ONLY,
-            approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-            family = "扩展", keywords = setOf("当前任务")) { ToolResult("ok") })
-        coordinator.enableTaskRelevantOptionalTools("使用当前任务新能力")
-        val names = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK))
-        assertTrue("new_capability" in names)
-        assertEquals("new_capability", names.first())
-    }
-
-    @Test
-    fun newlyRegisteredExtensionsAppearInDirectoryAndCanBeLoadedWithoutCodeChanges() {
-        val registry = ToolRegistry().apply {
-            register(tool(name = "local_core", access = ToolAccess.READ_ONLY,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.CORE,
-                family = "文件") { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        val initial = coordinator.searchCapabilities("能力目录")
-        assertFalse(initial.contains("mcp_newly_added"))
-        registry.register(tool(name = "mcp_newly_added", access = ToolAccess.PRIVILEGED,
-            approval = ToolApprovalPolicy.ALWAYS, exposure = ToolExposure.OPTIONAL,
-            family = "MCP", keywords = setOf("新服务", "MCP")) { ToolResult("ok") })
-        val directory = coordinator.searchCapabilities("工具与能力检测")
-        assertTrue(directory.contains("mcp_newly_added"))
-        val fallback = coordinator.searchCapabilities("完全不在关键词中的陌生描述")
-        assertTrue(fallback.contains("mcp_newly_added"))
-        assertFalse("mcp_newly_added" in coordinator.enabledOptionalSnapshot())
-        val result = coordinator.searchCapabilities("mcp_newly_added")
-        assertTrue(result.contains("mcp_newly_added"))
-        assertTrue("mcp_newly_added" in coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)))
-    }
-
-    @Test
-    fun disabledNetworkSearchBlocksDiscoverySchemasAndExecution() = runBlocking {
-        var networkEnabled = false
-        var executed = 0
-        val registry = ToolRegistry().apply {
-            for (name in listOf("web_search", "web_fetch", "http_request")) {
-                register(tool(
-                    name = name,
-                    access = ToolAccess.NETWORK,
-                    approval = ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "网络",
-                    keywords = setOf("联网", "网页搜索"),
-                ) {
-                    executed++
-                    ToolResult("ok")
-                })
-            }
-        }
-        val coordinator = coordinator(registry, networkSearchEnabled = { networkEnabled })
-        val detached = linkedSetOf<String>()
-        coordinator.prepareWorkTurnCapabilities("联网搜索", emptyList(), { false }, detached)
-        assertFalse("web_search" in detached)
-        assertFalse("web_fetch" in detached)
-        coordinator.enableOptionalTools(listOf("web_search", "web_fetch"))
-        coordinator.searchCapabilities("联网 网页搜索")
-        assertFalse("web_search" in coordinator.enabledOptionalSnapshot())
-        assertFalse("web_fetch" in coordinator.enabledOptionalSnapshot())
-        val schemas = LocalToolSchemaProjection(registry, coordinator).modelSchemas(
-            policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = false,
-            history = emptyList(),
-            enabledOptional = setOf("web_search", "web_fetch", "http_request"),
-        )
-        assertEquals(listOf("http_request"), LocalToolSchemaProjection(registry, coordinator).names(schemas))
-        for (name in listOf("web_search", "web_fetch")) {
-            val result = coordinator.execute(
-                LocalToolCall("test-$name", name, JsonObject(emptyMap()), "{}"),
-                allowMutation = true,
-            )
-            assertEquals("NETWORK_SEARCH_DISABLED", result.errorCode)
-        }
-        assertEquals(0, executed)
-        networkEnabled = true
-        coordinator.enableOptionalTools(listOf("web_search", "web_fetch"))
-        assertTrue("web_search" in coordinator.enabledOptionalSnapshot())
-        assertTrue("web_fetch" in coordinator.enabledOptionalSnapshot())
-    }
-
-    @Test
-    fun workEnablesNetworkToolsByDefaultWithoutEnablingWrites() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(tool(
-                name = "web_search", access = ToolAccess.NETWORK,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "网络", keywords = setOf("联网"),
-            ) { ToolResult("ok") })
-            register(tool(
-                name = "web_fetch", access = ToolAccess.NETWORK,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "网络", keywords = setOf("网页读取"),
-            ) { ToolResult("ok") })
-            register(tool(
-                name = "write", access = ToolAccess.WORKSPACE_WRITE,
-                approval = ToolApprovalPolicy.MUTATION, exposure = ToolExposure.OPTIONAL,
-                keywords = setOf("写入"),
-            ) { ToolResult("ok") })
-        }
-        val coordinator = coordinator(registry)
-        val detached = linkedSetOf<String>()
-        coordinator.prepareWorkTurnCapabilities("整理代码", emptyList(), { false }, detached)
-        assertEquals(setOf("web_search", "web_fetch"), detached)
-        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
-        val projection = LocalToolSchemaProjection(registry, coordinator)
-        val schemas = projection.modelSchemas(
-            policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = false,
-            history = emptyList(),
-            enabledOptional = detached,
-        )
-        assertEquals(setOf("web_search", "web_fetch"), projection.names(schemas).toSet())
-    }
-
-    @Test
-    fun workIntentDoesNotReadGitHubCredentialsForUnrelatedTaskAndPropagatesCancellation() = runBlocking {
-        val coordinator = coordinator(ToolRegistry())
-        var reads = 0
-        coordinator.prepareWorkTurnCapabilities("整理本地文件", emptyList(), { reads++; true })
-        assertEquals(0, reads)
-        val cancelled = kotlinx.coroutines.CancellationException("cancelled credential read")
-        val failure = runCatching {
-            coordinator.prepareWorkTurnCapabilities("检查 GitHub PR", emptyList(), { throw cancelled })
-        }.exceptionOrNull()
-        org.junit.Assert.assertSame(cancelled, failure)
-        assertTrue(coordinator.enabledOptionalSnapshot().isEmpty())
-    }
-
-    @Test
     fun toolContextInheritsFrozenRunProfileAndDoesNotLeakAfterScope() = runBlocking {
         val registry = ToolRegistry()
         val observed = mutableListOf<LocalModelProfile?>()
@@ -1103,38 +519,6 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue(result.isError)
         assertEquals("PLAN_MODE_BLOCKED", result.errorCode)
         assertFalse(executed)
-    }
-
-    @Test
-    fun explicitSubagentAllowlistCanActivateOptionalReadOnlyTool() {
-        val registry = ToolRegistry().apply {
-            register(tool(
-                name = "remote_lookup",
-                access = ToolAccess.NETWORK,
-                approval = ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL,
-                family = "网络",
-                keywords = setOf("remote", "lookup"),
-            ) { ToolResult("ok") })
-        }
-        val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-        val disabled = projection.subagentSchemas(
-            allowMutation = false,
-            allowVirtualScreen = false,
-            enabledOptional = emptySet(),
-        )
-        assertFalse("remote_lookup" in projection.names(disabled))
-        val allowed = projection.subagentSchemas(
-            allowMutation = false,
-            allowVirtualScreen = false,
-            enabledOptional = setOf("remote_lookup"),
-        )
-        assertTrue("remote_lookup" in projection.names(allowed))
-        assertTrue("remote_lookup" !in projection.names(projection.subagentSchemas(
-            allowMutation = false,
-            allowVirtualScreen = false,
-            enabledOptional = emptySet(),
-        )))
     }
 
     @Test
@@ -1788,141 +1172,6 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals("detached-session", observedSessionId)
     }
 
-    @Test
-    fun configuredConnectorCanPreEnableRegisteredOptionalToolsForFirstModelStep() {
-        val registry = ToolRegistry().apply {
-            register(
-                tool(
-                    name = "github_status",
-                    access = ToolAccess.NETWORK,
-                    approval = ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "GitHub",
-                    keywords = setOf("github", "pr"),
-                ) { ToolResult("ok") },
-            )
-            register(
-                tool(
-                    name = "github_api_get",
-                    access = ToolAccess.NETWORK,
-                    approval = ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "GitHub",
-                    keywords = setOf("github", "pr"),
-                ) { ToolResult("ok") },
-            )
-            register(
-                tool(
-                    name = "github_api_request",
-                    access = ToolAccess.PRIVILEGED,
-                    approval = ToolApprovalPolicy.ALWAYS,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "GitHub",
-                    keywords = setOf("github", "pr"),
-                ) { ToolResult("ok") },
-            )
-            register(
-                tool(
-                    name = "process_exec",
-                    access = ToolAccess.PROCESS,
-                    approval = ToolApprovalPolicy.ALWAYS,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "运行时",
-                    keywords = setOf("runtime", "process"),
-                ) { ToolResult("ok") },
-            )
-        }
-        val coordinator = coordinator(registry)
-
-        registry.register(
-            tool(
-                name = "future_repo_tool",
-                access = ToolAccess.NETWORK,
-                approval = ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.OPTIONAL,
-                family = "GitHub",
-                keywords = setOf("github", "future"),
-            ) { ToolResult("ok") },
-        )
-
-        coordinator.enableGitHubConnectorTools()
-        val visible = coordinator.visibleToolNames(localAgentRunPolicy(LocalUsageMode.WORK)).toSet()
-        val detachedEnabled = linkedSetOf<String>()
-        coordinator.enableGitHubConnectorTools(detachedEnabled)
-
-        assertEquals(
-            setOf("github_status", "github_api_get", "github_api_request", "future_repo_tool"),
-            visible,
-        )
-        assertEquals(visible, detachedEnabled)
-        assertFalse("process_exec" in visible)
-    }
-
-    @Test
-    fun capabilitySearchEnablesOptionalToolForCurrentTurn() {
-        val registry = ToolRegistry().apply {
-            register(
-                tool(
-                    name = "process_exec",
-                    access = ToolAccess.PROCESS,
-                    approval = ToolApprovalPolicy.ALWAYS,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "运行时",
-                    keywords = setOf("runtime", "process"),
-                ) { ToolResult("ok") },
-            )
-        }
-        val coordinator = coordinator(registry)
-
-        val before = coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK))
-        val result = coordinator.searchCapabilities("runtime process")
-        val after = coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK))
-
-        assertEquals(0, before.size)
-        assertTrue(result.contains("process_exec"))
-        assertEquals(1, after.size)
-        coordinator.clearTurnCapabilities()
-        assertEquals(0, coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)).size)
-    }
-
-    @Test
-    fun explicitTaskIntentPreEnablesMatchingCapabilityWithoutInflatingUnrelatedTurns() {
-        val registry = ToolRegistry().apply {
-            register(
-                tool(
-                    name = "web_search",
-                    access = ToolAccess.NETWORK,
-                    approval = ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "网络",
-                    keywords = setOf("联网", "网页搜索"),
-                ) { ToolResult("ok") },
-            )
-            register(
-                tool(
-                    name = "memory_update",
-                    access = ToolAccess.SESSION_WRITE,
-                    approval = ToolApprovalPolicy.ALWAYS,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "记忆",
-                    keywords = setOf("更新记忆"),
-                ) { ToolResult("ok") },
-            )
-        }
-        val coordinator = coordinator(registry)
-
-        coordinator.enableTaskRelevantOptionalTools("继续修改本地代码")
-        assertEquals(0, coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)).size)
-
-        coordinator.enableTaskRelevantOptionalTools("联网搜索最新文档")
-        assertEquals(
-            listOf("web_search"),
-            LocalToolSchemaProjection(registry, coordinator).names(
-                coordinator.visibleSchemas(localAgentRunPolicy(LocalUsageMode.WORK)),
-            ),
-        )
-    }
-
     @Test fun subagentSurfaceStaysStableAcrossCapabilityModes() {
         val registry = ToolRegistry()
         registerGateways(registry)
@@ -2138,6 +1387,81 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(2, approvals)
     }
 
+
+    @Test fun disabledNetworkSearchBlocksDirectInvocationWithoutAPluginExecutor() = runBlocking {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        var called = 0
+        registry.register(tool("web_search", ToolAccess.NETWORK,
+            ToolApprovalPolicy.NEVER, ToolExposure.OPTIONAL) {
+            called++
+            ToolResult("unexpected")
+        })
+        val args = directArgs("web_search")
+        val result = coordinator(registry, networkSearchEnabled = { false }).executeScoped(
+            LocalToolCall("network-direct", "tool_call", args, args.toString()),
+            "s1", true, false, approval = { _, _, _ -> true })
+        assertTrue(result.isError)
+        assertEquals("NETWORK_SEARCH_DISABLED", result.errorCode)
+        assertEquals(0, called)
+    }
+
+    @Test fun directCallChecksSubagentAllowlistAgainstTheActualChildTool() = runBlocking {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        var calls = 0
+        registry.register(tool("private_write", ToolAccess.WORKSPACE_WRITE,
+            ToolApprovalPolicy.ALWAYS, ToolExposure.OPTIONAL) {
+            calls++
+            ToolResult("wrote")
+        })
+        val args = directArgs("private_write")
+        val call = LocalToolCall("child-direct", "tool_call", args, args.toString())
+        val scope = com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope(
+            com.labteto.dshmobile.local.agent.LocalSubagentCapabilities(
+                allowMutation = true, toolAllowlist = setOf("read")),
+            null)
+        val result = withContext(scope) {
+            coordinator(registry).executeScoped(call, "s1", true, false,
+                approval = { _, _, _ -> true })
+        }
+        assertEquals("SUBAGENT_TOOL_SCOPE_BLOCKED", result.errorCode)
+        assertEquals(0, calls)
+    }
+
+    @Test fun directCallPreservesTargetIdentityAndRejectsInternalRegistration() = runBlocking {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        val started = mutableListOf<String>()
+        var calls = 0
+        registry.register(tool("internal_secret", ToolAccess.READ_ONLY,
+            ToolApprovalPolicy.NEVER, ToolExposure.INTERNAL) {
+            calls++
+            ToolResult("secret")
+        })
+        registry.register(tool("mcp_info", ToolAccess.READ_ONLY,
+            ToolApprovalPolicy.NEVER, ToolExposure.OPTIONAL) {
+            calls++
+            ToolResult("safe")
+        })
+        val executor = coordinator(registry, recordExecutionStarted = { _, call, _ ->
+            started += call.name
+        })
+        fun invoke(name: String): LocalToolCall {
+            val args = directArgs(name)
+            return LocalToolCall("direct-" + name, "tool_call", args, args.toString())
+        }
+        val hidden = executor.executeScoped(invoke("internal_secret"),
+            "s1", true, false, approval = { _, _, _ -> true })
+        assertEquals("TOOL_SCOPE_BLOCKED", hidden.errorCode)
+        val visible = executor.executeScoped(invoke("mcp_info"),
+            "s1", true, false, approval = { _, _, _ -> true })
+        assertFalse(visible.isError)
+        assertEquals("safe", visible.content)
+        assertEquals(listOf("mcp_info"), started)
+        assertEquals(1, calls)
+    }
+
     private fun registerGateways(registry: ToolRegistry) {
         for (name in listOf("tool_search", "tool_call")) {
             registry.register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
@@ -2159,22 +1483,17 @@ class LocalToolExecutionCoordinatorTest {
         ) -> Unit = { _, _, _, _ -> },
         executionIdFactory: () -> String = { "exec-test" },
         networkSearchEnabled: () -> Boolean = { true },
-        pinnedConnectorIds: () -> List<String> = { emptyList() },
-        pinnedSkillIds: () -> List<String> = { emptyList() },
         workspaceGate: com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate =
             com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate(),
     ) = LocalToolExecutionCoordinator(
         registry = registry,
         currentSessionId = { "s1" },
         planMode = { planMode },
-        enabledOptionalTools = linkedSetOf(),
         requestApproval = { _, _, _ -> true },
         recordExecutionStarted = recordExecutionStarted,
         recordAuthorizationDecision = recordAuthorizationDecision,
         executionIdFactory = executionIdFactory,
         networkSearchEnabled = networkSearchEnabled,
-        pinnedConnectorIds = pinnedConnectorIds,
-        pinnedSkillIds = pinnedSkillIds,
         workspaceReadWriteGate = workspaceGate,
     )
 
