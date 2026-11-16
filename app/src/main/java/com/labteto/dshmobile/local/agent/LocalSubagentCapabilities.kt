@@ -121,6 +121,9 @@ internal fun validateLocalSubagentToolAllowlist(
         val function = (element as? JsonObject)?.get("function") as? JsonObject
         function?.get("name")?.jsonPrimitive?.contentOrNull
     }.toSet()
+    // Unified gateway exposes only tool_call/tool_search. The exact allowlist is checked
+    // against the real target on each invocation, including dynamically registered MCP.
+    if ("tool_call" in available) return
     val unavailable = allowlist - available
     require(unavailable.isEmpty()) {
         val unavailableList = unavailable.sorted().joinToString(",")
@@ -143,6 +146,10 @@ internal fun filterLocalSubagentSchemas(
     capabilities: LocalSubagentCapabilities,
 ): JsonArray {
     val allowlist = capabilities.toolAllowlist ?: return source
+    if (source.any { element ->
+        val function = (element as? JsonObject)?.get("function") as? JsonObject
+        function?.get("name")?.jsonPrimitive?.contentOrNull == "tool_call"
+    }) return source // Limit real targets at execution, never hide the shared entrypoint.
     return JsonArray(
         source.filter { element ->
             val function = (element as? JsonObject)?.get("function") as? JsonObject
