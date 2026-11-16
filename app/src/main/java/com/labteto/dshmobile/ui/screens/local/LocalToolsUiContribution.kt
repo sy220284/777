@@ -30,7 +30,8 @@ internal fun localToolsFeatureUiContribution(
         startAtPlugins = startAtPlugins,
         startAtSkills = startAtSkills,
         onUseCapability = onUseCapability,
-        handleRootSystemBack = false,
+        // The ability center owns Back from every tab and returns to the caller.
+        handleRootSystemBack = true,
         onOpenSettings = { destination ->
             onSettingsDestinationChange(destination)
             onPushFeature(LocalFeaturePage.SETTINGS)
