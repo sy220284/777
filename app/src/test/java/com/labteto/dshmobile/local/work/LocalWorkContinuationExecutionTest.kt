@@ -77,6 +77,32 @@ class LocalWorkContinuationExecutionTest {
         assertEquals(1, binding.runHandle.pendingInputs.size())
     }
 
+    @Test fun explicitStopAlwaysWinsAgainstAutomaticRecovery() = withBinding { binding ->
+        binding.runHandle.cancellationRequested = true
+        assertFalse(queueAutomaticWorkContinuation(
+            binding, "run-stop", interruptedError(), sourceMessageId = "user-stop",
+        ))
+        assertEquals(0, binding.runHandle.pendingInputs.size())
+        assertEquals(null, binding.eventLog.latest("turn/continuation-queued"))
+    }
+
+    @Test fun transportOutageCanQueueAfterManyRecoveriesWithoutAbandoningTask() = withBinding { binding ->
+        binding.automaticContinuationCount = 25
+        val recoverable = LocalModelException(
+            code = "MODEL_NETWORK",
+            message = "network down before send",
+            retryable = true,
+            admissionState = LocalModelAdmissionState.NOT_SENT,
+            origin = com.labteto.dshmobile.local.LocalModelFailureOrigin.TRANSPORT,
+        )
+        assertTrue(queueAutomaticWorkContinuation(
+            binding, "run-26", recoverable, sourceMessageId = "user-1",
+        ))
+        assertEquals(26, binding.automaticContinuationCount)
+        assertEquals(1, binding.runHandle.pendingInputs.size())
+        assertEquals("MODEL_NETWORK", binding.runHandle.pendingInputs.snapshot().single().continuation?.failureCode)
+    }
+
     @Test fun nonContinuableFailureLeavesInboxUnchanged() = withBinding { binding ->
         val denied = LocalModelException(
             code = "AUTH_REJECTED",
