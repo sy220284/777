@@ -1181,7 +1181,12 @@ internal class LocalWorkAgentTurnExecutor(
                             pendingQuestion = null,
                             deviceApprovalLease = false,
                         ),
-                        kernel = it.kernel.copy(running = false),
+                        // Keep the original task visibly running until the Work registry
+                        // atomically either hands off its successor or releases the owner.
+                        kernel = it.kernel.copy(
+                            running = binding.foregroundServiceLease != null &&
+                                !binding.runHandle.cancellationRequested,
+                        ),
                     )
                 }
                 try {
