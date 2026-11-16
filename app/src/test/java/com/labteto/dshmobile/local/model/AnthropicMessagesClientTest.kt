@@ -476,6 +476,8 @@ class AnthropicMessagesClientTest {
 
         val invalidToolStartCases = listOf(
             """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","name":"bash","input":{}}}""" to "missing_tool_id",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":[],"name":"bash","input":{}}}""" to "missing_tool_id",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","name":[],"input":{}}}""" to "missing_tool_name",
             """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","input":{}}}""" to "missing_tool_name",
         )
         invalidToolStartCases.forEach { (toolStartCase, expectedIssue) ->
