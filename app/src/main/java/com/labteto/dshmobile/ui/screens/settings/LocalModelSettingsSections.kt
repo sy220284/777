@@ -56,8 +56,6 @@ import com.labteto.dshmobile.local.model.LocalModelCapability
 import com.labteto.dshmobile.local.model.LocalEffectiveModelContracts
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProtocol
-import com.labteto.dshmobile.local.model.LocalModelProtocolRoutePolicy
-import com.labteto.dshmobile.local.model.LocalKimiPolicy
 import com.labteto.dshmobile.uicontract.UiSettingsSnapshot
 import com.labteto.dshmobile.ui.components.DisclosureRow
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
@@ -145,7 +143,8 @@ internal fun LocalModelSettingsCard(
         model, baseUrl, apiKey, savedRoute || credentialSourceProfileId != null,
     ) else ApiModelEditorFormErrors()
     val selectedPreset = LocalModelPresets.find(model, baseUrl)
-    val advertisedProtocols = LocalModelProtocolRoutePolicy.supportedProtocols(model, baseUrl)
+    val advertisedProtocols = LocalModelPresets.editorProtocolsFor(model, baseUrl)
+    val contextWindowOptions = LocalModelPresets.editorContextWindowOptionsFor(model, baseUrl)
     val recommendedProtocol = LocalModelPresets.editablePresetFor(model, baseUrl)?.protocol
     val editRoute: (String, String, String?) -> Unit = { name, url, id ->
         saveAttempted = false
@@ -374,10 +373,10 @@ internal fun LocalModelSettingsCard(
                     )
                     if (!errors.valid) {
                         testStatus = errors.model ?: errors.baseUrl ?: errors.apiKey
-                    } else if (LocalKimiPolicy.supportsContextChoice(model, baseUrl) &&
+                    } else if (contextWindowOptions.isNotEmpty() &&
                         contextWindowTokens.isNotBlank() &&
                         contextWindowTokens.toIntOrNull()?.let {
-                            it in LocalKimiPolicy.selectableContextTokens
+                            it in contextWindowOptions
                         } != true
                     ) {
                         testStatus = kimiK3ContextInvalid
@@ -473,7 +472,7 @@ internal fun LocalModelSettingsCard(
                                     LocalModelProtocol.RESPONSES,
                                     LocalModelProtocol.ANTHROPIC_MESSAGES,
                                     LocalModelProtocol.CHAT_COMPLETIONS ->
-                                        LocalModelProtocolRoutePolicy.requestEndpoint(model, baseUrl, protocol)
+                                        LocalModelPresets.editorRequestEndpointFor(model, baseUrl, protocol)
                                 },
                             ),
                             style = DsType.caption11.withReadingWeight(),
@@ -486,19 +485,16 @@ internal fun LocalModelSettingsCard(
                                 color = colors.textTertiary,
                             )
                         }
-                        if (LocalKimiPolicy.supportsContextChoice(model, baseUrl)) {
+                        if (contextWindowOptions.size == 2) {
+                            val extended = contextWindowOptions.last().toString()
                             SySegmented(
                                 segments = listOf(
                                     SySegment("default", "256K · 默认"),
-                                    SySegment(LocalKimiPolicy.extendedContextTokens.toString(), "1M · 会员"),
+                                    SySegment(extended, "1M · 会员"),
                                 ),
-                                selectedKey = if (contextWindowTokens ==
-                                    LocalKimiPolicy.extendedContextTokens.toString()) {
-                                    LocalKimiPolicy.extendedContextTokens.toString()
-                                } else "default",
+                                selectedKey = if (contextWindowTokens == extended) extended else "default",
                                 onSelect = { choice ->
-                                    contextWindowTokens = if (choice ==
-                                        LocalKimiPolicy.extendedContextTokens.toString()) choice else ""
+                                    contextWindowTokens = if (choice == extended) choice else ""
                                     editorGeneration++
                                     testStatus = null
                                 },
@@ -527,7 +523,7 @@ internal fun LocalModelSettingsCard(
                     }
                 }
                 LocalModelProtocolPicker(protocol, available = advertisedProtocols) { selected ->
-                    baseUrl = LocalModelProtocolRoutePolicy.baseUrlFor(model, baseUrl, selected)
+                    baseUrl = LocalModelPresets.editorBaseUrlForProtocol(model, baseUrl, selected)
                     protocol = selected
                     editorGeneration++
                     testStatus = null
