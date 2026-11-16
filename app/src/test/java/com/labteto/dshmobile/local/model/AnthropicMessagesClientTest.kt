@@ -394,7 +394,8 @@ class AnthropicMessagesClientTest {
             listOf(start, delta) to "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""", """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}""") to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"private"}}""", """{"type":"content_block_stop","index":0}""", delta, stop) to "ANTHROPIC_PROTOCOL_ERROR",
-            listOf(start, stop) to "MODEL_FINISH_null",
+            listOf(start, stop) to "ANTHROPIC_PROTOCOL_ERROR",
+            listOf(start, """{"type":"message_delta","delta":{"stop_reason":"future_stop"}}""", stop) to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, """{"type":"error","error":{"type":"overloaded_error","message":"busy"}}""") to "ANTHROPIC_STREAM_ERROR",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
         ).forEach { (frames, code) ->
