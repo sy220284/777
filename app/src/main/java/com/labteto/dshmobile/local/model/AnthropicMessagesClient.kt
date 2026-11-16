@@ -597,7 +597,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         } else stopReason
         val nativeContent = buildJsonArray {
             blocks.toSortedMap().values.filter { completionReason == LocalModelCompletionReason.COMPLETED || it.type == "text" }
-                .forEach { add(it.toNative(json, requestId ?: messageId)) }
+                .forEach { add(it.toNative(json, requestId ?: messageId, stopReason, streamEventsSeen)) }
         }
         val canonicalBlocks = mutableListOf<LocalCanonicalContent>()
         nativeContent.forEach { raw ->
@@ -681,7 +681,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         val inputJson: StringBuilder = StringBuilder(),
         val citations: MutableList<JsonElement> = mutableListOf(),
     ) {
-        fun toNative(json: Json, requestId: String?): JsonObject = when (type) {
+        fun toNative(json: Json, requestId: String?, stopReason: String?, streamEventsSeen: Int): JsonObject = when (type) {
             "text" -> buildJsonObject {
                 rawStart.forEach { (key, value) -> if (key !in setOf("text", "citations")) put(key, value) }
                 put("type", "text")
@@ -701,10 +701,10 @@ internal class AnthropicMessagesClient @Inject constructor(
                 val input = if (inputJson.isNotEmpty()) {
                     runCatching { json.parseToJsonElement(inputJson.toString()).jsonObject }
                         .getOrElse { cause ->
-                            throw malformedToolArgumentsErrorStatic(requestId, cause)
+                            throw malformedToolArgumentsErrorStatic(requestId, stopReason, streamEventsSeen, cause)
                         }
                 } else {
-                    initialInput ?: throw malformedToolArgumentsErrorStatic(requestId)
+                    initialInput ?: throw malformedToolArgumentsErrorStatic(requestId, stopReason, streamEventsSeen)
                 }
                 buildJsonObject {
                     rawStart.forEach { (key, value) ->
@@ -918,7 +918,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         )
 
         /** Malformed model arguments cannot authorize tool execution; resume from saved history. */
-        fun malformedToolArgumentsErrorStatic(requestId: String?, cause: Throwable? = null) =
+        fun malformedToolArgumentsErrorStatic(requestId: String?, stopReason: String?, streamEventsSeen: Int, cause: Throwable? = null) =
             LocalModelException(
                 code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
                 message = "模型生成的 tool_use 参数不是合法 JSON 对象，本次工具调用尚未执行",
@@ -926,6 +926,10 @@ internal class AnthropicMessagesClient @Inject constructor(
                 cause = cause,
                 requestId = requestId,
                 providerCode = "malformed_tool_use_arguments",
+                // Terminal message_stop was received; retain non-sensitive stream facts to
+                // distinguish provider-completed malformed JSON from transport truncation.
+                lastStreamEventType = "message_stop:${stopReason ?: "unknown"}",
+                streamEventsSeen = streamEventsSeen,
                 admissionState = LocalModelAdmissionState.ADMITTED,
                 continuationEligible = true,
                 origin = LocalModelFailureOrigin.STREAM_PARSE,
