@@ -56,11 +56,11 @@ def export_components():
  return checked(['adb','pull','/sdcard/Android/data/com.sy220284.dshmobile.debug/files/ui-audit/.',str(OUT/'components')])
 phase('export-native-component-images',export_components)
 
-release=OUT/'777.397.apk'
+release=OUT/'777.400.apk'
 def baseline():
- url='https://github.com/sy220284/777/releases/download/v0.12.0-777.397/app-release.apk'
+ url='https://github.com/sy220284/777/releases/download/v0.12.0-777.400/app-release.apk'
  urllib.request.urlretrieve(url,release)
- digest='f0b7ae6bb74fce0978582057cd342608cde45a2eba07f5703bbd0a30aac28555'
+ digest='94305fa7bfcb3ff8ea456c3bc7dbf7c89163bcc55e5101b0e9e6ae0b0e4dc2a7'
  if hashlib.sha256(release.read_bytes()).hexdigest()!=digest:raise RuntimeError('Official release checksum mismatch')
  try:
   return checked(['python3','tools/ui/native-page-audit.py','--apk',str(release),'--package','com.sy220284.dshmobile','--expected-sha256',digest,'--output',str(OUT/'baseline')],timeout=420)
