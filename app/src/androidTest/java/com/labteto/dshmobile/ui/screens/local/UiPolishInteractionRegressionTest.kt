@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
@@ -84,6 +85,29 @@ class UiPolishInteractionRegressionTest {
             assertEquals(1, selectRequests)
             assertEquals(1, projectsRequests)
         }
+    }
+
+    @Test fun deepWorkspaceDirectoryProvidesExactAncestorNavigation() {
+        val breadcrumbs = workspaceBreadcrumbs(
+            "任务/2026/十一月/具有很长名称的目录", "任务", "任务文件",
+        )
+        assertEquals(
+            listOf("任务", "任务/2026", "任务/2026/十一月", "任务/2026/十一月/具有很长名称的目录"),
+            breadcrumbs.map { it.directory },
+        )
+        var destination = ""
+        compose.setContent {
+            DshTheme {
+                LocalWorkspacePathBreadcrumb(
+                    directory = "任务/2026/十一月/具有很长名称的目录",
+                    section = 0,
+                    onNavigate = { destination = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("workspace_path_breadcrumb").assertExists()
+        compose.onNodeWithTag("workspace_breadcrumb_1").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("任务/2026", destination) }
     }
 
     @Test fun fullscreenDialogHasOwnSceneBackground() {
