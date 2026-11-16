@@ -1,41 +1,41 @@
-# 模型默认协议与统一回复通道（2026-10-20）
+# 模型默认协议与统一回复通道（2026-11-16）
 
 ## 协议选择原则
 
-预设模型使用经官方文档确认、且当前 777 适配器真正支持的协议。模型名称不能单独决定用户已经保存的路由协议；**协议、地址和凭据绑定必须整体一致**。
+新建预置模型按官方推荐及 777 已实现的原生适配器选择协议。已保存配置仍由其 `profile.protocol` 决定路由；编辑页允许修改预置协议，变更前可进行连接测试。模型、协议、API 地址与凭据须共同形成路由身份；正在执行的会话不随前台修改漂移。
 
-| 预设 | 新建路由协议 | 新建路由 Base URL | 说明 |
+| 模型 | 新增配置默认协议 | Base URL | 决策依据 |
 | --- | --- | --- | --- |
-| DeepSeek Flash / V4 Pro | Chat Completions | `https://api.deepseek.com` | 保持已验证的图片／工具历史适配 |
-| MiniMax M3.1 Flash / M3 | Anthropic Messages | `https://api.minimaxi.com/anthropic/v1` | 原生 thinking/text/tool_use 分块，工具续轮回放 |
-| MiniMax M2.7 / highspeed | Chat Completions | `https://api.minimaxi.com/v1` | 不切换到当前仅对 M3 系列确认支持的 Anthropic 接口 |
-| Kimi Code K3 / coding | Chat Completions | `https://api.kimi.com/coding/v1` | 保留订阅路由及原有图像／视频输入链 |
-| OpenAI GPT API（历史兼容元数据） | Responses | `https://api.openai.com/v1` | 保持原 Responses 模型策略 |
-| ChatGPT 套餐 | Responses | 帐号绑定官方端点 | 独立鉴权与模型目录 |
-| Claude 官方（历史兼容元数据） | Anthropic Messages | `https://api.anthropic.com/v1` | 继续使用 x-api-key |
-| GLM / Gemini / Qwen（历史兼容元数据） | Chat Completions | 各自既有兼容 URL | 保持旧路线 |
+| DeepSeek `deepseek-flash`、`deepseek-v4-pro` | Responses | `https://api.deepseek.com` | 官方原生 Responses，支持 reasoning effort、函数工具、SSE 及图片输入（仅 Flash） |
+| MiniMax `MiniMax-M3.1-Flash`、`MiniMax-M3` | Anthropic Messages | `https://api.minimaxi.com/anthropic/v1` | 原生 thinking / text / tool_use，按型号传递 output_config / thinking |
+| MiniMax M2.7 / highspeed | 历史配置保留 Chat Completions | `https://api.minimaxi.com/v1` | 不再列入新增预置菜单；旧配置及地域官方接口识别保持不变 |
+| Kimi Code `k3.1-pro`、`k3.1-pro-highspeed`、`k3`、`k3-256k`、`kimi-for-coding`、`kimi-for-coding-highspeed` | Responses | `https://api.kimi.com/coding/v1` | 官方原生 Responses；工具、流式输出及思考档位直连 |
+| OpenAI API 历史兼容元数据 | Responses | `https://api.openai.com/v1` | 沿用既有 API Key Responses |
+| ChatGPT 套餐 | Responses | 帐号绑定官方地址 | 保持独立身份验证和模型目录 |
+| Claude 官方历史元数据 | Anthropic Messages | `https://api.anthropic.com/v1` | 保持 x-api-key 与历史模型路线 |
+| GLM、Gemini、Qwen 历史元数据 | Chat Completions | 历史各自兼容接口 | 保留已保存配置 |
 
-- **已有用户配置不迁移**：`/v1` 的 MiniMax M3 仍使用 Chat Completions；新建 `/anthropic/v1` 才使用 Anthropic Messages。模型查找匹配地区官方域名时也按地址反推对应协议。自定义代理不继承官方能力。
-- **无效温度控制**：MiniMax M3.1/M3 在官方协议的 temperature 被忽略，所以能力表禁用温度、设置页隐藏滑块、请求组装不发这个参数；M2 现有参数行为保留。
-- **长任务输出**：Anthropic Messages 必须携带 `max_tokens`，思考也计入此值；MiniMax M3.1/M3 的预设默认请求上限设置为 65536，避免落入通用适配器 8192 的短回复默认值。实际可用上限仍取决于厂商账户。
-- **鉴权匹配**：MiniMax Anthropic 兼容地址请求使用 `Authorization: Bearer`，Claude 官方继续 `x-api-key`。
+**协议与多模态关联：** Kimi Code 官方 Responses 当前支持文字与图片，视频输入需原生 Chat Completions。777 的能力投影按真实 `profile.protocol` 确定是否显示视频支持；预置默认 Responses，用户可通过预置编辑器明确改用 Chat Completions 处理视频。旧配置不自动改写协议，以免覆盖原来的用户选择和历史请求回放身份。Kimi K3.1 Pro 与 K3 的 1M 上下文需要拥有对应档位；默认 256K，高速旗舰的默认上下文为 1M。
 
-## 回复显示统一契约
+## 协议执行与缓存
 
-Chat Completions、Responses、Anthropic Messages 适配器统一输出 `LocalModelDelta(content, reasoning)` 与最终 `LocalModelReply`。新版本的 `LocalModelRequestCoordinator` 将两条增量分别送入同一个 `LocalStreamingPreviewStore`，按同一请求所有权、屏幕更新节流和最大预览长度管理：
+- `LocalModelGateway` 根据冻结的 profile protocol 分派到唯一适配器；Responses 使用 `/responses`，Anthropic 使用 `/messages`。与旧 Chat 对话共存时，各自原始响应仅在相同 route fingerprint 下回放。
+- DeepSeek Responses 发送 `reasoning.effort`（`none/low/high/max`）、可选 `max_output_tokens`、函数工具及完整历史；官方接口无状态，不使用 `previous_response_id`。其 `store` 字段不生效，自动缓存也不接受 OpenAI 特有的 cache key。
+- Kimi Code Responses 发送官方支持的 `reasoning.effort`，K3.1 Pro 始终保持思考开启；服务端固定采样参数不传用户温度。用户是否拥有高速/1M 配额由官方账户判定。
+- OpenAI 专用 `reasoning.encrypted_content`、prompt cache options 继续仅用于适用的 OpenAI 路由。ChatGPT 套餐 Responses Lite 的工具封装与请求参数保持独立。
+- MiniMax M3.1 / M3 的 Anthropic Messages 保留 `max_tokens = 65536` 默认预算、Bearer 鉴权、原生分块思考与工具历史；已保存 MiniMax /v1 Chat 路由原样可用。
 
-- 正文 `content` → 聊天 Markdown 正文／工作模式正文预览，事件日志确认后由正式消息替换；
-- 思考 `reasoning` → 聊天的 `ChatThinkingRow`／工作模式的“思考中”状态，避免把思考塞进正文；
-- 工具调用 → 保留原始工具身份、执行结果与对应来源，交给已有工作时间线；
-- 图片、音视频与文件成果 → 继续由已有多模态渲染与来源关联链处理，不在模型协议层制造新组件。
+## UI 与回复契约
 
-MiniMax Chat Completions 旧路由继续分离前导 `<think>`；Anthropic 的 thinking/text/tool_use 使用原生结构化事件；Responses 的 reasoning/output_text 使用事件快照。原始协议 replay 不被展示层改写，确保工具续轮语义不丢失。
+同一 `LocalModelDelta(content, reasoning)` 与 `LocalModelReply` 服务 Chat、Work 和子智能体。正文进入聊天/工作正文，思考进入思考区域；工具调用通过 Session EventLog 保留身份、结果和续轮，图片/视频/文件只暴露真正能传输的能力。预置编辑页提供协议选项及连接测试，若偏离推荐值给予明确提示。
 
-## 验收边界
+## 验证边界
 
-自动化回归覆盖：新旧 MiniMax 协议路由、无效温度、OpenAI/Claude/DeepSeek 等默认协议、不同鉴权请求头、思考／正文双通道与旧请求隔离。CI 执行结果以实际 GitHub 检查为准；无真实厂商密钥时不能宣称已通过在线服务联调。
+覆盖默认模型枚举、历史 MiniMax 区域兼容、Kimi 视频协议差异、思考档位与上下文档位、Responses `max_output_tokens`、请求头/地址、工具续轮、图像编码以及 ChatGPT 套餐既有契约。CI 或真实服务端验证应以实际回执为准；无真实服务商密钥不宣称已经完成线上联调。
 
 官方参考：
-- [MiniMax Anthropic SDK](https://platform.minimax.io/docs/api-reference/text-anthropic-api)
-- [MiniMax OpenAI SDK](https://platform.minimax.io/docs/api-reference/text-openai-api)
-- [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)
+- [DeepSeek Responses](https://api-docs.deepseek.com/guides/responses_api/)
+- [DeepSeek 思考参数](https://api-docs.deepseek.com/guides/thinking_mode/)
+- [Kimi Code 模型及接口](https://www.kimi.com/code/docs/kimi-code/models.html)
+- [Kimi Code Codex 接入与视频限制](https://www.kimi.com/code/docs/third-party-tools/codex.html)
+- [MiniMax Anthropic 接口](https://platform.minimax.io/docs/api-reference/text-anthropic-api)
