@@ -179,11 +179,11 @@ class OpenAiResponsesClient @Inject constructor(
                 val streamed = OpenAiResponsesStreamSnapshot()
                                 // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
                 // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
-                val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
+                val reader = ModelSseDataReader(ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES))
                 run {
                     while (true) {
                         val line = try {
-                            reader.readLine()
+                            reader.readData()
                         } catch (failure: ModelStreamLimitException) {
                             throw LocalModelException(
                                 code = "MODEL_RESPONSE_TOO_LARGE",
@@ -198,8 +198,7 @@ class OpenAiResponsesClient @Inject constructor(
                             if (streamed.content.isBlank() && eagerCalls.isEmpty()) throw failure
                             null
                         } ?: break
-                        if (!line.startsWith("data:")) continue
-                        val data = line.removePrefix("data:").trim()
+                        val data = line.trim()
                         if (data.isBlank() || data == "[DONE]") continue
                         val event = runCatching { json.parseToJsonElement(data).jsonObject }
                             .getOrElse { cause ->
