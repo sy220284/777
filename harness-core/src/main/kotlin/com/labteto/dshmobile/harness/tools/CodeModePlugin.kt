@@ -33,7 +33,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             name = TOOL_NAME,
             schema = functionToolSchema(
                 TOOL_NAME,
-                "串行执行已加载工具，支持前序结果引用和 when 条件。步骤从 1 开始编号；when.path 是前序工具返回正文的 JSON 字段路径，例如 approved、file.path 或 items[0].name，不是 steps[0].content；前序返回普通文本时省略 path，用 equals 比较全文。示例：第 1 步返回 {\"approved\":true}，第 2 步使用 when:{\"step\":1,\"path\":\"approved\",\"equals\":true}。扩展工具先用 capability_search 加载，下一模型步骤才能编排；每个子工具维持实际权限审批、执行与审计。",
+                "串行执行真实已注册工具，支持前序结果引用和 when 条件。步骤从 1 开始编号；when.path 是前序工具返回正文的 JSON 字段路径，例如 approved、file.path 或 items[0].name，不是 steps[0].content；前序返回普通文本时省略 path，用 equals 比较全文。示例：第 1 步返回 {\"approved\":true}，第 2 步使用 when:{\"step\":1,\"path\":\"approved\",\"equals\":true}。通过 tool_call 调用此编排器，可直接使用当前注册的工具，无需逐轮预加载；每个子工具维持实际权限审批、执行与审计。",
                 parameterSchema = buildJsonObject {
                     put("type", "object")
                     put("properties", buildJsonObject {
@@ -91,7 +91,7 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
             metadata = ToolMetadata(
                 family = "workflow",
                 discoveryKeywords = setOf("code mode", "编排", "批量工具"),
-                usageNotes = listOf("步骤序号从 1 起。when.path/\$step_result.path 对应原始 JSON 正文的字段，不是步骤回执的 steps[0].content；返回普通文本时省略 path。", "先用 capability_search 加载可选工具；保留每一步独立审批。"),
+                usageNotes = listOf("步骤序号从 1 起。when.path/\$step_result.path 对应原始 JSON 正文的字段，不是步骤回执的 steps[0].content；返回普通文本时省略 path。", "通过 tool_call 使用本编排器；每个子工具独立审批。"),
             ),
             executor = HarnessToolExecutor { originalContext, input, _ ->
                 executePlan(originalContext, input)
@@ -127,14 +127,15 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 ?: return rejection("CODE_MODE_TOOL_MISSING", "步骤 ${index + 1} 的工具不可用：$name")
             if (handler.exposure == ToolExposure.INTERNAL)
                 return rejection("CODE_MODE_UNAUTHORIZED_TOOL", "步骤 ${index + 1} 无法使用内部工具：$name")
-            // Optional tools must be independently loaded by capability_search and frozen
-            // in the exact tool table sent to the model. A script cannot discover or grant them.
+            // A script through tool_call resolves every actual handler in the registry, without
+            // preselection. Standalone legacy Code Mode retains its exact sampled authority.
+            val viaGateway = sampled?.registration("tool_call") != null
             if (handler.exposure == ToolExposure.OPTIONAL && sampled == null)
                 return rejection("CODE_MODE_UNSAMPLED_TOOL",
-                    "步骤 ${index + 1} 的扩展工具尚未装入：$name；先使用 capability_search 精确选择，在下一模型步骤重试")
-            if (sampled != null && sampled.codeModeChild(name) !== handler)
+                    "步骤 ${index + 1} 的扩展工具不在当前请求的注册表快照：$name；请使用 tool_search 检查工具注册")
+            if (sampled != null && !viaGateway && sampled.codeModeChild(name) !== handler)
                 return rejection("CODE_MODE_UNSAMPLED_TOOL",
-                    "步骤 ${index + 1} 的工具未在本轮冻结工具表：$name；扩展工具需先通过 capability_search 选择")
+                    "步骤 ${index + 1} 的工具不在当前请求的注册表快照：$name；请检查实际注册状态及权限")
             val arguments = step["args"] as? JsonObject
                 ?: return rejection("CODE_MODE_BAD_PLAN", "步骤 ${index + 1} 缺少对象类型的参数")
             validateReferencePlan(arguments, index + 1)?.let { problem ->

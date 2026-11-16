@@ -51,7 +51,15 @@ for name in endpoints:
 assert len(re.findall(r"\)\s*:\s*AppServerUiPort\s*\{", implementation)) == 1, "Exactly one App Server implementation"
 assert "abstract fun bind(implementation: LocalAppServer): AppServerUiPort" in implementation
 assert "LocalToolRouter.search(" in tool_logic
-assert "LocalCapabilityDiscovery.resolve(tools, query)" in execution
+# Model-facing tools stay fixed; actual ToolRegistry handlers use one executor.
+schema_projection = read(local / "tools/LocalToolSchemaProjection.kt")
+builtin = read(local / "LocalBuiltinToolRuntime.kt")
+catalog = read(local / "tools/LocalToolCatalog.kt")
+assert "DIRECT_TOOL_SEARCH" in schema_projection and "DIRECT_TOOL_CALL" in schema_projection
+assert "call.directToolTarget()" in execution and "executeScoped(" in execution
+assert '"tool_search" ->' in builtin and '"tool_call"' in catalog
+assert "prepareWorkTurnCapabilities(" not in execution, "Old per-turn selection still exists"
+assert "searchCapabilities(" not in execution, "Old preloading path still exists"
 for method in ("catalogue(", "searchCatalogue(", "deviceHints("):
     assert "LocalCapabilityDiscovery." + method in composition, f"Tool registry path diverges: {method}"
 assert "tools.discoverCapabilities(query, limit)" in tools_ui

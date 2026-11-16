@@ -4,7 +4,6 @@ import com.labteto.dshmobile.harness.agent.AgentToolResult
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.model.LocalToolCall
 import com.labteto.dshmobile.local.runtime.LocalAgentRunKind
-import com.labteto.dshmobile.local.tools.LocalToolCapabilityScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -78,9 +77,7 @@ internal class LocalWorkSubagentRuntime(
             runKind = LocalAgentRunKind.SUBAGENT,
             schemasProvider = schemasProvider,
             executeTool = { call, allowMutation, memoryTools, enabledOptional ->
-                withContext(LocalToolCapabilityScope(enabledOptional)) {
-                    executeTool(binding, call, allowMutation, memoryTools, enabledOptional)
-                }
+                executeTool(binding, call, allowMutation, memoryTools, enabledOptional)
             },
             historySnapshot = binding.runHandle.modelHistory::snapshot,
             modelAdmission = binding.executionControl.asModelAdmissionPort(),

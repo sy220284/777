@@ -21,51 +21,24 @@ class LocalModelToolStepSurfaceTest {
         put("function", buildJsonObject { put("name", name) })
     }
 
-    @Test fun newlyCreatedMcpCannotRunInTheConnectingStepEvenInABatch() = runBlocking {
+    @Test fun modelAcceptsOnlyStableGatewayEvenIfTargetPluginsChange() = runBlocking {
         val surface = LocalModelToolStepSurface()
-        surface.capture(JsonArray(listOf(schema("mcp_stdio_connect"), schema("read"))))
+        surface.capture(JsonArray(listOf(schema("tool_search"), schema("tool_call"))))
         val calls = listOf(
-            call("1", "mcp_stdio_connect"),
-            call("2", "mcp_x_twitter_x_post"),
-            call("3", "read"),
+            call("1", "tool_search"),
+            call("2", "mcp_plugin_direct"),
+            call("3", "tool_call"),
         )
-        val actuallyExecuted = mutableListOf<String>()
-        val results = surface.executeVisibleBatch(calls) { visible ->
-            actuallyExecuted += visible.map { it.name }
+        val executed = mutableListOf<String>()
+        val result = surface.executeVisibleBatch(calls) { visible ->
+            executed += visible.map { it.name }
             visible.map { AgentToolResult("ok") }
         }
-        assertEquals(listOf("mcp_stdio_connect", "read"), actuallyExecuted)
-        assertEquals(listOf(false, true, false), results.map { it.isError })
-        assertEquals("TOOL_NOT_EXPOSED", results[1].errorCode)
-
-        // After a fresh model request exposes the new schema, the same call is admissible.
-        surface.capture(JsonArray(listOf(schema("mcp_x_twitter_x_post"))))
-        val next = surface.executeVisibleBatch(listOf(calls[1])) { visible ->
-            actuallyExecuted += visible.map { it.name }
-            visible.map { AgentToolResult("posted") }
-        }
-        assertFalse(next.single().isError)
-        assertEquals("posted", next.single().content)
-        assertTrue(actuallyExecuted.contains("mcp_x_twitter_x_post"))
-    }
-
-    @Test fun unexposedToolCanBeQueuedWithoutExecutingInCurrentBatch() = runBlocking {
-        val surface = LocalModelToolStepSurface()
-        surface.capture(JsonArray(listOf(schema("read"))))
-        val requested = mutableListOf<String>()
-        val actuallyExecuted = mutableListOf<String>()
-        val results = surface.executeVisibleBatch(
-            listOf(call("a", "mcp_later"), call("b", "read")),
-            onUnexposed = { name -> requested += name; true },
-        ) { visible ->
-            actuallyExecuted += visible.map { it.name }
-            visible.map { AgentToolResult("ok") }
-        }
-        assertEquals(listOf("mcp_later"), requested)
-        assertEquals(listOf("read"), actuallyExecuted)
-        assertEquals("TOOL_NOT_EXPOSED", results.first().errorCode)
-        assertTrue(results.first().recoveryHint.orEmpty().contains("下一模型步骤"))
-        assertFalse(results.last().isError)
+        assertEquals(listOf("tool_search", "tool_call"), executed)
+        assertEquals("TOOL_NOT_EXPOSED", result[1].errorCode)
+        assertTrue(result[1].recoveryHint.orEmpty().contains("tool_call"))
+        assertFalse(result[0].isError)
+        assertFalse(result[2].isError)
     }
 
     @Test fun hiddenOnlyBatchNeverInvokesExecutor() = runBlocking {

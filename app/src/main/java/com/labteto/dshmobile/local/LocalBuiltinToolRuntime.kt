@@ -21,7 +21,10 @@ import com.labteto.dshmobile.local.tools.LocalArchiveReader
 import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
-import com.labteto.dshmobile.local.tools.toolCapabilityTarget
+import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
+import com.labteto.dshmobile.local.tools.LocalToolRouter
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import kotlinx.coroutines.Dispatchers
@@ -446,13 +449,40 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     runtimeStateStore.historyBudgetFor(binding.aggregateSnapshot()).maxHistoryChars,
                 ),
             )
-            "capability_search" -> {
-                val target = toolCapabilityTarget(currentCoroutineContext(), binding?.enabledOptionalTools)
-                if (target == null) {
-                    root.execution.searchCapabilities(args.string("query"))
-                } else {
-                    root.execution.searchCapabilities(args.string("query"), target)
-                }
+            "tool_search" -> {
+                val query = args.string("query").trim()
+                require(query.isNotEmpty()) { "请输入工具名称或功能关键词" }
+                val scope = currentCoroutineContext()[LocalSubagentExecutionScope]
+                val available = root.registry.names().mapNotNull(root.registry::get)
+                    .filter { it.exposure != ToolExposure.INTERNAL &&
+                        it.name !in setOf("tool_call", "tool_search") }
+                    .filter { tool ->
+                        scope == null || scope.canDiscover(tool)
+                    }
+                    .filter { tool ->
+                        !state.work.planMode ||
+                            LocalToolPolicy.allowedInPlan(tool.name, tool.access) ||
+                            tool.name == "code_mode_run"
+                    }
+                    .filter { tool -> root.execution.isNetworkSearchPermitted(tool.name) }
+                val inventory = LocalToolRouter.isInventoryRequest(query)
+                val exact = available.firstOrNull { it.name.equals(query, ignoreCase = true) }
+                val found = if (exact != null) listOf(exact)
+                    else if (inventory) available.sortedBy { it.name }
+                    else LocalToolRouter.search(available, query, limit = 12, includeCore = true)
+                buildJsonObject {
+                    put("total_registered", available.size)
+                    put("matched", found.size)
+                    put("tools", kotlinx.serialization.json.JsonArray(found.map { tool ->
+                        buildJsonObject {
+                            put("name", tool.name)
+                            put("family", tool.metadata.family)
+                            put("access", tool.access.name.lowercase())
+                            if (!inventory) put("schema", tool.schema)
+                        }
+                    }))
+                    put("instruction", "使用 tool_call(name, arguments) 直接调用；每次独立校验实际参数、连接与审批。")
+                }.toString()
             }
             "skill_create" -> {
                 require(allowMutation) { "当前子任务没有写入技能的权限" }

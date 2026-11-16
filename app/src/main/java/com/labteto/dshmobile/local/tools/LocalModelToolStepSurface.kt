@@ -33,7 +33,6 @@ internal class LocalModelToolStepSurface {
     /** The batch path must enforce the same frozen model surface as single-tool dispatch. */
     suspend fun executeVisibleBatch(
         calls: List<AgentToolCall>,
-        onUnexposed: (String) -> Boolean = { false },
         execute: suspend (List<AgentToolCall>) -> List<AgentToolResult>,
     ): List<AgentToolResult> {
         val visible = calls.filter { allows(it.name) }
@@ -42,17 +41,14 @@ internal class LocalModelToolStepSurface {
         val results = executed.iterator()
         return calls.map { call ->
             if (allows(call.name)) results.next()
-            else hiddenCallResult(call.name, onUnexposed(call.name))
+            else hiddenCallResult(call.name)
         }
     }
 
-    fun hiddenCallResult(name: String, queuedForNextStep: Boolean = false) = AgentToolResult(
-        content = "模型调用了本步骤未暴露的工具：$name",
+    fun hiddenCallResult(name: String) = AgentToolResult(
+        content = "模型调用了协议入口以外的工具：$name",
         isError = true,
         errorCode = "TOOL_NOT_EXPOSED",
-        recoveryHint = if (queuedForNextStep)
-            "工具已加入下一模型步骤优先候选；仍须实际进入模型工具表并通过权限审批，本步骤没有执行此工具或产生写入。"
-        else
-            "工具未进入本步骤工具表；通过 capability_search 查询当前可用能力，再在下一模型步骤选择调用。不要重复执行未核实的写入。",
+        recoveryHint = "使用固定入口 tool_call(name, arguments) 直接执行已注册工具；未知名称使用 tool_search 查询。",
     )
 }

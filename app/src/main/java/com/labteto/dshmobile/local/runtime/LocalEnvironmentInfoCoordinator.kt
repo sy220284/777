@@ -40,8 +40,6 @@ internal class LocalEnvironmentInfoCoordinator(
         val latestRequest = usageTracker.analyticsSnapshot().recentRecords.firstOrNull { record ->
             record.reported && record.inputTokens > 0L && record.context.sessionId == sessionId
         }
-        val enabledOptional = run?.enabledOptionalTools
-            ?: toolExecutionCoordinator.enabledOptionalSnapshot()
         val commands = COMMANDS.filter(commandAvailable)
         return LocalEnvironmentReport.build(
             workspacePath = workspacePath(),
@@ -53,7 +51,7 @@ internal class LocalEnvironmentInfoCoordinator(
             contextWindow = requestPressureStore.window(sessionId),
             workBudget = run?.workBudget ?: foregroundWorkBudget(sessionId),
             latestRequest = latestRequest,
-            capabilitySummary = toolExecutionCoordinator.capabilitySummary(enabledOptional),
+            capabilitySummary = toolExecutionCoordinator.capabilitySummary(),
             pendingInputs = pendingInputCount,
             pendingInputLimit = pendingInputLimit,
             commands = commands,

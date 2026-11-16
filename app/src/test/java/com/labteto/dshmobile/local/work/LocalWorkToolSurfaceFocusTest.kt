@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.work
 
-import android.content.SharedPreferences
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
@@ -9,271 +8,82 @@ import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
-import com.labteto.dshmobile.harness.tools.functionToolSchema
-import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.agent.localAgentRunPolicy
-import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
-import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
-import com.labteto.dshmobile.local.session.LocalHarnessSession
-import com.labteto.dshmobile.local.session.LocalSessionEventLog
+import com.labteto.dshmobile.local.model.LocalModelState
+import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
-import java.io.File
-import java.lang.reflect.Proxy
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
-/**
- * Full Work model-schema path: a prior capability_search(select:...) must survive
- * subsequent pinned-MCP/team/archive automatic discovery until a new user task.
- */
+/** The new tool interface is constant across steps, registries and plans. */
 class LocalWorkToolSurfaceFocusTest {
-    @get:Rule val files = TemporaryFolder()
-
-    @Test fun explicitFocusSurvivesModelStepsAndRestoresDefaultsOnNewUserTask() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(optional("mcp_pinned_status"))
-            register(optional("mcp_selected_lookup"))
-        }
-        val executor = LocalToolExecutionCoordinator(
-            registry = registry,
-            currentSessionId = { "focus-session" },
-            planMode = { false },
-            requestApproval = { _, _, _ -> true },
-            pinnedConnectorIds = { listOf("pinned") },
-        )
-        val runtime = LocalWorkTurnToolRuntime(
-            registry = registry,
-            execution = executor,
-            schemas = LocalToolSchemaProjection(registry, executor),
-            approvalPreferences = approvals(),
-            githubConfigured = { false },
-        )
-        val log = LocalSessionEventLog(File(files.newFolder(), "events.jsonl"), Json)
-        val binding = LocalWorkRunBinding(
-            sessionId = "focus-session",
-            initialState = LocalHarnessState(
-                sessionId = "focus-session", usageMode = LocalUsageMode.WORK,
-            ).toLocalWorkRunState(),
-            sessionBase = LocalHarnessSession(id = "focus-session", usageMode = LocalUsageMode.WORK),
-            runHandle = LocalAgentRunHandle(initialSessionId = "focus-session", maxPendingInputs = 8),
-            eventLog = log,
-        )
-        try {
-            binding.runHandle.modelHistory.append(buildJsonObject {
-                put("role", "user")
-                put("content", "请查询相关信息")
-            })
-            val policy = localAgentRunPolicy(LocalUsageMode.WORK)
-            runtime.prepare(binding, "请查询相关信息")
-            val firstNames = LocalToolSchemaProjection(registry, executor).names(
-                runtime.schemas(policy, binding),
-            )
-            assertTrue("mcp_pinned_status" in firstNames)
-
-            executor.searchCapabilities("select:mcp_selected_lookup", binding.enabledOptionalTools)
-            assertTrue(binding.enabledOptionalTools.exactFocus)
-            val secondNames = LocalToolSchemaProjection(registry, executor).names(
-                runtime.schemas(policy, binding),
-            )
-            assertTrue("mcp_selected_lookup" in secondNames)
-            assertFalse("mcp_pinned_status" in secondNames)
-            assertFalse("mcp_pinned_status" in binding.enabledOptionalTools)
-
-            binding.runHandle.modelHistory.append(buildJsonObject {
-                put("role", "user")
-                put("content", "继续在本地完成")
-            })
-            runtime.prepare(binding, "继续在本地完成")
-            val resumedNames = LocalToolSchemaProjection(registry, executor).names(
-                runtime.schemas(policy, binding),
-            )
-            assertTrue(binding.enabledOptionalTools.exactFocus)
-            assertTrue("mcp_selected_lookup" in resumedNames)
-            assertFalse("mcp_pinned_status" in resumedNames)
-
-            // User supplies a genuinely new task: the existing priority cursor releases
-            // the old exact focus, and the pinned tool is eligible again.
-            binding.runHandle.modelHistory.append(buildJsonObject {
-                put("role", "user")
-                put("content", "现在换一个任务：查询 pinned 服务的状态")
-            })
-            val changedNames = LocalToolSchemaProjection(registry, executor).names(
-                runtime.schemas(policy, binding),
-            )
-            assertFalse(binding.enabledOptionalTools.exactFocus)
-            assertTrue("mcp_pinned_status" in changedNames)
-        } finally {
-            log.close()
-        }
-    }
-
-    @Test fun exactCoreOnlySelectRemovesOptionalToolsAndNormalSearchPreservesFocus() {
-        val registry = ToolRegistry().apply {
-            register(optional("mcp_pinned_status"))
-            register(optional("mcp_selected_lookup"))
+    private fun registry() = ToolRegistry().apply {
+        for (name in listOf("tool_call", "tool_search")) {
+            val schema = LocalToolCatalog.specs.first {
+                it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == name
+            }.jsonObject
             register(HarnessTool(
-                name = "read",
-                schema = functionToolSchema("read", "Read-only built-in"),
-                access = ToolAccess.READ_ONLY,
-                approvalPolicy = ToolApprovalPolicy.NEVER,
-                exposure = ToolExposure.CORE,
-                metadata = ToolMetadata(family = "内置"),
-                executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+                name = name, schema = schema, access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER, exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("环境"),
+                executor = HarnessToolExecutor { _, _, _ -> ToolResult("gateway") },
             ))
         }
-        val focus = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
-        val coordinator = LocalToolExecutionCoordinator(
-            registry = registry,
-            currentSessionId = { "focus-session" },
-            planMode = { false },
+    }
+
+    private fun names(registry: ToolRegistry, plan: Boolean, optional: Set<String>?) =
+        LocalToolSchemaProjection(registry, LocalToolExecutionCoordinator(
+            registry = registry, currentSessionId = { "work" }, planMode = { plan },
             requestApproval = { _, _, _ -> true },
-            enabledOptionalTools = focus,
-        )
-        coordinator.searchCapabilities("select:mcp_selected_lookup", focus)
-        assertTrue(focus.exactFocus)
-        coordinator.searchCapabilities("状态", focus)
-        assertTrue("ordinary discovery should not remove explicit focus", focus.exactFocus)
-        assertTrue("mcp_selected_lookup" in focus)
-        coordinator.searchCapabilities("select:read", focus)
-        assertTrue("core-only exact selection must retain its focus", focus.exactFocus)
-        assertTrue("core-only selection must remove earlier optional schemas", focus.isEmpty())
-        assertTrue("显式仅 CORE 选择在同任务续跑中属于已准备状态",
-            focus.isPreparedForContinuation())
-        focus.beginNewTask()
-        assertFalse(focus.exactFocus)
-        assertFalse("新任务应恢复工具发现", focus.isPreparedForContinuation())
+        )).let { projection ->
+            projection.names(projection.modelSchemas(
+                policy = localAgentRunPolicy(LocalUsageMode.WORK),
+                modelState = LocalModelState(), planModeEnabled = plan,
+                history = emptyList(), enabledOptional = optional,
+            ))
+        }
+
+    @Test fun modelSurfaceIsStableWhenPluginsAndPreviousSelectionsChange() {
+        val registry = registry()
+        val expected = listOf("tool_search", "tool_call")
+        assertEquals(expected, names(registry, false, emptySet()))
+        registry.register(HarnessTool(
+            name = "mcp_new", schema = com.labteto.dshmobile.harness.tools.functionToolSchema(
+                "mcp_new", "动态接入的工具"),
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.OPTIONAL, metadata = ToolMetadata("MCP", discoveryKeywords = setOf("mcp_new")),
+            executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+        ))
+        assertEquals(expected, names(registry, false, setOf("mcp_new")))
+        assertEquals(expected, names(registry, true, setOf("mcp_new")))
+        assertTrue(registry.get("mcp_new") != null)
     }
 
-    @Test fun unexposedOptionalIsPrioritizedOnlyInLaterModelStep() = runBlocking {
-        val registry = ToolRegistry().apply {
-            register(optional("mcp_pinned_status"))
-            register(optional("mcp_later_lookup"))
-        }
-        val executor = LocalToolExecutionCoordinator(
-            registry = registry,
-            currentSessionId = { "focus-session" },
-            planMode = { false },
+    @Test fun toolDefinitionsAreAbsentFromDirectModelSurface() {
+        val registry = registry()
+        val actual = names(registry, false, setOf("read", "github_search"))
+        assertEquals(2, actual.size)
+        assertFalse("read" in actual)
+        assertFalse("github_search" in actual)
+    }
+
+    @Test fun ordinaryChatDoesNotEnableExecutableTools() {
+        val registry = registry()
+        val projection = LocalToolSchemaProjection(registry, LocalToolExecutionCoordinator(
+            registry = registry, currentSessionId = { "chat" }, planMode = { false },
             requestApproval = { _, _, _ -> true },
-            pinnedConnectorIds = { listOf("pinned") },
-        )
-        val runtime = LocalWorkTurnToolRuntime(
-            registry, executor, LocalToolSchemaProjection(registry, executor),
-            approvals(), githubConfigured = { false },
-        )
-        val log = LocalSessionEventLog(File(files.newFolder(), "next-step-events.jsonl"), Json)
-        val binding = LocalWorkRunBinding(
-            sessionId = "focus-session",
-            initialState = LocalHarnessState(
-                sessionId = "focus-session", usageMode = LocalUsageMode.WORK,
-            ).toLocalWorkRunState(),
-            sessionBase = LocalHarnessSession(id = "focus-session", usageMode = LocalUsageMode.WORK),
-            runHandle = LocalAgentRunHandle(initialSessionId = "focus-session", maxPendingInputs = 8),
-            eventLog = log,
-        )
-        try {
-            binding.runHandle.modelHistory.append(buildJsonObject {
-                put("role", "user")
-                put("content", "分析文件路径")
-            })
-            val policy = localAgentRunPolicy(LocalUsageMode.WORK)
-            runtime.prepare(binding, "分析文件路径")
-            // The first model step admits the user task before any model-emitted tool call.
-            val first = runtime.schemas(policy, binding)
-            assertTrue("mcp_later_lookup" !in LocalToolSchemaProjection(registry, executor).names(first))
-            assertTrue(runtime.prepareUnexposedForNextStep(binding, "mcp_later_lookup"))
-            assertFalse(runtime.prepareUnexposedForNextStep(binding, "does_not_exist"))
-            // The rejected tool cannot enter the already frozen step; it is prioritized
-            // only when the following model step projects its new schema surface.
-            val second = runtime.schemas(policy, binding)
-            assertTrue("mcp_later_lookup" in LocalToolSchemaProjection(registry, executor).names(second))
-            assertEquals("mcp_later_lookup", binding.enabledOptionalTools.first())
-            executor.searchCapabilities("select:mcp_pinned_status", binding.enabledOptionalTools)
-            assertFalse(runtime.prepareUnexposedForNextStep(binding, "mcp_later_lookup"))
-            assertTrue(runtime.prepareUnexposedForNextStep(binding, "mcp_pinned_status"))
-            assertEquals(listOf("mcp_pinned_status"), binding.enabledOptionalTools.toList())
-        } finally {
-            log.close()
-        }
-    }
-
-    @Test fun missingToolBudgetRecoveryRunsOnceAndPreservesExactSelection() {
-        val selection = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
-        selection.add("mcp_pinned_status")
-        assertTrue(selection.requestForNextStep("mcp_later_lookup"))
-        assertTrue(selection.hasBudgetOmittedRecoveryCandidate(
-            setOf("mcp_later_lookup")))
-        // Internal heuristic reordering must not erase the upcoming recovery.
-        selection.clear()
-        selection.add("mcp_pinned_status")
-        selection.applyRequestedPriority()
-        assertEquals(listOf("mcp_later_lookup", "mcp_pinned_status"), selection.toList())
-        // A compaction pass causes the tool surface to be recomputed from real
-        // history. Simulate automatic pin selection occurring again beforehand.
-        selection.clear()
-        selection.addAll(listOf("mcp_pinned_status", "mcp_later_lookup"))
-        selection.applyRequestedPriority()
-        assertEquals(listOf("mcp_later_lookup", "mcp_pinned_status"), selection.toList())
-        selection.finishCapacityCheck()
-        assertFalse(selection.hasBudgetOmittedRecoveryCandidate(
-            setOf("mcp_later_lookup")))
-        selection.markExactFocus()
-        assertFalse(selection.requestForNextStep("mcp_excluded"))
-        assertTrue(selection.requestForNextStep("mcp_later_lookup"))
-        selection.beginNewTask()
-        assertFalse(selection.hasBudgetOmittedRecoveryCandidate(
-            setOf("mcp_later_lookup")))
-    }
-
-    @Test fun runToolSelectionReplacesRedundantPriorityCursorAndRestoresOnReset() {
-        val selection = com.labteto.dshmobile.local.tools.LocalRunToolSelection()
-        assertFalse(selection.isPreparedForContinuation())
-        selection.add("read-only-optional")
-        assertTrue(selection.isPreparedForContinuation())
-        selection.clear()
-        assertFalse(selection.isPreparedForContinuation())
-        assertTrue(selection.isNewTask("用 MCP 获取 X 平台帖子"))
-        assertFalse(selection.isNewTask("用 MCP 获取 X 平台帖子"))
-        selection.markExactFocus()
-        assertTrue(selection.exactFocus)
-        assertTrue(selection.isNewTask("改为查询 GitHub PR"))
-        selection.beginNewTask()
-        assertFalse(selection.exactFocus)
-        assertFalse(selection.isNewTask("改为查询 GitHub PR"))
-        selection.resetTask()
-        assertTrue(selection.isNewTask("改为查询 GitHub PR"))
-    }
-
-    private fun optional(name: String) = HarnessTool(
-        name = name,
-        schema = functionToolSchema(name, "Read data"),
-        access = ToolAccess.READ_ONLY,
-        approvalPolicy = ToolApprovalPolicy.NEVER,
-        exposure = ToolExposure.OPTIONAL,
-        metadata = ToolMetadata(family = "MCP", discoveryKeywords = setOf("状态", "查询")),
-        executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
-    )
-
-    private fun approvals(): LocalApprovalPreferences {
-        val preferences = Proxy.newProxyInstance(
-            SharedPreferences::class.java.classLoader,
-            arrayOf(SharedPreferences::class.java),
-        ) { _, method, _ ->
-            when (method.name) {
-                "getString" -> null
-                "contains" -> false
-                else -> error("Unexpected SharedPreferences call: ${method.name}")
-            }
-        } as SharedPreferences
-        return LocalApprovalPreferences(preferences)
+        ))
+        assertTrue(projection.modelSelection(
+            policy = localAgentRunPolicy(LocalUsageMode.CHAT),
+            modelState = LocalModelState(), planModeEnabled = false, history = emptyList(),
+        ).schemas.isEmpty())
     }
 }

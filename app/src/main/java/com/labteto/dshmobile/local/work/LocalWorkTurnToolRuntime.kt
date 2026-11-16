@@ -22,6 +22,7 @@ import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.latestUserTurnHasArchive
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.directToolTarget
 import com.labteto.dshmobile.local.tools.isParallelSafeReadTool
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import com.labteto.dshmobile.local.tools.LocalToolRouter
@@ -60,168 +61,21 @@ internal class LocalWorkTurnToolRuntime(
 ) {
     internal fun captureBindings(schemas: JsonArray) = registry.captureBindings(schemas)
 
-    /**
-     * Selection only: never executes an unexposed tool or grants permission.
-     * Explicit focus, current registry, network switches and plan scope stay authoritative.
-     */
-    internal fun prepareUnexposedForNextStep(
+    /** Stable two-function model protocol; actual tools are resolved by the executor. */
+    internal fun selectSchemas(
+        policy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding,
-        name: String,
-    ): Boolean {
-        val tool = registry.get(name) ?: return false
-        if (tool.exposure != ToolExposure.OPTIONAL ||
-            !execution.isNetworkSearchPermitted(name) ||
-            (binding.state.value.work.planMode &&
-                !LocalToolPolicy.allowedInPlan(name, tool.access))) return false
-        return binding.enabledOptionalTools.requestForNextStep(name)
-    }
-    internal fun clear(binding: LocalWorkRunBinding) {
-        execution.clearTurnCapabilities(binding.enabledOptionalTools)
-        binding.enabledOptionalTools.resetTask()
-    }
-
-    internal suspend fun prepare(
-        binding: LocalWorkRunBinding,
-        input: String,
-    ) {
-        val history = binding.runHandle.modelHistory.snapshot()
-        // Establish the user-task boundary before next-step tool demand can arrive.
-        // Waiting until the first schema projection can discard a queued tool.
-        LocalToolCapabilityIntent.latestUserInput(history)?.takeIf(String::isNotBlank)?.let { activeTask ->
-            if (binding.enabledOptionalTools.isNewTask(activeTask)) {
-                binding.enabledOptionalTools.beginNewTask()
-            }
-        }
-        val task = effectiveWorkCapabilityTask(
-            input, binding.continuationParentRunId, history,
-            binding.workState.snapshot().goal?.description,
-        )
-        // A user's explicit capability_search(select:...) is the authoritative
-        // model-visible surface for this task. Re-running heuristic preactivation
-        // would clear its exact-focus flag while rearranging optional tools.
-        // A genuinely new task calls beginNewTask() above and re-enables discovery.
-        if (!binding.enabledOptionalTools.exactFocus) {
-            execution.prepareWorkTurnCapabilities(
-                input = task,
-                history = history,
-                gitHubConfigured = githubConfigured,
-                target = binding.enabledOptionalTools,
-            )
-        }
-    }
+    ): LocalToolRouter.ToolSchemaSelection = schemas.modelSelection(
+        policy = policy,
+        modelState = binding.state.value.modelState,
+        planModeEnabled = binding.state.value.work.planMode,
+        history = binding.runHandle.modelHistory.snapshot(),
+    )
 
     internal fun schemas(
         policy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding,
-    ): JsonArray = selectSchemas(policy, binding).also {
-        recordSchemaAdmission(binding, it)
-    }.schemas
-
-    /** Select once for the model request; compaction may invalidate this candidate. */
-    internal fun selectSchemas(
-        policy: LocalAgentRunPolicy,
-        binding: LocalWorkRunBinding,
-    ): LocalToolRouter.ToolSchemaSelection {
-        // 此时最新用户消息已从 PendingInput 队列写进历史，首轮集群标记才可靠。
-        val history = binding.runHandle.modelHistory.snapshot()
-        val teamMode = isLocalAgentTeamTurn(history)
-        val activeTask = LocalToolCapabilityIntent.latestUserInput(history)
-        val newTask = !activeTask.isNullOrBlank() && binding.enabledOptionalTools.isNewTask(activeTask)
-        if (newTask) binding.enabledOptionalTools.beginNewTask()
-        // Explicit select: owns the visible optional surface for this task. Discoverability,
-        // registration and per-call approval continue to use their existing shared owners.
-        val exactFocus = binding.enabledOptionalTools.exactFocus
-        // A user attachment is authoritative even if their text is merely "analyse this".
-        // Surface read-only archive tools for that turn without permanently enlarging CORE.
-        if (!exactFocus && latestUserTurnHasArchive(history)) {
-            synchronized(binding.enabledOptionalTools) {
-                val requested = listOf("archive_list", "archive_read")
-                    .filter { registry.get(it) != null }
-                val previous = binding.enabledOptionalTools.toList()
-                binding.enabledOptionalTools.clear()
-                binding.enabledOptionalTools.addAll(requested)
-                binding.enabledOptionalTools.addAll(previous)
-            }
-        }
-        // A connection or plugin install can register new tools during this run.
-        // Re-evaluate only the active user's task before each model step; newly registered
-        // capabilities become available automatically without restarting or editing tool maps.
-        if (newTask) {
-            // Only a genuinely new user task may replace explicit discovery priorities.
-            execution.enableTaskRelevantOptionalTools(
-                requireNotNull(activeTask), binding.enabledOptionalTools, prioritize = true,
-            )
-        }
-        // Observe registrations even while explicitly focused. A future user task can
-        // reactivate them; the current exact choice is never silently expanded.
-        val newMcpTools = binding.mcpDiscovery.observe(registry)
-        if (!exactFocus) {
-            execution.prioritizeRunCreatedMcpTools(
-                newMcpTools,
-                activeTask ?: binding.workState.snapshot().goal?.description.orEmpty(),
-                binding.enabledOptionalTools,
-            )
-            execution.prioritizePinnedForModelStep(binding.enabledOptionalTools)
-        }
-        val enabled = synchronized(binding.enabledOptionalTools) {
-            if (teamMode && !exactFocus) {
-                val priority = listOf(
-                    "team_task_create", "team_task_list", "team_task_update", "team_messages",
-                    "team_wait_for_message", "team_members", "team_task_get",
-                    "team_create_member", "team_start_member", "team_spawn",
-                    "team_send_message", "team_wait", "skill",
-                ).filter { registry.get(it) != null }
-                val previous = binding.enabledOptionalTools.toList()
-                binding.enabledOptionalTools.clear()
-                binding.enabledOptionalTools.addAll(priority)
-                binding.enabledOptionalTools.addAll(previous)
-            }
-            // An unexposed call from the previous model step outranks heuristic pins.
-            // It will still be omitted if the actual provider context cannot fit its schema.
-            binding.enabledOptionalTools.applyRequestedPriority()
-            binding.enabledOptionalTools.toSet()
-        }
-        val selection = schemas.modelSelection(
-            policy = policy,
-            modelState = binding.state.value.modelState,
-            planModeEnabled = binding.state.value.work.planMode,
-            history = history,
-            enabledOptional = enabled,
-            agentTeamMode = teamMode,
-        )
-        return selection
-    }
-
-    /** Record omission facts only for the final model-facing selection. */
-    internal fun recordSchemaAdmission(
-        binding: LocalWorkRunBinding,
-        selection: LocalToolRouter.ToolSchemaSelection,
-    ) {
-        // The request evidence already records the exact schema digest. Only record a separate
-        // fact when a selected capability could not reach the model; no parallel tool registry.
-        if (selection.omittedReasons.isNotEmpty()) {
-            // Diagnostics are observational, not a new admission gate. A failed diagnostic
-            // write must not make an otherwise legitimate model request unavailable.
-            try {
-                binding.eventLog.append("tool/schema-admission", buildJsonObject {
-                    put("version", 1)
-                    put("enabled_optional_count", synchronized(binding.enabledOptionalTools) {
-                        binding.enabledOptionalTools.size
-                    })
-                    put("omitted_total", selection.omittedReasons.size)
-                    put("omitted", buildJsonObject {
-                        selection.omittedReasons.entries.take(24).forEach { (name, reason) ->
-                            put(name, reason)
-                        }
-                    })
-                })
-            } catch (error: Exception) {
-                com.labteto.dshmobile.observability.AppLog.failure(
-                    "LocalWorkToolSurface", "record_schema_admission", error,
-                )
-            }
-        }
-    }
+    ): JsonArray = selectSchemas(policy, binding).schemas
 
     internal fun names(
         policy: LocalAgentRunPolicy,
@@ -232,6 +86,10 @@ internal class LocalWorkTurnToolRuntime(
     internal fun isParallel(name: String): Boolean =
         name in PARALLEL_SUBAGENT_TOOLS ||
             isSafeParallelReadTool(registry.get(LocalToolPolicy.canonical(name)))
+
+    /** Unwrap the real child before planning parallelism; a gateway never grants read-safety. */
+    internal fun isParallel(call: LocalToolCall): Boolean =
+        call.directToolTarget()?.let { target -> isParallel(target.name) } ?: false
 
     internal suspend fun execute(
         binding: LocalWorkRunBinding,
@@ -271,7 +129,7 @@ internal class LocalWorkTurnToolRuntime(
         superseded: () -> Boolean = { false },
     ): List<Pair<LocalToolCall, AgentToolResult>> {
         val output = mutableListOf<Pair<LocalToolCall, AgentToolResult>>()
-        val groups = planLocalToolBatch(calls.size) { index -> isParallel(calls[index].name) }
+        val groups = planLocalToolBatch(calls.size) { index -> isParallel(calls[index]) }
         for (group in groups) {
             val part = calls.subList(group.startInclusive, group.endExclusive)
             if (!group.parallel) {
@@ -346,7 +204,9 @@ internal class LocalWorkTurnToolRuntime(
         detail: String,
     ): AgentToolResult = parallelToolFailure(
         call = call,
-        access = registry.get(LocalToolPolicy.canonical(call.name))?.access,
+        access = call.directToolTarget()?.let { target ->
+            registry.get(LocalToolPolicy.canonical(target.name))?.access
+        },
         detail = detail,
     )
 }

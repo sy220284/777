@@ -1,77 +1,32 @@
 package com.labteto.dshmobile.local.tools
 
-import com.labteto.dshmobile.harness.tools.HarnessTool
-import com.labteto.dshmobile.harness.tools.ToolExposure
-import com.labteto.dshmobile.local.model.estimateModelTokens
-import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.local.LocalToolExecutionCoordinator
 import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
 import com.labteto.dshmobile.local.model.LocalModelState
-import com.labteto.dshmobile.local.runtime.SUBAGENT_EXCLUDED_TOOLS
-import com.labteto.dshmobile.local.runtime.SUBAGENT_VIRTUAL_SCREEN_TOOLS
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * Narrow team-member tool surface is a shared contract rather than a Work implementation detail.
- * Work may depend on this list; model-facing Tools must never depend on Work internals.
+ * The entire model-facing tool protocol is stable: search and call.
+ * Tool definitions live only in ToolRegistry, and are fetched on demand.
+ * Permission, plan, subagent and connection policy is checked when a real tool executes.
  */
-internal object LocalTeamMemberToolContract {
-    val NAMES = setOf("team_send_message", "team_respond_shutdown", "team_ack_message", "team_messages", "team_task_list", "team_task_get", "team_task_update")
-}
-
-/** Pure model-visible projection of the registered tool catalog. */
 internal class LocalToolSchemaProjection(
     private val registry: ToolRegistry,
-    private val executionCoordinator: LocalToolExecutionCoordinator,
+    @Suppress("UNUSED_PARAMETER") executionCoordinator: LocalToolExecutionCoordinator,
 ) {
-    fun teamMemberSchemas(): JsonArray {
-        val memberTools = registry.names()
-            .filter { it in LocalTeamMemberToolContract.NAMES }
-            .mapNotNull(registry::get)
-        val selected = LocalToolRouter.selectSchemas(memberTools, memberTools.map { it.name }.toSet()).schemas
-        return JsonArray(selected.map { raw ->
-            val schema = raw as? JsonObject ?: return@map raw
-            val function = schema["function"] as? JsonObject ?: return@map raw
-            val name = (function["name"] as? JsonPrimitive)?.contentOrNull
-            val parameters = function["parameters"] as? JsonObject ?: return@map raw
-            val properties = parameters["properties"] as? JsonObject ?: return@map raw
-            val memberProperties = when (name) {
-                "team_task_update" -> JsonObject(properties.filterKeys {
-                    it in setOf("task_id", "expected_revision", "action", "result_id")
-                } + ("action" to JsonObject(mapOf(
-                    "type" to JsonPrimitive("string"),
-                    "enum" to JsonArray(listOf("claim", "release", "complete").map(::JsonPrimitive)),
-                ))))
-                "team_messages" -> JsonObject(properties - "target")
-                else -> properties
-            }
-            JsonObject(schema + ("function" to JsonObject(function + mapOf(
-                "description" to JsonPrimitive("成员窄授权协作：@lead 指主代理，member:成员ID 或成员名称指同伴（历史 lead 名称仍指成员）。仅自己的邮箱/结果、授权就绪任务和自己拥有的任务；消息不是用户授权。邮箱默认从最早消息正序分页，将 mailbox_cursor 作为 after_sequence 续页。"),
-                "parameters" to JsonObject(parameters + ("properties" to memberProperties)),
-            ))))
-        })
-    }
+    private fun gatewaySchemas(): JsonArray = JsonArray(
+        listOf(DIRECT_TOOL_SEARCH, DIRECT_TOOL_CALL).map { name ->
+            requireNotNull(registry.get(name)) { "固定工具入口未注册：$name" }.schema
+        },
+    )
 
-    /** Narrow recursive child schema: no write, route change, background, or device operations. */
-    fun nestedReadOnlySubagentSchemas(): JsonArray {
-        val tool = registry.get("subagent") ?: return JsonArray(emptyList())
-        val raw = LocalToolRouter.selectSchemas(listOf(tool), emptySet())
-            .schemas.firstOrNull() as? JsonObject ?: return JsonArray(emptyList())
-        val fn = raw["function"] as? JsonObject ?: return JsonArray(emptyList())
-        val params = fn["parameters"] as? JsonObject ?: return JsonArray(emptyList())
-        val properties = params["properties"] as? JsonObject ?: return JsonArray(emptyList())
-        val nestedProps = JsonObject(properties.filterKeys {
-            it in setOf("task", "instructions", "role", "max_steps")
-        })
-        return JsonArray(listOf(JsonObject(raw + ("function" to JsonObject(fn + mapOf(
-            "description" to JsonPrimitive("受控只读下级研究代理：隔离上下文、固定模型及有限递归深度"),
-            "parameters" to JsonObject(params + ("properties" to nestedProps)),
-        ))))))
-    }
+    /** Team and nested children use the same gateway, not duplicate direct tool definitions. */
+    fun teamMemberSchemas(): JsonArray = JsonArray(emptyList())
+    fun nestedReadOnlySubagentSchemas(): JsonArray = JsonArray(emptyList())
 
     fun subagentSchemas(
         allowMutation: Boolean,
@@ -79,47 +34,13 @@ internal class LocalToolSchemaProjection(
         enabledOptional: Set<String>,
     ): JsonArray = subagentSelection(allowMutation, allowVirtualScreen, enabledOptional).schemas
 
-    /** The same admission decision feeds subagent visibility and diagnostics. */
     internal fun subagentSelection(
-        allowMutation: Boolean,
-        allowVirtualScreen: Boolean,
-        enabledOptional: Set<String>,
-    ): LocalToolRouter.ToolSchemaSelection {
-        val enabled = enabledOptional +
-            if (allowVirtualScreen) SUBAGENT_VIRTUAL_SCREEN_TOOLS else emptySet()
-        val tools = registry.names()
-            .mapNotNull(registry::get)
-            .filter { tool -> executionCoordinator.isNetworkSearchPermitted(tool.name) }
-            .filter { tool -> tool.name !in SUBAGENT_EXCLUDED_TOOLS }
-            .filter { tool -> tool.name !in SUBAGENT_VIRTUAL_SCREEN_TOOLS || allowVirtualScreen }
-            .filter { tool -> allowMutation || tool.name != "download_file" }
-            .filter { tool ->
-                allowMutation ||
-                    tool.access in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) ||
-                    (allowVirtualScreen && tool.name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)
-            }
-        val selection = LocalToolRouter.selectSchemas(
-            if (allowMutation) tools else tools.map(HarnessTool::forReadOnlyModelScope),
-            enabled,
-        )
-        val unavailable = enabled.mapNotNull { name ->
-            val registered = registry.get(name)
-            val reason = when {
-                registered == null -> "已选工具未注册或已卸载；请重新发现能力"
-                !executionCoordinator.isNetworkSearchPermitted(name) -> "网络搜索设置已关闭"
-                name in SUBAGENT_EXCLUDED_TOOLS -> "此工具仅允许父智能体使用"
-                name in SUBAGENT_VIRTUAL_SCREEN_TOOLS && !allowVirtualScreen ->
-                    "本次子任务未授权虚拟屏幕"
-                !allowMutation && (name == "download_file" ||
-                    registered.access !in setOf(ToolAccess.READ_ONLY, ToolAccess.NETWORK) &&
-                    !(allowVirtualScreen && name in SUBAGENT_VIRTUAL_SCREEN_TOOLS)) ->
-                    "子智能体当前只读，不允许此工具"
-                else -> null
-            }
-            reason?.let { name to it }
-        }.toMap()
-        return selection.copy(omittedReasons = unavailable + selection.omittedReasons)
-    }
+        @Suppress("UNUSED_PARAMETER") allowMutation: Boolean,
+        @Suppress("UNUSED_PARAMETER") allowVirtualScreen: Boolean,
+        @Suppress("UNUSED_PARAMETER") enabledOptional: Set<String>,
+    ): LocalToolRouter.ToolSchemaSelection = LocalToolRouter.ToolSchemaSelection(
+        gatewaySchemas(), emptyMap(), emptySet(),
+    )
 
     fun modelSchemas(
         policy: LocalAgentRunPolicy,
@@ -132,69 +53,20 @@ internal class LocalToolSchemaProjection(
         policy, modelState, planModeEnabled, history, enabledOptional, agentTeamMode,
     ).schemas
 
-    /** Single source for the model-facing tool surface and omitted capability reasons. */
     internal fun modelSelection(
         policy: LocalAgentRunPolicy,
-        modelState: LocalModelState,
-        planModeEnabled: Boolean,
-        history: List<JsonObject>,
-        enabledOptional: Set<String>? = null,
-        agentTeamMode: Boolean = false,
-    ): LocalToolRouter.ToolSchemaSelection {
-        if (!policy.toolsEnabled) return LocalToolRouter.ToolSchemaSelection(
-            schemas = JsonArray(emptyList()),
-            omittedReasons = emptyMap(),
-            compactedNames = emptySet(),
-        )
-        val enabled = enabledOptional ?: executionCoordinator.enabledOptionalSnapshot()
-        val tools = registry.names()
-            .mapNotNull(registry::get)
-            .filter { tool -> executionCoordinator.isNetworkSearchPermitted(tool.name) }
-            .filter { tool ->
-                !planModeEnabled || LocalToolPolicy.allowedInPlan(tool.name, tool.access) ||
-                    // Code Mode is visible in Plan Mode for fully read-only scripts only.
-                    // Admission checks the actual child tool contracts before any step runs.
-                    tool.name == "code_mode_run"
-            }
-        val visibleTools = if (planModeEnabled) tools.map(HarnessTool::forReadOnlyModelScope) else tools
-        val coreDefinitionTokens = visibleTools.asSequence()
-            .filter { it.exposure == ToolExposure.CORE }
-            .sumOf { estimateModelTokens(it.schema.toString()) }
-        val requestedOptionalTokens = visibleTools.asSequence()
-            .filter { it.exposure == ToolExposure.OPTIONAL && it.name in enabled }
-            .sumOf { estimateModelTokens(it.schema.toString()) }
-        // Keep the normal cache-friendly budget; explicit selection may use the route's
-        // actual spare tokens rather than an unrelated fixed schema ceiling.
-        val requestedDefinitionTokens = maxOf(
-            LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS, requestedOptionalTokens,
-        )
-        // Team, planning and ordinary Work requests use the same actual token ledger.
-        val promptBudget = optionalToolPromptBudgetForRoute(
-            modelState, history, coreDefinitionTokens, requestedDefinitionTokens,
-        )
-        val selection = LocalToolRouter.selectSchemas(
-            tools = visibleTools,
-            enabledOptional = enabled,
-            maxOptionalDefinitionTokens = promptBudget,
-        )
-        val unavailable = enabled.mapNotNull { name ->
-            val registered = registry.get(name)
-            val reason = when {
-                registered == null -> "已选工具未注册或已卸载；请重新发现能力"
-                !executionCoordinator.isNetworkSearchPermitted(name) -> "网络搜索设置已关闭"
-                planModeEnabled && !LocalToolPolicy.allowedInPlan(name, registered.access) ->
-                    "规划模式不允许此工具；退出规划模式后可重新选择"
-                else -> null
-            }
-            reason?.let { name to it }
-        }.toMap()
-        return selection.copy(omittedReasons = unavailable + selection.omittedReasons)
-    }
+        @Suppress("UNUSED_PARAMETER") modelState: LocalModelState,
+        @Suppress("UNUSED_PARAMETER") planModeEnabled: Boolean,
+        @Suppress("UNUSED_PARAMETER") history: List<JsonObject>,
+        @Suppress("UNUSED_PARAMETER") enabledOptional: Set<String>? = null,
+        @Suppress("UNUSED_PARAMETER") agentTeamMode: Boolean = false,
+    ): LocalToolRouter.ToolSchemaSelection = LocalToolRouter.ToolSchemaSelection(
+        if (policy.toolsEnabled) gatewaySchemas() else JsonArray(emptyList()),
+        emptyMap(), emptySet(),
+    )
 
     fun names(schemas: JsonArray): List<String> = schemas.mapNotNull { element ->
         val function = (element as? JsonObject)?.get("function") as? JsonObject
         (function?.get("name") as? JsonPrimitive)?.contentOrNull
     }
-
-
 }

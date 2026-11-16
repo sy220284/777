@@ -165,8 +165,13 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "从实时注册表发现扩展。已知名称可用 select:工具名1,工具名2，按照真实任务需要指定工具名称，由实际注册状态及模型定义预算决定本轮装入范围，并聚焦当前任务的可选工具候选。结果区分已注册、已选择候选与定义预算不足；以下一模型请求最终提供的工具表为实际可用依据。进入该工具表的 MCP/GitHub 扩展可参与 code_mode_run，仍须逐步经过真实连接与权限审批。", properties(
-            "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
+        // The model uses one stable dispatch tool for every registered capability.
+        add(tool("tool_call", "按注册名称直接调用工具，无需预加载。未知名称先用 tool_search 查询；参数由目标工具真实 Schema 校验，目标工具自行审批。", properties(
+            "name" to string("已注册工具名，例如 read、grep、github_search 或 MCP 工具名称"),
+            "arguments" to jsonSchemaObject("目标工具的完整 JSON 参数；参照 tool_search 返回的真实参数定义"),
+        ), listOf("name", "arguments")))
+        add(tool("tool_search", "只读查找实时工具注册表及准确参数定义；不选择、不加载、不改变模型工具表。", properties(
+            "query" to string("工具名称、功能描述或 能力目录"),
         ), listOf("query")))
         add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
             "items" to buildJsonObject {
