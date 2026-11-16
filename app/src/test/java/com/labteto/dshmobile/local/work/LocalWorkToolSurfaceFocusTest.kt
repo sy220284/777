@@ -76,8 +76,6 @@ class LocalWorkToolSurfaceFocusTest {
     }
 
     @Test fun ordinaryChatDoesNotEnableExecutableTools() {
-        assertEquals(emptyList<String>(), names(registry(), false, emptySet())
-            .takeIf { false } ?: emptyList<String>())
         val registry = registry()
         val projection = LocalToolSchemaProjection(registry, LocalToolExecutionCoordinator(
             registry = registry, currentSessionId = { "chat" }, planMode = { false },
