@@ -335,6 +335,7 @@ internal class LocalSubagentRunner(
             snapshot.kernel.resources.maxAgents > capabilities.depth
         val toolCallPolicy = LocalSubagentToolCallPolicy(
             allowMutation, virtualScreenId, modelToolStepSurface, capabilities.toolAllowlist,
+            teamManaged = capabilities.teamManaged,
         )
         val enabledOptionalTools = admitLocalAgentScopedToolGrants(
             capabilities, recoveredEnabledOptionalTools,
