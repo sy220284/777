@@ -173,11 +173,7 @@ internal class LocalWorkComposition @Inject constructor(
             createWorkspace = tools::forkAgentWorkspace,
             factory = subagentFactory,
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-                tools.schemas.subagentSchemas(
-                    allowMutation = allowMutation,
-                    allowVirtualScreen = allowVirtualScreen,
-                    enabledOptional = enabledOptional,
-                )
+                tools.schemas.subagentSchemas()
             },
             executeTool = { binding, call, allowMutation, _, _ ->
                 turnToolRuntime.execute(binding, call, allowMutation)
@@ -224,11 +220,7 @@ internal class LocalWorkComposition @Inject constructor(
                     executionWorkspaceGuidance = workspaceBinding?.guidance,
                     runKind = LocalAgentRunKind.SUBAGENT,
                     schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-                        tools.schemas.subagentSchemas(
-                            allowMutation = allowMutation,
-                            allowVirtualScreen = allowVirtualScreen,
-                            enabledOptional = enabledOptional,
-                        )
+                        tools.schemas.subagentSchemas()
                     },
                     executeTool = { call, allowMutation, memoryTools, enabledOptional ->
                         backgroundTools.executePersistentSubagentTool(
@@ -423,11 +415,7 @@ internal class LocalWorkComposition @Inject constructor(
         boundState = boundState,
         runKind = LocalAgentRunKind.AUTOMATION,
         schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-            tools.schemas.subagentSchemas(
-                allowMutation = allowMutation,
-                allowVirtualScreen = allowVirtualScreen,
-                enabledOptional = enabledOptional,
-            )
+            tools.schemas.subagentSchemas()
         },
         executeTool = { call, allowMutation, memoryTools, enabledOptional ->
             backgroundTools.executeAutomationSubagentTool(

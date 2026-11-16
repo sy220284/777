@@ -184,10 +184,8 @@ class LocalToolRouterTest {
             )
         )
         val modelSchemas = projection.modelSchemas(
-            policy = com.labteto.dshmobile.local.agent.localAgentRunPolicy(
+            com.labteto.dshmobile.local.agent.localAgentRunPolicy(
                 com.labteto.dshmobile.local.LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = false, history = emptyList(),
         )
         assertEquals(listOf("tool_search", "tool_call"), projection.names(modelSchemas))
         val fullCost = LocalToolCatalog.specs.sumOf {

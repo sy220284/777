@@ -268,7 +268,7 @@ internal class LocalWorkAgentTurnExecutor(
                     maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
                     maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
                 ),
-                toolNames = workTurnToolRuntime.names(runPolicy, binding),
+                toolNames = workTurnToolRuntime.names(runPolicy),
                 contextChars = runSnapshot.kernel.contextChars,
                 parentRunId = continuationParentRunId,
             )
@@ -450,7 +450,7 @@ internal class LocalWorkAgentTurnExecutor(
                     }
                     // The gateway surface is fixed for this run; reuse it for both
                     // context accounting and the actual model request.
-                    val modelToolSchemas = workTurnToolRuntime.schemas(runPolicy, binding)
+                    val modelToolSchemas = workTurnToolRuntime.schemas(runPolicy)
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
                             estimateModelTokens(workPromptContext.dynamic + improvementGuidance +
