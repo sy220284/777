@@ -10,6 +10,7 @@ import com.labteto.dshmobile.local.model.LocalModelStreamWatchdog
 import com.labteto.dshmobile.local.model.ModelStreamLimitException
 import com.labteto.dshmobile.local.model.ModelStreamLimitKind
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import com.labteto.dshmobile.local.model.LocalModelAdmissionTracker
 import com.labteto.dshmobile.local.model.LocalModelDelta
 import com.labteto.dshmobile.local.model.LocalKimiPolicy
@@ -590,7 +591,7 @@ class DeepSeekClient @Inject constructor(
         val completionReason = if ((message["refusal"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true)
             com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED else initialCompletionReason
         val rawToolCalls = message["tool_calls"]?.takeUnless { it == JsonNull }?.let {
-            it as? JsonArray ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "tool_calls 必须是数组", false)
+            it as? JsonArray ?: throw responseToolProtocolError("tool_calls 必须是数组")
         }.orEmpty()
         val rawContent = assistantText(message["content"])
             ?: (message["refusal"] as? JsonPrimitive)?.contentOrNull
@@ -609,9 +610,9 @@ class DeepSeekClient @Inject constructor(
         }
         val calls = (if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) rawToolCalls else emptyList()).map { element ->
             val item = element as? JsonObject
-                ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "工具调用必须是对象", false)
+                ?: throw responseToolProtocolError("工具调用必须是对象")
             val function = item["function"] as? JsonObject
-                ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "工具调用缺少 function 对象", false)
+                ?: throw responseToolProtocolError("工具调用缺少 function 对象")
             validatedModelToolCall(item["id"], function["name"], function["arguments"], "MODEL_RESPONSE_PROTOCOL")
         }
         requireUniqueModelToolCallIds(calls, "MODEL_RESPONSE_PROTOCOL")
@@ -747,6 +748,16 @@ private fun streamToolString(value: JsonElement?, field: String, allowEmpty: Boo
     return primitive.content
 }
 
+private fun responseToolProtocolError(detail: String): LocalModelException = LocalModelException(
+    code = "MODEL_RESPONSE_PROTOCOL",
+    message = detail,
+    retryable = false,
+    providerCode = "invalid_tool_arguments",
+    admissionState = LocalModelAdmissionState.ADMITTED,
+    continuationEligible = true,
+    origin = LocalModelFailureOrigin.STREAM_PARSE,
+)
+
 private fun streamProtocolError(
     detail: String,
     cause: Throwable? = null,
@@ -754,8 +765,12 @@ private fun streamProtocolError(
     code = "MODEL_STREAM_PROTOCOL",
     message = detail,
     retryable = false,
-    cause = cause,
+    // Decoder errors may include the raw streamed JSON (containing user commands).
+    cause = cause?.let { IllegalArgumentException("Chat Completions SSE decode: " + it::class.java.simpleName) },
     providerCode = "protocol_error_after_admission",
+    admissionState = LocalModelAdmissionState.ADMITTED,
+    continuationEligible = true,
+    origin = LocalModelFailureOrigin.STREAM_PARSE,
 )
 
 internal fun providerErrorDetail(body: String, json: Json): String? = runCatching {
