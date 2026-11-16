@@ -61,6 +61,7 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double? = null,
         reasoningEffort: String? = null,
         planSharing: Boolean,
+        maxTokens: Int? = null,
         allowImageGeneration: Boolean = false,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
@@ -76,6 +77,7 @@ class OpenAiResponsesClient @Inject constructor(
             temperature = temperature,
             reasoningEffort = reasoningEffort,
             planSharing = planSharing,
+            maxTokens = maxTokens,
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
@@ -390,6 +392,7 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double?,
         reasoningEffort: String? = null,
         planSharing: Boolean = true,
+        maxTokens: Int? = null,
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
         promptCacheComparisonResponseId: String? = null,
@@ -404,6 +407,10 @@ class OpenAiResponsesClient @Inject constructor(
         if (!planSharing) systemInstructions.takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("store", false)
         put("stream", true)
+        maxTokens?.let { tokens ->
+            require(tokens > 0) { "Responses API 最大输出 Token 数必须大于零" }
+            put("max_output_tokens", tokens)
+        }
         if (planSharing || reasoningEffort != null) {
             put("reasoning", buildJsonObject {
                 if (planSharing) put("context", "all_turns")
