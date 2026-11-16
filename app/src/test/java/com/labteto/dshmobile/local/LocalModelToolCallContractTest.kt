@@ -65,6 +65,21 @@ class LocalModelToolCallContractTest {
         }
     }
 
+    @Test fun unknownFinishReasonsContinueThroughProviderProtocolRecovery() = runBlocking {
+        val body = "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"future_finish\"}]}\n" +
+            "data: [DONE]\n"
+        val failure = runCatching {
+            client(body).completeStreaming(
+                "mock-token", "https://example.com/v1", "custom",
+                listOf(buildJsonObject { put("role", "user"); put("content", "检验结束原因") }),
+                tools = JsonArray(emptyList()),
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_STREAM_PROTOCOL", failure?.code)
+        assertTrue(failure?.continuationEligible == true)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+    }
+
     @Test fun toolFinishWithoutAnyCallIsAContinuableProtocolError() = runBlocking {
         val error = runCatching { stream(emptyList()) }.exceptionOrNull() as? LocalModelException
         assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
