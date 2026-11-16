@@ -537,8 +537,9 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                     agentRunCoordinator.ensureCurrentOwner(runContext)
-                    val eagerToolContext = currentCoroutineContext()
-                        [com.labteto.dshmobile.harness.agent.AgentEagerToolContext]
+                    val eagerToolContext = currentCoroutineContext()[
+                        com.labteto.dshmobile.harness.agent.AgentEagerToolContext
+                    ]
                     val sampling = try {
                         sampleWithToolArgumentsRepair(
                             revisions = binding.steeringRevision,
