@@ -167,14 +167,18 @@ class ToolRegistry private constructor(
             val function = (schema as? JsonObject)?.get("function") as? JsonObject
             (function?.get("name") as? JsonPrimitive)?.content
         }.toSet()
-        val codeModeChildren = if ("code_mode_run" in names && registered["code_mode_run"] != null) {
+        val directChildren = if ("tool_call" in names) registered.filter { (name, tool) ->
+            name != "tool_call" && tool.exposure != ToolExposure.INTERNAL
+        } else emptyMap()
+        val codeModeChildren = if ("code_mode_run" in names || "tool_call" in names) {
             registered.filter { (name, tool) ->
-                name != "code_mode_run" &&
-                    (tool.exposure == ToolExposure.CORE ||
+                name != "code_mode_run" && name != "tool_call" &&
+                    tool.exposure != ToolExposure.INTERNAL &&
+                    ("tool_call" in names || tool.exposure == ToolExposure.CORE ||
                         (tool.exposure == ToolExposure.OPTIONAL && name in names))
             }
         } else emptyMap()
-        return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren)
+        return ToolBindingSnapshot(registered.filterKeys { it in names }, codeModeChildren, directChildren)
     }
     internal fun schemas(): JsonArray = JsonArray(
         tools.snapshot().values
@@ -248,11 +252,13 @@ class ToolRegistry private constructor(
         }
         val sampled = currentCoroutineContext()[ToolBindingSnapshot]
         if (sampled != null && sampled.registration(name) !== tool) {
-            val child = currentCoroutineContext()[CodeModeStepScope]
-            if (child == null || child.snapshot !== sampled ||
-                child.registration !== tool || sampled.codeModeChild(name) !== tool) {
-                return registrationChanged(name)
-            }
+            val code = currentCoroutineContext()[CodeModeStepScope]
+            val direct = currentCoroutineContext()[DirectToolStepScope]
+            val codeAllowed = code != null && code.snapshot === sampled &&
+                code.registration === tool && sampled.codeModeChild(name) === tool
+            val directAllowed = direct != null && direct.snapshot === sampled &&
+                direct.registration === tool && sampled.directChild(name) === tool
+            if (!codeAllowed && !directAllowed) return registrationChanged(name)
         }
         validateToolInput(tool, input)?.let { problem ->
             return ToolInvocationResult(
