@@ -509,7 +509,7 @@ class LocalToolExecutionCoordinatorTest {
     }
 
     @Test
-    fun unknownToolReturnsStructuredFailure() {
+    fun unknownToolReturnsStructuredFailure() = runBlocking {
         val coordinator = coordinator(ToolRegistry())
 
         val result = coordinator.execute(
