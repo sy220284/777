@@ -520,6 +520,15 @@ internal class AnthropicMessagesClient @Inject constructor(
                             else -> null
                         }
                         if (expectedBlock != null && accumulator.type != expectedBlock) {
+                            if (accumulator.type == "tool_use" || expectedBlock == "tool_use") {
+                                throw malformedToolArgumentsErrorStatic(
+                                    requestId ?: messageId, stopReason, streamEventsSeen,
+                                    toolName = accumulator.name,
+                                    inputJson = accumulator.inputJson.toString(),
+                                    inputDeltaCount = accumulator.inputDeltaCount,
+                                    issue = "tool_delta_type_mismatch",
+                                )
+                            }
                             throw protocolError("delta 类型与内容块不一致", requestId)
                         }
                         when (deltaType) {
@@ -631,11 +640,20 @@ internal class AnthropicMessagesClient @Inject constructor(
                 }
                 "tool_use" -> {
                     val id = block["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                        ?: throw protocolError("tool_use 缺少 id", requestId)
+                        ?: throw malformedToolArgumentsErrorStatic(
+                            requestId ?: messageId, stopReason, streamEventsSeen,
+                            issue = "missing_tool_id",
+                        )
                     val name = block["name"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                        ?: throw protocolError("tool_use 缺少 name", requestId)
+                        ?: throw malformedToolArgumentsErrorStatic(
+                            requestId ?: messageId, stopReason, streamEventsSeen,
+                            issue = "missing_tool_name",
+                        )
                     val input = block["input"] as? JsonObject
-                        ?: throw protocolError("tool_use input 不是对象", requestId)
+                        ?: throw malformedToolArgumentsErrorStatic(
+                            requestId ?: messageId, stopReason, streamEventsSeen,
+                            toolName = name, issue = "missing_or_non_object_input",
+                        )
                     canonicalBlocks += LocalCanonicalContent.ToolCall(
                         id = id,
                         name = name,
@@ -976,6 +994,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                 "missing_partial_json" -> "服务商的 input_json_delta 缺少字符串 partial_json"
                 "unknown_tool_delta" -> "服务商发来了未知工具参数增量"
                 "missing_or_non_object_input" -> "工具参数缺失或根节点不是 JSON 对象"
+                "missing_tool_id" -> "tool_use 调用标识缺失"
+                "missing_tool_name" -> "tool_use 工具名称缺失"
+                "tool_delta_type_mismatch" -> "服务商工具参数增量类型与内容块不一致"
                 "unclosed_object" -> "JSON 对象尚未闭合"
                 "missing_value" -> "字段值尚未生成"
                 else -> "JSON 参数无法解析成完整对象"
