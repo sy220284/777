@@ -876,7 +876,12 @@ class OpenAiResponsesClient @Inject constructor(
                 }
             }
         }
-        if (completionReason != LocalModelCompletionReason.COMPLETED) toolCalls.clear()
+        if (completionReason == LocalModelCompletionReason.COMPLETED) {
+            val callIds = toolCalls.map { it.id }
+            if (callIds.distinct().size != callIds.size) {
+                throw responseProtocolError("模型生成了重复的工具调用 call_id")
+            }
+        } else toolCalls.clear()
         val rawContent = content.toString().takeIf(String::isNotBlank)
             ?: streamedContent.takeIf { allowStreamFallback && it.isNotBlank() }
         val settledContent = if (webSources.isEmpty()) rawContent else buildString {
