@@ -221,6 +221,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
     maxTokens: Int? = null,
+    responseFormat: JsonObject? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -235,6 +236,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheTtl = promptCacheTtl,
         allowImageGeneration = allowImageGeneration,
         maxTokens = maxTokens,
+        responseFormat = responseFormat,
         )
 
     suspend fun completeStreaming(
@@ -251,6 +253,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
     maxTokens: Int? = null,
+    responseFormat: JsonObject? = null,
     ): LocalModelReply =
         completeResolved(
             route = resolveRoute(model, baseUrl, profile),
@@ -265,6 +268,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheTtl = promptCacheTtl,
         allowImageGeneration = allowImageGeneration,
         maxTokens = maxTokens,
+        responseFormat = responseFormat,
         )
 
     suspend fun probeApiKey(
@@ -353,6 +357,7 @@ class LocalModelGateway @Inject constructor(
         promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
     maxTokens: Int? = null,
+    responseFormat: JsonObject? = null,
     ): LocalModelReply {
         val prepared = prepareLocalModelAdapterRequest(
             route = route,
@@ -366,6 +371,7 @@ class LocalModelGateway @Inject constructor(
             promptCacheTtl = promptCacheTtl,
         allowImageGeneration = allowImageGeneration,
         maxTokens = maxTokens,
+        responseFormat = responseFormat,
         )
         return adapters.adapter(route.protocol).complete(
             request = prepared.request,
@@ -397,7 +403,17 @@ internal fun prepareLocalModelAdapterRequest(
     promptCacheTtl: String? = null,
     allowImageGeneration: Boolean = false,
     maxTokens: Int? = null,
+    responseFormat: JsonObject? = null,
 ): LocalPreparedModelRequest {
+    if (responseFormat != null &&
+        (route.protocol != LocalModelProtocol.RESPONSES ||
+            !DeepSeekChatRequestPolicy.isOfficial(route.model, route.baseUrl))) {
+        throw LocalModelException(
+            code = "MODEL_STRUCTURED_OUTPUT_UNSUPPORTED",
+            message = "当前结构化输出通道只支持官方 DeepSeek Responses",
+            retryable = false,
+        )
+    }
     val canonicalMessages = LocalCanonicalModelCodec.messages(messages).filterNot(::isEmptyCanonicalAssistant)
     validateCanonicalModelHistory(canonicalMessages)
     val canonicalTools = LocalCanonicalModelCodec.tools(tools)
@@ -454,6 +470,7 @@ internal fun prepareLocalModelAdapterRequest(
             tools = canonicalTools,
             temperature = routedTemperature,
             reasoningEffort = reasoningEffort,
+            responseFormat = responseFormat,
             maxTokens = when (route.protocol) {
                 LocalModelProtocol.CHAT_COMPLETIONS ->
                     DeepSeekChatRequestPolicy.checkedMaxTokens(route.model, route.baseUrl, maxTokens)
