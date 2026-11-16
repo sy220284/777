@@ -12,8 +12,8 @@ Kimi 官方文档推荐具备原生 Responses 的工具优先使用 Responses；
 
 | 模型 ID | 实际型号 | 默认本地上下文 | 思考控制 | 原生输入 |
 | --- | --- | --- | --- | --- |
-| `k3.1-pro` | K3.1 Pro | 256K（合格套餐可手动升至 1M） | 仅思考；low/high/max | 文字、图片 |
-| `k3.1-pro-highspeed` | K3.1 Pro 高速 | 1M（需要 Pro/Allegretto 以上权益） | 仅思考；low/high/max | 文字、图片 |
+| `k3.1-pro` | K3.1 Pro | 256K（合格套餐可手动升至 1M） | 仅思考；low/high/max | Responses 文字、图片；Chat 支持视频 |
+| `k3.1-pro-highspeed` | K3.1 Pro 高速 | 1M（需要 Pro/Allegretto 以上权益） | 仅思考；low/high/max | Responses 文字、图片；Chat 支持视频 |
 | `k3` | K3 | 256K（合格套餐可手动升至 1M） | low/high/max | 文字、图片；Chat 协议可处理视频 |
 | `k3-256k` | K3 256K | 256K | low/high/max | 文字、图片 |
 | `kimi-for-coding` | K2.8 Preview | 1M | low/high/max | 文字、图片；Chat 协议可处理视频 |
@@ -25,7 +25,7 @@ Kimi 官方文档推荐具备原生 Responses 的工具优先使用 Responses；
 
 - Responses 路由在本机将图片附件转成 `input_image`，通过 `reasoning.effort` 设置思考，按 OpenAI Responses 流式事件提取正文、思考、函数调用和 Token 用量，沿同一路由恢复工具结果与对话。
 - **Kimi 官方 Responses 目前不支持视频输入。** 777 对该路由不声明视频能力，错误发送 `video_url` 时显式拒绝，不将视频悄悄丢弃。用户需要视频时，在模型编辑页选择 Chat Completions；旧 Chat 多模态路径保留 `video_url` 和 20MB 输入上限。
-- 对可用 Chat 视频路由，仅 `k3`、`kimi-for-coding`、`kimi-for-coding-highspeed` 具备现有视频格式编码；`k3-256k` 不支持视频。仅按实际协议向设置页提供能力标识。
+- 对可用 Chat 视频路由，`k3.1-pro`、`k3.1-pro-highspeed`、`k3`、`kimi-for-coding`、`kimi-for-coding-highspeed` 具备现有视频格式编码；`k3-256k` 不支持视频。仅按实际协议向设置页提供能力标识。
 - 聊天、工作模式、子智能体共用同一 Session 和附件持久引用；图像/视频 Base64 在日志中脱敏，历史文件引用不会每轮重新上传。
 - Kimi 的账号权益属于订阅配额，本地 Token 账本只记录服务商返回的用量，不虚构已支付的按量金额。调用失败保留供应商原始 HTTP 诊断。
 
