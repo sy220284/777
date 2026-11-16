@@ -8,9 +8,57 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class LocalRequestEvidenceTest {
+
+    @Test
+    fun textOnlyEvidenceReusesOriginalRequestMessagesWithoutRedactionWork() {
+        val messages = listOf(
+            buildJsonObject {
+                put("role", "system")
+                put("content", "keep prompt")
+            },
+            buildJsonObject {
+                put("role", "user")
+                put("content", JsonArray(listOf(buildJsonObject {
+                    put("type", "text")
+                    put("text", "plain text")
+                })))
+            },
+        )
+        val logged = redactModelImages(messages)
+        assertSame(messages, logged)
+        assertEquals(buildLocalRequestEvidence(messages, JsonArray(emptyList())),
+            buildLocalRequestEvidence(logged, JsonArray(emptyList())))
+    }
+
+    @Test
+    fun mediaEvidenceRedactsOnlySensitivePartsAndKeepsOtherMessagesUnchanged() {
+        val originalText = buildJsonObject {
+            put("role", "user")
+            put("content", "plain text")
+        }
+        val withImage = buildJsonObject {
+            put("role", "user")
+            put("content", JsonArray(listOf(buildJsonObject {
+                put("type", "image_url")
+                put("image_url", buildJsonObject { put("url", "data:image/png;base64,SECRET") })
+            })))
+        }
+        val raw = listOf(originalText, withImage)
+        val logged = redactModelImages(raw)
+        assertNotSame(raw, logged)
+        assertSame(originalText, logged.first())
+        assertFalse(logged.last().toString().contains("SECRET"))
+        val tools = JsonArray(emptyList())
+        assertNotEquals(buildLocalRequestEvidence(raw, tools).messageDigest,
+            buildLocalRequestEvidence(logged, tools).messageDigest)
+    }
+
     @Test
     fun capturesOnlyModelInstructionContextAndStableDigests() {
         val messages = listOf(
