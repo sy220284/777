@@ -89,7 +89,8 @@ class LocalCodexPatchConversionTest {
             val patch = normalizeWorkspacePatch(native, root)
             val preflight = git(root, patch, true)
             assertEquals(preflight.second, 0, preflight.first)
-            assertEquals(git(root, patch, false).second, 0, git(root, patch, true).first)
+            val applied = git(root, patch, false)
+            assertEquals(applied.second, 0, applied.first)
             assertEquals("top\nfinish\n", File(root, "bottom.txt").readText())
         } finally {
             root.deleteRecursively()
