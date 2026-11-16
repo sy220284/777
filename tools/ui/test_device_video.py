@@ -40,7 +40,11 @@ if args[0]=='screenrecord':
  dest.write_bytes(b'\0\0\0\x18ftypisom'+b'0'*1024)
  (store/'pid').unlink(missing_ok=True)
  sys.exit(0)
-if args[0]=='pull':shutil.copyfile(store/Path(args[1]).name, args[2]);sys.exit(0)
+if args[0]=='pull':
+ if os.environ.get('FAKE_ADB_FAIL_PULL')=='1':
+  sys.stderr.write('simulated interrupted transfer')
+  sys.exit(23)
+ shutil.copyfile(store/Path(args[1]).name, args[2]);sys.exit(0)
 if args[0]=='rm':(store/Path(args[-1]).name).unlink(missing_ok=True);sys.exit(0)
 raise Exception(args)
 '''
@@ -74,6 +78,23 @@ class VideoTest(unittest.TestCase):
             self.assertTrue(all((root/'videos'/x['file']).exists() for x in receipt['clips']))
             self.assertEqual(json.loads((root/'videos'/'manifest.json').read_text())['name'],'main-tour')
 
+
+    def test_failed_transfer_never_deletes_only_recording(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            rec = self.setup_recorder(root)
+            rec.start()
+            time.sleep(.1)
+            os.environ["FAKE_ADB_FAIL_PULL"] = "1"
+            try:
+                with self.assertRaisesRegex(RuntimeError, "无法保存"):
+                    rec.stop()
+            finally:
+                os.environ.pop("FAKE_ADB_FAIL_PULL", None)
+            receipt = json.loads((root / "videos" / "manifest.json").read_text())
+            self.assertEqual(len(receipt["unrecovered_device_clips"]), 1)
+            self.assertTrue(list((root / "remote").glob("*.mp4")))
+            self.assertEqual(receipt["clips"], [])
 
     def test_cli_preserves_video_when_wrapped_test_fails(self):
         with tempfile.TemporaryDirectory() as d:
