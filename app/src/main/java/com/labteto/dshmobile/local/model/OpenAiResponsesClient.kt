@@ -67,6 +67,7 @@ class OpenAiResponsesClient @Inject constructor(
         reasoningEffort: String? = null,
         planSharing: Boolean,
         maxTokens: Int? = null,
+        responseFormat: JsonObject? = null,
         allowImageGeneration: Boolean = false,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
@@ -83,6 +84,7 @@ class OpenAiResponsesClient @Inject constructor(
             reasoningEffort = reasoningEffort,
             planSharing = planSharing,
             maxTokens = maxTokens,
+            responseFormat = responseFormat,
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
             openAiExtensions = openAiContract,
@@ -403,6 +405,7 @@ class OpenAiResponsesClient @Inject constructor(
         reasoningEffort: String? = null,
         planSharing: Boolean = true,
         maxTokens: Int? = null,
+        responseFormat: JsonObject? = null,
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
         openAiExtensions: Boolean = true,
@@ -422,6 +425,17 @@ class OpenAiResponsesClient @Inject constructor(
         if (!planSharing) maxTokens?.let { tokens ->
             require(tokens > 0) { "Responses API 最大输出 Token 数必须大于零" }
             put("max_output_tokens", tokens)
+        }
+        responseFormat?.let { format ->
+            require(!planSharing) { "ChatGPT 套餐不接受本地自定义结构化输出" }
+            require(format["type"]?.jsonPrimitive?.contentOrNull in setOf("json_object", "json_schema")) {
+                "Responses text.format 只能为 json_object 或 json_schema"
+            }
+            if (format["type"]?.jsonPrimitive?.contentOrNull == "json_schema") {
+                require(format["name"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true &&
+                    format["schema"] is JsonObject) { "Responses json_schema 需要 name 与 schema" }
+            }
+            put("text", buildJsonObject { put("format", format) })
         }
         if (planSharing || reasoningEffort != null) {
             put("reasoning", buildJsonObject {
