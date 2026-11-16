@@ -449,11 +449,11 @@ internal class AnthropicMessagesClient @Inject constructor(
         var streamEventsSeen = 0
         val closedBlocks = mutableSetOf<Int>()
 
-        val reader = ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
+        val reader = ModelSseDataReader(ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES))
         run {
             while (true) {
                 val line = try {
-                    reader.readLine()
+                    reader.readData()
                 } catch (failure: ModelStreamLimitException) {
                     throw LocalModelException(
                         code = "MODEL_RESPONSE_TOO_LARGE",
@@ -469,8 +469,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                     if (!(blocks.values.any { it.type == "text" && it.text.isNotBlank() })) throw failure
                     null
                 } ?: break
-                if (!line.startsWith("data:")) continue
-                val data = line.removePrefix("data:").trim()
+                val data = line.trim()
                 if (data.isBlank()) continue
                 val event = runCatching { json.parseToJsonElement(data).jsonObject }
                     .getOrElse { cause ->
@@ -538,9 +537,30 @@ internal class AnthropicMessagesClient @Inject constructor(
                                 }
                             "signature_delta" -> delta["signature"]?.jsonPrimitive?.contentOrNull
                                 ?.let(accumulator.signature::append)
-                            "input_json_delta" -> delta["partial_json"]?.jsonPrimitive?.contentOrNull
-                                ?.let(accumulator.inputJson::append)
+                            "input_json_delta" -> {
+                                val part = delta["partial_json"] as? JsonPrimitive
+                                if (part == null || !part.isString) {
+                                    throw malformedToolArgumentsErrorStatic(
+                                        requestId ?: messageId, stopReason, streamEventsSeen,
+                                        toolName = accumulator.name,
+                                        inputJson = accumulator.inputJson.toString(),
+                                        inputDeltaCount = accumulator.inputDeltaCount,
+                                        issue = "missing_partial_json",
+                                    )
+                                }
+                                accumulator.inputJson.append(part.content)
+                                accumulator.inputDeltaCount++
+                            }
                             "citations_delta" -> delta["citation"]?.let(accumulator.citations::add)
+                            else -> if (accumulator.type == "tool_use") {
+                                throw malformedToolArgumentsErrorStatic(
+                                    requestId ?: messageId, stopReason, streamEventsSeen,
+                                    toolName = accumulator.name,
+                                    inputJson = accumulator.inputJson.toString(),
+                                    inputDeltaCount = accumulator.inputDeltaCount,
+                                    issue = "unknown_tool_delta",
+                                )
+                            }
                         }
                     }
                     "message_delta" -> {
@@ -679,6 +699,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         val thinking: StringBuilder = StringBuilder(),
         val signature: StringBuilder = StringBuilder(),
         val inputJson: StringBuilder = StringBuilder(),
+        var inputDeltaCount: Int = 0,
         val citations: MutableList<JsonElement> = mutableListOf(),
     ) {
         fun toNative(json: Json, requestId: String?, stopReason: String?, streamEventsSeen: Int): JsonObject = when (type) {
@@ -701,10 +722,17 @@ internal class AnthropicMessagesClient @Inject constructor(
                 val input = if (inputJson.isNotEmpty()) {
                     runCatching { json.parseToJsonElement(inputJson.toString()).jsonObject }
                         .getOrElse { cause ->
-                            throw malformedToolArgumentsErrorStatic(requestId, stopReason, streamEventsSeen, cause)
+                            throw malformedToolArgumentsErrorStatic(
+                                requestId, stopReason, streamEventsSeen, cause,
+                                toolName = name, inputJson = inputJson.toString(),
+                                inputDeltaCount = inputDeltaCount,
+                            )
                         }
                 } else {
-                    initialInput ?: throw malformedToolArgumentsErrorStatic(requestId, stopReason, streamEventsSeen)
+                    initialInput ?: throw malformedToolArgumentsErrorStatic(
+                        requestId, stopReason, streamEventsSeen,
+                        toolName = name, issue = "missing_or_non_object_input",
+                    )
                 }
                 buildJsonObject {
                     rawStart.forEach { (key, value) ->
@@ -917,23 +945,61 @@ internal class AnthropicMessagesClient @Inject constructor(
             origin = LocalModelFailureOrigin.STREAM_PARSE,
         )
 
-        /** Malformed model arguments cannot authorize tool execution; resume from saved history. */
-        fun malformedToolArgumentsErrorStatic(requestId: String?, stopReason: String?, streamEventsSeen: Int, cause: Throwable? = null) =
-            LocalModelException(
+
+        /** Only schema-safe identifiers and failure shape escape the parser. */
+        private val SAFE_GATEWAY_TARGET = Regex(""""name"\s*:\s*"([A-Za-z][A-Za-z0-9_-]{0,63})"""")
+        private val MISSING_ARGUMENTS_VALUE = Regex(""""arguments"\s*:\s*$""")
+
+        fun malformedToolArgumentsErrorStatic(
+            requestId: String?,
+            stopReason: String?,
+            streamEventsSeen: Int,
+            cause: Throwable? = null,
+            toolName: String? = null,
+            inputJson: String? = null,
+            inputDeltaCount: Int = 0,
+            issue: String? = null,
+        ): LocalModelException {
+            val safeTool = toolName?.takeIf { it.matches(Regex("[A-Za-z][A-Za-z0-9_-]{0,63}")) }
+            val target = if (safeTool == "tool_call") {
+                SAFE_GATEWAY_TARGET.find(inputJson.orEmpty())?.groupValues?.getOrNull(1)
+            } else null
+            val reason = issue ?: when {
+                MISSING_ARGUMENTS_VALUE.containsMatchIn(inputJson.orEmpty()) -> "missing_arguments_value"
+                inputJson.isNullOrBlank() -> "missing_input"
+                inputJson.trimEnd().endsWith(":") -> "missing_value"
+                inputJson.trimEnd().startsWith("{") && !inputJson.trimEnd().endsWith("}") -> "unclosed_object"
+                else -> "invalid_json_object"
+            }
+            val detail = when (reason) {
+                "missing_arguments_value" -> "arguments 字段还没有 JSON 对象值"
+                "missing_partial_json" -> "服务商的 input_json_delta 缺少字符串 partial_json"
+                "unknown_tool_delta" -> "服务商发来了未知工具参数增量"
+                "missing_or_non_object_input" -> "工具参数缺失或根节点不是 JSON 对象"
+                "unclosed_object" -> "JSON 对象尚未闭合"
+                "missing_value" -> "字段值尚未生成"
+                else -> "JSON 参数无法解析成完整对象"
+            }
+            val qualifiedTool = listOfNotNull(safeTool, target).joinToString("/")
+            return LocalModelException(
                 code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
-                message = "模型生成的 tool_use 参数不是合法 JSON 对象，本次工具调用尚未执行",
+                message = "模型工具调用 " + qualifiedTool.ifBlank { "tool_use" } +
+                    " 的参数无效：" + detail + "；该调用尚未执行",
                 retryable = false,
                 cause = cause,
                 requestId = requestId,
                 providerCode = "malformed_tool_use_arguments",
-                // Terminal message_stop was received; retain non-sensitive stream facts to
-                // distinguish provider-completed malformed JSON from transport truncation.
-                lastStreamEventType = "message_stop:${stopReason ?: "unknown"}",
+                providerParam = qualifiedTool.takeIf(String::isNotBlank),
+                lastStreamEventType = "message_stop:" + (stopReason ?: "unknown"),
                 streamEventsSeen = streamEventsSeen,
+                toolInputIssue = reason,
+                toolInputDeltaCount = inputDeltaCount,
+                toolInputChars = inputJson?.length ?: 0,
                 admissionState = LocalModelAdmissionState.ADMITTED,
                 continuationEligible = true,
                 origin = LocalModelFailureOrigin.STREAM_PARSE,
             )
+        }
 
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         const val CLAUDE_API_VERSION = "2026-10-21"

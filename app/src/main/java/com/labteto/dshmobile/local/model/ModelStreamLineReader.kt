@@ -37,3 +37,30 @@ internal class ModelStreamLineReader(
         return line
     }
 }
+
+
+/** SSE records may contain several data: lines; parsing each line as JSON loses fragments. */
+internal class ModelSseDataReader(private val lines: ModelStreamLineReader) {
+    private var exhausted = false
+
+    fun readData(): String? {
+        if (exhausted) return null
+        val data = StringBuilder()
+        while (true) {
+            val line = lines.readLine()
+            if (line == null) {
+                exhausted = true
+                return data.toString().takeIf(String::isNotEmpty)
+            }
+            if (line.isEmpty()) {
+                if (data.isNotEmpty()) return data.toString()
+                continue
+            }
+            // Blank lines dispatch frames. Comments, IDs and event labels are metadata.
+            if (!line.startsWith("data:")) continue
+            if (data.isNotEmpty()) data.append('\n')
+            val value = line.substring(5)
+            data.append(if (value.startsWith(' ')) value.substring(1) else value)
+        }
+    }
+}
