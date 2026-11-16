@@ -912,11 +912,10 @@ internal class AnthropicMessagesClient @Inject constructor(
         when (reason) {
             "end_turn", "stop_sequence", "tool_use", "refusal" -> return
             "max_tokens" -> return
-            else -> throw LocalModelException(
-                code = "MODEL_FINISH_$reason",
-                message = "Anthropic 模型未正常完成回复（$reason）",
-                retryable = false,
-                requestId = requestId,
+            else -> throw protocolError(
+                "Anthropic 模型返回未知 stop_reason：" +
+                    (reason?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) } ?: "unknown"),
+                requestId,
             )
         }
     }
