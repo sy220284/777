@@ -10,6 +10,9 @@ import com.labteto.dshmobile.local.tools.LocalToolRouter
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,7 +24,7 @@ import org.junit.rules.TemporaryFolder
 class LocalAgentLspDiscoveryTest {
     @get:Rule val workspace = TemporaryFolder()
 
-    @Test fun taskSelectsPreciseLspToolsWithoutDownloadingOrExposingUninstall() = runBlocking {
+    @Test fun lspCanBeDirectlyInvokedWithoutAnyOptionalExposure() = runBlocking {
         var installs = 0
         val ctx = HarnessContext()
         val plugin = LspPlugin(
@@ -34,47 +37,42 @@ class LocalAgentLspDiscoveryTest {
         )
         plugin.install(ctx)
         try {
+            for (name in listOf("tool_search", "tool_call")) {
+                val schema = com.labteto.dshmobile.local.tools.LocalToolCatalog.specs.first {
+                    it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == name
+                }.jsonObject
+                ctx.tools.register(com.labteto.dshmobile.harness.tools.HarnessTool(
+                    name = name, schema = schema,
+                    access = com.labteto.dshmobile.harness.tools.ToolAccess.READ_ONLY,
+                    approvalPolicy = com.labteto.dshmobile.harness.tools.ToolApprovalPolicy.NEVER,
+                    exposure = com.labteto.dshmobile.harness.tools.ToolExposure.CORE,
+                    metadata = com.labteto.dshmobile.harness.tools.ToolMetadata("环境"),
+                    executor = com.labteto.dshmobile.harness.tools.HarnessToolExecutor { _, _, _ ->
+                        com.labteto.dshmobile.harness.tools.ToolResult("stub")
+                    },
+                ))
+            }
             val coordinator = LocalToolExecutionCoordinator(
                 registry = ctx.tools,
                 currentSessionId = { "lsp-discovery" },
                 planMode = { false },
                 requestApproval = { _, _, _ -> true },
             )
-            val enabled = linkedSetOf<String>()
-            coordinator.prepareWorkTurnCapabilities(
-                input = "检查代码的类型错误",
-                history = emptyList(),
-                gitHubConfigured = { false },
-                target = enabled,
-            )
-            assertTrue("lsp_diagnostics" in enabled)
-            assertFalse("lsp_uninstall_component" in enabled)
-            assertFalse("lsp_rename_preview" in enabled)
-            assertFalse("lsp_definition" in enabled)
             val projection = LocalToolSchemaProjection(ctx.tools, coordinator)
-            val toolsInModel = projection.names(projection.modelSchemas(
+            assertEquals(listOf("tool_search", "tool_call"), projection.names(projection.modelSchemas(
                 policy = localAgentRunPolicy(LocalUsageMode.WORK),
-                modelState = LocalModelState(),
-                planModeEnabled = false,
-                history = emptyList(),
-                enabledOptional = enabled,
-            ))
-            assertTrue("lsp_diagnostics" in toolsInModel)
-            assertFalse("lsp_uninstall_component" in toolsInModel)
-            assertEquals(0, installs)
-
-            // The Agent can explicitly search for more semantics without a hardcoded allowlist.
-            val discovered = coordinator.searchCapabilities("查找引用", enabled)
-            assertTrue(discovered.contains("lsp_references"))
-            assertTrue("lsp_references" in coordinator.visibleToolNames(
-                localAgentRunPolicy(LocalUsageMode.WORK),
-            ) || "lsp_references" in projection.names(projection.modelSchemas(
-                policy = localAgentRunPolicy(LocalUsageMode.WORK),
-                modelState = LocalModelState(),
-                planModeEnabled = false,
-                history = emptyList(),
-                enabledOptional = enabled,
+                modelState = LocalModelState(), planModeEnabled = false, history = emptyList(),
             )))
+            val args = kotlinx.serialization.json.buildJsonObject {
+                put("name", "lsp_status")
+                put("arguments", kotlinx.serialization.json.buildJsonObject {})
+            }
+            val response = coordinator.execute(
+                original = LocalToolCall("lsp-direct", "tool_call", args, args.toString()),
+                allowMutation = true,
+            )
+            assertFalse(response.isError)
+            assertTrue(response.content.contains("typescript 6.0.1 尚未安装"))
             assertEquals(0, installs)
         } finally {
             plugin.uninstall(ctx)
