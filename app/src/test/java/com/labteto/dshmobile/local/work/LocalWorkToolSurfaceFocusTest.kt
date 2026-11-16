@@ -59,7 +59,7 @@ class LocalWorkToolSurfaceFocusTest {
                 "mcp_new", "动态接入的工具"),
             access = ToolAccess.READ_ONLY,
             approvalPolicy = ToolApprovalPolicy.NEVER,
-            exposure = ToolExposure.OPTIONAL, metadata = ToolMetadata("MCP"),
+            exposure = ToolExposure.OPTIONAL, metadata = ToolMetadata("MCP", discoveryKeywords = setOf("mcp_new")),
             executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
         ))
         assertEquals(expected, names(registry, false, setOf("mcp_new")))
