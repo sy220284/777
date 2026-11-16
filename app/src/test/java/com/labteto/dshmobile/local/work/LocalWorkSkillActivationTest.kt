@@ -32,6 +32,13 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun explicitSkillNameTracksOnlyUserSelectedTurn() {
+        assertEquals("private-notes", explicitLocalSkillName("@skill:private-notes\n审查参考资料"))
+        assertEquals(null, explicitLocalSkillName("继续上一个已完成任务"))
+        assertEquals(null, explicitLocalSkillName("提到了 @skill:private-notes，但未选择"))
+    }
+
+    @Test
     fun explicitOnlySkillRunsWhenPinnedAndMissingPinFailsClearly() {
         val root = Files.createTempDirectory("skill-pin-disabled").toFile()
         try {

@@ -45,6 +45,9 @@ internal class LocalWorkRunBinding(
         require(runHandle.sessionId == sessionId) { "Work run 运行句柄与会话编号不一致" }
     }
 
+    /** Explicit user selection belongs to this Work run and never grants tool permission. */
+    @Volatile internal var explicitlySelectedSkill: String? = null
+
     val state = MutableStateFlow(initialState)
     /** Exact live tool bodies, including question waits; settled by the shared execution boundary. */
     val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())

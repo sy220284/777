@@ -5,6 +5,11 @@ import com.labteto.dshmobile.local.files.LocalSkillMetadata
 import java.util.Locale
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 
+/** The same explicit selection parser is used for prompt injection and resource access. */
+internal fun explicitLocalSkillName(input: String): String? =
+    Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)")
+        .find(input)?.groupValues?.get(1)
+
 /** Selected skill instructions are loaded once per model step and never persisted in history. */
 internal fun resolveLocalWorkSkillGuidance(
     workspace: LocalWorkspace,
@@ -13,7 +18,7 @@ internal fun resolveLocalWorkSkillGuidance(
 ): String {
     // User-selected skills are part of the requested task. The model request's real
     // context budget, not a separate character quota, decides whether they fit.
-    val explicitName = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)").find(input)?.groupValues?.get(1)
+    val explicitName = explicitLocalSkillName(input)
     val explicitDocument = explicitName?.let { name ->
         try {
             workspace.readSkillSnapshot(name)

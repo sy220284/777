@@ -329,6 +329,7 @@ internal class LocalWorkAgentTurnExecutor(
             }
 
             var effectiveSkillInput = input
+            binding.explicitlySelectedSkill = explicitLocalSkillName(input)
             val loop = AgentTurnEngine(
                 model = AgentModel {
                     agentRunCoordinator.ensureCurrentOwner(runContext)
@@ -389,6 +390,7 @@ internal class LocalWorkAgentTurnExecutor(
                             ?.get("content")?.let { it as? JsonPrimitive }?.contentOrNull
                             ?.takeIf(String::isNotBlank) ?: input
                         effectiveSkillInput = effectiveInput
+                        binding.explicitlySelectedSkill = explicitLocalSkillName(effectiveInput)
                         workPromptContext = contextComposer.composeWorkTurnContext(
                             input = effectiveInput,
                             snapshot = snapshot,
