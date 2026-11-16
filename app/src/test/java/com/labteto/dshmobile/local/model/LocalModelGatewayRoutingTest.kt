@@ -200,6 +200,12 @@ class LocalModelGatewayRoutingTest {
             message, JsonArray(emptyList()), null, true, maxTokens = 8192,
         )
         assertEquals(8192, kimi.request.maxTokens)
+        val miniMax = prepareLocalModelAdapterRequest(
+            routeFor("MiniMax-M3", "https://api.minimaxi.com/anthropic/v1").copy(
+                protocol = LocalModelProtocol.ANTHROPIC_MESSAGES),
+            message, JsonArray(emptyList()), null, true, maxTokens = 131_072,
+        )
+        assertEquals(131_072, miniMax.request.maxTokens)
         val plan = prepareLocalModelAdapterRequest(
             routeFor("gpt-6-sol", "https://api.openai.com/v1", LocalModelAuthKind.CHATGPT_PLAN),
             message, JsonArray(emptyList()), null, true, maxTokens = 8192,
