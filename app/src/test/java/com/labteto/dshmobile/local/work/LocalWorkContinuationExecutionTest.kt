@@ -88,6 +88,9 @@ class LocalWorkContinuationExecutionTest {
 
     @Test fun transportOutageCanQueueAfterManyRecoveriesWithoutAbandoningTask() = withBinding { binding ->
         binding.automaticContinuationCount = 25
+        val checkpoint = binding.eventLog.append("turn/checkpoint", buildJsonObject {
+            put("kind", "pre-send-network")
+        })
         val recoverable = LocalModelException(
             code = "MODEL_NETWORK",
             message = "network down before send",
@@ -101,6 +104,8 @@ class LocalWorkContinuationExecutionTest {
         assertEquals(26, binding.automaticContinuationCount)
         assertEquals(1, binding.runHandle.pendingInputs.size())
         assertEquals("MODEL_NETWORK", binding.runHandle.pendingInputs.snapshot().single().continuation?.failureCode)
+        assertEquals(checkpoint.sequence,
+            binding.runHandle.pendingInputs.snapshot().single().continuation?.checkpointSequence)
     }
 
     @Test fun nonContinuableFailureLeavesInboxUnchanged() = withBinding { binding ->
