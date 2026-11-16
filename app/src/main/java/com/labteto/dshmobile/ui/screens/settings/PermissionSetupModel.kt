@@ -41,12 +41,12 @@ internal fun permissionSetupStatus(
         PermissionSetupFeature.NOTIFICATION_READ -> state.notificationAccessGranted
         PermissionSetupFeature.TASK_ALERTS -> state.postingNotifications == true
         PermissionSetupFeature.BACKGROUND_EXECUTION -> state.batteryOptimizationExempt && !state.backgroundRestricted
-        PermissionSetupFeature.BACKGROUND_EXECUTION -> state.batteryOptimizationExempt && !state.backgroundRestricted
     }
     val connected = when (feature) {
         PermissionSetupFeature.SCREEN_CONTROL -> state.accessibility
         PermissionSetupFeature.NOTIFICATION_READ -> state.notifications
         PermissionSetupFeature.TASK_ALERTS -> state.postingNotifications == true
+        PermissionSetupFeature.BACKGROUND_EXECUTION -> state.batteryOptimizationExempt && !state.backgroundRestricted
     }
     return when {
         granted && connected -> PermissionSetupStatus.READY
