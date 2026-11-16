@@ -31,15 +31,30 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
             ) throw error
             repairs++
             onRepair(repairs)
-            // Request-only correction; never append fake user instructions or failed tool calls to history.
+            // Only the failed model step is corrected. Tool execution is never replayed.
+            val safeTool = error.providerParam?.takeIf {
+                it.matches(Regex("[A-Za-z][A-Za-z0-9_/-]{0,127}"))
+            }
+            val instruction = buildString {
+                append("上一轮工具调用尚未执行，协议参数校验失败。错误码=")
+                append(error.code)
+                append("；具体原因=")
+                append(error.toolInputIssue ?: "invalid_json_object")
+                safeTool?.let { append("；目标工具="); append(it) }
+                append("。重新生成完整、符合当前工具定义的 JSON 对象参数。")
+                if (safeTool == "tool_call/bash") {
+                    append("bash 的正确格式为 tool_call({\"name\":\"bash\",\"arguments\":{\"command\":\"实际 Shell 命令\"}})。")
+                }
+                if (repairs > 1) {
+                    append("已经再次发生相同类别错误；请先调用 tool_search 查清真实参数，再调用正确工具。")
+                } else {
+                    append("如果不确定名称或参数，先用 tool_search 查询 Schema。")
+                }
+                append("继续原任务；历史中已有成功回执的操作不得重复执行。")
+            }
             messages = originalMessages + buildJsonObject {
                 put("role", "user")
-                put(
-                    "content",
-                    "上一轮模型生成的工具调用参数不是合法 JSON 对象，工具尚未执行。" +
-                        "如不确定工具名称或参数结构，先调用 tool_search 查明真实定义，再重新生成完整、合法的 JSON 对象参数，" +
-                        "继续完成原任务。不要重复已在历史中有成功回执的工具操作。"
-                )
+                put("content", instruction)
             }
         }
     }

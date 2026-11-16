@@ -11,4 +11,14 @@ private val SUBAGENT_CONTINUATION_POLICY = LocalAgentContinuationPolicy(
 internal fun subagentContinuationMessage(
     error: LocalModelException,
     completedContinuations: Int,
-): JsonObject? = SUBAGENT_CONTINUATION_POLICY.message(error, completedContinuations)
+): JsonObject? {
+    val continuation = SUBAGENT_CONTINUATION_POLICY.message(error, completedContinuations) ?: return null
+    if (error.code != "ANTHROPIC_TOOL_ARGUMENTS_INVALID") return continuation
+    return kotlinx.serialization.json.JsonObject(
+        continuation + ("content" to kotlinx.serialization.json.JsonPrimitive(
+            "工具参数解析失败（" + (error.toolInputIssue ?: "invalid_json_object") +
+                "），该工具尚未执行。请先用 tool_search 查阅真实工具参数，重新构造完整 JSON 对象，" +
+                "继续未完成子任务；已经成功执行的操作不能重复。"
+        ))
+    )
+}

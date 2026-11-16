@@ -111,7 +111,10 @@ internal fun queueAutomaticWorkContinuation(
             outputLimitProgress ->
                 "上一响应因输出上限暂停，部分正文已保存在历史中。接续正文末尾，只生成尚未完成的内容，不重复已有正文、已执行工具或副作用。"
             error.code == "ANTHROPIC_TOOL_ARGUMENTS_INVALID" ->
-                "继续当前任务。上一轮模型生成的 tool_use 工具参数不是合法 JSON 对象，该工具尚未执行。请核对历史中的真实工具回执；如有疑问先用 tool_search 查询工具定义，再重新生成完整、可解析的 JSON 对象参数，继续未完成的操作；已完成的工具副作用不能重复执行。"
+                "继续当前任务。上一轮工具参数解析失败（" + (error.toolInputIssue ?: "invalid_json_object") +
+                    "），目标=" + (error.providerParam ?: "tool_use") + "，该工具尚未执行。先核对历史真实回执；" +
+                    "对未知参数用 tool_search 查询真实 Schema，重新生成完整可解析的 JSON 对象并继续任务；" +
+                    "已有回执的副作用不能重复执行。"
             else -> INTERNAL_WORK_CONTINUATION_PROMPT
         },
     )

@@ -122,10 +122,15 @@ internal class LocalToolExecutionCoordinator(
                 "INVALID_TOOL_ARGUMENTS",
                 "tool_call 需要有效的 name 与 JSON 对象 arguments；不允许递归调用入口。",
                 readOnly = false, executionStarted = false,
+            ).copy(
+                recoveryHint = "工具尚未执行。格式示例：tool_call({\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}})。" +
+                    "未知工具先用 tool_search 查验真实名称、参数字段和必填项，修正后再调用。",
             )
             val handler = registry.get(child.name)
                 ?: return localToolFailure("UNKNOWN_TOOL", "工具未注册：" + child.name,
-                    readOnly = false, executionStarted = false)
+                    readOnly = false, executionStarted = false).copy(
+                    recoveryHint = "先用 tool_search 查找实时已注册工具和参数；按返回的真实名称重新调用。本次没有进入目标工具执行器。",
+                )
             if (handler.exposure == ToolExposure.INTERNAL) return localToolFailure(
                 "TOOL_SCOPE_BLOCKED", "内部工具不可通过模型调用：" + child.name,
                 readOnly = false, executionStarted = false,
