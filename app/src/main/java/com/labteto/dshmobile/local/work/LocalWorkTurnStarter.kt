@@ -223,6 +223,7 @@ internal class LocalWorkTurnStarter(
             }
             if (continuation.failureCode != WORK_OUTPUT_LIMIT_CONTINUATION) binding.automaticContinuationCount = continuation.index
             binding.continuationParentRunId = continuation.sourceRunId
+            binding.continuationFailureCode = continuation.failureCode
         }
         try {
             workRunRegistry.attach(binding)
