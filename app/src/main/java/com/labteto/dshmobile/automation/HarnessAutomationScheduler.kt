@@ -526,18 +526,18 @@ class HarnessAutomationScheduler @Inject constructor(
             else -> firstRunAtMillis.coerceAtLeast(now)
         }
         require(current.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
+        var scheduleChanged = false
         val updated = store.updateIf(
             id,
             predicate = { it.scheduleGeneration == current.scheduleGeneration },
         ) { latest ->
-            latest.copy(
+            val candidate = latest.copy(
                 prompt = prompt.trim(),
                 nextRunAt = nextRun,
                 recurringMinutes = recurring,
                 scheduleType = scheduleType,
                 dispatchPolicy = automationDispatchPolicy(scheduleType, recurring),
                 scheduleAnchorAt = if (scheduleType == AutomationScheduleType.SILENCE) now else nextRun,
-                scheduleGeneration = latest.scheduleGeneration + 1L,
                 silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) silenceMinutes else null,
                 windowStartMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
                     windowStartMinuteOfDay
@@ -557,7 +557,13 @@ class HarnessAutomationScheduler @Inject constructor(
                 lastError = null,
                 failureStreak = 0,
             )
+            if (candidate == latest) latest else {
+                scheduleChanged = true
+                candidate.copy(scheduleGeneration = latest.scheduleGeneration + 1L)
+            }
         } ?: return false
+        // Saving unchanged settings must not cancel a live WorkManager request.
+        if (!scheduleChanged) return true
         if (updated.status != AutomationStatus.PAUSED) {
             if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
                 enqueueOneTime(id, nextRun, updated.scheduleGeneration)

@@ -331,10 +331,7 @@ internal class LocalWorkAgentTurnExecutor(
                             input = input,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(
-                                sessionStorage.files.workspace, input,
-                                selectedInvocations = pinnedInvocations.current(),
-                            ),
+                            skillGuidance = "",
                         )
                         if (memoryInput.isNotBlank()) workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
@@ -361,10 +358,7 @@ internal class LocalWorkAgentTurnExecutor(
                             input = input,
                             snapshot = runState.value,
                             workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(
-                                sessionStorage.files.workspace, input,
-                                selectedInvocations = pinnedInvocations.current(),
-                            ),
+                            skillGuidance = "",
                         )
                         workModelHistoryRuntime.updateContextMetrics(binding)
                     }
@@ -380,10 +374,7 @@ internal class LocalWorkAgentTurnExecutor(
                             input = effectiveInput,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(
-                                sessionStorage.files.workspace, effectiveInput,
-                                selectedInvocations = pinnedInvocations.current(),
-                            ),
+                            skillGuidance = "",
                         )
                         projectedSteeringRevision = observedSteer
                     }
@@ -440,6 +431,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val reusableDiscoveryContext = improvementArchive.relevantDiscoveries(
                         snapshot.projectId.orEmpty(), effectiveSkillInput,
                     )
+                    // Read the live skill catalog only at the real model-request boundary.
                     val skillGuidance = resolveLocalWorkSkillGuidance(
                         sessionStorage.files.workspace, effectiveSkillInput,
                         selectedInvocations = pinnedInvocations.current(),

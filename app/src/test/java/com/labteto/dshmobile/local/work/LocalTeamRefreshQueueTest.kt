@@ -72,4 +72,36 @@ class LocalTeamRefreshQueueTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun queuedSessionRefreshMergesReconcileInsteadOfRebuildingTwice() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val secondDone = CompletableDeferred<Unit>()
+        val observed = java.util.Collections.synchronizedList(mutableListOf<Boolean>())
+        try {
+            val queue = LocalTeamRefreshQueue(scope) { id, reconcile ->
+                if (id != "coalesce") return@LocalTeamRefreshQueue
+                observed.add(reconcile)
+                if (observed.size == 1) {
+                    firstStarted.complete(Unit)
+                    releaseFirst.await()
+                } else {
+                    secondDone.complete(Unit)
+                }
+            }
+            queue.schedule("coalesce", reconcile = false)
+            withTimeout(5_000) { firstStarted.await() }
+            queue.schedule("coalesce", reconcile = false)
+            queue.schedule("coalesce", reconcile = true)
+            releaseFirst.complete(Unit)
+            withTimeout(5_000) { secondDone.await() }
+            assertEquals(listOf(false, true), observed.toList())
+        } finally {
+            releaseFirst.complete(Unit)
+            scope.cancel()
+        }
+    }
+
 }

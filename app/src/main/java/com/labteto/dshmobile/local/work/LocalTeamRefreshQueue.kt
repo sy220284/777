@@ -3,7 +3,6 @@ package com.labteto.dshmobile.local.work
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Coalesces progress per session without letting one long history replay block other sessions. */
 internal class LocalTeamRefreshQueue(
@@ -18,11 +17,9 @@ internal class LocalTeamRefreshQueue(
     init {
         scope.launch {
             for (ignored in wake) {
-                if (!synchronized(lock) { pending.values.any { it } }) {
-                    withTimeoutOrNull(250L) {
-                        do { wake.receive() } while (!synchronized(lock) { pending.values.any { it } })
-                    }
-                }
+                // A completion wake with no pending work is already settled; no
+                // timer or secondary receive is needed to discover future work.
+                if (!synchronized(lock) { pending.isNotEmpty() }) continue
                 val batch = synchronized(lock) {
                     val freeSlots = (MAX_PARALLEL_SESSIONS - runningSessions.size).coerceAtLeast(0)
                     pending.entries.asSequence()

@@ -341,6 +341,8 @@ class AutomationStore internal constructor(
         if (!predicate(task)) return null
         val updated = transform(task)
         require(updated.id == task.id && updated.scheduleGeneration >= task.scheduleGeneration) { "自动任务身份不能回退或替换" }
+        // No semantic change: skip journal append, backup write and UI refresh.
+        if (updated == task) return task
         write(document.copy(tasks = document.tasks.map { if (it.id == id) updated else it }))
         return updated
     }

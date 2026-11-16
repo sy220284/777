@@ -560,7 +560,6 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 error = if (durableReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) null
                     else "模型未完成：${durableReply.rawStopReason ?: durableReply.completionReason.name}；已保留部分正文。",
             )
-            sessionStorage.enqueueCurrentSnapshot(sessionId)
 
             val assistantMessage = durableReply.content?.takeIf(String::isNotBlank)
             if (durableReply.completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED && assistantTranscript != null && assistantMessage != null) {
@@ -596,7 +595,6 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 }
             }
             modelHistory.checkpointAtTurnBoundary(sessionId, "chat/cancelled")
-            sessionStorage.enqueueCurrentSnapshot(sessionId)
             throw cancelled
         } catch (error: Exception) {
             val detail = if (regenerationCommitted) {
@@ -623,7 +621,6 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 }
             }
             modelHistory.checkpointAtTurnBoundary(sessionId, "chat/failed")
-            sessionStorage.enqueueCurrentSnapshot(sessionId)
         } finally {
             runtimeStateStore.foregroundInteractions.cancelAll()
             runtimeStateStore.projection.setForegroundRunning(

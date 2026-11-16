@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.automation
 
 import java.nio.file.Files
+import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -95,6 +96,26 @@ class AutomationStoreRecoveryTest {
             assertTrue(directory.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText().contains("broken") })
             assertTrue(directory.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText() == "{broken-backup" })
             assertThrows(IllegalStateException::class.java) { AutomationStore(file, json).list() }
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+
+    @Test
+    fun unchangedTaskUpdateDoesNotAppendAnotherDurableMutation() {
+        val directory = Files.createTempDirectory("automation-noop-update").toFile()
+        try {
+            val file = directory.resolve("automations.json")
+            val store = AutomationStore(file, json)
+            val existing = store.upsert(task("fixed", 15_000L)).admitted
+            val before = directory.walkTopDown().filter(File::isFile)
+                .associate { it.relativeTo(directory).path to it.readBytes().toList() }
+            assertEquals(existing, store.update("fixed") { it.copy() })
+            val after = directory.walkTopDown().filter(File::isFile)
+                .associate { it.relativeTo(directory).path to it.readBytes().toList() }
+            assertEquals(before, after)
+            assertEquals(existing, store.get("fixed"))
         } finally {
             directory.deleteRecursively()
         }
