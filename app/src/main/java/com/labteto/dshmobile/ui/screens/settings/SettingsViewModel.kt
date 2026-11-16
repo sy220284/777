@@ -467,4 +467,10 @@ class SettingsViewModel @Inject constructor(
 
     fun openAppNotificationSettings() = deviceCapabilitiesController.openAppNotificationSettings()
 
+    fun requestContinuousWorkBatteryExemption() =
+        deviceCapabilitiesController.requestContinuousWorkBatteryExemption()
+
+    fun openBatteryOptimizationSettings() =
+        deviceCapabilitiesController.openBatteryOptimizationSettings()
+
 }
