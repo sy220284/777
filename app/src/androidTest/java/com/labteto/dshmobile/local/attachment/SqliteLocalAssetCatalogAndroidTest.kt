@@ -223,6 +223,35 @@ class SqliteLocalAssetCatalogAndroidTest {
         }
     }
 
+    @Test fun importerCanRefineLegacyRecoveredMediaTypeWithoutChangingContentId() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-refine-${UUID.randomUUID()}.db"
+        val root = File(context.cacheDir, "asset-refine-${UUID.randomUUID()}")
+        val folder = File(root, ".dsh/attachments").apply { mkdirs() }
+        try {
+            val bytes = "# A Markdown file".toByteArray()
+            val id = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val file = File(folder, "$id.md").apply { writeBytes(bytes) }
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                val catalog = SqliteLocalAssetCatalog(db)
+                assertEquals(1, catalog.reconcilePublishedFiles(root, listOf(file)).registered)
+                assertEquals("application/octet-stream", catalog.asset(id)?.mediaType)
+                catalog.register(LocalImportedAttachment(
+                    name = file.name, relativePath = ".dsh/attachments/$id.md",
+                    mediaType = "text/markdown", bytes = bytes.size.toLong(),
+                    attachmentId = id,
+                ))
+                assertEquals("text/markdown", catalog.asset(id)?.mediaType)
+                assertEquals(listOf(".dsh/attachments/$id.md"), catalog.locations(id))
+                assertEquals(0, catalog.reconcilePublishedFiles(root, listOf(file)).registered)
+            }
+        } finally {
+            context.deleteDatabase(name)
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun duplicateContentUnderTwoSafeExtensionsKeepsBothLocations() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "asset-alias-${UUID.randomUUID()}.db"

@@ -86,8 +86,23 @@ internal class SqliteLocalAssetCatalog(
                     check(rows.moveToFirst()) { "附件路径登记失败" }
                     Triple(rows.getString(0), rows.getLong(1), rows.getString(2))
                 }
-                check(registered == Triple(id, imported.bytes, imported.mediaType)) {
-                    "附件路径登记与原记录冲突"
+                check(registered.first == id && registered.second == imported.bytes) {
+                    "附件路径登记与内容哈希冲突"
+                }
+                if (registered.third != imported.mediaType) {
+                    // A recovered file's MIME was guessed from its extension.
+                    // The later actual importer can refine the presentation
+                    // metadata without changing the content-addressed identity.
+                    check(db.update("local_asset_locations", ContentValues().apply {
+                        put("media_type", imported.mediaType)
+                    }, "relative_path=? AND asset_id=?",
+                        arrayOf(imported.relativePath, id)) == 1) {
+                        "附件真实媒体类型更新失败"
+                    }
+                    db.update("local_assets", ContentValues().apply {
+                        put("media_type", imported.mediaType)
+                    }, "asset_id=? AND relative_path=?",
+                        arrayOf(id, imported.relativePath))
                 }
                 SqliteAssetEventIndex.promotePendingReferences(db, id)
                 db.setTransactionSuccessful()
