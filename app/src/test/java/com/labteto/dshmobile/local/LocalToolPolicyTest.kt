@@ -87,7 +87,7 @@ class LocalToolPolicyTest {
         assertEquals(ToolExposure.OPTIONAL, LocalToolPolicy.exposure("team_ack_message"))
         assertEquals(ToolApprovalPolicy.NEVER, LocalToolPolicy.approval("team_ack_message"))
         assertEquals(LocalAutoApprovalScope.NONE, LocalToolPolicy.autoApprovalScope("team_ack_message"))
-        assertTrue("team_ack_message" in com.labteto.dshmobile.local.tools.LocalTeamMemberToolContract.NAMES)
+        assertTrue("team_ack_message" in com.labteto.dshmobile.local.work.LocalAgentTeamContract.MEMBER_TOOL_NAMES)
         assertTrue("team_ack_message" !in com.labteto.dshmobile.local.work.LocalAgentTeamContract.TOOL_NAMES)
         assertTrue(com.labteto.dshmobile.local.work.LocalAgentTeamContract.isTeamChildControlCall("team_ack_message"))
     }
