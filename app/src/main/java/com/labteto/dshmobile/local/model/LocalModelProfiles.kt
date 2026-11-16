@@ -693,8 +693,10 @@ object LocalModelPresets {
                 promptCachePolicy = promptCachePolicy,
             )
             LocalModelProtocol.RESPONSES -> LocalModelRuntimeCapabilities(
-                structuredOutput = true,
-                strictSchema = true,
+                structuredOutput = authKind == LocalModelAuthKind.API_KEY &&
+                    DeepSeekChatRequestPolicy.isOfficial(model, baseUrl),
+                strictSchema = authKind == LocalModelAuthKind.API_KEY &&
+                    DeepSeekChatRequestPolicy.isOfficial(model, baseUrl),
                 imageInput = image,
                 temperature = preset?.temperatureSupported != false,
                 maxImageBytes = maxImageBytes,
@@ -802,7 +804,9 @@ internal fun List<LocalModelProfile>.apiKeyProfileForRoute(
     val matches = filter { profile ->
         profile.authKind == LocalModelAuthKind.API_KEY &&
             profile.model == model &&
-            normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl
+            (normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl ||
+                (profileId != null && profile.id == profileId &&
+                    LocalModelProtocolRoutePolicy.sameCredentialOrigin(profile.baseUrl, normalizedBaseUrl)))
     }
     if (profileId != null) {
         return requireNotNull(matches.firstOrNull { it.id == profileId }) {
