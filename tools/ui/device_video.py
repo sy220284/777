@@ -39,7 +39,6 @@ class DeviceVideoRecorder:
 
     def start(self):
         self.directory.mkdir(parents=True, exist_ok=True)
-        self._adb("shell", "-n", "mkdir", "-p", "/sdcard/Download", timeout=20)
         self._thread = threading.Thread(target=self._capture, name="android-ui-video", daemon=True)
         self._thread.start()
         if not self._started.wait(12):
@@ -60,7 +59,7 @@ class DeviceVideoRecorder:
         index = 0
         while not self._stop.is_set():
             index += 1
-            remote = f"/sdcard/Download/ui-audit-{self._token}-{index:03d}.mp4"
+            remote = f"/data/local/tmp/ui-audit-{self._token}-{index:03d}.mp4"
             began = _utc_now()
             start = time.monotonic()
             try:

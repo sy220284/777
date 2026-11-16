@@ -27,6 +27,7 @@ if args[0]=='kill':
  except ProcessLookupError:pass
  sys.exit(0)
 if args[0]=='screenrecord':
+ if not args[-1].startswith('/data/local/tmp/'):raise Exception('Use device shell-writable storage')
  dest=store/Path(args[-1]).name
  quitting=False
  def stop(sig,frame):
