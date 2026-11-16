@@ -30,7 +30,7 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 6) {
+) : SQLiteOpenHelper(context, name, null, 7) {
     private val searchBlockIndex = SqliteSessionSearchBlockIndex(json)
     init { setWriteAheadLoggingEnabled(true) }
 
@@ -66,7 +66,7 @@ class SqliteSessionEventDatabase(
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..5 && newVersion == 6) {
+        require(oldVersion in 1..6 && newVersion == 7) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
         // Idempotent even if an older pilot schema omitted this table.

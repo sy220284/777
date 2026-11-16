@@ -32,6 +32,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.put
 
 /** Preserve human file names in Work while keeping all imported paths under one local folder. */
@@ -82,6 +83,44 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
             try { downloadsPublisher.ensureDirectory() }
             catch (failure: Exception) { AppLog.failure("DownloadsPublisher", "initialize_folder", failure) }
+        }
+        // One-off, resumable backfill on process initialization, not a periodic task.
+        // Production uploads still use the same catalog and Session mutation gate.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
+            val db = eventLogs.sqliteDatabase ?: return@launch
+            try {
+                val catalog = SqliteLocalAssetCatalog(db)
+                val mediaDir = File(workspace.path, ".dsh/attachments")
+                if (mediaDir.exists()) {
+                    val published = requireNotNull(mediaDir.listFiles()) {
+                        "无法读取历史附件目录，资源回填未完成"
+                    }.sortedBy(File::getName)
+                    var unclassified = 0
+                    for (batch in published.chunked(128)) {
+                        val result = resourceScheduler.withResource(
+                            HarnessResourceKind.FILE_IO, "file:asset_backfill",
+                            priority = HarnessResourcePriority.BACKGROUND,
+                        ) { catalog.reconcilePublishedFiles(File(workspace.path), batch) }
+                        unclassified += result.unclassified
+                        yield()
+                    }
+                    if (unclassified > 0) {
+                        AppLog.failure("AssetCatalog", "unclassified_legacy_assets",
+                            IllegalStateException("尚有 $unclassified 个无内容哈希的旧附件，保留原文件等待单独核对"))
+                    }
+                }
+                while (true) {
+                    val indexed = resourceScheduler.withResource(
+                        HarnessResourceKind.FILE_IO, "file:event_reference_backfill",
+                        priority = HarnessResourcePriority.BACKGROUND,
+                    ) { catalog.reconcileCommittedEvents() }
+                    if (indexed == 0) break
+                    yield()
+                }
+            } catch (failure: Exception) {
+                // Keep all files and the last durable cursor; next process start resumes.
+                AppLog.failure("AssetCatalog", "reconcile", failure)
+            }
         }
         runCatching { LocalWorkspaceToolGuide.ensure(context, File(workspace.path)) }
             .onFailure { AppLog.failure("WorkspaceToolGuide", "create_readme", it) }

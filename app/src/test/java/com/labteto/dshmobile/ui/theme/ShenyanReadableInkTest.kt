@@ -35,8 +35,8 @@ class ShenyanReadableInkTest {
                     assertTrue("${palette.key}/${if (dark) "dark" else "light"}/$index",
                         syInkContrastRatio(colors.onAccent, fill) >= 4.5f)
                     assertTrue("legacy/canonical foreground must match",
-                        colors.withV6Accent(com.shenyan.designsystem.foundation.ShenyanPalettes.light)
-                            .onPrimary == colors.onAccent)
+                        com.shenyan.designsystem.foundation.ShenyanPalettes.light
+                            .withV6Accent(colors).onPrimary == colors.onAccent)
                 }
             }
         }
