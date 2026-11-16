@@ -82,11 +82,19 @@ class LocalModelApiKeyDraftTest {
     }
 
     @Test fun replacementKeyDoesNotReadAnotherCredentialAndKeepsTheChosenProtocol() = runBlocking {
-        val draft = resolveLocalModelApiKeyDraft(" replacement ", legacy.model, url,
-            LocalModelProtocol.RESPONSES, listOf(current, legacy), { error("No stored key should be read") }, legacy.id)
-        assertEquals(legacy.id, draft.profile.id)
+        val saved = LocalModelProfile(
+            "mm-edit", "MiniMax-M3", "https://api.minimaxi.com/anthropic/v1",
+            protocol = LocalModelProtocol.ANTHROPIC_MESSAGES,
+        )
+        val draft = resolveLocalModelApiKeyDraft(
+            " replacement ", saved.model, "https://api.minimaxi.com/v1",
+            LocalModelProtocol.CHAT_COMPLETIONS, listOf(saved),
+            { error("No stored key should be read") }, saved.id,
+        )
+        assertEquals(saved.id, draft.profile.id)
         assertEquals("replacement", draft.key)
-        assertEquals(LocalModelProtocol.RESPONSES, draft.profile.protocol)
+        assertEquals("https://api.minimaxi.com/v1", draft.profile.baseUrl)
+        assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, draft.profile.protocol)
     }
 
     @Test fun apiKeyLookupCannotBorrowAPlanAccountsCredentialIdentity() = runBlocking {
