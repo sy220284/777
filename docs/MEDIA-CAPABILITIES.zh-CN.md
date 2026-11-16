@@ -20,7 +20,7 @@
 | Google Gemini | 可支持图片／视频理解；777 当前聊天请求仍按其已编码协议判断 | `gemini-3.1-flash-image`、`gemini-2.5-flash-image` 文生图；`veo-3.1-generate-preview` 视频；`lyria-3.5` 音乐 | **图片已接通**（原生 `generateContent`）；Veo/Lyria 文档已支持但尚未接通 |
 | DeepSeek | 官方 `deepseek-flash` 支持图片输入理解；其他模型不可据此泛化 | 本轮未查证可直接调用的官方图片／视频／语音生成产品 API | **未接通创作**；保留图像理解，不伪装图片生成为已支持 |
 | Anthropic Claude | 官方 Vision 允许图片理解 | Claude Messages 的图像输入不是图像合成端点；不能由 Vision 自动派生创作能力 | **未接通创作**，保留已有 Vision |
-| Kimi Code（会员订阅） | 默认 Responses：K3.1 Pro/K3 系列等六个模型均支持文字、图片；视频仅限手动选择 Chat Completions 的 `k3`、`kimi-for-coding`、`kimi-for-coding-highspeed`（20MB 输入上限） | Kimi Code 独立编程会员 API，支持原生 Responses 推理、工具调用和流式输出；媒体生成另走独立服务 | **已具备本地请求编码与回归测试**；无真实会员 Key 的线上联调记录。详见 `KIMI-CODE-ADAPTATION.zh-CN.md` |
+| Kimi Code（会员订阅） | 默认 Responses：K3.1 Pro/K3 系列等六个模型均支持文字、图片；视频仅限手动选择 Chat Completions 的 `k3.1-pro`、`k3.1-pro-highspeed`、`k3`、`kimi-for-coding`、`kimi-for-coding-highspeed`（20MB 输入上限） | Kimi Code 独立编程会员 API，支持原生 Responses 推理、工具调用和流式输出；媒体生成另走独立服务 | **已具备本地请求编码与回归测试**；无真实会员 Key 的线上联调记录。详见 `KIMI-CODE-ADAPTATION.zh-CN.md` |
 | 智谱 GLM | 按具体 GLM 模型区分文本、图片理解 | 官方存在 CogView / CogVideo 家族专业生成产品，但本轮未核实与用户的聊天模型账户相同的模型、版本与专用端点细节 | **未接通创作**；有官方可用接口时新增适配器与模型条目 |
 | 自定义 OpenAI 兼容代理 | 仅能通过具体协议探测确认已实现的聊天／图像输入 | **不能**因为自称 OpenAI 兼容就默认兼容 `/images/generations`、语音、视频或账户费用 | **默认不接通付费创作**，必须明确配置可验证的专属适配 |
 
