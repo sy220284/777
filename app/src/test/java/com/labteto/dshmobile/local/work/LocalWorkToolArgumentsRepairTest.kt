@@ -53,6 +53,37 @@ class LocalWorkToolArgumentsRepairTest {
         assertTrue(repair.contains("不要重复"))
     }
 
+    @Test fun actualMiniMaxToolJsonErrorFeedsSpecificCauseBackToTheModel() = runTest {
+        val error = LocalModelException(
+            code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
+            message = "工具 tool_call/bash 的 arguments 字段缺少值",
+            retryable = false,
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
+            providerParam = "tool_call/bash",
+            toolInputIssue = "missing_arguments_value",
+        )
+        val seen = mutableListOf<List<JsonObject>>()
+        val response = sampleWithToolArgumentsRepair(
+            revisions = MutableStateFlow(0L),
+            observedRevision = 0L,
+            originalMessages = original,
+            canRepair = { true },
+            onRepair = {},
+        ) { history ->
+            seen += history
+            if (seen.size == 1) throw error
+            "工具已修正"
+        }
+        assertEquals(LocalWorkSamplingOutcome.Completed("工具已修正"), response)
+        val correction = seen.last().last().getValue("content").jsonPrimitive.content
+        assertTrue(correction.contains("missing_arguments_value"))
+        assertTrue(correction.contains("tool_call/bash"))
+        assertTrue(correction.contains("\"command\""))
+        assertTrue(correction.contains("tool_search"))
+        assertEquals(original, seen.last().dropLast(1))
+    }
+
     @Test fun boundedRepairDoesNotRepeatIndefinitely() = runTest {
         val attempts = mutableListOf<Int>()
         var requests = 0

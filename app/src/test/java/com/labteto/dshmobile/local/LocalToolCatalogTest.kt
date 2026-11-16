@@ -25,6 +25,22 @@ class LocalToolCatalogTest {
     }
 
     @Test
+    fun modelFacingGatewayExplainsJsonAndRealBashCommandField() {
+        val gateway = LocalToolCatalog.specs.single {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == "tool_call"
+        }.jsonObject["function"]!!.jsonObject
+        val description = gateway.getValue("description").jsonPrimitive.content
+        val params = gateway.getValue("parameters").jsonObject
+        val properties = params.getValue("properties").jsonObject
+        assertTrue(description.contains("arguments.command"))
+        assertTrue(description.contains("\"name\":\"bash\""))
+        assertTrue(properties.getValue("arguments").jsonObject
+            .getValue("description").jsonPrimitive.content.contains("\"command\""))
+        assertEquals(listOf("name", "arguments"),
+            params.getValue("required").jsonArray.map { it.jsonPrimitive.content })
+    }
+
+    @Test
     fun exposesAndroidAdaptableOfficialCapabilityFamilies() {
         val names = LocalToolCatalog.specs.mapNotNull {
             it.jsonObject["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull

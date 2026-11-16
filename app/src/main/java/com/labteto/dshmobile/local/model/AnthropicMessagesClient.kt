@@ -990,7 +990,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                 requestId = requestId,
                 providerCode = "malformed_tool_use_arguments",
                 providerParam = qualifiedTool.takeIf(String::isNotBlank),
-                lastStreamEventType = "message_stop:" + (stopReason ?: "unknown"),
+                lastStreamEventType = if (stopReason == null) "content_block_delta" else "message_stop:" + stopReason,
                 streamEventsSeen = streamEventsSeen,
                 toolInputIssue = reason,
                 toolInputDeltaCount = inputDeltaCount,

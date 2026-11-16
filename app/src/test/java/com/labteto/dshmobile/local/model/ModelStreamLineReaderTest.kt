@@ -11,6 +11,17 @@ class ModelStreamLineReaderTest {
     private fun stream(text: String, lineLimit: Int, byteLimit: Int) =
         ModelStreamLineReader(BufferedReader(StringReader(text)), lineLimit, byteLimit)
 
+    @Test fun sseReaderReassemblesMultilineJsonIgnoresHeadersAndRetainsFinalFrame() {
+        val input = "event: message_start\r\n: ping\r\ndata: {\"type\":\"message_start\",\r\n" +
+            "data: \"message\":{\"id\":\"msg\"}}\r\n\r\n" +
+            "event: message_stop\n" +
+            "data: {\"type\":\"message_stop\"}"
+        val events = ModelSseDataReader(stream(input, 200, 500))
+        assertEquals("{\"type\":\"message_start\",\n\"message\":{\"id\":\"msg\"}}", events.readData())
+        assertEquals("{\"type\":\"message_stop\"}", events.readData())
+        assertNull(events.readData())
+    }
+
     @Test fun crLfAndEofPreserveProviderFraming() {
         val reader = stream("data: one\r\ndata: two", 100, 100)
         assertEquals("data: one", reader.readLine())

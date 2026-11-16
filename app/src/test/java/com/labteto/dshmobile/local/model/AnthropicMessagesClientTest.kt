@@ -447,6 +447,39 @@ class AnthropicMessagesClientTest {
         assertNotNull(diagnostic)
         assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", diagnostic?.code)
         assertTrue(diagnostic?.continuationEligible == true)
+        assertEquals("tool_call/bash", diagnostic?.providerParam)
+        assertEquals("missing_arguments_value", diagnostic?.toolInputIssue)
+        assertEquals(1, diagnostic?.toolInputDeltaCount)
+        assertTrue((diagnostic?.toolInputChars ?: 0) > 0)
+        assertTrue(diagnostic?.message.orEmpty().contains("arguments 字段"))
+        assertEquals("message_stop:tool_use", diagnostic?.lastStreamEventType)
+
+        val missingDelta = """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta"}}"""
+        val missing = runCatching {
+            fixture(listOf(start, toolStart, missingDelta) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", missing?.code)
+        assertEquals("missing_partial_json", missing?.toolInputIssue)
+        assertEquals(0, missing?.toolInputDeltaCount)
+        assertEquals("content_block_delta", missing?.lastStreamEventType)
+
+        val unknownDelta = """{"type":"content_block_delta","index":0,"delta":{"type":"future_json_delta","fragment":"anything"}}"""
+        val unknown = runCatching {
+            fixture(listOf(start, toolStart, unknownDelta) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", unknown?.code)
+        assertEquals("unknown_tool_delta", unknown?.toolInputIssue)
+
+        val multiLineMessage = """{"type":"message_delta","delta":""" +
+            "\ndata: " + """{"stop_reason":"tool_use"}}"""
+        val multipart = fixture(
+            listOf(start, toolStart, part("{\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}}"),
+                end[0], multiLineMessage, end[2]),
+        ).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals("tool_call", multipart.toolCalls.single().name)
+        assertEquals("bash", multipart.toolCalls.single().arguments.getValue("name").jsonPrimitive.content)
 
         val valid = fixture(
             listOf(start, toolStart, part("{\"path\":"), part("\"a.txt\"}")) + end,
