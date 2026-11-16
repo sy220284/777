@@ -479,7 +479,7 @@ internal fun LocalModelSettingsCard(
                                 color = colors.textTertiary,
                             )
                         }
-                        if (preset.provider == "Kimi Code" && preset.model == "k3") {
+                        if (preset.provider == "Kimi Code" && preset.model in setOf("k3", "k3.1-pro")) {
                             // Subscription tier determines whether K3 may use 1M instead of the 256K default.
                             // Exposing the override only for K3 avoids implying other models are upgradeable.
                             LocalModelContextWindowField(contextWindowTokens) {
@@ -487,19 +487,28 @@ internal fun LocalModelSettingsCard(
                                 editorGeneration++
                                 testStatus = null
                             }
-                            Text("K3 默认 256K；仅已开通 Pro/Allegretto 及以上会员时填写 1048576。",
+                            Text("K3 / K3.1 Pro 默认 256K；Pro/Allegretto 及以上会员可设置 1048576。",
                                 style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
-                        ModelCapabilityTags(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl))
+                        ModelCapabilityTags(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl, protocol))
                         if (preset.capabilities.any { it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO }) {
                             Text(stringResource(R.string.local_model_media_not_connected),
                                 style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
                     }
                 }
-                if (custom) LocalModelProtocolPicker(protocol) {
+                LocalModelProtocolPicker(protocol) {
                     protocol = it; editorGeneration++; testStatus = null
                     discoveredModels = emptyList(); catalogStatus = null
+                }
+                if (selectedPreset != null && selectedPreset.protocol != protocol) {
+                    Text("当前协议已偏离预置推荐值：${selectedPreset.protocol.name}。切换协议前请测试连接。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                }
+                if (selectedPreset?.provider == "Kimi Code" && protocol == LocalModelProtocol.RESPONSES &&
+                    LocalModelCapability.VIDEO in selectedPreset.capabilities) {
+                    Text("Kimi Responses 支持文字与图片；视频分析请手动选择 Chat Completions。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
                 SyTextField(apiKey, onValueChange = {
                     apiKey = it.take(8000); editorGeneration++; testStatus = null
