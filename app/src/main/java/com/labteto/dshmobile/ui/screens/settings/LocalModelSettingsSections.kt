@@ -34,7 +34,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -730,38 +729,21 @@ internal fun DeepSeekPricingCard(
                         style = DsType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
-                    // 表头：缓存命中 / 缓存未命中 / 输出
-                    Row(Modifier.fillMaxWidth()) {
-                        Spacer(Modifier.weight(1.5f))
-                        Text(
-                            stringResource(R.string.pricing_col_cache_hit),
-                            style = DsType.caption11.withReadingWeight(), color = colors.textTertiary,
-                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
-                        )
-                        Text(
-                            stringResource(R.string.pricing_col_cache_miss),
-                            style = DsType.caption11.withReadingWeight(), color = colors.textTertiary,
-                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
-                        )
-                        Text(
-                            stringResource(R.string.pricing_col_output),
-                            style = DsType.caption11.withReadingWeight(), color = colors.textTertiary,
-                            modifier = Modifier.weight(1f), textAlign = TextAlign.End,
-                        )
-                    }
-                    PriceTableRow(
-                        periodLabel = stringResource(R.string.pricing_period_off_peak),
-                        cacheHit = formatDeepSeekPrice(model.offPeak.cacheHitCnyPerMillion),
-                        cacheMiss = formatDeepSeekPrice(model.offPeak.cacheMissCnyPerMillion),
-                        output = formatDeepSeekPrice(model.offPeak.outputCnyPerMillion),
-                        active = currentPeriod == DeepSeekPricePeriod.OFF_PEAK,
-                    )
-                    PriceTableRow(
-                        periodLabel = stringResource(R.string.pricing_period_peak),
-                        cacheHit = formatDeepSeekPrice(model.peak.cacheHitCnyPerMillion),
-                        cacheMiss = formatDeepSeekPrice(model.peak.cacheMissCnyPerMillion),
-                        output = formatDeepSeekPrice(model.peak.outputCnyPerMillion),
-                        active = currentPeriod == DeepSeekPricePeriod.PEAK,
+                    PriceComparisonTable(
+                        offPeak = PricePeriodValues(
+                            label = stringResource(R.string.pricing_period_off_peak),
+                            cacheHit = formatDeepSeekPrice(model.offPeak.cacheHitCnyPerMillion),
+                            cacheMiss = formatDeepSeekPrice(model.offPeak.cacheMissCnyPerMillion),
+                            output = formatDeepSeekPrice(model.offPeak.outputCnyPerMillion),
+                            active = currentPeriod == DeepSeekPricePeriod.OFF_PEAK,
+                        ),
+                        peak = PricePeriodValues(
+                            label = stringResource(R.string.pricing_period_peak),
+                            cacheHit = formatDeepSeekPrice(model.peak.cacheHitCnyPerMillion),
+                            cacheMiss = formatDeepSeekPrice(model.peak.cacheMissCnyPerMillion),
+                            output = formatDeepSeekPrice(model.peak.outputCnyPerMillion),
+                            active = currentPeriod == DeepSeekPricePeriod.PEAK,
+                        ),
                     )
                 }
             }
@@ -788,31 +770,6 @@ internal fun DeepSeekPricingCard(
             variant = SyButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
-    }
-}
-
-/** 价格表行：时段标签 + 三列右对齐价格；当前计价时段整行提亮。 */
-@Composable
-private fun PriceTableRow(
-    periodLabel: String,
-    cacheHit: String,
-    cacheMiss: String,
-    output: String,
-    active: Boolean,
-) {
-    val colors = LocalSyColors.current
-    val labelColor = if (active) colors.primary else colors.textSecondary
-    val priceColor = if (active) colors.text else colors.textSecondary
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            periodLabel,
-            style = DsType.small13.withReadingWeight(),
-            color = labelColor,
-            modifier = Modifier.weight(1.5f),
-        )
-        Text(cacheHit, style = DsType.small13.withReadingWeight(), color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-        Text(cacheMiss, style = DsType.small13.withReadingWeight(), color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-        Text(output, style = DsType.small13.withReadingWeight(), color = priceColor, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
     }
 }
 

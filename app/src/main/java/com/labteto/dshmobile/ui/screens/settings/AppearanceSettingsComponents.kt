@@ -31,6 +31,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -229,6 +231,12 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
 @Composable
 internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val labelStyle = DsType.caption11.withReadingWeight()
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val swatchWidth = AccentPalettes.ALL.maxOf { palette ->
+        with(density) { measurer.measure(palette.cnName, style = labelStyle, softWrap = false).size.width.toDp() }
+    }.plus(16.dp).coerceAtLeast(68.dp)
     Column(modifier = Modifier.padding(vertical = SyMetric.gapMd)) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -240,7 +248,7 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .width(68.dp)
+                        .width(swatchWidth)
                         .clip(DsShapes.cube)
                         .background(
                             if (selected) colors.selected else Color.Transparent,
@@ -272,8 +280,9 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     Spacer(Modifier.height(SyMetric.gapSm))
                     Text(
                         palette.cnName,
-                        style = DsType.caption11.withReadingWeight(),
-                        color = if (selected) colors.primary else colors.textTertiary,
+                        style = labelStyle,
+                        softWrap = false,
+                        color = if (selected) colors.text else colors.textSecondary,
                     )
                     if (selected) {
                         Icon(

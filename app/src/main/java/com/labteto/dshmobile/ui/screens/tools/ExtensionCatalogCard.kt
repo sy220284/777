@@ -57,7 +57,7 @@ internal fun ExtensionCatalogCard(
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = 84.dp)
                 .padding(horizontal = 10.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Surface(
@@ -92,8 +92,6 @@ internal fun ExtensionCatalogCard(
                     modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-title-$id"),
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     description,
@@ -103,18 +101,17 @@ internal fun ExtensionCatalogCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            if (statusLabel in setOf("已安装", "已安装可用技能", "已内置 · 按需授权")) {
-                Text(
-                    "已安装",
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.textTertiary,
-                    maxLines = 1,
-                )
+                if (statusLabel in setOf("已安装", "已安装可用技能", "已内置 · 按需授权")) {
+                    Text(
+                        "已安装",
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.textSecondary,
+                    )
+                }
             }
             Icon(
                 FeatherIcons.ChevronRight, contentDescription = "查看详情",
-                tint = colors.textTertiary, modifier = Modifier.size(18.dp),
+                tint = colors.textTertiary, modifier = Modifier.size(18.dp).align(Alignment.CenterVertically),
             )
         }
     }

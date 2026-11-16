@@ -181,23 +181,13 @@ internal fun UsageCalculationPage(
     }
 
     SectionHeading(stringResource(R.string.usage_mode_detail))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-    ) {
-        CompactMetric(
-            label = stringResource(R.string.usage_calculation_total_tokens),
-            value = formatTokens(modeAnalytics.aggregate.totalTokens),
-            modifier = Modifier.weight(1f),
-            testTag = "usagePrimaryMetric",
-        )
-        CompactMetric(
-            label = stringResource(R.string.usage_today),
-            value = formatTokens(todayAggregate(days).totalTokens),
-            modifier = Modifier.weight(1f),
-            testTag = "usagePrimaryMetric",
-        )
-    }
+    UsageMetricPair(
+        firstLabel = stringResource(R.string.usage_calculation_total_tokens),
+        firstValue = formatTokens(modeAnalytics.aggregate.totalTokens),
+        secondLabel = stringResource(R.string.usage_today),
+        secondValue = formatTokens(todayAggregate(days).totalTokens),
+        testTag = "usagePrimaryMetric",
+    )
 
     if (selectedModel == null && analytics.byModel.isNotEmpty()) {
         Column(

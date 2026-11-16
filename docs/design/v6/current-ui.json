@@ -1,9 +1,9 @@
 {
   "schema": "777.v6.current-ui/1",
-  "baselineCommit": "02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a",
-  "asOf": "2026-11-13",
+  "baselineCommit": "73d86a8db525d22336c8ff45fbc7bdd1d2f4f9c9",
+  "asOf": "2026-11-16",
   "platform": "Android mobile",
-  "sourceOfTruth": "Merged Android Compose on main@02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a",
+  "sourceOfTruth": "Android Compose，main@73d86a8d + PR #926；最终增量按用户要求完成源码审阅并提交",
   "routes": [
     {
       "id": "HOME",
@@ -52,8 +52,9 @@
       "label": "工作区文件",
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkspaceFilesDialog.kt",
       "entries": [
-        "文件列表",
-        "文件打开",
+        "文件列表／预览／打开",
+        "导入手机文件",
+        "更多文件操作：选择文件、管理项目、代码审查、打开下载",
         "成果消息"
       ]
     },
@@ -222,5 +223,26 @@
     }
   ],
   "interactionContract": "V6-IMPLEMENTED-INTERACTION-CONTRACT.zh-CN.md",
-  "proposedDesignDocument": "V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md"
+  "proposedDesignDocument": "V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md",
+  "mobileReadability": {
+    "actionLabels": "自然换行，完整呈现操作名称",
+    "segmentedChoices": "实测文字宽度；能完整容纳时等分，否则单行横向滚动并展示选中项",
+    "permissionRows": "说明占满行宽，授权动作独立排布",
+    "accentSwatches": "宽度跟随真实字号与标签文字",
+    "extensionEntries": "名称自然换行，安装状态置于信息区下方，保持完整的条目身份",
+    "numericMetrics": "根据实际数值文字宽度切换单双列，保留完整数值",
+    "priceComparison": "按实际字号与标题、数值测量列宽，比较表可横向查看，十进制价格保持单行"
+  },
+  "reviewEvidence": {
+    "lastNativeHead": "f3017b63ab396d6dd0d0554c1b30b68238846c0f",
+    "platforms": [
+      "Android 16 / API 36",
+      "Android 17 / API 37"
+    ],
+    "settingsCasesPerPlatform": 71,
+    "releaseVersion": "777.397",
+    "releaseTourNodes": 13,
+    "candidateTourNodes": 12,
+    "finalIncrementVerification": "按用户最新指令仅做源码与差异审阅，未重新编译、构建或设备复验"
+  }
 }

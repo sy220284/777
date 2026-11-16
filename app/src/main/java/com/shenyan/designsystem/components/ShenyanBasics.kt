@@ -116,7 +116,7 @@ fun SyButton(
                 if (text.isNotEmpty()) Spacer(Modifier.width(8.dp))
             }
             if (text.isNotEmpty()) {
-                Text(text, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                Text(text, textAlign = TextAlign.Center,
                     style = if (compact) MaterialTheme.typography.labelMedium else LocalTextStyle.current)
             }
         }
