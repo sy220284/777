@@ -39,15 +39,23 @@ internal class ModelStreamLineReader(
 }
 
 
-/** SSE records may contain several data: lines; parsing each line as JSON loses fragments. */
-internal class ModelSseDataReader(private val lines: ModelStreamLineReader) {
+/**
+ * Parses SSE records at their blank-line boundary. Also accepts adjacent standalone JSON
+ * data records without a blank delimiter, as emitted by some OpenAI-compatible endpoints.
+ * Unknown non-SSE content can be passed to a protocol-specific fallback decoder.
+ */
+internal class ModelSseDataReader(
+    private val lines: ModelStreamLineReader,
+    private val onNonEventLine: (String) -> Unit = {},
+) {
     private var exhausted = false
+    private var pendingLine: String? = null
 
     fun readData(): String? {
         if (exhausted) return null
         val data = StringBuilder()
         while (true) {
-            val line = lines.readLine()
+            val line = pendingLine?.also { pendingLine = null } ?: lines.readLine()
             if (line == null) {
                 exhausted = true
                 return data.toString().takeIf(String::isNotEmpty)
@@ -56,11 +64,25 @@ internal class ModelSseDataReader(private val lines: ModelStreamLineReader) {
                 if (data.isNotEmpty()) return data.toString()
                 continue
             }
-            // Blank lines dispatch frames. Comments, IDs and event labels are metadata.
-            if (!line.startsWith("data:")) continue
+            if (!line.startsWith("data:")) {
+                // Preserve legacy non-SSE JSON payloads in Chat Completions.
+                if (line.isNotBlank() && !line.startsWith(":") &&
+                    !line.startsWith("event:") && !line.startsWith("id:") &&
+                    !line.startsWith("retry:")) onNonEventLine(line)
+                continue
+            }
+            if (data.isNotEmpty() && isCompleteModelEvent(data.toString())) {
+                // Some provider proxies omit the mandatory blank line between events.
+                pendingLine = line
+                return data.toString()
+            }
             if (data.isNotEmpty()) data.append('\n')
             val value = line.substring(5)
             data.append(if (value.startsWith(' ')) value.substring(1) else value)
         }
     }
+
+    private fun isCompleteModelEvent(data: String): Boolean =
+        data == "[DONE]" ||
+            runCatching { kotlinx.serialization.json.Json.parseToJsonElement(data) }.isSuccess
 }
