@@ -131,12 +131,15 @@ class LocalModelGatewayRoutingTest {
     @Test
     fun presetsRouteEachProviderWithoutChangingExistingCompatibleTransports() {
         val expected = listOf(
-            Triple("deepseek-flash", "https://api.deepseek.com", LocalModelProtocol.CHAT_COMPLETIONS),
+            Triple("deepseek-flash", "https://api.deepseek.com", LocalModelProtocol.RESPONSES),
+            Triple("deepseek-v4-pro", "https://api.deepseek.com", LocalModelProtocol.RESPONSES),
             Triple("MiniMax-M3", "https://api.minimaxi.com/v1", LocalModelProtocol.CHAT_COMPLETIONS),
             Triple("MiniMax-M3.1-Flash", "https://api.minimaxi.com/anthropic/v1", LocalModelProtocol.ANTHROPIC_MESSAGES),
             Triple("MiniMax-M3", "https://api.minimaxi.com/anthropic/v1", LocalModelProtocol.ANTHROPIC_MESSAGES),
             Triple("MiniMax-M2.7", "https://api.minimaxi.com/v1", LocalModelProtocol.CHAT_COMPLETIONS),
-            Triple("k3", "https://api.kimi.com/coding/v1", LocalModelProtocol.CHAT_COMPLETIONS),
+            Triple("k3", "https://api.kimi.com/coding/v1", LocalModelProtocol.RESPONSES),
+            Triple("k3.1-pro", "https://api.kimi.com/coding/v1", LocalModelProtocol.RESPONSES),
+            Triple("k3.1-pro-highspeed", "https://api.kimi.com/coding/v1", LocalModelProtocol.RESPONSES),
             Triple("glm-5.3-flash", "https://open.bigmodel.cn/api/paas/v4", LocalModelProtocol.CHAT_COMPLETIONS),
             Triple(
                 "gemini-3.8-flash",
@@ -167,6 +170,48 @@ class LocalModelGatewayRoutingTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun responsesOutputBudgetSurvivesSharedRequestPreparationAndPlanStillOmitsIt() {
+        val message = listOf(buildJsonObject { put("role", "user"); put("content", "继续") })
+        fun routeFor(
+            model: String,
+            baseUrl: String,
+            authKind: LocalModelAuthKind = LocalModelAuthKind.API_KEY,
+        ) = LocalResolvedModelRoute(
+            profileId = "budget-test",
+            provider = "test",
+            model = model,
+            baseUrl = baseUrl,
+            authKind = authKind,
+            protocol = LocalModelProtocol.RESPONSES,
+            bearerToken = "test",
+            capabilities = LocalModelPresets.runtimeCapabilitiesFor(
+                model, baseUrl, LocalModelProtocol.RESPONSES, authKind),
+        )
+        val deepSeek = prepareLocalModelAdapterRequest(
+            routeFor("deepseek-v4-pro", "https://api.deepseek.com"),
+            message, JsonArray(emptyList()), null, true, maxTokens = 131_072,
+        )
+        assertEquals(131_072, deepSeek.request.maxTokens)
+        val kimi = prepareLocalModelAdapterRequest(
+            routeFor("k3", "https://api.kimi.com/coding/v1"),
+            message, JsonArray(emptyList()), null, true, maxTokens = 8192,
+        )
+        assertEquals(8192, kimi.request.maxTokens)
+        val plan = prepareLocalModelAdapterRequest(
+            routeFor("gpt-6-sol", "https://api.openai.com/v1", LocalModelAuthKind.CHATGPT_PLAN),
+            message, JsonArray(emptyList()), null, true, maxTokens = 8192,
+        )
+        assertNull(plan.request.maxTokens)
+        val invalid = assertThrows(IllegalArgumentException::class.java) {
+            prepareLocalModelAdapterRequest(
+                routeFor("deepseek-v4-pro", "https://api.deepseek.com"),
+                message, JsonArray(emptyList()), null, true, maxTokens = 500_000,
+            )
+        }
+        assertEquals(true, invalid.message.orEmpty().contains("max_tokens"))
     }
 
     @Test
