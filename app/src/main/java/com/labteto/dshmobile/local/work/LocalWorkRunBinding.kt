@@ -57,6 +57,9 @@ internal class LocalWorkRunBinding(
     val steeringRevision = MutableStateFlow(0L)
     /** Main Agent and every child spawned by this Work run share one admission budget and breaker. */
     val executionControl = LocalWorkExecutionControl()
+    /** One foreground-service lease spans every automatic continuation of this Work task. */
+    @Volatile internal var foregroundServiceLease:
+        com.labteto.dshmobile.local.runtime.LocalExecutionService.Companion.TurnLease? = null
 
     private val interactionStatePort = object : LocalInteractionStatePort {
         override fun pendingQuestion() = state.value.work.pendingQuestion
@@ -219,7 +222,7 @@ internal class LocalWorkRunBinding(
         }
     }
 
-    private fun clearPendingForCancellation() {
+    private fun clearPendingForCancellation() = synchronized(runHandle.lock) {
         interactions.cancelAll()
         runHandle.cancellationRequested = true
         try {
