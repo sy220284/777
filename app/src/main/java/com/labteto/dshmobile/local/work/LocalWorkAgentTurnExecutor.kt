@@ -564,6 +564,7 @@ internal class LocalWorkAgentTurnExecutor(
                 baseUrl = snapshot.modelState.baseUrl,
                 planSharing = snapshot.modelState.modelSelection.activeProfile?.authKind ==
                     com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN,
+                profile = snapshot.modelState.modelSelection.activeProfile,
                 resourceScheduler = resourceScheduler,
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
