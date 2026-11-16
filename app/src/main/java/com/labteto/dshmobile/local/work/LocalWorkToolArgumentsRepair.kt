@@ -44,8 +44,9 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
                 if (error.code in setOf(
                         "ANTHROPIC_PROTOCOL_ERROR", "MODEL_STREAM_PROTOCOL",
                         "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR",
+                        "MODEL_EMPTY_RESPONSE",
                     )) {
-                    append("模型返回的响应帧或工具参数结构违反当前协议；")
+                    append("模型回复内容为空、响应帧或工具参数结构不符合要求；")
                     append(com.labteto.dshmobile.observability.sanitizeDiagnosticText(
                         error.message.orEmpty(),
                     ).take(280))
@@ -79,6 +80,7 @@ private val MODEL_OUTPUT_REPAIRABLE_PROTOCOL_ERRORS = setOf(
     "MODEL_STREAM_PROTOCOL",
     "MODEL_RESPONSE_PROTOCOL",
     "RESPONSES_PROTOCOL_ERROR",
+    "MODEL_EMPTY_RESPONSE",
 )
 
 private const val MAX_IN_STEP_TOOL_ARGUMENT_REPAIRS = 2
