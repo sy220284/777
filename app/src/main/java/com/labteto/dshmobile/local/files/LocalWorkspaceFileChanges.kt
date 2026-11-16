@@ -56,7 +56,6 @@ internal fun workspaceFileWatchTargets(
             watchers.getOrPut(current.canonicalFile) { linkedSetOf() } += "*"
         }
     }
-    require(watchers.size <= 128) { "单次文件观察目录不能超过 128 个" }
     return watchers.mapValues { (_, names) -> names.toSet() }
 }
 

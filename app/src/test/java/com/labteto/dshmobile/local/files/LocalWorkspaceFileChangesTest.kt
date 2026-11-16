@@ -72,7 +72,7 @@ class LocalWorkspaceFileChangesTest {
         } finally { root.deleteRecursively() }
     }
 
-    @Test fun rootWatchReceivesAnyDirectChildAndBoundsResourceCount() {
+    @Test fun rootWatchSupportsLargeSkillTreesWithoutAnArtificialDirectoryCap() {
         val dir = Files.createTempDirectory("workspace-observer-root-").toFile()
         try {
             val workspace = dir.resolve("root").apply { mkdirs() }
@@ -85,9 +85,13 @@ class LocalWorkspaceFileChangesTest {
                 workspace.resolve("directory-$index").apply { mkdirs() }
                 "directory-$index/file.txt"
             }
-            assertTrue(runCatching {
-                workspaceFileWatchTargets(workspace, directories)
-            }.isFailure)
+            val watched = workspaceFileWatchTargets(workspace, directories)
+            assertEquals(130, watched.size) // root plus one watcher per nested directory
+            for (index in 0 until 129) {
+                assertEquals(setOf("file.txt"), watched.getValue(
+                    workspace.resolve("directory-$index").canonicalFile,
+                ))
+            }
         } finally { dir.deleteRecursively() }
     }
 }
