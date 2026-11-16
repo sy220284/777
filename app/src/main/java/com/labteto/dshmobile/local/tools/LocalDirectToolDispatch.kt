@@ -3,6 +3,8 @@ package com.labteto.dshmobile.local.tools
 import com.labteto.dshmobile.harness.agent.AgentToolCall
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalRecursiveReadOnlyToolScope
+import com.labteto.dshmobile.local.runtime.SUBAGENT_EXCLUDED_TOOLS
+import com.labteto.dshmobile.local.work.LocalAgentTeamContract
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.local.model.LocalToolCall
@@ -40,6 +42,7 @@ internal fun AgentToolCall.directToolTarget(): AgentToolCall? {
 internal class LocalSubagentExecutionScope(
     val capabilities: LocalSubagentCapabilities,
     val virtualScreenId: String?,
+    val canDelegateNested: Boolean = false,
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<LocalSubagentExecutionScope>
 
@@ -47,6 +50,14 @@ internal class LocalSubagentExecutionScope(
         val name = tool.name
         if (tool.exposure == ToolExposure.INTERNAL) return false
         if (name in setOf(DIRECT_TOOL_CALL, DIRECT_TOOL_SEARCH)) return true
+        // The gateway must preserve every per-agent exclusion of the previous actual schema.
+        // Team members only own their explicitly defined member commands; nested delegation
+        // is enabled solely when the runner has acquired the delegation admission.
+        if (name in SUBAGENT_EXCLUDED_TOOLS) {
+            val memberTool = capabilities.teamManaged && name in LocalAgentTeamContract.MEMBER_TOOL_NAMES
+            val nestedTool = name == "subagent" && canDelegateNested
+            if (!memberTool && !nestedTool) return false
+        }
         if (capabilities.toolAllowlist != null && name !in capabilities.toolAllowlist) return false
         if (capabilities.teamManaged && tool.exposure == ToolExposure.OPTIONAL &&
             name !in capabilities.initialOptionalTools) return false
