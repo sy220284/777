@@ -86,6 +86,7 @@ class OpenAiResponsesClient @Inject constructor(
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
             openAiExtensions = openAiContract,
+            deepSeekCustomPatch = !openAiContract && DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl),
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
@@ -128,7 +129,7 @@ class OpenAiResponsesClient @Inject constructor(
         suspend fun acceptCompletedItem(event: JsonObject) {
             if (eager == null || event["type"]?.jsonPrimitive?.contentOrNull != "response.output_item.done") return
             val item = event["item"] as? JsonObject ?: return
-            if (item["type"]?.jsonPrimitive?.contentOrNull != "function_call" ||
+            if (item["type"]?.jsonPrimitive?.contentOrNull !in setOf("function_call", "custom_tool_call") ||
                 item["status"]?.jsonPrimitive?.contentOrNull != "completed") return
             val index = event["output_index"]?.jsonPrimitive?.intOrNull
                 ?.takeIf { it >= 0 } ?: throw responseProtocolError("完成工具项缺少输出序号")
@@ -405,6 +406,7 @@ class OpenAiResponsesClient @Inject constructor(
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
         openAiExtensions: Boolean = true,
+        deepSeekCustomPatch: Boolean = false,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
@@ -453,6 +455,16 @@ class OpenAiResponsesClient @Inject constructor(
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
         val adaptedTools = responseTools(tools, planSharing, enforceOpenAiToolSchema)
+        val nativeTools = if (!planSharing && deepSeekCustomPatch) JsonArray(adaptedTools.map { raw ->
+            val function = raw as? JsonObject
+            if (function?.get("type")?.jsonPrimitive?.contentOrNull == "function" &&
+                function["name"]?.jsonPrimitive?.contentOrNull == "apply_patch"
+            ) buildJsonObject {
+                put("type", "custom")
+                put("name", "apply_patch")
+                put("format", buildJsonObject { put("type", "text") })
+            } else raw
+        }) else adaptedTools
         // Codex Responses Lite accepts executable namespaces as a developer input item.
         // Top-level tools belongs exclusively to the standard API-key Responses route.
         if (planSharing && adaptedTools.isEmpty() && explicitNativeWebSearchRequested(messages)) {
@@ -486,9 +498,9 @@ class OpenAiResponsesClient @Inject constructor(
             }
             responseInput(messages).forEach(::add)
         })
-        if (!planSharing && (adaptedTools.isNotEmpty() || nativeImageToolEnabled)) {
+        if (!planSharing && (nativeTools.isNotEmpty() || nativeImageToolEnabled)) {
             put("tools", buildJsonArray {
-                adaptedTools.forEach(::add)
+                nativeTools.forEach(::add)
                 if (nativeImageToolEnabled) {
                     add(buildJsonObject {
                         put("type", "image_generation")
@@ -586,6 +598,13 @@ class OpenAiResponsesClient @Inject constructor(
         }
 
     private fun responseInput(messages: List<JsonObject>): JsonArray = buildJsonArray {
+        val nativeCustomCallIds = messages.flatMap { message ->
+            (message[RESPONSES_OUTPUT_KEY] as? JsonArray).orEmpty().mapNotNull { raw ->
+                val item = raw as? JsonObject ?: return@mapNotNull null
+                if (item["type"]?.jsonPrimitive?.contentOrNull != "custom_tool_call") return@mapNotNull null
+                item["call_id"]?.jsonPrimitive?.contentOrNull
+            }
+        }.toSet()
         messages.forEach { message ->
             val role = message["role"]?.jsonPrimitive?.contentOrNull.orEmpty()
             val raw = message[RESPONSES_OUTPUT_KEY] as? JsonArray
@@ -629,7 +648,9 @@ class OpenAiResponsesClient @Inject constructor(
                 val callId = message["tool_call_id"]?.jsonPrimitive?.contentOrNull
                     ?: return@forEach
                 add(buildJsonObject {
-                    put("type", "function_call_output")
+                    put("type", if (callId in nativeCustomCallIds) {
+                        "custom_tool_call_output"
+                    } else "function_call_output")
                     put("call_id", callId)
                     put("output", message["content"]?.jsonPrimitive?.contentOrNull.orEmpty())
                 })
@@ -809,6 +830,19 @@ class OpenAiResponsesClient @Inject constructor(
                         json.parseToJsonElement(rawArguments) as? JsonObject
                     }.getOrNull() ?: throw responseProtocolError("工具参数不是合法 JSON 对象")
                     toolCalls += LocalToolCall(callId, name, arguments, rawArguments)
+                }
+                "custom_tool_call" -> {
+                    if (completionReason != LocalModelCompletionReason.COMPLETED) return@forEach
+                    val callId = obj["call_id"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: throw responseProtocolError("custom 工具调用缺少 call_id")
+                    val name = obj["name"]?.jsonPrimitive?.contentOrNull
+                        ?: throw responseProtocolError("custom 工具调用缺少 name")
+                    if (name != "apply_patch") throw responseProtocolError("不支持的 custom 工具：$name")
+                    val patch = obj["input"]?.jsonPrimitive?.contentOrNull
+                        ?: throw responseProtocolError("apply_patch 输入必须是文本")
+                    val args = buildJsonObject { put("patch", patch) }
+                    toolCalls += LocalToolCall(callId, "apply_patch", args, args.toString())
                 }
                 "image_generation_call" -> {
                     val result = obj["result"]?.jsonPrimitive?.contentOrNull
