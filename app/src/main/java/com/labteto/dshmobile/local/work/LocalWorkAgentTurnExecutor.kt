@@ -1187,16 +1187,12 @@ internal class LocalWorkAgentTurnExecutor(
                         sessionId = foregroundSessionId, runId = runContext.runId)
                     binding.state.update { current -> current.copy(error = "Work 回合已结束，快照保存失败：${error.message}") }
                 } finally {
-                    try {
-                        try {
-                            withContext(kotlinx.coroutines.NonCancellable) {
-                                cpuProjection?.cancelAndJoin()
-                                lease.release(foregroundOutcome)
-                            }
-                        }
-                        finally { serviceReleased = true }
-                    } finally {
-                        workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
+                    withContext(kotlinx.coroutines.NonCancellable) {
+                        cpuProjection?.cancelAndJoin()
+                    }
+                    // Claim a successor before releasing the foreground service. Otherwise
+                    // Android can reject the next start while the app is backgrounded.
+                    val successor = workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
                             if (shouldAutoContinueWorkGoalAfterForm(
                                     completedGoalDisposition, waitingForReplyFormSubmission)) {
                                 driveLocalWorkGoalAfterTurn(
@@ -1228,7 +1224,15 @@ internal class LocalWorkAgentTurnExecutor(
                                     continuation = next.continuation,
                                 )
                             }
-                        }?.start()
+                        }
+                    if (successor != null) {
+                        // The binding keeps the same service lease until the whole Work task ends.
+                        serviceReleased = true
+                        successor.start()
+                    } else {
+                        binding.foregroundServiceLease = null
+                        withContext(kotlinx.coroutines.NonCancellable) { lease.release(foregroundOutcome) }
+                        serviceReleased = true
                     }
                 }
             }
@@ -1237,7 +1241,11 @@ internal class LocalWorkAgentTurnExecutor(
         try {
             withContext(kotlinx.coroutines.NonCancellable) {
                 cpuProjection?.cancelAndJoin()
-                if (!serviceReleased) foregroundLease?.release(LocalExecutionService.OUTCOME_FAILED)
+                if (!serviceReleased) {
+                    val danglingLease = binding.foregroundServiceLease ?: foregroundLease
+                    binding.foregroundServiceLease = null
+                    danglingLease?.release(LocalExecutionService.OUTCOME_FAILED)
+                }
             }
         } finally {
             if (ownerJob != null) {
