@@ -52,10 +52,10 @@ internal fun ExtensionCatalogCard(
         onClick = onOpen,
         enabled = enabled,
         color = colors.materialL4,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 84.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp)
                 .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -101,11 +101,20 @@ internal fun ExtensionCatalogCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (statusLabel in setOf("已安装", "已安装可用技能", "已内置 · 按需授权")) {
+                if (statusLabel.isNotBlank()) {
                     Text(
-                        "已安装",
-                        style = DsType.small13.withReadingWeight(),
-                        color = colors.textSecondary,
+                        statusLabel,
+                        modifier = Modifier.testTag("$tagPrefix-status-$id"),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = when {
+                            statusLabel.contains("失败") || statusLabel.contains("异常") ||
+                                statusLabel.contains("冲突") -> colors.dangerInk
+                            statusLabel.contains("待") || statusLabel.contains("需要") ||
+                                statusLabel.contains("不可") -> colors.warningInk
+                            statusLabel.contains("已安装") || statusLabel.contains("已连接") ||
+                                statusLabel.contains("已内置") -> colors.successInk
+                            else -> colors.textSecondary
+                        },
                     )
                 }
             }

@@ -50,6 +50,7 @@ internal fun GroupChatMemberPickerSheet(
     currentIds: List<String>,
     enabled: Boolean,
     onSave: (List<String>) -> Boolean,
+    onCreatePersona: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val selected = remember { mutableStateListOf<String>() }
@@ -123,6 +124,14 @@ internal fun GroupChatMemberPickerSheet(
                 style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
+            if (onCreatePersona != null) {
+                SyButton(
+                    text = "去创建人物",
+                    onClick = onCreatePersona,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth().testTag("group-chat-create-persona"),
+                )
+            }
         } else {
             SyTextField(
                 value = query,

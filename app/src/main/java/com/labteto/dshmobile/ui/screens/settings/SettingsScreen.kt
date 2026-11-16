@@ -1126,8 +1126,8 @@ fun SettingsScreen(
                                         color = colors.text,
                                     )
                                     Text(
-                                        "浏览器历史、上传、下载、控制的独立管理策略尚未接入实际执行；" +
-                                            "当前设备操作仍按 Android 系统权限和工具审批执行。",
+                                        "手机操作按 Android 系统授权和工具审批执行。" +
+                                            "此处显示网络与模型使用规则，其他管理项目会在实际支持后显示。",
                                         style = DsType.caption11.withReadingWeight(),
                                         color = colors.textSecondary,
                                     )
@@ -1144,7 +1144,7 @@ fun SettingsScreen(
                                         style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
                                     )
                                     Text(
-                                        if (policy.managedRestrictions.isEmpty()) "当前没有管理策略锁定字段"
+                                        if (policy.managedRestrictions.isEmpty()) "当前无额外管理限制"
                                         else "管理策略锁定：${policy.managedRestrictions.joinToString("、")}",
                                         style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
                                     )
