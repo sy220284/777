@@ -85,7 +85,8 @@ internal fun queueAutomaticWorkContinuation(
     error: LocalModelException,
     sourceMessageId: String? = null,
     outputLimitProgress: Boolean = false,
-): Boolean {
+): Boolean = synchronized(binding.runHandle.lock) {
+    if (binding.runHandle.cancellationRequested) return@synchronized false
     if (
         !outputLimitProgress && !shouldAutoContinueWorkFailure(
             error = error,
@@ -93,13 +94,13 @@ internal fun queueAutomaticWorkContinuation(
             pendingInputs = binding.runHandle.pendingInputs.size(),
         )
     ) {
-        return false
+        return@synchronized false
     }
 
-    if (outputLimitProgress && (binding.runHandle.cancellationRequested || binding.runHandle.pendingInputs.size() != 0)) return false
+    if (outputLimitProgress && binding.runHandle.pendingInputs.size() != 0) return@synchronized false
     // An unsettled write/effect must be reconciled before any autonomous continuation.
     binding.state.value.work.goal?.let { goal ->
-        if (hasUnresolvedWorkGoalToolEffects(binding.eventLog, goal)) return false
+        if (hasUnresolvedWorkGoalToolEffects(binding.eventLog, goal)) return@synchronized false
     }
     val command = LocalWorkResumeCommand(
         sourceRunId = sourceRunId,
@@ -125,7 +126,7 @@ internal fun queueAutomaticWorkContinuation(
             ),
         )
     }
-    if (!accepted) return false
+    if (!accepted) return@synchronized false
     // Additional lifecycle annotation; the inbox event above owns durable recovery.
     binding.eventLog.append("turn/continuation-queued", buildJsonObject {
         put("source_run_id", command.sourceRunId)
@@ -146,5 +147,5 @@ internal fun queueAutomaticWorkContinuation(
             error = null,
         )
     }
-    return true
+    true
 }
