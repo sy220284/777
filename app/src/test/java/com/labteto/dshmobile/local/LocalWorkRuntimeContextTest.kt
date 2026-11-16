@@ -111,7 +111,8 @@ class LocalWorkRuntimeContextTest {
         assertFalse(context.contains("session_event_search"))
         assertFalse(context.contains("媒体工具"))
         assertFalse(context.contains("用户指令优先级"))
-        assertTrue(context.contains("capability_search"))
+        assertTrue(context.contains("tool_call"))
+        assertTrue(context.contains("tool_search"))
     }
 
 }
