@@ -2204,7 +2204,7 @@ class LocalToolExecutionCoordinatorTest {
         access = access,
         approvalPolicy = approval,
         exposure = exposure,
-        metadata = ToolMetadata(family = family, discoveryKeywords = keywords),
+        metadata = ToolMetadata(family = family, discoveryKeywords = if (exposure == ToolExposure.OPTIONAL && keywords.isEmpty()) setOf(name) else keywords),
         executor = HarnessToolExecutor { _, _, _ -> execute() },
     )
 }
