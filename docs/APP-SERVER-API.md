@@ -10,7 +10,7 @@
 - App Server → `AppServerUiPort`，由唯一 `LocalAppServer` 装配六大 Feature 的现有公开 Port。
 - Notifications → `AppServerUiPort.notices`，消费 Feature 原有 Flow；事件只提示刷新原 Owner 快照，不创造新的全局序号。
 - Commands → `UiAppServerCommand` / `UiAppServerReply`，逐一对应 Chat、Work、Session、Agent、Automation、Tools、Settings 原有操作回执。
-- Tool discovery → `LocalCapabilityDiscovery` 统一由实时 ToolRegistry 导出；模型 `capability_search` 与 UI 目录共用匹配、精确选择；执行审批、连接和模型工具定义预算仍由原所有者校验。
+- Tool discovery → `LocalCapabilityDiscovery` 统一由实时 ToolRegistry 导出；模型 `tool_search` 与 UI 目录查询真实工具，`tool_call` 按名称直接执行；连接、权限、参数与审批均由真实目标工具的原执行器校验，无需逐轮预加载。
 
 ## 使用方式
 
