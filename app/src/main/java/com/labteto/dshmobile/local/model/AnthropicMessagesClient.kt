@@ -981,12 +981,19 @@ internal class AnthropicMessagesClient @Inject constructor(
                 else -> "JSON 参数无法解析成完整对象"
             }
             val qualifiedTool = listOfNotNull(safeTool, target).joinToString("/")
+            val fingerprint = inputJson?.let { source ->
+                java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(source.toByteArray(Charsets.UTF_8))
+                    .take(8)
+                    .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+            }
             return LocalModelException(
                 code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
                 message = "模型工具调用 " + qualifiedTool.ifBlank { "tool_use" } +
                     " 的参数无效：" + detail + "；该调用尚未执行",
                 retryable = false,
-                cause = cause,
+                // JSON decoder exceptions may contain raw commands and arguments.
+                cause = cause?.let { IllegalArgumentException("tool_use JSON decode failed: " + it::class.java.simpleName) },
                 requestId = requestId,
                 providerCode = "malformed_tool_use_arguments",
                 providerParam = qualifiedTool.takeIf(String::isNotBlank),
@@ -995,6 +1002,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                 toolInputIssue = reason,
                 toolInputDeltaCount = inputDeltaCount,
                 toolInputChars = inputJson?.length ?: 0,
+                toolInputFingerprint = fingerprint,
                 admissionState = LocalModelAdmissionState.ADMITTED,
                 continuationEligible = true,
                 origin = LocalModelFailureOrigin.STREAM_PARSE,
