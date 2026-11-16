@@ -1872,6 +1872,29 @@ class OpenAiResponsesClientTest {
 
 
     @Test
+    fun deepSeekResponsesAllowsLongThinkingWithoutChangingOtherReadTimeouts() = runBlocking {
+        val readTimeouts = linkedMapOf<String, Int>()
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            readTimeouts[chain.request().url.host] = chain.readTimeoutMillis()
+            val data = """data: {"type":"response.completed","response":{"id":"timeout-test","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"完成"}]}]}}""" + "\n\n"
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(data.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val client = OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true })
+        for (base in listOf("https://api.deepseek.com", "https://api.kimi.com/coding/v1")) {
+            val reply = client.completeStreaming(
+                accessToken = "test", baseUrl = base, model = "test",
+                messages = listOf(buildJsonObject { put("role", "user"); put("content", "测试") }),
+                tools = JsonArray(emptyList()), planSharing = false,
+            )
+            assertEquals("完成", reply.content)
+        }
+        assertEquals(12 * 60 * 1000, readTimeouts["api.deepseek.com"])
+        assertEquals(5 * 60 * 1000, readTimeouts["api.kimi.com"])
+    }
+
+    @Test
     fun deepSeekNativeResponsesPreservesToolContinuationAndOutputBudget() = runBlocking {
         val requests = mutableListOf<JsonObject>()
         val tools = Json.parseToJsonElement(
