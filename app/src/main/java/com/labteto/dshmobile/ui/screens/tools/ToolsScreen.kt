@@ -230,7 +230,7 @@ class ToolsViewModel @Inject constructor(
     fun setNetworkSearchEnabled(enabled: Boolean) = localTools.setNetworkSearchEnabled(enabled)
     fun setDeepSeekSearchPreferred(enabled: Boolean) = localTools.setDeepSeekSearchPreferred(enabled)
 
-    /** Reads the same live registry and query ranking as Agent capability_search. */
+    /** Reads the same live registry and query ranking as Agent tool_search. */
     fun discoverCapabilities(query: String): List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot> =
         if (query.isBlank()) localTools.capabilityCatalogue()
         else localTools.discoverCapabilities(query, Int.MAX_VALUE)
