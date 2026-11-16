@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import com.shenyan.designsystem.foundation.SyMetric
+import androidx.activity.compose.BackHandler
 
 import java.text.DateFormat
 import java.util.Calendar
@@ -260,6 +261,8 @@ internal fun CharacterDiaryScreen(
     var sourceError by remember { mutableStateOf(false) }
     var expandedDayKey by rememberSaveable { mutableStateOf<String?>(null) }
     var browseExpanded by rememberSaveable { mutableStateOf(false) }
+    // Keep modal confirmation and editing Back actions within their own dialog.
+    BackHandler(enabled = editingEntry == null && deactivatingEntry == null) { onDismiss() }
     LaunchedEffect(selectedSubjectKey) {
         editingEntry = null
         deactivatingEntry = null

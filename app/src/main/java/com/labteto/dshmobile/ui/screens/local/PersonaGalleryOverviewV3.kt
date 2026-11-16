@@ -6,6 +6,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -157,6 +158,15 @@ internal fun PersonaGalleryOverviewV3(
     val selectedIds = remember { mutableStateListOf<String>() }
     val scope = rememberCoroutineScope()
     val deleteSelectedFailed = stringResource(R.string.persona_gallery_delete_selected_failed)
+
+    // Inner gallery modes own Back before the parent gallery can exit.
+    BackHandler(enabled = adding || managing) {
+        if (adding) adding = false
+        else {
+            managing = false
+            selectedIds.clear()
+        }
+    }
 
     fun persistOrder(next: List<String>) {
         orderIds = next

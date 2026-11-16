@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""One owner for native UI evidence: run each declared class and verify its real receipt."""
+"""Run native UI checks and preserve playable videos of every interaction journey."""
+from html import escape
 from pathlib import Path
 import hashlib,json,re,subprocess,sys,urllib.request
+from device_video import DeviceVideoRecorder
 
 ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
+VIDEOS=OUT/'videos';VIDEOS.mkdir(exist_ok=True)
 CLASSES=[
  'com.shenyan.designsystem.components.MobileActionReadabilityTest',
  'com.labteto.dshmobile.ui.screens.local.WorkspaceBrowseLayoutTest',
+ 'com.labteto.dshmobile.ui.screens.local.UiPolishInteractionRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalWorkspaceShareSelectionUiTest',
  'com.labteto.dshmobile.ui.audit.SettingsPageAuditTest',
  'com.labteto.dshmobile.ui.audit.MainPagesAuditTourTest',
@@ -19,14 +23,38 @@ CLASSES=[
  'com.labteto.dshmobile.notify.NotificationRoutingAndroidTest',
 ]
 summary=[]
-def phase(name,fn):
+
+def write_index():
+ rows=[]
+ for entry in summary:
+  clips=entry.get('video',{}).get('clips',[])
+  links=' '.join(f'<a href="{escape(entry["phase"])}'+'/'+escape(clip['file'])+'">第 '+str(i)+' 段</a>' for i,clip in enumerate(clips,1))
+  rows.append('<tr><td>'+escape(entry['phase'])+'</td><td>'+('通过' if entry['passed'] else '失败')+'</td><td>'+links+'</td></tr>')
+ (VIDEOS/'index.html').write_text('''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>777 原生 UI 自动巡检录屏</title><style>body{font:16px system-ui;max-width:1100px;margin:36px auto;padding:0 18px}table{width:100%;border-collapse:collapse;word-break:break-word}td,th{padding:12px;border-bottom:1px solid #ddd;text-align:left}a{margin-right:16px}p{color:#555}</style><h1>777 模拟器 UI 巡检视频</h1><p>按真实测试用例或页面走查分组。时长超过 Android 单段录制上限时自动分段，按序播放即可。详细结果在上一级 execution.json；每组录像目录提供 manifest.json。</p><table><thead><tr><th>页面/交互流程</th><th>结果</th><th>视频</th></tr></thead><tbody>'''+''.join(rows)+'''</tbody></table></html>''',encoding='utf-8')
+
+def phase(name,fn,record=False):
  print('UI audit phase:',name,flush=True)
+ video=DeviceVideoRecorder(VIDEOS/name,name) if record else None
+ result=None;failure=None;receipt=None
  try:
-  result=fn();summary.append({'phase':name,'passed':True,'result':result})
+  if video:video.start()
+  result=fn()
  except Exception as exc:
-  summary.append({'phase':name,'passed':False,'error':str(exc)})
-  print('UI audit failure:',name,str(exc),flush=True)
- (OUT/'execution.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2))
+  failure=str(exc)
+ finally:
+  if video:
+   try:receipt=video.stop()
+   except Exception as error:
+    manifest=VIDEOS/name/'manifest.json'
+    if manifest.exists():receipt=json.loads(manifest.read_text(encoding='utf-8'))
+    failure=(failure+'\n' if failure else '')+'录屏失败：'+str(error)
+  entry={'phase':name,'passed':failure is None}
+  if failure:entry['error']=failure;print('UI audit failure:',name,failure,flush=True)
+  else:entry['result']=result
+  if receipt:entry['video']=receipt
+  summary.append(entry)
+  (OUT/'execution.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
+  write_index()
 
 def checked(argv,timeout=180):
  p=subprocess.run(argv,cwd=ROOT,text=True,capture_output=True,timeout=timeout)
@@ -49,7 +77,7 @@ for name in CLASSES:
   if p.returncode or not match or int(match.group(1))==0 or ('INSTRUMENTATION_STATUS: class='+name) not in text:
    raise RuntimeError('Native class did not produce passing non-empty results: '+text[-5000:])
   return {'class':name,'tests':int(match.group(1))}
- phase(name,run_class)
+ phase(name.rsplit('.',1)[1],run_class,record=True)
 
 def export_components():
  return checked(['adb','pull','/sdcard/Android/data/com.sy220284.dshmobile.debug/files/ui-audit/.',str(OUT/'components')])
@@ -65,7 +93,7 @@ def baseline():
   return checked(['python3','tools/ui/native-page-audit.py','--apk',str(release),'--package','com.sy220284.dshmobile','--expected-sha256',digest,'--output',str(OUT/'baseline')],timeout=420)
  finally:
   release.unlink(missing_ok=True)
-phase('installed-release-page-tour',baseline)
-phase('candidate-page-tour',lambda:checked(['python3','tools/ui/native-page-audit.py','--apk',str(debug),'--package','com.sy220284.dshmobile.debug','--output',str(OUT/'candidate')],timeout=420))
+phase('installed-release-page-tour',baseline,record=True)
+phase('candidate-page-tour',lambda:checked(['python3','tools/ui/native-page-audit.py','--apk',str(debug),'--package','com.sy220284.dshmobile.debug','--output',str(OUT/'candidate')],timeout=420),record=True)
 print(json.dumps(summary,ensure_ascii=False,indent=2),flush=True)
 sys.exit(0 if all(item['passed'] for item in summary) else 1)

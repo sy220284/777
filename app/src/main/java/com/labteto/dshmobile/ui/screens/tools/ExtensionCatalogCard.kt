@@ -41,7 +41,7 @@ internal fun ExtensionCatalogCard(
     accent: Color,
     documentIcon: Int? = null,
     brandLogo: ImageBitmap? = null,
-    statusLabel: String = "",
+    marketState: ExtensionMarketState? = null,
     enabled: Boolean = true,
     tagPrefix: String = "plugin-inventory",
     onOpen: () -> Unit,
@@ -52,10 +52,10 @@ internal fun ExtensionCatalogCard(
         onClick = onOpen,
         enabled = enabled,
         color = colors.materialL4,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 84.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp)
                 .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -101,11 +101,22 @@ internal fun ExtensionCatalogCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (statusLabel in setOf("已安装", "已安装可用技能", "已内置 · 按需授权")) {
+                marketState?.let { state ->
                     Text(
-                        "已安装",
-                        style = DsType.small13.withReadingWeight(),
-                        color = colors.textSecondary,
+                        state.label,
+                        modifier = Modifier.testTag("$tagPrefix-status-$id"),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = when (state.status) {
+                            ExtensionMarketStatus.FAILED -> colors.dangerInk
+                            ExtensionMarketStatus.NEEDS_SETUP,
+                            ExtensionMarketStatus.UNSUPPORTED -> colors.warningInk
+                            ExtensionMarketStatus.INSTALLED,
+                            ExtensionMarketStatus.BUILTIN,
+                            ExtensionMarketStatus.REGISTERED -> colors.successInk
+                            ExtensionMarketStatus.INSTALLABLE,
+                            ExtensionMarketStatus.MANUAL_ONLY,
+                            ExtensionMarketStatus.CONNECTING -> colors.textSecondary
+                        },
                     )
                 }
             }

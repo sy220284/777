@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.shenyan.SyFullScreenDialog
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
-import com.labteto.dshmobile.ui.theme.rootSurface
 import com.shenyan.designsystem.foundation.LocalSyColors
 
 /**
@@ -32,7 +31,7 @@ internal fun ExtensionDetailPage(
 ) {
     val colors = LocalSyColors.current
     SyFullScreenDialog(onDismiss = onDismiss) {
-        Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+        Surface(Modifier.fillMaxSize(), color = colors.surfaceSolid) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 SyTopBar(title = title, onBack = onDismiss,
                     backContentDescription = "返回技能列表")

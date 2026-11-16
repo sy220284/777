@@ -56,6 +56,8 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - name: 验证 UI 录屏分段、停止与 MP4 完整性
+        run: python3 -m unittest discover -s tools/ui -p 'test_device_video.py' -v
       - name: 检查 Android 模拟器硬件加速
         run: |
           test -e /dev/kvm
@@ -78,10 +80,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: runtime-user-journey-results-${{ matrix.android.api }}
+          name: 777-ui-videos-and-results-${{ matrix.android.api }}
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
             app/build/outputs/ui-audit/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 30

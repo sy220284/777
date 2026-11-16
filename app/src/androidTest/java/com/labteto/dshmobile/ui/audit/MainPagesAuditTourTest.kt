@@ -9,7 +9,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.espresso.Espresso
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
@@ -102,7 +104,18 @@ class MainPagesAuditTourTest {
             captureUiAudit(compose, "main-task-editor-keyboard")
             Espresso.pressBack()
             captureUiAudit(compose, "main-task-editor-keyboard-dismissed")
-            back()
+            // A Back press while editing can first dismiss the IME. Ensure the
+            // editor's own Back action is exercised before leaving the task page.
+            val taskRootAction = text(R.string.tasks_new)
+            if (compose.onAllNodes(hasContentDescription(taskRootAction))
+                    .fetchSemanticsNodes().isEmpty()) {
+                compose.onNodeWithContentDescription(text(R.string.common_back)).performClick()
+            }
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasContentDescription(taskRootAction))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            captureUiAudit(compose, "main-task-editor-closed")
         }
         page(R.string.tools_title, "main-tools") {
             compose.onNodeWithText(text(R.string.skills_title)).performClick()
@@ -111,7 +124,7 @@ class MainPagesAuditTourTest {
             captureUiAudit(compose, "main-connectors")
         }
         page(R.string.settings_title, "main-settings") {
-            compose.onNodeWithText(text(R.string.settings_page_models)).performScrollTo().performClick()
+            compose.onAllNodesWithText(text(R.string.settings_page_models)).filter(hasClickAction()).onFirst().performScrollTo().performClick()
             compose.onNodeWithText(text(R.string.local_api_model_add)).performClick()
             captureUiAudit(compose, "main-model-connection-form")
             back()

@@ -1782,6 +1782,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             currentIds = state.groupChat.members.map { it.galleryId },
             enabled = !state.running,
             onSave = onConfigureGroupMembers,
+            onCreatePersona = {
+                showGroupMemberPicker = false
+                onOpenPersonaGallery()
+            },
             onDismiss = { showGroupMemberPicker = false },
         )
     }
@@ -1955,12 +1959,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     if (showAttachmentPicker) {
         SyResponsiveSheet(
-            title = null,
+            title = "添加内容",
             onDismiss = { showAttachmentPicker = false },
-            showDragHandle = false,
+            showDragHandle = true,
             floating = true,
             scrollable = true,
             seamlessBackground = true,
+            dimScrimWhenSeamless = true,
         ) {
             // Four compact icon-and-label actions in one horizontal row.
             Row(

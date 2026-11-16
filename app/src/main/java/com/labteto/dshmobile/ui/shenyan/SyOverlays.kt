@@ -144,8 +144,15 @@ fun SyFullScreenDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
             dismissOnBackPress = true,
             dismissOnClickOutside = true,
         ),
-        content = content,
-    )
+    ) {
+        // A full-screen dialog owns another window and needs its own scene painter.
+        SySceneBackgroundSurface(
+            modifier = Modifier.fillMaxSize(),
+            shape = androidx.compose.ui.graphics.RectangleShape,
+            tag = "syFullScreenDialogBackdrop",
+            content = content,
+        )
+    }
 }
 
 /** Caller-owned feedback. Repeated identical messages restart their TTL. */
