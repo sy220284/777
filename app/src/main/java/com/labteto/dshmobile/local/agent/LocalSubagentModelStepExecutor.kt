@@ -43,7 +43,8 @@ internal class LocalSubagentModelStepExecutor(
         initialMessages = history,
         maxAttempts = modelAttempts().coerceIn(1, 5),
         retryable = { error ->
-            (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+            // Shared admission policy: raw I/O failure does not prove inference never started.
+            com.labteto.dshmobile.local.model.canRetryModelAttemptAfterOutput(error, streamedChars = 0)
         },
         backoffMillis = { failedAttempt, error ->
             (error as? LocalModelException)?.providerRetryAfterMs?.coerceIn(0L, 60_000L)
