@@ -129,11 +129,11 @@ class OpenAiResponsesClient @Inject constructor(
                 message = JsonObject(replay.message - RESPONSES_OUTPUT_KEY))
         }
         suspend fun acceptCompletedItem(event: JsonObject) {
-            if (eager == null || event["type"]?.jsonPrimitive?.contentOrNull != "response.output_item.done") return
+            if (eager == null || (event["type"] as? JsonPrimitive)?.contentOrNull != "response.output_item.done") return
             val item = event["item"] as? JsonObject ?: return
-            if (item["type"]?.jsonPrimitive?.contentOrNull !in setOf("function_call", "custom_tool_call") ||
-                item["status"]?.jsonPrimitive?.contentOrNull != "completed") return
-            val index = event["output_index"]?.jsonPrimitive?.intOrNull
+            if ((item["type"] as? JsonPrimitive)?.contentOrNull !in setOf("function_call", "custom_tool_call") ||
+                (item["status"] as? JsonPrimitive)?.contentOrNull != "completed") return
+            val index = (event["output_index"] as? JsonPrimitive)?.intOrNull
                 ?.takeIf { it >= 0 } ?: throw responseProtocolError("完成工具项缺少输出序号")
             val call = parseCompleted(buildJsonObject {
                 put("status", "completed"); put("output", JsonArray(listOf(item)))
@@ -202,14 +202,9 @@ class OpenAiResponsesClient @Inject constructor(
                         if (data.isBlank() || data == "[DONE]") continue
                         val event = runCatching { json.parseToJsonElement(data).jsonObject }
                             .getOrElse { cause ->
-                                throw streamInterruptedAfterAdmission(
-                                    planSharing = planSharing,
-                                    requestId = requestId,
-                                    detail = "Responses API 返回了无法解析的数据帧",
-                                    cause = cause,
-                                )
+                                throw responseProtocolError("服务商返回的 SSE 数据帧不是完整 JSON 对象")
                             }
-                        val eventType = event["type"]?.jsonPrimitive?.contentOrNull
+                        val eventType = (event["type"] as? JsonPrimitive)?.contentOrNull
                         lastStreamEventType = eventType?.take(48)?.takeIf { type ->
                             type.all { char -> char.isLetterOrDigit() || char == '_' || char == '.' || char == '-' }
                         }
@@ -217,7 +212,7 @@ class OpenAiResponsesClient @Inject constructor(
                         ((event["response"] as? JsonObject)?.get("usage") as? JsonObject)?.let { reportedUsage = it }
                         streamed.record(event)?.let { onDelta(it) }
                         acceptCompletedItem(event)
-                        when (event["type"]?.jsonPrimitive?.contentOrNull) {
+                        when (eventType) {
                             "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
                             "response.failed" -> throw responseFailure(
                                 event = event,
