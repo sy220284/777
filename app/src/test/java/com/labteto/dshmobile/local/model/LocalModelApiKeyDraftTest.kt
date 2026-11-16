@@ -157,6 +157,10 @@ class LocalModelApiKeyDraftTest {
             { "key" }, k3.profile.id, contextWindowTokensOverride = 0)
         assertNull(reset.profile.contextWindowTokensOverride)
         assertEquals(262_144, documentedContextWindowTokens("k3", url, reset.profile.contextWindowTokensOverride))
+        val k31 = resolveLocalModelApiKeyDraft("key", "k3.1-pro", url, null, emptyList(), { null },
+            contextWindowTokensOverride = 1_048_576, newProfileId = { "k31-pro" })
+        assertEquals(1_048_576, k31.profile.contextWindowTokensOverride)
+        assertEquals(LocalModelProtocol.RESPONSES, k31.profile.protocol)
         val otherPreset = resolveLocalModelApiKeyDraft("key", "k3-256k", url, null, emptyList(),
             { null }, contextWindowTokensOverride = 1_048_576, newProfileId = { "fixed" })
         assertNull(otherPreset.profile.contextWindowTokensOverride)
