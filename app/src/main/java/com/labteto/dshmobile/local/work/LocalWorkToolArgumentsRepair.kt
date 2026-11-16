@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Repair malformed tool-use arguments within the SAME Agent model step.
+ * Repair invalid tool arguments and provider response protocol errors in the SAME model step.
  * A failed provider response never enters history or the tool dispatcher.
  * Each correction is a NEW request, keeping already-settled tool receipts untouched.
  */
@@ -25,7 +25,7 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
         try {
             return sampleUntilWorkSteered(revisions, observedRevision) { sample(messages) }
         } catch (error: LocalModelException) {
-            if (error.code != "ANTHROPIC_TOOL_ARGUMENTS_INVALID" ||
+            if (error.code !in setOf("ANTHROPIC_TOOL_ARGUMENTS_INVALID", "ANTHROPIC_PROTOCOL_ERROR") ||
                 repairs >= MAX_IN_STEP_TOOL_ARGUMENT_REPAIRS ||
                 revisions.value != observedRevision || !canRepair()
             ) throw error
@@ -36,10 +36,14 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
                 it.matches(Regex("[A-Za-z][A-Za-z0-9_/-]{0,127}"))
             }
             val instruction = buildString {
-                append("上一轮工具调用尚未执行，协议参数校验失败。错误码=")
+                append("上一轮模型响应解析失败，该模型回复中没有执行任何工具。错误码=")
                 append(error.code)
                 append("；具体原因=")
-                append(error.toolInputIssue ?: "invalid_json_object")
+                if (error.code == "ANTHROPIC_PROTOCOL_ERROR") {
+                    append("服务商返回的 SSE 或消息块不满足 Anthropic Messages 协议")
+                } else {
+                    append(error.toolInputIssue ?: "invalid_json_object")
+                }
                 safeTool?.let { append("；目标工具="); append(it) }
                 append("。重新生成完整、符合当前工具定义的 JSON 对象参数。")
                 if (safeTool == "tool_call/bash") {
