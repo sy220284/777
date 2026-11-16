@@ -1238,6 +1238,10 @@ class OpenAiResponsesClient @Inject constructor(
         code = "RESPONSES_PROTOCOL_ERROR",
         message = "Responses API 协议错误：$detail",
         retryable = false,
+        providerCode = "responses_protocol_invalid_after_admission",
+        admissionState = LocalModelAdmissionState.ADMITTED,
+        continuationEligible = true,
+        origin = LocalModelFailureOrigin.STREAM_PARSE,
     )
 
     companion object {
