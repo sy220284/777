@@ -129,11 +129,11 @@ class OpenAiResponsesClient @Inject constructor(
                 message = JsonObject(replay.message - RESPONSES_OUTPUT_KEY))
         }
         suspend fun acceptCompletedItem(event: JsonObject) {
-            if (eager == null || event["type"]?.jsonPrimitive?.contentOrNull != "response.output_item.done") return
+            if (eager == null || (event["type"] as? JsonPrimitive)?.contentOrNull != "response.output_item.done") return
             val item = event["item"] as? JsonObject ?: return
-            if (item["type"]?.jsonPrimitive?.contentOrNull !in setOf("function_call", "custom_tool_call") ||
-                item["status"]?.jsonPrimitive?.contentOrNull != "completed") return
-            val index = event["output_index"]?.jsonPrimitive?.intOrNull
+            if ((item["type"] as? JsonPrimitive)?.contentOrNull !in setOf("function_call", "custom_tool_call") ||
+                (item["status"] as? JsonPrimitive)?.contentOrNull != "completed") return
+            val index = (event["output_index"] as? JsonPrimitive)?.intOrNull
                 ?.takeIf { it >= 0 } ?: throw responseProtocolError("完成工具项缺少输出序号")
             val call = parseCompleted(buildJsonObject {
                 put("status", "completed"); put("output", JsonArray(listOf(item)))
@@ -179,11 +179,11 @@ class OpenAiResponsesClient @Inject constructor(
                 val streamed = OpenAiResponsesStreamSnapshot()
                                 // Response 生命周期由 withCancellableModelResponse 统一关闭；这里不要单独 use(reader)，
                 // 否则成功终态后的 reader.close() 异常仍可能把成功请求翻成失败。
-                val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
+                val reader = ModelSseDataReader(ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES))
                 run {
                     while (true) {
                         val line = try {
-                            reader.readLine()
+                            reader.readData()
                         } catch (failure: ModelStreamLimitException) {
                             throw LocalModelException(
                                 code = "MODEL_RESPONSE_TOO_LARGE",
@@ -198,19 +198,13 @@ class OpenAiResponsesClient @Inject constructor(
                             if (streamed.content.isBlank() && eagerCalls.isEmpty()) throw failure
                             null
                         } ?: break
-                        if (!line.startsWith("data:")) continue
-                        val data = line.removePrefix("data:").trim()
+                        val data = line.trim()
                         if (data.isBlank() || data == "[DONE]") continue
                         val event = runCatching { json.parseToJsonElement(data).jsonObject }
                             .getOrElse { cause ->
-                                throw streamInterruptedAfterAdmission(
-                                    planSharing = planSharing,
-                                    requestId = requestId,
-                                    detail = "Responses API 返回了无法解析的数据帧",
-                                    cause = cause,
-                                )
+                                throw responseProtocolError("服务商返回的 SSE 数据帧不是完整 JSON 对象")
                             }
-                        val eventType = event["type"]?.jsonPrimitive?.contentOrNull
+                        val eventType = (event["type"] as? JsonPrimitive)?.contentOrNull
                         lastStreamEventType = eventType?.take(48)?.takeIf { type ->
                             type.all { char -> char.isLetterOrDigit() || char == '_' || char == '.' || char == '-' }
                         }
@@ -218,7 +212,7 @@ class OpenAiResponsesClient @Inject constructor(
                         ((event["response"] as? JsonObject)?.get("usage") as? JsonObject)?.let { reportedUsage = it }
                         streamed.record(event)?.let { onDelta(it) }
                         acceptCompletedItem(event)
-                        when (event["type"]?.jsonPrimitive?.contentOrNull) {
+                        when (eventType) {
                             "error" -> throw streamError(event, planSharing, requestId, retryAfterMs)
                             "response.failed" -> throw responseFailure(
                                 event = event,
@@ -311,6 +305,12 @@ class OpenAiResponsesClient @Inject constructor(
                 requestId = admittedRequestId,
                 cause = error,
             )
+        } catch (error: IllegalArgumentException) {
+            if (eagerCalls.isNotEmpty()) return@withContext interruptedEagerReply()
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
+                throw responseProtocolError("模型流式响应字段类型不符合协议")
+            }
+            throw error
         }
     }
 
@@ -877,7 +877,12 @@ class OpenAiResponsesClient @Inject constructor(
                 }
             }
         }
-        if (completionReason != LocalModelCompletionReason.COMPLETED) toolCalls.clear()
+        if (completionReason == LocalModelCompletionReason.COMPLETED) {
+            val callIds = toolCalls.map { it.id }
+            if (callIds.distinct().size != callIds.size) {
+                throw responseProtocolError("模型生成了重复的工具调用 call_id")
+            }
+        } else toolCalls.clear()
         val rawContent = content.toString().takeIf(String::isNotBlank)
             ?: streamedContent.takeIf { allowStreamFallback && it.isNotBlank() }
         val settledContent = if (webSources.isEmpty()) rawContent else buildString {
@@ -1239,6 +1244,10 @@ class OpenAiResponsesClient @Inject constructor(
         code = "RESPONSES_PROTOCOL_ERROR",
         message = "Responses API 协议错误：$detail",
         retryable = false,
+        providerCode = "responses_protocol_invalid_after_admission",
+        admissionState = LocalModelAdmissionState.ADMITTED,
+        continuationEligible = true,
+        origin = LocalModelFailureOrigin.STREAM_PARSE,
     )
 
     companion object {

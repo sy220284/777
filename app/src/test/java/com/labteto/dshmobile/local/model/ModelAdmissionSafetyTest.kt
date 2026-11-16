@@ -155,6 +155,36 @@ class ModelAdmissionSafetyTest {
     }
 
     @Test
+    fun invalidModelToolArgumentsAreNotMistakenForTransportInterruptions() {
+        val error = com.labteto.dshmobile.local.LocalModelException(
+            code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
+            message = "tool_use 参数不是合法 JSON 对象",
+            retryable = false,
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
+        )
+        assertEquals("tool_arguments_invalid", modelFailureKind(error))
+        assertEquals(null, modelTransportFailureKind(error))
+    }
+
+    @Test
+    fun receivedProtocolErrorsAndEmptyRepliesHavePreciseCategories() {
+        fun diagnosed(code: String, providerCode: String? = null) =
+            com.labteto.dshmobile.local.LocalModelException(
+                code = code, message = "模型响应异常",
+                retryable = false, providerCode = providerCode,
+                admissionState = LocalModelAdmissionState.ADMITTED,
+                continuationEligible = true,
+                origin = com.labteto.dshmobile.local.LocalModelFailureOrigin.STREAM_PARSE,
+            )
+        assertEquals("model_empty_response", modelFailureKind(diagnosed("MODEL_EMPTY_RESPONSE")))
+        assertEquals("provider_protocol_invalid", modelFailureKind(diagnosed("RESPONSES_PROTOCOL_ERROR")))
+        assertEquals("provider_protocol_invalid", modelFailureKind(diagnosed("MODEL_STREAM_PROTOCOL")))
+        assertEquals("tool_arguments_invalid", modelFailureKind(
+            diagnosed("MODEL_STREAM_PROTOCOL", "invalid_tool_arguments")))
+    }
+
+    @Test
     fun diagnosticsDifferentiateDnsTruncationAndNonTransportRejection() {
         val dns = modelTransportFailure(
             "MODEL_NETWORK", "dns failed", LocalModelAdmissionTracker(), "req-dns",

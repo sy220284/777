@@ -162,6 +162,106 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun responsesReassemblesMultilineCompletedFrame() = runBlocking {
+        val response = "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-multiline\",\"output\":[\n" +
+            "data: {\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"跨行完成\"}]}],\"usage\":{\"input_tokens\":2,\"output_tokens\":3}}}\n\n"
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(response.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val reply = OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+            accessToken = "mock-token",
+            baseUrl = "https://api.openai.com/v1",
+            model = "gpt-test",
+            messages = chatPostTurnModelMessages("验证跨行"),
+            tools = JsonArray(emptyList()),
+            planSharing = false,
+        )
+        assertEquals("跨行完成", reply.content)
+    }
+
+    @Test
+    fun invalidCompletedResponsesOutputFieldTypeIsCorrectable() = runBlocking {
+        val response = """{"type":"response.completed","response":{"status":"completed","id":"resp-wrong-type","output":[{"type":[]}],"usage":{"input_tokens":2,"output_tokens":1}}}"""
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(("data: " + response + "\n\n").toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val error = runCatching {
+            OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "test", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
+                messages = chatPostTurnModelMessages("验证字段"), tools = JsonArray(emptyList()),
+                planSharing = false,
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", error?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, error?.admissionState)
+        assertTrue(error?.continuationEligible == true)
+        assertFalse(error?.retryable ?: true)
+    }
+
+    @Test
+    fun malformedResponsesSseFrameEntersInStepProtocolCorrection() = runBlocking {
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body("data: {\"type\":\"response.completed\",\"response\":\n\n"
+                    .toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val failure = runCatching {
+            OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "mock-token", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
+                messages = chatPostTurnModelMessages("检查协议"), tools = JsonArray(emptyList()),
+            planSharing = false,
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+        assertFalse(failure?.cause?.message.orEmpty().contains("response.completed"))
+    }
+
+    @Test
+    fun duplicateResponsesToolIdsAreRejectedBeforeDispatch() {
+        val duplicateCall = """{"type":"function_call","call_id":"same-id","name":"tool_call","arguments":"{}"}"""
+        val response = Json.parseToJsonElement(
+            """{"status":"completed","id":"resp-duplicate","output":[""" +
+                duplicateCall + "," + duplicateCall + "]}"
+        ).jsonObject
+        val failure = runCatching {
+            client.parseCompleted(response, TokenPromptBreakdown())
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+    }
+
+    @Test
+    fun malformedCompletedFunctionArgumentsAreContinuableBeforeExecution() = runBlocking {
+        val frame = """{"type":"response.completed","response":{"id":"resp-bad-tools","output":[{"type":"function_call","call_id":"call-1","name":"tool_call","arguments":"{\"name\":\"bash\",\"arguments\":"}]}}"""
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(("data: " + frame + "\n\n").toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val failure = runCatching {
+            OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "mock-token", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
+                messages = chatPostTurnModelMessages("检查工具"), tools = JsonArray(emptyList()),
+            planSharing = false,
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+    }
+
+    @Test
     fun exactReportedCancelWithoutSpaceIsRetryable() {
         val error = client.networkFailure(IOException("stream was reset:CANCEL"))
         assertEquals("MODEL_NETWORK", error.code)

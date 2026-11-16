@@ -166,9 +166,9 @@ object LocalToolCatalog {
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
         // The model uses one stable dispatch tool for every registered capability.
-        add(tool("tool_call", "按注册名称直接调用工具，无需预加载。未知名称先用 tool_search 查询；参数由目标工具真实 Schema 校验，目标工具自行审批。", properties(
-            "name" to string("已注册工具名，例如 read、grep、github_search 或 MCP 工具名称"),
-            "arguments" to jsonSchemaObject("目标工具的完整 JSON 参数；参照 tool_search 返回的真实参数定义"),
+        add(tool("tool_call", "按注册名称直接调用工具，无需预加载。使用 JSON 参数，不传 shell 命令字符串。bash 示例：{\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}}；需要执行的命令位于 arguments.command。未知工具或参数通过 tool_search 查询真实 Schema；执行器负责校验、审批及回执。", properties(
+            "name" to string("已注册工具名（例如 bash、read、grep），不是 shell 命令；不确定时用 tool_search 查询"),
+            "arguments" to jsonSchemaObject("目标工具的完整 JSON 对象。bash 参数示例：{\"command\":\"pwd\"}；实际字段和必填项以 tool_search 返回的工具 Schema 为准"),
         ), listOf("name", "arguments")))
         add(tool("tool_search", "只读查找实时工具注册表及准确参数定义；不选择、不加载、不改变模型工具表。", properties(
             "query" to string("工具名称、功能描述或 能力目录"),

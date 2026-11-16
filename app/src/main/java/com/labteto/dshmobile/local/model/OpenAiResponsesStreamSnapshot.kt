@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -114,5 +115,8 @@ internal class OpenAiResponsesStreamSnapshot {
 
     private fun invalidField(key: String) = LocalModelException(
         "RESPONSES_PROTOCOL_ERROR", "Responses API 流式字段格式无效：$key", false,
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
+            origin = LocalModelFailureOrigin.STREAM_PARSE,
     )
 }

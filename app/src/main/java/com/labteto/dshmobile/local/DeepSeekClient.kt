@@ -3,12 +3,14 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.ModelStreamLineReader
+import com.labteto.dshmobile.local.model.ModelSseDataReader
 import com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy
 import com.labteto.dshmobile.local.model.LocalModelStreamProgressMonitor
 import com.labteto.dshmobile.local.model.LocalModelStreamWatchdog
 import com.labteto.dshmobile.local.model.ModelStreamLimitException
 import com.labteto.dshmobile.local.model.ModelStreamLimitKind
 import com.labteto.dshmobile.local.model.LocalModelAdmissionState
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 import com.labteto.dshmobile.local.model.LocalModelAdmissionTracker
 import com.labteto.dshmobile.local.model.LocalModelDelta
 import com.labteto.dshmobile.local.model.LocalKimiPolicy
@@ -310,11 +312,14 @@ class DeepSeekClient @Inject constructor(
                 try {
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
-                val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
+                val reader = ModelSseDataReader(
+                    ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES),
+                    onNonEventLine = { fallback.append(it) },
+                )
                 run {
                     while (true) {
                         val line = try {
-                            reader.readLine()
+                            reader.readData()
                         } catch (failure: ModelStreamLimitException) {
                             throw LocalModelException(
                                 code = "MODEL_RESPONSE_TOO_LARGE",
@@ -344,12 +349,8 @@ class DeepSeekClient @Inject constructor(
                                 requestId = requestId,
                             )
                         }
-                        if (!line.startsWith("data:")) {
-                            if (line.isNotBlank()) fallback.append(line)
-                            continue
-                        }
                         sawStreamData = true
-                        val data = line.removePrefix("data:").trim()
+                        val data = line.trim()
                         if (data.isBlank()) continue
                         if (data == "[DONE]") {
                             sawTerminalFrame = true
@@ -495,6 +496,10 @@ class DeepSeekClient @Inject constructor(
                     )
                 }
                 requireUniqueModelToolCallIds(calls, "MODEL_STREAM_PROTOCOL", retryable = false)
+                if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED &&
+                    rawStopReason in setOf("tool_calls", "function_call") && calls.isEmpty()) {
+                    throw streamProtocolError("模型声明了工具调用结束，但没有提供完整工具调用数据")
+                }
                 val message = buildJsonObject {
                     put("role", "assistant")
                     put("content", content.toString())
@@ -569,6 +574,11 @@ class DeepSeekClient @Inject constructor(
                 requestId = requestId,
                 cause = error,
             )
+        } catch (error: IllegalArgumentException) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
+                throw streamProtocolError("模型流式响应字段类型不符合协议", error)
+            }
+            throw error
         }
     }
 
@@ -590,7 +600,7 @@ class DeepSeekClient @Inject constructor(
         val completionReason = if ((message["refusal"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true)
             com.labteto.dshmobile.local.model.LocalModelCompletionReason.REFUSED else initialCompletionReason
         val rawToolCalls = message["tool_calls"]?.takeUnless { it == JsonNull }?.let {
-            it as? JsonArray ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "tool_calls 必须是数组", false)
+            it as? JsonArray ?: throw responseToolProtocolError("tool_calls 必须是数组")
         }.orEmpty()
         val rawContent = assistantText(message["content"])
             ?: (message["refusal"] as? JsonPrimitive)?.contentOrNull
@@ -609,12 +619,16 @@ class DeepSeekClient @Inject constructor(
         }
         val calls = (if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) rawToolCalls else emptyList()).map { element ->
             val item = element as? JsonObject
-                ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "工具调用必须是对象", false)
+                ?: throw responseToolProtocolError("工具调用必须是对象")
             val function = item["function"] as? JsonObject
-                ?: throw LocalModelException("MODEL_RESPONSE_PROTOCOL", "工具调用缺少 function 对象", false)
+                ?: throw responseToolProtocolError("工具调用缺少 function 对象")
             validatedModelToolCall(item["id"], function["name"], function["arguments"], "MODEL_RESPONSE_PROTOCOL")
         }
         requireUniqueModelToolCallIds(calls, "MODEL_RESPONSE_PROTOCOL")
+        if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED &&
+            rawStopReason in setOf("tool_calls", "function_call") && calls.isEmpty()) {
+            throw responseToolProtocolError("模型声明了工具调用结束，但没有提供工具调用数据")
+        }
         val usage = parseDeepSeekOpenAiUsage(root)
         return LocalModelReply(
             completionReason = completionReason, rawStopReason = rawStopReason,
@@ -721,10 +735,9 @@ internal fun mergeModelMetadata(previous: JsonObject, next: JsonObject): JsonObj
 
 private fun requireCompleteFinishReason(reason: String) {
     if (reason in setOf("stop", "tool_calls", "function_call", "length", "content_filter")) return
-    throw LocalModelException(
-        code = "MODEL_FINISH_$reason",
-        message = "模型未正常完成回复（$reason），请调整请求后重试。",
-        retryable = false,
+    throw streamProtocolError(
+        "模型返回未知 finish_reason：" +
+            reason.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) }.orEmpty().ifBlank { "unknown" },
     )
 }
 
@@ -747,6 +760,16 @@ private fun streamToolString(value: JsonElement?, field: String, allowEmpty: Boo
     return primitive.content
 }
 
+private fun responseToolProtocolError(detail: String): LocalModelException = LocalModelException(
+    code = "MODEL_RESPONSE_PROTOCOL",
+    message = detail,
+    retryable = false,
+    providerCode = "invalid_tool_arguments",
+    admissionState = LocalModelAdmissionState.ADMITTED,
+    continuationEligible = true,
+    origin = LocalModelFailureOrigin.STREAM_PARSE,
+)
+
 private fun streamProtocolError(
     detail: String,
     cause: Throwable? = null,
@@ -754,8 +777,12 @@ private fun streamProtocolError(
     code = "MODEL_STREAM_PROTOCOL",
     message = detail,
     retryable = false,
-    cause = cause,
+    // Decoder errors may include the raw streamed JSON (containing user commands).
+    cause = cause?.let { IllegalArgumentException("Chat Completions SSE decode: " + it::class.java.simpleName) },
     providerCode = "protocol_error_after_admission",
+    admissionState = LocalModelAdmissionState.ADMITTED,
+    continuationEligible = true,
+    origin = LocalModelFailureOrigin.STREAM_PARSE,
 )
 
 internal fun providerErrorDetail(body: String, json: Json): String? = runCatching {

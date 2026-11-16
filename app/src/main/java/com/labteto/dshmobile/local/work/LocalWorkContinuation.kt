@@ -107,8 +107,22 @@ internal fun queueAutomaticWorkContinuation(
         failureCode = error.code,
         index = binding.automaticContinuationCount + 1,
         sourceMessageId = sourceMessageId,
-        prompt = if (outputLimitProgress) "上一响应因输出上限暂停，部分正文已保存在历史中。接续正文末尾，只生成尚未完成的内容，不重复已有正文、已执行工具或副作用。"
-            else INTERNAL_WORK_CONTINUATION_PROMPT,
+        prompt = when {
+            outputLimitProgress ->
+                "上一响应因输出上限暂停，部分正文已保存在历史中。接续正文末尾，只生成尚未完成的内容，不重复已有正文、已执行工具或副作用。"
+            error.code == "MODEL_EMPTY_RESPONSE" ->
+                "继续当前任务。上一轮模型声明完成但返回了空白内容，没有可采纳的回答或工具调用。请结合真实任务进度和已有回执，重新生成具体结果或继续所需工具操作；不要重复已完成的副作用。"
+            error.code in setOf("MODEL_STREAM_PROTOCOL", "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR") ->
+                "继续当前任务。上一轮模型生成的工具调用或响应结构不符合当前协议，工具尚未执行。请仔细阅读错误原因，必要时使用 tool_search 查询注册工具的正确参数结构，重新生成有效调用并完成原目标；已有回执的工具操作不得重复执行。"
+            error.code == "ANTHROPIC_PROTOCOL_ERROR" ->
+                "继续当前任务。上一轮服务商响应中的 SSE 或消息块结构不符合 Anthropic Messages 协议，且未形成可执行工具调用。请检查当前已保存回执，查明真实工具名及 Schema，重新生成合法的工具调用继续任务；已完成操作不可重复执行。"
+            error.code == "ANTHROPIC_TOOL_ARGUMENTS_INVALID" ->
+                "继续当前任务。上一轮工具参数解析失败（" + (error.toolInputIssue ?: "invalid_json_object") +
+                    "），目标=" + (error.providerParam ?: "tool_use") + "，该工具尚未执行。先核对历史真实回执；" +
+                    "对未知参数用 tool_search 查询真实 Schema，重新生成完整、可解析的 JSON 对象参数并继续任务；" +
+                    "已完成的工具副作用不能重复执行。"
+            else -> INTERNAL_WORK_CONTINUATION_PROMPT
+        },
     )
     val queued = command.toQueueInput()
     // The user may queue a new instruction after the earlier pending-count check.

@@ -37,3 +37,65 @@ internal class ModelStreamLineReader(
         return line
     }
 }
+
+
+/**
+ * Parses SSE records at their blank-line boundary. Also accepts adjacent standalone JSON
+ * data records without a blank delimiter, as emitted by some OpenAI-compatible endpoints.
+ * Unknown non-SSE content can be passed to a protocol-specific fallback decoder.
+ */
+internal class ModelSseDataReader(
+    private val lines: ModelStreamLineReader,
+    private val onNonEventLine: (String) -> Unit = {},
+) {
+    private var exhausted = false
+    private var pendingLine: String? = null
+
+    fun readData(): String? {
+        if (exhausted) return null
+        val data = StringBuilder()
+        while (true) {
+            val line = pendingLine?.also { pendingLine = null } ?: lines.readLine()
+            if (line == null) {
+                exhausted = true
+                return data.toString().takeIf(String::isNotEmpty)
+            }
+            if (line.isEmpty()) {
+                if (data.isNotEmpty()) return data.toString()
+                continue
+            }
+            if (!line.startsWith("data:")) {
+                // Preserve legacy non-SSE JSON payloads in Chat Completions.
+                if (line.isNotBlank() && !line.startsWith(":") &&
+                    !line.startsWith("event:") && !line.startsWith("id:") &&
+                    !line.startsWith("retry:")) onNonEventLine(line)
+                continue
+            }
+            if (data.isNotEmpty() && isCompleteModelEvent(data.toString())) {
+                // Some provider proxies omit the mandatory blank line between events.
+                pendingLine = line
+                return data.toString()
+            }
+            if (data.isNotEmpty()) data.append('\n')
+            val value = line.substring(5)
+            data.append(if (value.startsWith(' ')) value.substring(1) else value)
+            // A complete terminal event is authoritative even if the provider omits
+            // the SSE blank delimiter and closes the connection with an error.
+            // Do not consume transport bytes after a terminal model response.
+            if (isTerminalModelEvent(data.toString())) return data.toString()
+        }
+    }
+
+    private fun isTerminalModelEvent(data: String): Boolean {
+        if (data == "[DONE]") return true
+        val event = runCatching {
+            kotlinx.serialization.json.Json.parseToJsonElement(data) as? kotlinx.serialization.json.JsonObject
+        }.getOrNull() ?: return false
+        val type = (event["type"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+        return type in setOf("message_stop", "response.completed", "response.failed", "response.incomplete", "error")
+    }
+
+    private fun isCompleteModelEvent(data: String): Boolean =
+        data == "[DONE]" ||
+            runCatching { kotlinx.serialization.json.Json.parseToJsonElement(data) }.isSuccess
+}

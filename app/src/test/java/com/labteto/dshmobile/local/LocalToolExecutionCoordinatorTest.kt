@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.AgentToolSideEffect
+import com.labteto.dshmobile.harness.agent.modelVisibleContent
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
@@ -478,6 +479,33 @@ class LocalToolExecutionCoordinatorTest {
         }
         coordinator.execute(LocalToolCall("c2", "vision_status", JsonObject(emptyMap()), "{}"), true)
         assertEquals(listOf(profile, null), observed)
+    }
+
+    @Test
+    fun invalidGatewayArgumentsReturnActionableModelVisibleFeedbackWithoutExecution() = runBlocking {
+        val dispatcher = coordinator(ToolRegistry())
+        val invalid = dispatcher.execute(
+            LocalToolCall("broken-gateway", "tool_call", JsonObject(emptyMap()), "{}"),
+            allowMutation = true,
+        )
+        assertTrue(invalid.isError)
+        assertEquals("INVALID_TOOL_ARGUMENTS", invalid.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, invalid.sideEffect)
+        assertTrue(invalid.recoveryHint.orEmpty().contains("tool_search"))
+        assertTrue(invalid.recoveryHint.orEmpty().contains("\"command\""))
+        assertTrue(invalid.modelVisibleContent().contains("\"recovery_hint\""))
+
+        val unknownArgs = buildJsonObject {
+            put("name", "nonexistent-tool")
+            put("arguments", buildJsonObject {})
+        }
+        val unknown = dispatcher.execute(
+            LocalToolCall("unknown-gateway", "tool_call", unknownArgs, unknownArgs.toString()),
+            allowMutation = true,
+        )
+        assertEquals("UNKNOWN_TOOL", unknown.errorCode)
+        assertEquals(AgentToolSideEffect.NONE, unknown.sideEffect)
+        assertTrue(unknown.modelVisibleContent().contains("tool_search"))
     }
 
     @Test

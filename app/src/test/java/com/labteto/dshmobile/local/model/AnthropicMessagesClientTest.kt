@@ -394,9 +394,10 @@ class AnthropicMessagesClientTest {
             listOf(start, delta) to "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""", """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}""") to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"private"}}""", """{"type":"content_block_stop","index":0}""", delta, stop) to "ANTHROPIC_PROTOCOL_ERROR",
-            listOf(start, stop) to "MODEL_FINISH_null",
+            listOf(start, stop) to "ANTHROPIC_PROTOCOL_ERROR",
+            listOf(start, """{"type":"message_delta","delta":{"stop_reason":"future_stop"}}""", stop) to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, """{"type":"error","error":{"type":"overloaded_error","message":"busy"}}""") to "ANTHROPIC_STREAM_ERROR",
-            listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_PROTOCOL_ERROR",
+            listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
         ).forEach { (frames, code) ->
             val error = runCatching {
                 fixture(frames).complete(route(), emptyList(), emptyList(), null, true)
@@ -404,6 +405,130 @@ class AnthropicMessagesClientTest {
             assertEquals(code, error?.code)
             assertFalse("HTTP 成功接收后的失败不得触发整轮重放：$code", error?.retryable ?: true)
         }
+    }
+
+    @Test
+    fun providerSseFieldTypeErrorBecomesCorrectableProtocolFailure() = runBlocking {
+        val start = """{"type":"message_start","message":{"id":"msg-malformed","usage":{"input_tokens":1}}}"""
+        val invalid = """{"type":"content_block_start","index":[],"content_block":{"type":"tool_use","id":"x","name":"tool_call","input":{}}}"""
+        val failure = runCatching {
+            fixture(listOf(start, invalid)).complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertNotNull(failure)
+        assertEquals("ANTHROPIC_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertEquals(LocalModelFailureOrigin.STREAM_PARSE, failure?.origin)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+        assertFalse(failure?.cause?.message.orEmpty().contains("index"))
+    }
+
+    @Test
+    fun malformedToolJsonIsSafelyContinuableAndValidJsonFragmentsStillWork() = runBlocking {
+        val start = """{"type":"message_start","message":{"id":"msg-tool","usage":{"input_tokens":4}}}"""
+        val toolStart = """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"tool_call","input":{}}}"""
+        fun part(fragment: String) = buildJsonObject {
+            put("type", "content_block_delta")
+            put("index", 0)
+            put("delta", buildJsonObject {
+                put("type", "input_json_delta")
+                put("partial_json", fragment)
+            })
+        }.toString()
+        val end = listOf(
+            """{"type":"content_block_stop","index":0}""",
+            """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+            """{"type":"message_stop"}""",
+        )
+
+        val malformed = runCatching {
+            fixture(listOf(start, toolStart, part("{\"name\":")) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertNotNull(malformed)
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", malformed!!.code)
+        assertFalse(malformed.retryable)
+        assertTrue(malformed.continuationEligible)
+        assertEquals(LocalModelAdmissionState.ADMITTED, malformed.admissionState)
+        assertEquals(LocalModelFailureOrigin.STREAM_PARSE, malformed.origin)
+        assertEquals("message_stop:tool_use", malformed.lastStreamEventType)
+        assertTrue((malformed.streamEventsSeen ?: 0) >= 5)
+
+        // Actual 777.400 diagnostic: all three MiniMax calls ended while building
+        // the unified tool_call wrapper: {"name": "bash", "arguments":
+        val diagnostic = runCatching {
+            fixture(
+                listOf(start, toolStart, part("{\"name\": \"bash\", \"arguments\": ")) + end,
+            ).complete(route(baseUrl = "https://api.minimaxi.com/anthropic/v1"), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertNotNull(diagnostic)
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", diagnostic?.code)
+        assertTrue(diagnostic?.continuationEligible == true)
+        assertEquals("tool_call/bash", diagnostic?.providerParam)
+        assertEquals("missing_arguments_value", diagnostic?.toolInputIssue)
+        assertEquals(1, diagnostic?.toolInputDeltaCount)
+        assertTrue((diagnostic?.toolInputChars ?: 0) > 0)
+        assertEquals(16, diagnostic?.toolInputFingerprint?.length)
+        assertTrue(diagnostic?.message.orEmpty().contains("arguments 字段"))
+        assertFalse(diagnostic?.cause?.message.orEmpty().contains("bash"))
+        assertEquals("message_stop:tool_use", diagnostic?.lastStreamEventType)
+
+        val missingDelta = """{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta"}}"""
+        val missing = runCatching {
+            fixture(listOf(start, toolStart, missingDelta) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", missing?.code)
+        assertEquals("missing_partial_json", missing?.toolInputIssue)
+        assertEquals(0, missing?.toolInputDeltaCount)
+        assertEquals("content_block_delta", missing?.lastStreamEventType)
+
+        val unknownDelta = """{"type":"content_block_delta","index":0,"delta":{"type":"future_json_delta","fragment":"anything"}}"""
+        val unknown = runCatching {
+            fixture(listOf(start, toolStart, unknownDelta) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", unknown?.code)
+        assertEquals("unknown_tool_delta", unknown?.toolInputIssue)
+
+        val invalidToolStartCases = listOf(
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","name":"bash","input":{}}}""" to "missing_tool_id",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":[],"name":"bash","input":{}}}""" to "missing_tool_id",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","name":[],"input":{}}}""" to "missing_tool_name",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","input":{}}}""" to "missing_tool_name",
+        )
+        invalidToolStartCases.forEach { (toolStartCase, expectedIssue) ->
+            val error = runCatching {
+                fixture(listOf(start, toolStartCase, part("{}")) + end)
+                    .complete(route(), emptyList(), emptyList(), null, true)
+            }.exceptionOrNull() as? LocalModelException
+            assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", error?.code)
+            assertEquals(expectedIssue, error?.toolInputIssue)
+            assertTrue(error?.continuationEligible == true)
+        }
+        val wrongDelta = """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"unexpected"}}"""
+        val mismatch = runCatching {
+            fixture(listOf(start, toolStart, wrongDelta) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", mismatch?.code)
+        assertEquals("tool_delta_type_mismatch", mismatch?.toolInputIssue)
+
+        val multiLineMessage = """{"type":"message_delta","delta":""" +
+            "\ndata: " + """{"stop_reason":"tool_use"}}"""
+        val multipart = fixture(
+            listOf(start, toolStart, part("{\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}}"),
+                end[0], multiLineMessage, end[2]),
+        ).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals("tool_call", multipart.toolCalls.single().name)
+        assertEquals("bash", multipart.toolCalls.single().arguments.getValue("name").jsonPrimitive.content)
+
+        val valid = fixture(
+            listOf(start, toolStart, part("{\"path\":"), part("\"a.txt\"}")) + end,
+        ).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals(1, valid.toolCalls.size)
+        assertEquals("tool-1", valid.toolCalls.single().id)
+        assertEquals("a.txt", valid.toolCalls.single().arguments.getValue("path").jsonPrimitive.content)
     }
 
     @Test

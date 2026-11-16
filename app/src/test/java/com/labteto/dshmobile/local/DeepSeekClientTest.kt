@@ -74,6 +74,49 @@ class DeepSeekClientTest {
     }
 
     @Test
+    fun chatCompletionsReassemblesMultilineEventAndAdjacentDone() = runBlocking {
+        val response = "data: {\"choices\":[\n" +
+            "data: {\"delta\":{\"content\":\"跨行成功\"},\"finish_reason\":\"stop\"}]}\n" +
+            "data: [DONE]\n"
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(response.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val reply = DeepSeekClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+            apiKey = "mock-token", baseUrl = "https://example.com/v1", model = "model",
+            messages = listOf(buildJsonObject {
+                put("role", "user")
+                put("content", "检查分帧")
+            }), tools = JsonArray(emptyList()),
+        )
+        assertEquals("跨行成功", reply.content)
+    }
+
+    @Test
+    fun invalidChatCompletionsFieldTypeReturnsCorrectableProtocolError() = runBlocking {
+        val response = "data: {\"choices\":[{\"delta\":{\"reasoning_details\":[{\"index\":[],\"text\":\"x\"}]}}]}\n" +
+            "data: [DONE]\n"
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(response.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val error = runCatching {
+            DeepSeekClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+                apiKey = "test", baseUrl = "https://api.deepseek.com/v1", model = "deepseek-flash",
+                messages = listOf(buildJsonObject { put("role", "user"); put("content", "查询") }),
+                tools = JsonArray(emptyList()),
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED, error?.admissionState)
+        assertTrue(error?.continuationEligible == true)
+        assertFalse(error?.retryable ?: true)
+        assertFalse(error?.cause?.message.orEmpty().contains("reasoning_details"))
+    }
+
+    @Test
     fun reasoningOverrideMatchesEachProviderWireContract() = runBlocking {
         val requests = mutableListOf<String>()
         val http = OkHttpClient.Builder().addInterceptor { chain ->

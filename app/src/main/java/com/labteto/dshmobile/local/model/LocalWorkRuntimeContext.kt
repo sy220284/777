@@ -39,7 +39,7 @@ internal fun workRuntimeContextParts(
         profile?.provider?.takeIf(String::isNotBlank)?.let { appendLine("- 模型提供方：$it") }
         profile?.let { appendLine("- 认证来源：${it.sourceLabel()}") }
         protocol?.let { appendLine("- 模型协议：${it.name}") }
-        appendLine("- 使用工具统一通过 tool_call，填写已注册的 name 与 arguments JSON 参数，直接由本机注册表执行；不需要预先暴露、选择或等待下一模型步骤。仅在未知准确名称和参数时使用 tool_search 查询实时 Schema。若收到 INVALID_TOOL_ARGUMENTS，按真实参数修正；写入类操作必须核对真实回执再决定是否重试。")
+        appendLine("- 模型通过结构化函数参数调用 tool_call。name 是工具名；arguments 必须是完整 JSON 对象。执行 shell：tool_call({\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}})，请把实际命令放在 arguments.command 中，不要把 shell 命令当 name。未知工具名或参数先用 tool_search 查询实时 Schema；失败时阅读 error_code/content/recovery_hint，自主修正并继续执行。可能发生副作用时先核对真实回执。")
         appendLine(LocalAgentCognitionGuidance.DEFAULT)
         appendLine(LocalAgentCognitionGuidance.WORK)
         appendLine("- 遇到与历史调查相关的复杂问题，可按需查找工作区现有的 自我改进/07-调查发现.md 和 01-经验与方法.md；按来源与适用条件复用，先核对原始证据状态，避免把旧假说或已撤回的发现当作事实。简单任务无需额外读取。")

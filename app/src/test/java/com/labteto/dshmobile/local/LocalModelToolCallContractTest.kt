@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.LocalCanonicalModelCodec
 import com.labteto.dshmobile.local.model.LocalModelReply
+import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import okhttp3.*
@@ -45,6 +46,10 @@ class LocalModelToolCallContractTest {
         for (bad in invalid) {
             val error = runCatching { client("").parse(response(listOf(bad))) }.exceptionOrNull()
             assertEquals(bad.toString(), "MODEL_RESPONSE_PROTOCOL", (error as? LocalModelException)?.code)
+            val modelError = error as? LocalModelException
+            assertEquals(LocalModelAdmissionState.ADMITTED, modelError?.admissionState)
+            assertTrue(modelError?.continuationEligible == true)
+            assertFalse(modelError?.retryable ?: true)
             val historyError = runCatching { LocalCanonicalModelCodec.message(message(listOf(bad))) }.exceptionOrNull()
             assertEquals(bad.toString(), "MODEL_HISTORY_INVALID", (historyError as? LocalModelException)?.code)
         }
@@ -54,7 +59,44 @@ class LocalModelToolCallContractTest {
         for (args in listOf(null, JsonNull, JsonPrimitive(""), JsonPrimitive("[]"), JsonPrimitive("{broken"), JsonPrimitive(1))) {
             val error = runCatching { stream(listOf(frame(indexed(call(args = args), 0)))) }.exceptionOrNull()
             assertEquals("MODEL_STREAM_PROTOCOL", (error as? LocalModelException)?.code)
+            assertEquals(LocalModelAdmissionState.ADMITTED, (error as? LocalModelException)?.admissionState)
+            assertTrue((error as? LocalModelException)?.continuationEligible == true)
+            assertFalse((error as? LocalModelException)?.retryable ?: true)
         }
+    }
+
+    @Test fun unknownFinishReasonsContinueThroughProviderProtocolRecovery() = runBlocking {
+        val body = "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"future_finish\"}]}\n" +
+            "data: [DONE]\n"
+        val failure = runCatching {
+            client(body).completeStreaming(
+                "mock-token", "https://example.com/v1", "custom",
+                listOf(buildJsonObject { put("role", "user"); put("content", "检验结束原因") }),
+                tools = JsonArray(emptyList()),
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_STREAM_PROTOCOL", failure?.code)
+        assertTrue(failure?.continuationEligible == true)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+    }
+
+    @Test fun toolFinishWithoutAnyCallIsAContinuableProtocolError() = runBlocking {
+        val error = runCatching { stream(emptyList()) }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_STREAM_PROTOCOL", error?.code)
+        assertEquals(com.labteto.dshmobile.local.model.LocalModelAdmissionState.ADMITTED, error?.admissionState)
+        assertTrue(error?.continuationEligible == true)
+
+        val empty = buildJsonObject {
+            put("choices", buildJsonArray {
+                add(buildJsonObject {
+                    put("message", message(emptyList()))
+                    put("finish_reason", "tool_calls")
+                })
+            })
+        }
+        val complete = runCatching { client("").parse(empty.toString()) }.exceptionOrNull() as? LocalModelException
+        assertEquals("MODEL_RESPONSE_PROTOCOL", complete?.code)
+        assertTrue(complete?.continuationEligible == true)
     }
 
     @Test fun explicitEmptyObjectRemainsValidInAllThreePaths() = runBlocking {

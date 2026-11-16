@@ -28,4 +28,10 @@ internal class LocalModelException(
     /** Type/count only; never retain a raw SSE payload or user content here. */
     val lastStreamEventType: String? = null,
     val streamEventsSeen: Int? = null,
+    /** Redacted parse diagnostics, without any raw tool argument content. */
+    val toolInputIssue: String? = null,
+    val toolInputDeltaCount: Int? = null,
+    val toolInputChars: Int? = null,
+    /** Eight SHA-256 bytes of the accumulated provider input; never store raw commands. */
+    val toolInputFingerprint: String? = null,
 ) : Exception(message, cause)

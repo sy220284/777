@@ -449,11 +449,11 @@ internal class AnthropicMessagesClient @Inject constructor(
         var streamEventsSeen = 0
         val closedBlocks = mutableSetOf<Int>()
 
-        val reader = ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES)
+        val reader = ModelSseDataReader(ModelStreamLineReader(body.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_STREAM_BYTES))
         run {
             while (true) {
                 val line = try {
-                    reader.readLine()
+                    reader.readData()
                 } catch (failure: ModelStreamLimitException) {
                     throw LocalModelException(
                         code = "MODEL_RESPONSE_TOO_LARGE",
@@ -469,18 +469,18 @@ internal class AnthropicMessagesClient @Inject constructor(
                     if (!(blocks.values.any { it.type == "text" && it.text.isNotBlank() })) throw failure
                     null
                 } ?: break
-                if (!line.startsWith("data:")) continue
-                val data = line.removePrefix("data:").trim()
+                val data = line.trim()
                 if (data.isBlank()) continue
                 val event = runCatching { json.parseToJsonElement(data).jsonObject }
                     .getOrElse { cause ->
                         throw protocolError("Anthropic SSE 包含无法解析的数据帧", requestId, cause)
                     }
-                val eventType = event["type"]?.jsonPrimitive?.contentOrNull
+                val eventType = (event["type"] as? JsonPrimitive)?.contentOrNull
                 lastStreamEventType = eventType?.take(48)
                 streamEventsSeen++
                 LocalMiniMaxPolicy.requireSuccessfulResponse(event)
-                when (eventType) {
+                try {
+                    when (eventType) {
                     "message_start" -> {
                         if (sawMessageStart) throw protocolError("重复 message_start", requestId)
                         sawMessageStart = true
@@ -513,7 +513,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                             ?: throw protocolError("content_block_delta 引用了未知 block", requestId)
                         val delta = event["delta"] as? JsonObject
                             ?: throw protocolError("content_block_delta 缺少 delta", requestId)
-                        val deltaType = delta["type"]?.jsonPrimitive?.contentOrNull
+                        val deltaType = (delta["type"] as? JsonPrimitive)?.contentOrNull
                         val expectedBlock = when (deltaType) {
                             "text_delta", "citations_delta" -> "text"
                             "thinking_delta", "signature_delta" -> "thinking"
@@ -521,6 +521,15 @@ internal class AnthropicMessagesClient @Inject constructor(
                             else -> null
                         }
                         if (expectedBlock != null && accumulator.type != expectedBlock) {
+                            if (accumulator.type == "tool_use") {
+                                throw malformedToolArgumentsErrorStatic(
+                                    requestId ?: messageId, stopReason, streamEventsSeen,
+                                    toolName = accumulator.name,
+                                    inputJson = accumulator.inputJson.toString(),
+                                    inputDeltaCount = accumulator.inputDeltaCount,
+                                    issue = "tool_delta_type_mismatch",
+                                )
+                            }
                             throw protocolError("delta 类型与内容块不一致", requestId)
                         }
                         when (deltaType) {
@@ -538,9 +547,30 @@ internal class AnthropicMessagesClient @Inject constructor(
                                 }
                             "signature_delta" -> delta["signature"]?.jsonPrimitive?.contentOrNull
                                 ?.let(accumulator.signature::append)
-                            "input_json_delta" -> delta["partial_json"]?.jsonPrimitive?.contentOrNull
-                                ?.let(accumulator.inputJson::append)
+                            "input_json_delta" -> {
+                                val part = delta["partial_json"] as? JsonPrimitive
+                                if (part == null || !part.isString) {
+                                    throw malformedToolArgumentsErrorStatic(
+                                        requestId ?: messageId, stopReason, streamEventsSeen,
+                                        toolName = accumulator.name,
+                                        inputJson = accumulator.inputJson.toString(),
+                                        inputDeltaCount = accumulator.inputDeltaCount,
+                                        issue = "missing_partial_json",
+                                    )
+                                }
+                                accumulator.inputJson.append(part.content)
+                                accumulator.inputDeltaCount++
+                            }
                             "citations_delta" -> delta["citation"]?.let(accumulator.citations::add)
+                            else -> if (accumulator.type == "tool_use") {
+                                throw malformedToolArgumentsErrorStatic(
+                                    requestId ?: messageId, stopReason, streamEventsSeen,
+                                    toolName = accumulator.name,
+                                    inputJson = accumulator.inputJson.toString(),
+                                    inputDeltaCount = accumulator.inputDeltaCount,
+                                    issue = "unknown_tool_delta",
+                                )
+                            }
                         }
                     }
                     "message_delta" -> {
@@ -567,6 +597,11 @@ internal class AnthropicMessagesClient @Inject constructor(
                         if (index !in blocks || !closedBlocks.add(index)) throw protocolError("block stop 无效或重复", requestId)
                     }
                     "ping" -> Unit
+                    }
+                } catch (invalid: IllegalArgumentException) {
+                    // A provider may send the right event type with an invalid field type.
+                    // Turn this into a diagnosed, safe-to-correct protocol failure.
+                    throw protocolError("Anthropic SSE 消息字段类型错误", requestId ?: messageId, invalid)
                 }
             }
         }
@@ -597,7 +632,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         } else stopReason
         val nativeContent = buildJsonArray {
             blocks.toSortedMap().values.filter { completionReason == LocalModelCompletionReason.COMPLETED || it.type == "text" }
-                .forEach { add(it.toNative(json, requestId ?: messageId)) }
+                .forEach { add(it.toNative(json, requestId ?: messageId, stopReason, streamEventsSeen)) }
         }
         val canonicalBlocks = mutableListOf<LocalCanonicalContent>()
         nativeContent.forEach { raw ->
@@ -610,12 +645,21 @@ internal class AnthropicMessagesClient @Inject constructor(
                     canonicalBlocks += LocalCanonicalContent.Reasoning(it)
                 }
                 "tool_use" -> {
-                    val id = block["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                        ?: throw protocolError("tool_use 缺少 id", requestId)
-                    val name = block["name"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-                        ?: throw protocolError("tool_use 缺少 name", requestId)
+                    val id = (block["id"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+                        ?: throw malformedToolArgumentsErrorStatic(
+                            requestId ?: messageId, stopReason, streamEventsSeen,
+                            issue = "missing_tool_id",
+                        )
+                    val name = (block["name"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+                        ?: throw malformedToolArgumentsErrorStatic(
+                            requestId ?: messageId, stopReason, streamEventsSeen,
+                            issue = "missing_tool_name",
+                        )
                     val input = block["input"] as? JsonObject
-                        ?: throw protocolError("tool_use input 不是对象", requestId)
+                        ?: throw malformedToolArgumentsErrorStatic(
+                            requestId ?: messageId, stopReason, streamEventsSeen,
+                            toolName = name, issue = "missing_or_non_object_input",
+                        )
                     canonicalBlocks += LocalCanonicalContent.ToolCall(
                         id = id,
                         name = name,
@@ -679,9 +723,10 @@ internal class AnthropicMessagesClient @Inject constructor(
         val thinking: StringBuilder = StringBuilder(),
         val signature: StringBuilder = StringBuilder(),
         val inputJson: StringBuilder = StringBuilder(),
+        var inputDeltaCount: Int = 0,
         val citations: MutableList<JsonElement> = mutableListOf(),
     ) {
-        fun toNative(json: Json, requestId: String?): JsonObject = when (type) {
+        fun toNative(json: Json, requestId: String?, stopReason: String?, streamEventsSeen: Int): JsonObject = when (type) {
             "text" -> buildJsonObject {
                 rawStart.forEach { (key, value) -> if (key !in setOf("text", "citations")) put(key, value) }
                 put("type", "text")
@@ -701,10 +746,17 @@ internal class AnthropicMessagesClient @Inject constructor(
                 val input = if (inputJson.isNotEmpty()) {
                     runCatching { json.parseToJsonElement(inputJson.toString()).jsonObject }
                         .getOrElse { cause ->
-                            throw protocolErrorStatic("tool_use 参数不是合法 JSON 对象", requestId, cause)
+                            throw malformedToolArgumentsErrorStatic(
+                                requestId, stopReason, streamEventsSeen, cause,
+                                toolName = name, inputJson = inputJson.toString(),
+                                inputDeltaCount = inputDeltaCount,
+                            )
                         }
                 } else {
-                    initialInput ?: throw protocolErrorStatic("tool_use input 缺失或不是对象", requestId)
+                    initialInput ?: throw malformedToolArgumentsErrorStatic(
+                        requestId, stopReason, streamEventsSeen,
+                        toolName = name, issue = "missing_or_non_object_input",
+                    )
                 }
                 buildJsonObject {
                     rawStart.forEach { (key, value) ->
@@ -721,14 +773,14 @@ internal class AnthropicMessagesClient @Inject constructor(
 
         companion object {
             fun from(block: JsonObject): StreamBlock {
-                val type = block["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                val type = (block["type"] as? JsonPrimitive)?.contentOrNull.orEmpty()
                 if (type !in setOf("text", "thinking", "redacted_thinking", "tool_use")) {
                     throw protocolErrorStatic("不支持的 Anthropic 内容块：$type", null)
                 }
                 return StreamBlock(
                     type = type,
-                    id = block["id"]?.jsonPrimitive?.contentOrNull,
-                    name = block["name"]?.jsonPrimitive?.contentOrNull,
+                    id = (block["id"] as? JsonPrimitive)?.contentOrNull,
+                    name = (block["name"] as? JsonPrimitive)?.contentOrNull,
                     initialInput = block["input"] as? JsonObject,
                     rawStart = block,
                     text = StringBuilder(block["text"]?.jsonPrimitive?.contentOrNull.orEmpty()),
@@ -860,11 +912,10 @@ internal class AnthropicMessagesClient @Inject constructor(
         when (reason) {
             "end_turn", "stop_sequence", "tool_use", "refusal" -> return
             "max_tokens" -> return
-            else -> throw LocalModelException(
-                code = "MODEL_FINISH_$reason",
-                message = "Anthropic 模型未正常完成回复（$reason）",
-                retryable = false,
-                requestId = requestId,
+            else -> throw protocolError(
+                "Anthropic 模型返回未知 stop_reason：" +
+                    (reason?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) } ?: "unknown"),
+                requestId,
             )
         }
     }
@@ -913,9 +964,82 @@ internal class AnthropicMessagesClient @Inject constructor(
             message = detail,
             retryable = false,
             requestId = requestId,
-            cause = cause,
+            // Parser exceptions may include complete provider frame contents.
+            cause = cause?.let {
+                IllegalArgumentException("Anthropic SSE protocol parse failure: " + it::class.java.simpleName)
+            },
+            providerCode = "invalid_anthropic_stream_protocol",
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
             origin = LocalModelFailureOrigin.STREAM_PARSE,
         )
+
+
+        /** Only schema-safe identifiers and failure shape escape the parser. */
+        private val SAFE_GATEWAY_TARGET = Regex(""""name"\s*:\s*"([A-Za-z][A-Za-z0-9_-]{0,63})"""")
+        private val MISSING_ARGUMENTS_VALUE = Regex(""""arguments"\s*:\s*$""")
+
+        fun malformedToolArgumentsErrorStatic(
+            requestId: String?,
+            stopReason: String?,
+            streamEventsSeen: Int,
+            cause: Throwable? = null,
+            toolName: String? = null,
+            inputJson: String? = null,
+            inputDeltaCount: Int = 0,
+            issue: String? = null,
+        ): LocalModelException {
+            val safeTool = toolName?.takeIf { it.matches(Regex("[A-Za-z][A-Za-z0-9_-]{0,63}")) }
+            val target = if (safeTool == "tool_call") {
+                SAFE_GATEWAY_TARGET.find(inputJson.orEmpty())?.groupValues?.getOrNull(1)
+            } else null
+            val reason = issue ?: when {
+                MISSING_ARGUMENTS_VALUE.containsMatchIn(inputJson.orEmpty()) -> "missing_arguments_value"
+                inputJson.isNullOrBlank() -> "missing_input"
+                inputJson.trimEnd().endsWith(":") -> "missing_value"
+                inputJson.trimEnd().startsWith("{") && !inputJson.trimEnd().endsWith("}") -> "unclosed_object"
+                else -> "invalid_json_object"
+            }
+            val detail = when (reason) {
+                "missing_arguments_value" -> "arguments 字段还没有 JSON 对象值"
+                "missing_partial_json" -> "服务商的 input_json_delta 缺少字符串 partial_json"
+                "unknown_tool_delta" -> "服务商发来了未知工具参数增量"
+                "missing_or_non_object_input" -> "工具参数缺失或根节点不是 JSON 对象"
+                "missing_tool_id" -> "tool_use 调用标识缺失"
+                "missing_tool_name" -> "tool_use 工具名称缺失"
+                "tool_delta_type_mismatch" -> "服务商工具参数增量类型与内容块不一致"
+                "unclosed_object" -> "JSON 对象尚未闭合"
+                "missing_value" -> "字段值尚未生成"
+                else -> "JSON 参数无法解析成完整对象"
+            }
+            val qualifiedTool = listOfNotNull(safeTool, target).joinToString("/")
+            val fingerprint = inputJson?.let { source ->
+                java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(source.toByteArray(Charsets.UTF_8))
+                    .take(8)
+                    .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+            }
+            return LocalModelException(
+                code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
+                message = "模型工具调用 " + qualifiedTool.ifBlank { "tool_use" } +
+                    " 的参数无效：" + detail + "；该调用尚未执行",
+                retryable = false,
+                // JSON decoder exceptions may contain raw commands and arguments.
+                cause = cause?.let { IllegalArgumentException("tool_use JSON decode failed: " + it::class.java.simpleName) },
+                requestId = requestId,
+                providerCode = "malformed_tool_use_arguments",
+                providerParam = qualifiedTool.takeIf(String::isNotBlank),
+                lastStreamEventType = if (stopReason == null) "content_block_delta" else "message_stop:" + stopReason,
+                streamEventsSeen = streamEventsSeen,
+                toolInputIssue = reason,
+                toolInputDeltaCount = inputDeltaCount,
+                toolInputChars = inputJson?.length ?: 0,
+                toolInputFingerprint = fingerprint,
+                admissionState = LocalModelAdmissionState.ADMITTED,
+                continuationEligible = true,
+                origin = LocalModelFailureOrigin.STREAM_PARSE,
+            )
+        }
 
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         const val CLAUDE_API_VERSION = "2026-10-21"

@@ -587,6 +587,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 error.providerParam?.let { put("provider_param", it) }
                                 error.lastStreamEventType?.let { put("last_stream_event", it) }
                                 error.streamEventsSeen?.let { put("stream_events_seen", it) }
+                                error.toolInputIssue?.let { put("tool_input_issue", it) }
+                                error.toolInputDeltaCount?.let { put("tool_input_deltas", it) }
+                                error.toolInputChars?.let { put("tool_input_chars", it) }
+                                error.toolInputFingerprint?.let { put("tool_input_fingerprint", it) }
                                 error.cause?.let { cause ->
                                     put("cause_type", cause.javaClass.simpleName)
                                     cause.message?.let { put("cause_detail", sanitizeDiagnosticText(it).take(800)) }
@@ -905,7 +909,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             lastProviderError = error
                             log.append("request/provider-error", buildJsonObject {
                                 put("request_uid", requestUid)
-                                put("origin", localModelRequestErrorOrigin(error.code))
+                                put("origin", localModelRequestErrorOrigin(error.code, error.origin))
                                 put("step", step)
                                 put("code", error.code)
                                 error.status?.let { put("status", it) }
@@ -915,6 +919,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 error.providerParam?.let { put("provider_param", it) }
                                 error.lastStreamEventType?.let { put("last_stream_event", it) }
                                 error.streamEventsSeen?.let { put("stream_events_seen", it) }
+                                error.toolInputIssue?.let { put("tool_input_issue", it) }
+                                error.toolInputDeltaCount?.let { put("tool_input_deltas", it) }
+                                error.toolInputChars?.let { put("tool_input_chars", it) }
+                                error.toolInputFingerprint?.let { put("tool_input_fingerprint", it) }
                                 put("failure_kind", modelFailureKind(error))
                                 modelTransportFailureKind(error)?.let { put("transport_kind", it) }
                                 put("network_path_at_start", networkPathAtStart)
