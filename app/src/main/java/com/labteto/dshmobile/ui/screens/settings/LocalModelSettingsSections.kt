@@ -146,9 +146,7 @@ internal fun LocalModelSettingsCard(
     ) else ApiModelEditorFormErrors()
     val selectedPreset = LocalModelPresets.find(model, baseUrl)
     val advertisedProtocols = LocalModelProtocolRoutePolicy.supportedProtocols(model, baseUrl)
-    val recommendedProtocol = LocalModelPresets.entries.firstOrNull {
-        it.model.equals(model, ignoreCase = true) && it.provider == selectedPreset?.provider
-    }?.protocol
+    val recommendedProtocol = LocalModelPresets.editablePresetFor(model, baseUrl)?.protocol
     val editRoute: (String, String, String?) -> Unit = { name, url, id ->
         saveAttempted = false
         editorGeneration++
@@ -319,9 +317,9 @@ internal fun LocalModelSettingsCard(
                                     onClick = { viewModel.selectLocalModel(profile.id) }) else null,
                             SyMenuItem(text = stringResource(R.string.local_model_edit), onClick = {
                                 editRoute(profile.model, profile.baseUrl, profile.id)
-                                custom = LocalModelPresets.entries.none {
-                                    it.model == profile.model && it.baseUrl == profile.baseUrl
-                                }
+                                custom = LocalModelPresets.editablePresetFor(
+                                    profile.model, profile.baseUrl,
+                                ) == null
                                 showEditor = true
                             }),
                             SyMenuItem(text = stringResource(R.string.local_model_remove), danger = true,
