@@ -58,6 +58,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         streaming: Boolean,
         onDelta: (LocalModelDelta) -> Unit = {},
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
         require(route.bearerToken.isNotBlank()) { "当前模型 API Key 为空" }
         require(route.model.isNotBlank()) { "当前模型名称为空" }
@@ -74,6 +75,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             tools = tools,
             temperature = temperature,
             reasoningEffort = reasoningEffort,
+            maxTokens = maxTokens,
         )
         val wirePayload = payload.toString().toByteArray(Charsets.UTF_8)
         val maxRequestBytes = if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) 64_000_000 else 32_000_000
@@ -90,7 +92,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                     header("x-api-key", route.bearerToken)
                 }
             }
-            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("anthropic-version", if (isOfficialAnthropicCachingRoute(route.baseUrl)) {
+                CLAUDE_API_VERSION
+            } else ANTHROPIC_COMPATIBILITY_VERSION)
             .header("accept", "text/event-stream")
             .header("content-type", "application/json")
             .post(wirePayload.toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
@@ -167,6 +171,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         tools: List<LocalCanonicalToolDefinition>,
         temperature: Double?,
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
     ): JsonObject {
         // Keep instruction provenance until wire serialization: Claude caches tools -> system
         // -> messages, so the stable system prefix can be reused across changing turn context.
@@ -181,7 +186,12 @@ internal class AnthropicMessagesClient @Inject constructor(
         val system = systemFragments.joinToString("\n\n") { it.first }
         return buildJsonObject {
             put("model", route.model)
-            put("max_tokens", route.capabilities.defaultMaxOutputTokens ?: DEFAULT_MAX_TOKENS)
+            val outputBudget = maxTokens ?: route.capabilities.defaultMaxOutputTokens ?: DEFAULT_MAX_TOKENS
+            require(outputBudget > 0) { "Anthropic 最大输出 Token 数必须大于零" }
+            if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                require(outputBudget <= 524_288) { "MiniMax M3 输出 Token 数最大为 524288" }
+            }
+            put("max_tokens", outputBudget)
             if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
                 LocalMiniMaxPolicy.writeThinking(this, route.model, reasoningEffort, anthropic = true)
             }
@@ -268,7 +278,12 @@ internal class AnthropicMessagesClient @Inject constructor(
                     })
                 }
             })
-            temperature?.takeIf { route.capabilities.temperature }?.let { put("temperature", it) }
+            // Claude 2026-10-21 rejects temperature/top_p/top_k even when set to defaults.
+            // MiniMax ignores temperature, so forwarding it is never useful either.
+            if (!isOfficialAnthropicCachingRoute(route.baseUrl) &&
+                !LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                temperature?.takeIf { route.capabilities.temperature }?.let { put("temperature", it) }
+            }
         }
     }
 
@@ -900,7 +915,8 @@ internal class AnthropicMessagesClient @Inject constructor(
         )
 
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
-        const val ANTHROPIC_VERSION = "2023-06-01"
+        const val CLAUDE_API_VERSION = "2026-10-21"
+        const val ANTHROPIC_COMPATIBILITY_VERSION = "2023-06-01"
         const val DEFAULT_MAX_TOKENS = 8192
         const val CONNECT_TIMEOUT_SECONDS = 20L
         const val READ_TIMEOUT_SECONDS = 300L
