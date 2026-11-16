@@ -37,6 +37,8 @@ import com.labteto.dshmobile.ui.screens.local.PersonaGalleryAddPanel
 import com.labteto.dshmobile.ui.screens.local.PersonaGalleryScreen
 import com.labteto.dshmobile.ui.screens.tasks.TaskCard
 import com.labteto.dshmobile.ui.screens.tools.ExtensionCatalogCard
+import com.labteto.dshmobile.ui.screens.tools.ExtensionMarketState
+import com.labteto.dshmobile.ui.screens.tools.ExtensionMarketStatus
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -114,7 +116,7 @@ class ContentPagesAuditTest(
                                     id = "ui-audit", title = "资料整理与内容检索助手",
                                     description = "查询资料、组织线索，并保留可以继续追溯的原始来源。完整说明可从详情页阅读。",
                                     icon = FeatherIcons.Search, accent = LocalSyColors.current.primary,
-                                    statusLabel = "已安装", onOpen = {},
+                                    marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLED, "已安装"), onOpen = {},
                                 )
                             }
                         }
