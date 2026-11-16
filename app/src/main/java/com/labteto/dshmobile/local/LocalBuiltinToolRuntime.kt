@@ -163,11 +163,8 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         }
         val output = execute(call, allowMutation, executionSessionId, binding, captured, workspace)
         if (call.name == "apply_patch") {
-            val code = when {
-                output.startsWith("[apply_patch][CHECK_FAILED]") -> "PATCH_CHECK_FAILED"
-                output.startsWith("[apply_patch][APPLY_FAILED]") -> "PATCH_APPLY_FAILED"
-                else -> null
-            }
+            val code = if (output.startsWith("[apply_patch][APPLY_FAILED]"))
+                "PATCH_APPLY_FAILED" else null
             if (code != null) return com.labteto.dshmobile.harness.tools.ToolResult(output, isError = true, errorCode = code)
         }
         return com.labteto.dshmobile.harness.tools.ToolResult(output)
@@ -321,29 +318,12 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 val patch = normalizeWorkspacePatch(requestedPatch, File(workspace.path))
                 require(patch.length <= MAX_PATCH_CHARS) { "转换后的补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
                 validateWorkspacePatchPaths(patch)
-                val check = root.process.execute(
-                    ProcessRequest(
-                        command = listOf("git", "apply", "--check", "--whitespace=nowarn", "-"),
-                        workingDirectory = workspace.path,
-                        stdin = patch,
-                        timeoutMillis = 30_000L,
-                    ),
-                )
-                if (check.exitCode != 0) {
-                    return "[apply_patch][CHECK_FAILED] 补丁预检失败：\n" +
-                        (check.stderr.ifBlank { check.stdout }).take(20_000)
-                }
-                val stat = root.process.execute(
-                    ProcessRequest(
-                        command = listOf("git", "apply", "--stat", "-"),
-                        workingDirectory = workspace.path,
-                        stdin = patch,
-                        timeoutMillis = 30_000L,
-                    ),
-                )
+                // git apply validates every hunk and applies the entire patch atomically
+                // without --reject. Verbose receipts identify changed files directly.
+                // One process replaces separate --check, --stat and apply invocations.
                 val applied = root.process.execute(
                     ProcessRequest(
-                        command = listOf("git", "apply", "--whitespace=nowarn", "-"),
+                        command = listOf("git", "apply", "--verbose", "--whitespace=nowarn", "-"),
                         workingDirectory = workspace.path,
                         stdin = patch,
                         timeoutMillis = 30_000L,
@@ -353,7 +333,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     return "[apply_patch][APPLY_FAILED] 补丁应用失败：\n" +
                         (applied.stderr.ifBlank { applied.stdout }).take(20_000)
                 }
-                "补丁已应用" + stat.stdout.takeIf(String::isNotBlank)?.let { "\n$it" }.orEmpty()
+                val appliedFiles = applied.stderr.lineSequence()
+                    .filter { it.startsWith("Applied patch ") }
+                    .joinToString("\n").take(20_000)
+                "补丁已应用" + appliedFiles.takeIf(String::isNotBlank)?.let { "\n$it" }.orEmpty()
             }
             "list_files" -> workspace.list(args.optionalString("path") ?: ".", args.int("depth", 3), args.int("cursor", 0))
             "glob", "glob_files" -> workspace.glob(args.string("pattern"), args.optionalString("path") ?: ".", args.int("cursor", 0))
