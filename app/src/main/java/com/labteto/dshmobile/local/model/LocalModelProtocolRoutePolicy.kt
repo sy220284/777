@@ -43,7 +43,8 @@ internal object LocalModelProtocolRoutePolicy {
             "当前官方模型不支持 ${protocol.name} 协议，请选择界面提供的协议"
         }
         if (!LocalMiniMaxPolicy.isOfficial(normalized) ||
-            model.trim().lowercase() !in miniMaxM3) return normalized
+            (model.trim().lowercase() !in miniMaxM3 &&
+                !model.trim().lowercase().startsWith("minimax-m2"))) return normalized
         val uri = URI(normalized)
         val root = "https://${uri.rawAuthority}"
         return when (protocol) {
