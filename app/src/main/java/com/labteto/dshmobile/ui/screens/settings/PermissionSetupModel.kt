@@ -5,6 +5,7 @@ internal enum class PermissionSetupFeature {
     SCREEN_CONTROL,
     NOTIFICATION_READ,
     TASK_ALERTS,
+    BACKGROUND_EXECUTION,
 }
 
 internal enum class NotificationGrantAction { REQUEST_RUNTIME, OPEN_APP_SETTINGS }
@@ -39,6 +40,8 @@ internal fun permissionSetupStatus(
         PermissionSetupFeature.SCREEN_CONTROL -> state.accessibilityGranted
         PermissionSetupFeature.NOTIFICATION_READ -> state.notificationAccessGranted
         PermissionSetupFeature.TASK_ALERTS -> state.postingNotifications == true
+        PermissionSetupFeature.BACKGROUND_EXECUTION -> state.batteryOptimizationExempt && !state.backgroundRestricted
+        PermissionSetupFeature.BACKGROUND_EXECUTION -> state.batteryOptimizationExempt && !state.backgroundRestricted
     }
     val connected = when (feature) {
         PermissionSetupFeature.SCREEN_CONTROL -> state.accessibility
