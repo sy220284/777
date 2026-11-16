@@ -323,16 +323,10 @@ internal class LocalWorkAgentTurnExecutor(
                     agentRunCoordinator.ensureCurrentOwner(runContext)
                     // Persistent history stays compact; user rules, recalled memory and handoff are
                     // assembled per request and are deliberately never written back into runHistory.
+                    var needsContextRefresh = !requestPrepared
                     if (!requestPrepared) {
                         workModelHistoryRuntime.repairInterleavedPromptUpdates(binding)
                         workModelHistoryRuntime.ensureSystemMessage(binding)
-                        val snapshot = runState.value
-                        workPromptContext = contextComposer.composeWorkTurnContext(
-                            input = input,
-                            snapshot = snapshot,
-                            workspacePath = workspacePath,
-                            skillGuidance = "",
-                        )
                         if (memoryInput.isNotBlank()) workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
                     }
@@ -354,12 +348,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 selectedModel.modelSelection.activeProfileId,
                             ))
                         }
-                        workPromptContext = contextComposer.composeWorkTurnContext(
-                            input = input,
-                            snapshot = runState.value,
-                            workspacePath = workspacePath,
-                            skillGuidance = "",
-                        )
+                        needsContextRefresh = true
                         workModelHistoryRuntime.updateContextMetrics(binding)
                     }
                     val snapshot = runState.value
@@ -370,13 +359,18 @@ internal class LocalWorkAgentTurnExecutor(
                             ?.takeIf(String::isNotBlank) ?: input
                         effectiveSkillInput = effectiveInput
                         binding.explicitlySelectedSkill = explicitLocalSkillName(effectiveInput)
+                        projectedSteeringRevision = observedSteer
+                        needsContextRefresh = true
+                    }
+                    if (needsContextRefresh) {
+                        // Route changes and user steering share one context rebuild.
+                        // The live skill directory is read only at the model boundary.
                         workPromptContext = contextComposer.composeWorkTurnContext(
-                            input = effectiveInput,
+                            input = effectiveSkillInput,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
                             skillGuidance = "",
                         )
-                        projectedSteeringRevision = observedSteer
                     }
                     // An unverified strategy can be tried only on a naturally
                     // requested Goal with the identical acceptance contract as its verified

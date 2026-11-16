@@ -617,46 +617,45 @@ class HarnessAutomationScheduler @Inject constructor(
     }
 
     fun onChatUserActivity(sessionId: String, userMessageAt: Long) {
-        store.list()
-            .filter {
-                it.mode == AutomationMode.CHAT &&
-                    it.targetSessionId == sessionId
+        // One user event updates every affected task in one durable store mutation.
+        val resumed = store.updateMatching(
+            predicate = { it.mode == AutomationMode.CHAT && it.targetSessionId == sessionId },
+        ) { current ->
+            val latestActivity = maxOf(current.lastUserActivityAt ?: Long.MIN_VALUE, userMessageAt)
+            if (current.status == AutomationStatus.WAITING_USER) {
+                current.copy(
+                    status = AutomationStatus.SCHEDULED,
+                    nextRunAt = nextAutomationRunAfterUserActivity(current, latestActivity),
+                    lastUserActivityAt = latestActivity,
+                    lastError = null,
+                )
+            } else {
+                current.copy(lastUserActivityAt = latestActivity)
             }
-            .forEach { task ->
-                var resumedFromWaiting = false
-                val updated = store.update(task.id) { current ->
-                    if (
-                        current.mode != AutomationMode.CHAT ||
-                        current.targetSessionId != sessionId
-                    ) {
-                        current
-                    } else {
-                        val latestActivity = maxOf(current.lastUserActivityAt ?: Long.MIN_VALUE, userMessageAt)
-                        resumedFromWaiting = current.status == AutomationStatus.WAITING_USER
-                        if (resumedFromWaiting) {
-                            current.copy(
-                                status = AutomationStatus.SCHEDULED,
-                                nextRunAt = nextAutomationRunAfterUserActivity(current, latestActivity),
-                                lastUserActivityAt = latestActivity,
-                                lastError = null,
-                            )
-                        } else {
-                            current.copy(lastUserActivityAt = latestActivity)
-                        }
-                    }
-                } ?: return@forEach
-                if (updated.status != AutomationStatus.SCHEDULED || !resumedFromWaiting) return@forEach
-                if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
-                    enqueueOneTime(updated.id, updated.nextRunAt, updated.scheduleGeneration)
+        }.filter { (before, after) ->
+            before.status == AutomationStatus.WAITING_USER &&
+                after.status == AutomationStatus.SCHEDULED
+        }
+
+        resumed.forEach { (_, updated) ->
+            // A newer chat activity may have changed the run time before enqueue.
+            // Submit only while this exact schedule remains the durable authority.
+            store.withCurrentGeneration(updated.id, updated.scheduleGeneration) { latest ->
+                if (latest.status != AutomationStatus.SCHEDULED ||
+                    latest.nextRunAt != updated.nextRunAt ||
+                    latest.lastUserActivityAt != updated.lastUserActivityAt) return@withCurrentGeneration
+                if (usesChainedAutomationScheduling(latest) || latest.recurringMinutes == null) {
+                    enqueueOneTime(latest.id, latest.nextRunAt, latest.scheduleGeneration)
                 } else {
                     enqueuePeriodic(
-                        updated.id,
-                        requireNotNull(updated.recurringMinutes),
-                        updated.nextRunAt,
-                        updated.scheduleGeneration,
+                        latest.id,
+                        requireNotNull(latest.recurringMinutes),
+                        latest.nextRunAt,
+                        latest.scheduleGeneration,
                     )
                 }
             }
+        }
     }
 
     fun cancelTask(id: String): Boolean {

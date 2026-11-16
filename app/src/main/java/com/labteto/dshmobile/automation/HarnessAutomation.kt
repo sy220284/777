@@ -347,6 +347,28 @@ class AutomationStore internal constructor(
         return updated
     }
 
+    /** Update all matching tasks in one transaction, so one chat event causes one durable mutation. */
+    @Synchronized
+    internal fun updateMatching(
+        predicate: (AutomationTask) -> Boolean,
+        transform: (AutomationTask) -> AutomationTask,
+    ): List<Pair<AutomationTask, AutomationTask>> {
+        val document = read()
+        val changed = mutableListOf<Pair<AutomationTask, AutomationTask>>()
+        val updatedTasks = document.tasks.map { task ->
+            if (!predicate(task)) task else {
+                val updated = transform(task)
+                require(updated.id == task.id && updated.scheduleGeneration >= task.scheduleGeneration) {
+                    "自动任务身份不能回退或替换"
+                }
+                if (updated != task) changed += task to updated
+                updated
+            }
+        }
+        if (changed.isNotEmpty()) write(document.copy(tasks = updatedTasks))
+        return changed
+    }
+
     /** Submit a bounded, non-suspending effect only while the captured generation still owns it. */
     @Synchronized
     internal fun withCurrentGeneration(

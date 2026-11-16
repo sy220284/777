@@ -7,6 +7,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -102,6 +104,19 @@ class LocalTeamRefreshQueueTest {
             releaseFirst.complete(Unit)
             scope.cancel()
         }
+    }
+
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun normalNonReconcileRefreshStartsWithoutAnExtraTimerTick() = runTest {
+        val completed = mutableListOf<String>()
+        val queue = LocalTeamRefreshQueue(backgroundScope) { id, reconcile ->
+            completed += "$id:$reconcile"
+        }
+        queue.schedule("instant", reconcile = false)
+        runCurrent()
+        assertEquals(listOf("instant:false"), completed)
     }
 
 }
