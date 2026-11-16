@@ -181,6 +181,22 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun duplicateResponsesToolIdsAreRejectedBeforeDispatch() {
+        val duplicateCall = """{"type":"function_call","call_id":"same-id","name":"tool_call","arguments":"{}"}"""
+        val response = Json.parseToJsonElement(
+            """{"status":"completed","id":"resp-duplicate","output":[""" +
+                duplicateCall + "," + duplicateCall + "]}"
+        ).jsonObject
+        val failure = runCatching {
+            client.parseCompleted(response, TokenPromptBreakdown())
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+    }
+
+    @Test
     fun malformedCompletedFunctionArgumentsAreContinuableBeforeExecution() = runBlocking {
         val frame = """{"type":"response.completed","response":{"id":"resp-bad-tools","output":[{"type":"function_call","call_id":"call-1","name":"tool_call","arguments":"{\"name\":\"bash\",\"arguments\":"}]}}"""
         val transport = OkHttpClient.Builder().addInterceptor { chain ->
