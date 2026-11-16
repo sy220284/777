@@ -730,10 +730,9 @@ internal fun mergeModelMetadata(previous: JsonObject, next: JsonObject): JsonObj
 
 private fun requireCompleteFinishReason(reason: String) {
     if (reason in setOf("stop", "tool_calls", "function_call", "length", "content_filter")) return
-    throw LocalModelException(
-        code = "MODEL_FINISH_$reason",
-        message = "模型未正常完成回复（$reason），请调整请求后重试。",
-        retryable = false,
+    throw streamProtocolError(
+        "模型返回未知 finish_reason：" +
+            reason.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) }.orEmpty().ifBlank { "unknown" },
     )
 }
 
