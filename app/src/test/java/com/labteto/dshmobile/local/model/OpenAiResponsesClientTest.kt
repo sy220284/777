@@ -176,6 +176,7 @@ class OpenAiResponsesClientTest {
             model = "gpt-test",
             messages = chatPostTurnModelMessages("验证跨行"),
             tools = JsonArray(emptyList()),
+            planSharing = false,
         )
         assertEquals("跨行完成", reply.content)
     }
@@ -192,6 +193,7 @@ class OpenAiResponsesClientTest {
             OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
                 accessToken = "mock-token", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
                 messages = chatPostTurnModelMessages("检查协议"), tools = JsonArray(emptyList()),
+            planSharing = false,
             )
         }.exceptionOrNull() as? LocalModelException
         assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
@@ -229,6 +231,7 @@ class OpenAiResponsesClientTest {
             OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
                 accessToken = "mock-token", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
                 messages = chatPostTurnModelMessages("检查工具"), tools = JsonArray(emptyList()),
+            planSharing = false,
             )
         }.exceptionOrNull() as? LocalModelException
         assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
