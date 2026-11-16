@@ -296,7 +296,7 @@ internal fun PluginInventoryBrowser(
         val copy = extensionPresentation(id, id, "", ExtensionKind.SKILL)
         InventoryRow(
             id = "curated-skill:" + id, name = copy.title,
-            detail = "官方精选技能 · 安装前校验完整内容",
+            detail = copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = copy.group, documentIcon = copy.documentIcon,
             available = false, installableCurated = true,

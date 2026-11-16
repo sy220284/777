@@ -36,6 +36,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -144,8 +145,14 @@ fun SyFullScreenDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
             dismissOnBackPress = true,
             dismissOnClickOutside = true,
         ),
-        content = content,
-    )
+    ) {
+        // Fullscreen Dialog has its own window; page surfaces may be transparent
+        // for the activity wallpaper. Paint an opaque reading backdrop here.
+        Surface(
+            modifier = Modifier.fillMaxSize().testTag("sy-fullscreen-reading-surface"),
+            color = LocalSyColors.current.canvas,
+        ) { content() }
+    }
 }
 
 /** Caller-owned feedback. Repeated identical messages restart their TTL. */

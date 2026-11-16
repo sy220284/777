@@ -1126,9 +1126,8 @@ fun SettingsScreen(
                                         color = colors.text,
                                     )
                                     Text(
-                                        "浏览器历史、上传、下载、控制的独立管理策略尚未接入实际执行；" +
-                                            "当前设备操作仍按 Android 系统权限和工具审批执行。",
-                                        style = DsType.caption11.withReadingWeight(),
+                                        "设备操作由系统授权和执行审批管理。浏览器历史与文件操作的独立管理项尚未开放。",
+                                        style = DsType.small13.withReadingWeight(),
                                         color = colors.textSecondary,
                                     )
                                     policy.allowedModelProviders?.let { providers ->

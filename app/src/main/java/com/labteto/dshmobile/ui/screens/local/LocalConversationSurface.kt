@@ -1783,6 +1783,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             enabled = !state.running,
             onSave = onConfigureGroupMembers,
             onDismiss = { showGroupMemberPicker = false },
+            onCreatePersona = {
+                showGroupMemberPicker = false
+                onOpenPersonaGallery()
+            },
+            createPersonaLabel = "前往人物图集",
         )
     }
     if (showGroupAnnouncement && state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled) {
@@ -1955,12 +1960,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     }
     if (showAttachmentPicker) {
         SyResponsiveSheet(
-            title = null,
+            title = "添加附件与能力",
             onDismiss = { showAttachmentPicker = false },
-            showDragHandle = false,
+            showDragHandle = true,
             floating = true,
             scrollable = true,
-            seamlessBackground = true,
+            seamlessBackground = false,
         ) {
             // Four compact icon-and-label actions in one horizontal row.
             Row(

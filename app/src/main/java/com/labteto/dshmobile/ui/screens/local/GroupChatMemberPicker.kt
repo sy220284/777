@@ -51,6 +51,8 @@ internal fun GroupChatMemberPickerSheet(
     enabled: Boolean,
     onSave: (List<String>) -> Boolean,
     onDismiss: () -> Unit,
+    onCreatePersona: (() -> Unit)? = null,
+    createPersonaLabel: String = "创建人物",
 ) {
     val selected = remember { mutableStateListOf<String>() }
     var query by rememberSaveable { mutableStateOf("") }
@@ -117,6 +119,17 @@ internal fun GroupChatMemberPickerSheet(
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
 
+        if (entries.size < MIN_GROUP_CHAT_MEMBERS && onCreatePersona != null) {
+            Text(
+                "当前有 ${entries.size} 位人物，至少需要 $MIN_GROUP_CHAT_MEMBERS 位才能建立群聊。",
+                style = DsType.small13.withReadingWeight(),
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+            )
+            SyButton(
+                text = createPersonaLabel, onClick = onCreatePersona, enabled = enabled,
+                modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline,
+            )
+        }
         if (entries.isEmpty()) {
             Text(
                 stringResource(R.string.local_group_chat_no_characters),

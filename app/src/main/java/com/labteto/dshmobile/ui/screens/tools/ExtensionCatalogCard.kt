@@ -101,11 +101,15 @@ internal fun ExtensionCatalogCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (statusLabel in setOf("已安装", "已安装可用技能", "已内置 · 按需授权")) {
+                if (statusLabel.isNotBlank()) {
+                    // The state text comes from the authoritative installation/connection model.
                     Text(
-                        "已安装",
+                        statusLabel,
+                        modifier = Modifier.testTag("$tagPrefix-status-$id"),
                         style = DsType.small13.withReadingWeight(),
                         color = colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
