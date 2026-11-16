@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.model.DeepSeekTokenUsage
 import com.labteto.dshmobile.local.model.ModelStreamLineReader
+import com.labteto.dshmobile.local.model.ModelSseDataReader
 import com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy
 import com.labteto.dshmobile.local.model.LocalModelStreamProgressMonitor
 import com.labteto.dshmobile.local.model.LocalModelStreamWatchdog
@@ -310,11 +311,14 @@ class DeepSeekClient @Inject constructor(
                 try {
                 // Response 统一由 withCancellableModelResponse 收尾，避免成功后 reader.close()
                 // 的连接异常覆盖已完成结果并触发重复请求。
-                val reader = ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES)
+                val reader = ModelSseDataReader(
+                    ModelStreamLineReader(responseBody.charStream().buffered(), MAX_SSE_LINE_CHARS, MAX_MODEL_RESPONSE_BYTES),
+                    onNonEventLine = { fallback.append(it) },
+                )
                 run {
                     while (true) {
                         val line = try {
-                            reader.readLine()
+                            reader.readData()
                         } catch (failure: ModelStreamLimitException) {
                             throw LocalModelException(
                                 code = "MODEL_RESPONSE_TOO_LARGE",
@@ -344,12 +348,8 @@ class DeepSeekClient @Inject constructor(
                                 requestId = requestId,
                             )
                         }
-                        if (!line.startsWith("data:")) {
-                            if (line.isNotBlank()) fallback.append(line)
-                            continue
-                        }
                         sawStreamData = true
-                        val data = line.removePrefix("data:").trim()
+                        val data = line.trim()
                         if (data.isBlank()) continue
                         if (data == "[DONE]") {
                             sawTerminalFrame = true
