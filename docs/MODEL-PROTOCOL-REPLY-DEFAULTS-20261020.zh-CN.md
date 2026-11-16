@@ -34,6 +34,16 @@
 - **本轮只交付国内接口**：新模型预置固定 DeepSeek `api.deepseek.com`、MiniMax `api.minimaxi.com`、Kimi `api.kimi.com`；既有用户保存的历史兼容路由继续保留，不为海外地址新增预置或能力承诺。
 - **SDK 选择**：继续采用 OkHttp + Kotlinx Serialization 的统一模型适配器，复用单一准入、取消、历史续轮、事件日志与权限机制。官方 Java SDK 可作为后续协议对照验证工具；目前引入额外 SDK 会增加移动端体积、复杂度及第三方兼容分支，尚无必要。
 
+## 协议切换与全链路契约收敛（2026-11-16）
+
+- **切换协议时同时调整请求地址**：MiniMax M3 / M3.1 Flash 的 Chat Completions 使用当前相同官方主机的 `/v1/chat/completions`，Anthropic Messages 使用 `/anthropic/v1/messages`。设置页展示的请求地址来自模型模块的同一规则；不支持的官方协议不出现在可选列表。其他厂商和自定义代理不进行隐式地址重写。
+- **同一账号保留原配置与凭据**：MiniMax 在同一 HTTPS 官方域名、同一模型下切换这两种路径，可沿用配置 ID 和安全保存的密钥；跨主机、跨地区、代理或不同型号不能借此继承凭据。旧会话携带的路由指纹仍按模型、协议、地址和凭据变化隔离历史回放。
+- **Kimi 会员上下文**：K3 / K3.1 Pro 的编辑界面只提供 256K 默认与 1M 会员两个选项，服务端账户权益仍由 Kimi 验证。用户输入、保存以及运行上下文推导共享同一批可选档位。
+- **输入能力真实投影**：设置页显示当前选定协议实际可传输的模态；MiniMax M3 Anthropic Messages 和 Kimi 支持视频的 Chat 模型显示视频已接通，Kimi Responses 提示切换 Chat，不再统一显示“音视频理解暂未开放”。
+- **结构化输出**：运行能力的 `structuredOutput` / `strictSchema` 仅对已接通官方 DeepSeek Responses `text.format` 的 API Key 路由声明可用；网关按冻结能力验证。其他协议可以通过现有提示词和本地结果校验完成结构化工作，但不声明已有同名的原生请求支持。
+- **标准 HTTPS 端口**：MiniMax 标准 `https://host:443` 与省略端口的同源接口在额度和媒体功能识别上一致；跨服务和非标准端口保留严格的服务边界。
+- **验收测试**：覆盖模型预置选项、协议切换地址、同源账号与密钥连续性、真实格式 Chat 请求、跨域拒绝、Kimi 档位、视频标识及结构化输出准入。
+
 ## UI 与回复契约
 
 同一 `LocalModelDelta(content, reasoning)` 与 `LocalModelReply` 服务 Chat、Work 和子智能体。正文进入聊天/工作正文，思考进入思考区域；工具调用通过 Session EventLog 保留身份、结果和续轮，图片/视频/文件只暴露真正能传输的能力。预置编辑页提供协议选项及连接测试，若偏离推荐值给予明确提示。
