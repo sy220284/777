@@ -176,7 +176,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             else -> "work"
         }
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
-            promptCacheBaselines.get(snapshot.sessionId, routeFingerprint)
+            promptCacheBaselines.get(snapshot.sessionId, routeFingerprint, cacheDiagnosticSurface)
         } else {
             null
         }
@@ -237,6 +237,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 requestMessages,
                 tools,
                 nativeTools,
+                diagnosticSurface = cacheDiagnosticSurface,
             )
         } else {
             null
@@ -688,8 +689,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                 }
             },
         ) { activeMessages ->
-            val activePrefixAssessment = if (cachePolicy.mode != LocalPromptCacheMode.NONE) {
-                promptCacheContinuity.assess(
+            val activePrefixAssessment = when {
+                cachePolicy.mode == LocalPromptCacheMode.NONE -> null
+                // The first model attempt sees the already frozen request surface.
+                // Overflow recovery builds a different message sequence and re-assesses.
+                activeMessages === requestMessages -> prefixAssessment
+                else -> promptCacheContinuity.assess(
                     snapshot.sessionId,
                     routeFingerprint,
                     activeMessages,
@@ -697,11 +702,10 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                     nativeTools,
                     diagnosticSurface = cacheDiagnosticSurface,
                 )
-            } else {
-                null
             }
                 executor.execute { providerAttempt ->
-                    val activeLogMessages = redactModelImages(activeMessages)
+                    val activeLogMessages = if (activeMessages === requestMessages) logMessages
+                        else redactModelImages(activeMessages)
                     val activeEvidence = if (activeMessages === requestMessages) requestEvidence
                         else buildLocalRequestEvidence(activeMessages, tools, nativeTools)
                     val activeReplayEvidence = when {
@@ -732,12 +736,15 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                             )
                         }).sequence
                     }
-                    val activePressure = LocalPromptPressureMeter.measure(
-                        messages = activeMessages,
-                        tools = tools,
-                        operationalLimitTokens = operationalLimit,
-                        modelContextWindowTokens = pressure.modelContextWindowTokens,
-                    )
+                    // A normal attempt sends the already measured request surface.
+                    // Only context-overflow recovery replaces messages and needs a new estimate.
+                    val activePressure = if (activeMessages === requestMessages) pressure else
+                        LocalPromptPressureMeter.measure(
+                            messages = activeMessages,
+                            tools = tools,
+                            operationalLimitTokens = operationalLimit,
+                            modelContextWindowTokens = pressure.modelContextWindowTokens,
+                        )
                     val deepSeekMaxTokens = if (
                         runSurface.protocol == com.labteto.dshmobile.local.model.LocalModelProtocol.CHAT_COMPLETIONS
                     ) {
@@ -984,7 +991,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 }
                             })
                             if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
-                                promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, reply.requestId)
+                                promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, cacheDiagnosticSurface, reply.requestId)
                                 reply.promptCacheDiagnostic?.let { diagnostic ->
                                     log.append("request/cache-diagnostic", buildJsonObject {
                                         put("request_uid", requestUid)

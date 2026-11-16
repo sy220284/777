@@ -9,6 +9,7 @@ internal class LocalPromptCacheBaselineStore(
     private data class Key(
         val sessionId: String,
         val routeFingerprint: String,
+        val diagnosticSurface: String,
     )
 
     private val capacity = maxEntries.coerceAtLeast(1)
@@ -19,13 +20,13 @@ internal class LocalPromptCacheBaselineStore(
     }
 
     @Synchronized
-    fun get(sessionId: String, routeFingerprint: String): String? =
-        entries[Key(sessionId, routeFingerprint)]
+    fun get(sessionId: String, routeFingerprint: String, diagnosticSurface: String): String? =
+        entries[Key(sessionId, routeFingerprint, diagnosticSurface)]
 
     @Synchronized
-    fun put(sessionId: String, routeFingerprint: String, responseId: String) {
+    fun put(sessionId: String, routeFingerprint: String, diagnosticSurface: String, responseId: String) {
         val normalized = responseId.trim().takeIf(String::isNotBlank) ?: return
-        entries[Key(sessionId, routeFingerprint)] = normalized.take(512)
+        entries[Key(sessionId, routeFingerprint, diagnosticSurface)] = normalized.take(512)
     }
 
     @Synchronized

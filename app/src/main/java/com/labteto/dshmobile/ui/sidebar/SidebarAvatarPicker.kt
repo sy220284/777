@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,12 +70,14 @@ import kotlinx.coroutines.withContext
 
 /** Shared app-identity avatar used by every navigation drawer. */
 @Composable
-internal fun SidebarAvatarPicker(modifier: Modifier = Modifier) {
+internal fun SidebarAvatarPicker(modifier: Modifier = Modifier, drawerOpen: Boolean = true) {
     val store = rememberSidebarAvatarStore()
     val rawSource by store.source.collectAsStateWithLifecycle(initialValue = null)
     val source = remember(rawSource) { parseSidebarAvatarSource(rawSource) }
     val scope = rememberCoroutineScope()
     var sheetOpen by remember { mutableStateOf(false) }
+    // The sheet belongs to the navigation drawer, not to destination pages.
+    LaunchedEffect(drawerOpen) { if (!drawerOpen) sheetOpen = false }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var pendingCustom by remember { mutableStateOf<PreparedSidebarAvatar?>(null) }
@@ -135,7 +138,7 @@ internal fun SidebarAvatarPicker(modifier: Modifier = Modifier) {
         }
     }
 
-    if (sheetOpen) {
+    if (sheetOpen && drawerOpen) {
         SidebarAvatarSheet(
             selected = rawSource,
             busy = busy,

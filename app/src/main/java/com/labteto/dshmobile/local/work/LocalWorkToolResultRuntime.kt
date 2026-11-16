@@ -26,8 +26,8 @@ internal class LocalWorkToolResultRuntime(
         val history = binding.runHandle.modelHistory
         // Reference protection is derived from existing Work history/checkpoints, never a
         // separate authority for task facts. Eviction still honors private storage budgets.
-        val snapshot = history.snapshot()
-        val referencedIds = referencedWorkToolCallIds(snapshot)
+        val referenceWindow = history.recentWithLatestWorkCheckpoint(80)
+        val referencedIds = referencedWorkToolCallIds(referenceWindow)
         toolOutputStore.retainActiveReferences(
             binding.sessionId, referencedIds,
         )

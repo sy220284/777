@@ -30,6 +30,24 @@ class LocalPromptCacheContinuityStoreTest {
     }
 
     @Test
+    fun firstRequestAndProviderAttemptUseSameNamedCacheSeries() {
+        val store = LocalPromptCacheContinuityStore()
+        val tools = JsonArray(emptyList())
+        val messages = listOf(message("user", "开始任务"))
+        val first = store.assess("s", "route", messages, tools, diagnosticSurface = "work")
+        assertEquals(LocalPromptPrefixContinuity.COLD, first.continuity)
+        store.recordSuccess("s", "route", messages, tools, first.generation,
+            diagnosticSurface = "work")
+        val nextRequest = messages + message("assistant", "完成")
+        val setup = store.assess("s", "route", nextRequest, tools, diagnosticSurface = "work")
+        val providerAttempt = store.assess("s", "route", nextRequest, tools, diagnosticSurface = "work")
+        assertEquals(setup, providerAttempt)
+        assertEquals(LocalPromptPrefixContinuity.CONTINUOUS, setup.continuity)
+        assertEquals(LocalPromptPrefixContinuity.COLD,
+            store.assess("s", "route", nextRequest, tools, diagnosticSurface = "main").continuity)
+    }
+
+    @Test
     fun nativeToolSurfaceChangeBreaksPrefixContinuity() {
         val store = LocalPromptCacheContinuityStore()
         val messages = listOf(message("user", "画图"))

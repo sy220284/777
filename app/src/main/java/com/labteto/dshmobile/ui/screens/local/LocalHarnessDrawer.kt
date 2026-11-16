@@ -390,7 +390,7 @@ internal fun LocalModeDrawer(
                             onClick = { syRailCollapsed = true }, tint = sy.text,
                         )
                     }
-                    SidebarAvatarPicker()
+                    SidebarAvatarPicker(drawerOpen = drawerOpen)
                     Spacer(Modifier.width(SyMetric.gapMd))
                     Text(
                         stringResource(R.string.app_name),

@@ -387,7 +387,8 @@ internal fun PersonaGalleryScreen(
         }
     }
 
-    BackHandler(enabled = selected != null, onBack = ::navigateBack)
+    // Root Back exits the gallery; nested Back returns to the character list.
+    BackHandler(onBack = ::navigateBack)
 
     if (confirmDiscardStoryDraft && selected != null) {
         SyDialog(

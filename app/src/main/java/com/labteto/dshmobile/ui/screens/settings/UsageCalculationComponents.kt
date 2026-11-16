@@ -457,8 +457,9 @@ internal fun CompactMetric(label: String, value: String, modifier: Modifier = Mo
             value,
             style = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
             color = colors.text,
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            softWrap = false,
+            // Responsive columns already reserve space for the entire numeric value.
+            // Regular layout keeps complete text readable without an inner horizontal scroller.
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
