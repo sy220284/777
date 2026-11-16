@@ -581,7 +581,7 @@ internal fun PluginInventoryBrowser(
                             accent = item.accent,
                             documentIcon = item.documentIcon,
                             brandLogo = brandLogo,
-                            statusLabel = item.marketState.label,
+                            marketState = item.marketState,
                             onOpen = {
                                 selectedRow = item
                                 if (item.id.startsWith("codex-plugin:")) {
