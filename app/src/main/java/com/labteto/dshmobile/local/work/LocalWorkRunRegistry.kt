@@ -275,9 +275,11 @@ class LocalWorkRunRegistry internal constructor(
                 }
                 if (resume.failureCode != WORK_OUTPUT_LIMIT_CONTINUATION) binding.automaticContinuationCount = resume.index
                 binding.continuationParentRunId = resume.sourceRunId
+                binding.continuationFailureCode = resume.failureCode
             } else if (next.kind == QueuedAgentInputKind.USER) {
                 binding.automaticContinuationCount = 0
                 binding.continuationParentRunId = null
+                binding.continuationFailureCode = null
             }
 
             val durableMessage = next.modelMessage ?: buildJsonObject {
