@@ -52,7 +52,8 @@ internal suspend fun resolveLocalModelApiKeyDraft(
             LocalKimiPolicy.supportsContextChoice(name, url) -> when (contextWindowTokensOverride) {
             null -> existing?.contextWindowTokensOverride
             0 -> null
-            in LocalKimiPolicy.selectableContextTokens -> contextWindowTokensOverride
+            LocalKimiPolicy.standardContextTokens,
+            LocalKimiPolicy.extendedContextTokens -> contextWindowTokensOverride
             else -> throw IllegalArgumentException(
                 "Kimi K3/K3.1 Pro 上下文只支持 ${LocalKimiPolicy.standardContextTokens} " +
                     "或 ${LocalKimiPolicy.extendedContextTokens} Token",
