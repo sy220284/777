@@ -405,9 +405,7 @@ internal fun prepareLocalModelAdapterRequest(
     maxTokens: Int? = null,
     responseFormat: JsonObject? = null,
 ): LocalPreparedModelRequest {
-    if (responseFormat != null &&
-        (route.protocol != LocalModelProtocol.RESPONSES ||
-            !DeepSeekChatRequestPolicy.isOfficial(route.model, route.baseUrl))) {
+    if (responseFormat != null && !route.capabilities.structuredOutput) {
         throw LocalModelException(
             code = "MODEL_STRUCTURED_OUTPUT_UNSUPPORTED",
             message = "当前结构化输出通道只支持官方 DeepSeek Responses",
