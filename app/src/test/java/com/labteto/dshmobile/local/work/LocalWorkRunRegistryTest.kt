@@ -574,6 +574,73 @@ class LocalWorkRunRegistryTest {
         }
     }
 
+    @Test
+    fun hiddenWorkKeepsReceivingLiveOutputAndReturnsAtLatestPositionWithoutReplay() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
+            loading = false,
+            sessionId = "session-a",
+            usageMode = LocalUsageMode.WORK,
+            modelState = LocalModelState(configured = true),
+        ))
+        val registry = LocalWorkRunRegistry(runtime)
+        val active = binding("session-a")
+        val runningJob = Job()
+        active.runHandle.job = runningJob
+        active.state.update { current ->
+            current.copy(kernel = current.kernel.copy(running = true))
+        }
+        registry.attach(active)
+        val preview = runtime.streamingPreviewStore
+        val owner = preview.newOwner("session-a", "request-1", LocalUsageMode.WORK)
+        preview.begin(owner)
+        try {
+            preview.publishAssistant(owner, "首段输出")
+            registry.mirrorVisible(active)
+            assertTrue(runtime.state.value.kernel.running)
+            assertEquals("首段输出", preview.state.value.assistant)
+
+            // Switching to a different conversation only detaches the presentation.
+            runtime.activateSession("session-b")
+            runtime.projection.update { it.copy(
+                sessionId = "session-b",
+                usageMode = LocalUsageMode.CHAT,
+                kernel = it.kernel.copy(running = false),
+            ) }
+            preview.publishAssistant(owner, "首段输出，后台继续产生第二段和第三段")
+            active.state.update { current ->
+                current.copy(kernel = current.kernel.copy(queuedInputCount = 3))
+            }
+            registry.mirrorVisible(active)
+            assertEquals("session-b", runtime.state.value.sessionId)
+            assertFalse(runtime.state.value.kernel.running)
+            assertEquals("", preview.state.value.assistant)
+            assertTrue(runningJob.isActive)
+            assertSame(active, registry.live("session-a"))
+
+            // Return reads the current hot state immediately, without replaying old deltas.
+            runtime.activateSession("session-a")
+            runtime.projection.update { it.copy(
+                sessionId = "session-a",
+                usageMode = LocalUsageMode.WORK,
+                kernel = it.kernel.copy(running = false),
+            ) }
+            registry.mirrorVisible(active)
+            assertTrue(runtime.state.value.kernel.running)
+            assertEquals(3, runtime.state.value.kernel.queuedInputCount)
+            assertEquals("首段输出，后台继续产生第二段和第三段",
+                preview.state.value.assistant)
+            preview.publishAssistant(owner, "首段输出，后台继续产生第二段和第三段，前台实时续写")
+            assertEquals("首段输出，后台继续产生第二段和第三段，前台实时续写",
+                preview.state.value.assistant)
+        } finally {
+            preview.clear(owner)
+            runningJob.cancel()
+            registry.detach(active)
+            active.eventLog.close()
+        }
+    }
+
     private fun binding(sessionId: String): LocalWorkRunBinding =
         LocalWorkRunBinding(
             sessionId = sessionId,
