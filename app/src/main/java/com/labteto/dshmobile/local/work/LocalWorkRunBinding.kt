@@ -48,6 +48,8 @@ internal class LocalWorkRunBinding(
     val state = MutableStateFlow(initialState)
     /** Exact live tool bodies, including question waits; settled by the shared execution boundary. */
     val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())
+    /** CPU can sleep while waiting for a network callback; the foreground task stays alive. */
+    val waitingForTransport = MutableStateFlow(false)
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
     val enabledOptionalTools = LocalRunToolSelection()
     /** Per-run MCP registrations discovered after a model step, not a global permission grant. */
