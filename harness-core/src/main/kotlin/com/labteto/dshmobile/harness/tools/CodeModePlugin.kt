@@ -127,12 +127,13 @@ class CodeModePlugin(private val liveTools: ToolRegistry) : HarnessPlugin {
                 ?: return rejection("CODE_MODE_TOOL_MISSING", "步骤 ${index + 1} 的工具不可用：$name")
             if (handler.exposure == ToolExposure.INTERNAL)
                 return rejection("CODE_MODE_UNAUTHORIZED_TOOL", "步骤 ${index + 1} 无法使用内部工具：$name")
-            // Every child must be in the immutable registry binding captured with the gateway
-            // in the exact tool table sent to the model. A script cannot discover or grant them.
+            // A script through tool_call resolves every actual handler in the registry, without
+            // preselection. Standalone legacy Code Mode retains its exact sampled authority.
+            val viaGateway = sampled?.registration("tool_call") != null
             if (handler.exposure == ToolExposure.OPTIONAL && sampled == null)
                 return rejection("CODE_MODE_UNSAMPLED_TOOL",
                     "步骤 ${index + 1} 的扩展工具不在当前请求的注册表快照：$name；请使用 tool_search 检查工具注册")
-            if (sampled != null && sampled.codeModeChild(name) !== handler)
+            if (sampled != null && !viaGateway && sampled.codeModeChild(name) !== handler)
                 return rejection("CODE_MODE_UNSAMPLED_TOOL",
                     "步骤 ${index + 1} 的工具不在当前请求的注册表快照：$name；请检查实际注册状态及权限")
             val arguments = step["args"] as? JsonObject
