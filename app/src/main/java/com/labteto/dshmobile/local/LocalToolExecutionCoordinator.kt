@@ -12,17 +12,13 @@ import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolInvocationContext
 import com.labteto.dshmobile.harness.tools.ToolContext
 import com.labteto.dshmobile.harness.tools.ToolRegistry
-import com.labteto.dshmobile.local.agent.LocalAgentRunPolicy
 import com.labteto.dshmobile.local.model.LocalModelRunContext
 import com.labteto.dshmobile.local.model.LocalToolCall
-import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.DIRECT_TOOL_CALL
 import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
 import com.labteto.dshmobile.local.tools.directToolTarget
-import com.labteto.dshmobile.local.tools.LocalRunToolSelection
-import com.labteto.dshmobile.local.tools.LocalToolRouter
 import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
 import com.labteto.dshmobile.local.work.LocalWorkGoalAcceptanceRejectedException
 import com.labteto.dshmobile.observability.AppLog
@@ -33,22 +29,19 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Owns the model-visible tool surface and the common permission/error boundary for foreground runs.
  *
- * Built-in implementations stay registered in [ToolRegistry]; this coordinator decides visibility,
- * capability activation, approval and structured error projection so the Runtime Kernel never
- * duplicates those rules around the Agent loop.
+ * Built-in implementations stay registered in [ToolRegistry]; this coordinator resolves
+ * concrete execution, permissions, approval and audit without per-turn tool activation.
  */
 internal class LocalToolExecutionCoordinator(
     private val registry: ToolRegistry,
     private val currentSessionId: () -> String,
     private val planMode: () -> Boolean,
-    private val enabledOptionalTools: MutableSet<String> = linkedSetOf(),
     private val requestApproval: suspend (
         call: LocalToolCall,
         tool: HarnessTool,
@@ -65,8 +58,6 @@ internal class LocalToolExecutionCoordinator(
     ) -> Unit = { _, _, _, _ -> },
     private val executionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val networkSearchEnabled: () -> Boolean = { true },
-    private val pinnedConnectorIds: () -> List<String> = { emptyList() },
-    private val pinnedSkillIds: () -> List<String> = { emptyList() },
     private val workspaceReadWriteGate: LocalWorkspaceReadWriteGate = LocalWorkspaceReadWriteGate(),
     /** Real handler receipts survive cancellation; they never authorize a continuation. */
     private val recordCancelledExecutionFinished: suspend (
@@ -76,331 +67,28 @@ internal class LocalToolExecutionCoordinator(
 ) {
     // 前台 Lead 与所有后台成员共用此闸门，文件写入工具不得并行交错执行。
 
+    /** Network preference is checked against the real child tool, never the gateway. */
     internal fun isNetworkSearchPermitted(name: String): Boolean =
         networkSearchEnabled() || LocalToolPolicy.canonical(name) !in NETWORK_SEARCH_TOOLS
 
-    fun clearTurnCapabilities(target: MutableSet<String> = enabledOptionalTools) {
-        synchronized(target) { target.clear() }
-    }
-
-    fun enabledOptionalSnapshot(): Set<String> =
-        synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
-
-    fun enableOptionalTools(
-        names: Collection<String>,
-        target: MutableSet<String> = enabledOptionalTools,
-    ) {
-        synchronized(target) {
-            target += names.filter { name ->
-                registry.get(name)?.takeIf { isNetworkSearchPermitted(it.name) }
-                    ?.let(LocalToolRouter::isOptional) == true
-            }
-        }
-    }
-
-    fun enableTaskRelevantOptionalTools(
-        taskContext: String,
-        target: MutableSet<String> = enabledOptionalTools,
-        prioritize: Boolean = true,
-    ) {
-        // GitHub pre-activation has its own intent and credential gate. Generic keyword matches
-        // must not reactivate it from a negated current input or an older GitHub request.
-        val tools = registry.names().mapNotNull(registry::get).filterNot(::isGitHubConnectorTool)
-            .filter { isNetworkSearchPermitted(it.name) }
-        val relevant = LocalToolRouter.relevantOptionalToolNames(tools, taskContext)
-            .filter { name ->
-                registry.get(name)?.takeIf { isNetworkSearchPermitted(it.name) }
-                    ?.let(LocalToolRouter::isOptional) == true
-            }
-        synchronized(target) {
-            if (prioritize && relevant.isNotEmpty()) {
-                // Re-rank the current task even when its tools were selected in an earlier step.
-                // This prevents previous-turn/history tools from occupying the entire budget.
-                val previouslySelected = target.toList()
-                target.clear()
-                target.addAll(relevant)
-                target.addAll(previouslySelected)
-            } else {
-                target.addAll(relevant)
-            }
-        }
-    }
-
-    suspend fun prepareWorkTurnCapabilities(
-        input: String,
-        history: List<JsonObject>,
-        gitHubConfigured: suspend () -> Boolean,
-        target: MutableSet<String>? = null,
-    ) {
-        val intent = LocalToolCapabilityIntent.from(input, history)
-        val enableGitHub = if (intent.requestsGitHub || "github" in pinnedConnectorIds()) {
-            try {
-                gitHubConfigured()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                AppLog.failure("LocalToolExecution", "check_github_tool_availability", error)
-                false
-            }
-        } else false
-        val selected = target ?: enabledOptionalTools
-        // The old path selected current tools, then searched the four earlier user
-        // requests again. It recreated irrelevant tools in every Work request and
-        // enlarged the model schema surface. GitHub's recent-session authorization
-        // signal is checked above, but optional tool selection owns only this task.
-        // Explicit capability_search selections remain available within the run.
-        prepareWorkTurnCapabilities(input, enableGitHub, selected, prioritizeTask = true)
-    }
-
-    fun prepareWorkTurnCapabilities(
-        taskContext: String,
-        enableGitHub: Boolean,
-        target: MutableSet<String>? = null,
-        prioritizeTask: Boolean = true,
-    ) {
-        val resolvedTarget = target ?: enabledOptionalTools
-        // User-requested provider tools outrank background defaults under the schema-token budget.
-        if (enableGitHub) enableGitHubConnectorTools(resolvedTarget)
-        enableTaskRelevantOptionalTools(taskContext, resolvedTarget, prioritize = prioritizeTask)
-        if (networkSearchEnabled()) enableOptionalTools(DEFAULT_NETWORK_TOOLS, resolvedTarget)
-        // Preserve explicit user choices after ALL heuristic re-ranking, not before it.
-        // The credential gate above determines whether GitHub is admitted.
-        enablePinnedMediaTools(resolvedTarget)
-        prioritizePinnedConnectorTools(resolvedTarget, enableGitHub)
-    }
-
-    fun enableGitHubConnectorTools(target: MutableSet<String> = enabledOptionalTools) {
-        val githubTools = registry.names().mapNotNull(registry::get)
-            .filter { tool ->
-                LocalToolRouter.isOptional(tool) && isGitHubConnectorTool(tool)
-            }
-            .map(HarnessTool::name)
-        enableOptionalTools(githubTools, target)
-    }
-
-    /** Newly connected MCP services may register hundreds of tools. Only operations
-     * relevant to the active user task receive model schema priority; the complete
-     * catalog remains available by exact capability search. Discovery grants no access.
-     */
-    fun prioritizeRunCreatedMcpTools(
-        names: List<String>,
-        taskContext: String,
-        target: MutableSet<String> = enabledOptionalTools,
-    ) {
-        val candidates = names.mapNotNull(registry::get)
-            .filter { LocalToolRouter.isOptional(it) &&
-                it.metadata.family.equals("MCP", ignoreCase = true) &&
-                isNetworkSearchPermitted(it.name) }
-        val preferred = LocalToolRouter.relevantOptionalToolNames(candidates, taskContext)
-        enableOptionalTools(preferred, target)
-        synchronized(target) {
-            val existing = target.toList()
-            target.clear()
-            target.addAll(preferred.filter { it in existing })
-            target.addAll(existing)
-        }
-    }
-
-    /** Reassert explicit pins after each model-step heuristic rerank, including step-2+ schemas. */
-    fun prioritizePinnedForModelStep(target: MutableSet<String> = enabledOptionalTools) {
-        // Only re-order tools already credential-admitted during prepare().
-        // Avoid adding GitHub tools after an unavailable/auth-failed preflight.
-        val admittedGithub = synchronized(target) {
-            target.any { name -> registry.get(name)?.let(::isGitHubConnectorTool) == true }
-        }
-        enablePinnedMediaTools(target)
-        prioritizePinnedConnectorTools(target, enableGitHub = admittedGithub)
-    }
-
-    private fun enablePinnedMediaTools(target: MutableSet<String>) {
-        if (pinnedSkillIds().none { it == "imagegen" || it == "minimax-media" }) return
-        enableOptionalTools(listOf("media_image_options", "media_image_status", "media_image_create"), target)
-    }
-
-    private fun prioritizePinnedConnectorTools(target: MutableSet<String>, enableGitHub: Boolean) {
-        val pins = pinnedConnectorIds().distinct()
-        if (pins.isEmpty()) return
-        val registered = registry.names().mapNotNull(registry::get)
-        val preferred = pins.flatMap { id ->
-            if (id == "github") {
-                if (enableGitHub) registered.filter(::isGitHubConnectorTool).map(HarnessTool::name)
-                else emptyList()
-            } else if (Regex("[A-Za-z0-9_-]{1,48}").matches(id)) {
-                registered.filter { it.metadata.family.equals("MCP", ignoreCase = true) &&
-                    it.name.startsWith("mcp_${id}_") }.map(HarnessTool::name)
-            } else emptyList()
-        }
-        // Registration, network policy and approval are still the single execution authority.
-        enableOptionalTools(preferred, target)
-        synchronized(target) {
-            val previous = target.toList()
-            target.clear()
-            target.addAll(preferred.filter { it in previous })
-            target.addAll(previous)
-        }
-    }
-
-    private fun isGitHubConnectorTool(tool: HarnessTool): Boolean =
-        tool.metadata.family.equals(GITHUB_TOOL_FAMILY, ignoreCase = true)
-
-    fun capabilitySummary(enabledOptional: Set<String> = enabledOptionalSnapshot()): String {
-        val registered = registry.names().mapNotNull(registry::get)
-        val blocked = registered.filterNot { isNetworkSearchPermitted(it.name) }
-            .map(HarnessTool::name).toSet()
-        return LocalToolRouter.capabilitySummary(registered, enabledOptional, blocked)
-    }
-
-    fun visibleSchemas(
-        policy: LocalAgentRunPolicy,
-        maxOptionalDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-    ): JsonArray = selectVisibleSchemas(policy, maxOptionalDefinitionTokens).schemas
-
-    /** Foreground requests and capability inspection share one admission decision. */
-    internal fun selectVisibleSchemas(
-        policy: LocalAgentRunPolicy,
-        maxOptionalDefinitionTokens: Int = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-    ): LocalToolRouter.ToolSchemaSelection {
-        if (!policy.toolsEnabled) return LocalToolRouter.ToolSchemaSelection(
-            schemas = JsonArray(emptyList()), omittedReasons = emptyMap(), compactedNames = emptySet(),
-        )
-        val enabled = enabledOptionalSnapshot()
+    /** Runtime catalog is always live; there is no persisted or per-turn selection. */
+    fun capabilitySummary(): String {
         val tools = registry.names().mapNotNull(registry::get)
-            .filter { isNetworkSearchPermitted(it.name) }
-        val selection = LocalToolRouter.selectSchemas(
-            tools = tools, enabledOptional = enabled,
-            maxOptionalDefinitionTokens = maxOptionalDefinitionTokens,
-        )
-        val unavailable = enabled.mapNotNull { name ->
-            val registered = registry.get(name)
-            val reason = when {
-                registered == null -> "已选工具未注册或已卸载；请重新发现能力"
-                !isNetworkSearchPermitted(name) -> "网络搜索设置已关闭"
-                else -> null
-            }
-            reason?.let { name to it }
-        }.toMap()
-        return selection.copy(omittedReasons = unavailable + selection.omittedReasons)
-    }
-
-    fun visibleToolNames(policy: LocalAgentRunPolicy): List<String> =
-        visibleSchemas(policy).mapNotNull { element ->
-            val function = (element as? JsonObject)?.get("function") as? JsonObject
-            (function?.get("name") as? JsonPrimitive)?.content
-        }
-
-    fun searchCapabilities(
-        query: String,
-        target: MutableSet<String> = enabledOptionalTools,
-    ): String {
-        val registered = registry.names().mapNotNull(registry::get)
-        val blocked = registered.filterNot { isNetworkSearchPermitted(it.name) }
-            .map(HarnessTool::name).toSet()
-        val tools = registered.filter { it.name !in blocked }
-        if (LocalToolRouter.isInventoryRequest(query)) {
-            return LocalToolRouter.capabilityDirectory(registered,
-                synchronized(target) { target.toSet() }, blocked)
-        }
-        val discovery = com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery.resolve(tools, query)
-        val exactNames = discovery.exactNames
-        val alreadyBuiltIn = discovery.core
-        val matches = discovery.optional
-        val unavailableNames = discovery.unavailable
-        if (matches.isEmpty()) {
-            if (exactNames != null) {
-                // Selecting only CORE tools is still an exact focus: clear prior OPTIONAL
-                // schemas without treating the built-in tool as unavailable.
-                if (alreadyBuiltIn.isNotEmpty()) synchronized(target) {
-                    target.clear()
-                    if (target is LocalRunToolSelection) target.markExactFocus()
-                }
-                return buildString {
-                    if (alreadyBuiltIn.isNotEmpty()) appendLine(
-                        "以下是内置工具，无需加载即可直接调用：" + alreadyBuiltIn.joinToString(", "))
-                    if (unavailableNames.isNotEmpty()) appendLine(
-                        "指定工具当前无法加载：" + unavailableNames.joinToString(", "))
-                    if (unavailableNames.isNotEmpty()) append(
-                        "请检查实时注册状态、网络开关及工具名；不会自动加载近似名称。")
-                    if (alreadyBuiltIn.isNotEmpty()) append(
-                        "本轮已移除之前加载的可选扩展；所有内置 CORE 工具仍可按原策略直接调用。")
-                }.trimEnd()
-            }
-            // A fuzzy match on a CORE tool is a successful discovery; nothing needs loading.
-            if (alreadyBuiltIn.isNotEmpty()) return "已找到内置工具，可直接调用：" +
-                alreadyBuiltIn.joinToString(", ") + "；执行依旧按当前权限与工具策略校验。"
-            // Don't bounce the user back to guess an internal capability name.
-            return "实时工具表没有精确匹配的扩展能力。请勿猜测调用不存在的工具，也不必因此放弃任务。\n" +
-                "在允许联网与写入的 Work 中，可先用 web_search / GitHub 查找可复用实现，" +
-                "或使用工作区文件和终端制作脚本、技能或 MCP stdio 服务，" +
-                "经 mcp_stdio_connect 注册后在下一模型步骤确认实际暴露与审批，再做真实测试。\n" +
-                "以下为当前真实已注册能力（目录不代表远端服务已验证）：\n" +
-                LocalToolRouter.capabilityDirectory(registered,
-                    synchronized(target) { target.toSet() }, blocked)
-        }
-        val previouslyEnabled = synchronized(target) { target.toSet() }
-        val currentEnabled = synchronized(target) {
-            // Explicitly discovered capabilities outrank speculative pre-activation. This changes
-            // the next tool surface intentionally, so the request projection can update its cache generation.
-            val selected = matches.map(HarnessTool::name)
-            // select: is an exact active tool surface, not a permanent union of every
-            // earlier discovery. Plain-language discovery still keeps prior choices.
-            // Unselected tools remain installed in ToolRegistry and can be reselected.
-            val previous = if (exactNames == null) target.filterNot { it in selected }
-                else emptyList()
-            val previouslyFocused = target is LocalRunToolSelection && target.exactFocus
-            target.clear()
-            target.addAll(selected)
-            target.addAll(previous)
-            // Explicit select: stays in force on this real task. A later natural-language
-            // discovery may add matching tools, but cannot re-enable automatic unrelated pins.
-            if ((exactNames != null || previouslyFocused) && target is LocalRunToolSelection) {
-                target.markExactFocus()
-            }
-            target.toSet()
-        }
-        val selection = LocalToolRouter.selectSchemas(
-            tools = tools,
-            enabledOptional = currentEnabled,
-        )
-        val projected = selection.schemas.mapNotNull { element ->
-            val function = (element as? JsonObject)?.get("function") as? JsonObject
-            (function?.get("name") as? JsonPrimitive)?.content
-        }.toSet()
-        val omittedNames = matches.map(HarnessTool::name).filterNot(projected::contains)
+            .filter { it.exposure != ToolExposure.INTERNAL &&
+                it.name !in setOf("tool_call", "tool_search") }
+        val available = tools.filter { isNetworkSearchPermitted(it.name) }
+        val byFamily = available.groupingBy { it.metadata.family }.eachCount()
         return buildString {
-            appendLine("找到 ${matches.size} 个扩展工具，${matches.size - omittedNames.size} 个通过初步定义预算筛选；实际可用状态以下一次模型请求的工具表为准。")
-            if (alreadyBuiltIn.isNotEmpty()) appendLine(
-                "内置工具可直接调用：" + alreadyBuiltIn.joinToString(", "))
-            if (exactNames != null) appendLine(
-                "已按 select: 将本轮可选工具聚焦到指定名称；其它工具仍可重新选择，实际进入模型工具表后可直接使用。")
-            if (unavailableNames.isNotEmpty()) appendLine(
-                "指定但未能加载：" + unavailableNames.joinToString(", ") + "（未注册、被关闭或不是可选扩展；不会改用相似工具）"
+            append("实时已注册工具：").append(available.size).append(" 个，")
+            append("覆盖 ").append(byFamily.size).append(" 类能力。")
+            if (byFamily.isNotEmpty()) append(" ").append(
+                byFamily.entries.sortedBy { it.key }.joinToString("；") {
+                    it.key + " " + it.value + " 个"
+                }
             )
-            // A large live MCP catalog is discoverable, but should not flood a model turn.
-            matches.take(MAX_SEARCH_RESULT_PREVIEW).forEach { tool ->
-                append("- ").append(tool.name)
-                if (tool.name in projected) {
-                    append(if (tool.name in previouslyEnabled) " [已选候选]" else " [下一步候选]")
-                }
-                selection.omittedReasons[tool.name]?.let { reason ->
-                    append(" [当前未装入：").append(reason).append("]")
-                }
-                if (tool.name in selection.compactedNames) append(" [已精简冗长说明，保留完整参数定义]")
-                LocalToolRouter.conciseDescription(tool).takeIf(String::isNotBlank)?.let {
-                    append("：").append(it)
-                }
-                appendLine()
-            }
-            if (matches.size > MAX_SEARCH_RESULT_PREVIEW) {
-                appendLine("另有 ${matches.size - MAX_SEARCH_RESULT_PREVIEW} 个匹配工具未在此展开；可按类别或精确名称进一步搜索。")
-            }
-            if (omittedNames.isNotEmpty()) {
-                appendLine("本轮工具定义预算不足，剩余 ${omittedNames.size} 个工具已排在待加载队列；先使用已装入的工具完成当前工作。")
-                appendLine("后续需要剩余工具时，直接调用 capability_search，query 为：")
-                appendLine("select:" + omittedNames.joinToString(","))
-                appendLine("该选择会将剩余工具提前，不要求重新配置或重新连接已注册服务。")
-            }
-            append("工具调用仍受当前审批与实际连接状态约束。")
-        }.trimEnd()
+            if (available.size != tools.size) append("；网络搜索关闭：" + (tools.size - available.size) + " 个。")
+            append(" 已知工具名通过 tool_call 直接执行；未知名称通过 tool_search 查询实时参数。")
+        }
     }
 
     suspend fun execute(
@@ -854,10 +542,7 @@ internal class LocalToolExecutionCoordinator(
     }
 
     private companion object {
-        val DEFAULT_NETWORK_TOOLS = listOf("web_search", "web_fetch")
         val NETWORK_SEARCH_TOOLS = setOf("web_search", "web_fetch")
-        const val GITHUB_TOOL_FAMILY = "GitHub"
-        const val MAX_SEARCH_RESULT_PREVIEW = 100
         val MUTATING_ACCESSES = setOf(
             ToolAccess.WORKSPACE_WRITE,
             ToolAccess.SESSION_WRITE,
