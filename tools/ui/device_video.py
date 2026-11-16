@@ -101,6 +101,7 @@ class DeviceVideoRecorder:
             self._thread.join(timeout=45)
             if self._thread.is_alive():
                 self._errors.append("录屏进程未能正常结束并回收")
+        unrecovered = []
         for item in self._remotes:
             remote = item["remote"]
             local = self.directory / item["file"]
@@ -118,13 +119,17 @@ class DeviceVideoRecorder:
                                     "bytes": local.stat().st_size, "sha256": digest.hexdigest()})
                 self._clips[-1].pop("remote")
             except Exception as error:
+                # Keep the source recording on the device if transfer or MP4 validation fails.
+                # This is the only remaining recoverable copy; report its precise location.
                 self._errors.append(f"无法保存 {item['file']}: {error}")
-            finally:
-                try:
-                    self._adb("shell", "-n", "rm", "-f", remote, timeout=20)
-                except Exception as cleanup_error:
-                    self._errors.append(f"清理设备录像文件失败：{cleanup_error}")
-        receipt = {"name": self.name, "clips": self._clips, "errors": self._errors}
+                unrecovered.append({"remote": remote, "file": item["file"]})
+                continue
+            try:
+                self._adb("shell", "-n", "rm", "-f", remote, timeout=20)
+            except Exception as cleanup_error:
+                self._errors.append(f"清理已验证的设备录像失败：{cleanup_error}")
+        receipt = {"name": self.name, "clips": self._clips,
+                   "unrecovered_device_clips": unrecovered, "errors": self._errors}
         (self.directory / "manifest.json").write_text(
             json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
         if self._errors or not self._clips:
