@@ -2053,6 +2053,91 @@ class LocalToolExecutionCoordinatorTest {
         assertTrue(actual.omittedReasons.isEmpty())
     }
 
+    private fun directArgs(name: String) = buildJsonObject {
+        put("name", name)
+        put("arguments", buildJsonObject {})
+    }
+
+    @Test fun optionalToolExecutesImmediatelyThroughGatewayWithoutSamplingItsSchema() = runBlocking {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        var invocations = 0
+        registry.register(tool("mcp_direct_lookup", ToolAccess.READ_ONLY,
+            ToolApprovalPolicy.NEVER, ToolExposure.OPTIONAL) {
+            invocations++
+            ToolResult("direct-success")
+        })
+        val sampled = registry.captureBindings(JsonArray(listOf(
+            requireNotNull(registry.get("tool_call")).schema,
+            requireNotNull(registry.get("tool_search")).schema,
+        )))
+        val result = withContext(sampled) {
+            val args = directArgs("mcp_direct_lookup")
+            coordinator(registry).executeScoped(
+                LocalToolCall("gateway-1", "tool_call", args, args.toString()),
+                "s1", true, false, approval = { _, _, _ -> true },
+            )
+        }
+        assertFalse(result.isError)
+        assertEquals("direct-success", result.content)
+        assertEquals(1, invocations)
+    }
+
+    @Test fun runtimeCanCallNewlyRegisteredToolEvenWhenModelSchemaIsUnchanged() = runBlocking {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        val sampled = registry.captureBindings(JsonArray(listOf(
+            requireNotNull(registry.get("tool_call")).schema,
+        )))
+        var invoked = 0
+        registry.register(tool("later_mcp", ToolAccess.READ_ONLY,
+            ToolApprovalPolicy.NEVER, ToolExposure.OPTIONAL) {
+            invoked++
+            ToolResult("dynamic")
+        })
+        val result = withContext(sampled) {
+            val args = directArgs("later_mcp")
+            coordinator(registry).executeScoped(
+                LocalToolCall("dynamic", "tool_call", args, args.toString()),
+                "s1", true, false, approval = { _, _, _ -> true },
+            )
+        }
+        assertEquals("dynamic", result.content)
+        assertFalse(result.isError)
+        assertEquals(1, invoked)
+    }
+
+    @Test fun directGatewayPreservesRealChildMutationAndApprovalAdmission() = runBlocking {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        var writes = 0
+        var approvals = 0
+        registry.register(tool("mutating_optional", ToolAccess.WORKSPACE_WRITE,
+            ToolApprovalPolicy.ALWAYS, ToolExposure.OPTIONAL) {
+            writes++
+            ToolResult("wrote")
+        })
+        val args = directArgs("mutating_optional")
+        val call = LocalToolCall("write-direct", "tool_call", args, args.toString())
+        val execution = coordinator(registry)
+        val planBlocked = execution.executeScoped(call, "s1", true, true,
+            approval = { _, _, _ -> approvals++; true })
+        assertEquals("PLAN_MODE_BLOCKED", planBlocked.errorCode)
+        val readonlyBlocked = execution.executeScoped(call, "s1", false, false,
+            approval = { _, _, _ -> approvals++; true })
+        assertEquals("MUTATION_SCOPE_BLOCKED", readonlyBlocked.errorCode)
+        val denied = execution.executeScoped(call, "s1", true, false,
+            approval = { _, _, _ -> approvals++; false })
+        assertEquals("APPROVAL_DENIED", denied.errorCode)
+        assertEquals(0, writes)
+        assertEquals(1, approvals)
+        val success = execution.executeScoped(call, "s1", true, false,
+            approval = { _, _, _ -> approvals++; true })
+        assertFalse(success.isError)
+        assertEquals(1, writes)
+        assertEquals(2, approvals)
+    }
+
     private fun registerGateways(registry: ToolRegistry) {
         for (name in listOf("tool_search", "tool_call")) {
             registry.register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
