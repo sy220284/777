@@ -512,7 +512,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                             ?: throw protocolError("content_block_delta 引用了未知 block", requestId)
                         val delta = event["delta"] as? JsonObject
                             ?: throw protocolError("content_block_delta 缺少 delta", requestId)
-                        val deltaType = delta["type"]?.jsonPrimitive?.contentOrNull
+                        val deltaType = (delta["type"] as? JsonPrimitive)?.contentOrNull
                         val expectedBlock = when (deltaType) {
                             "text_delta", "citations_delta" -> "text"
                             "thinking_delta", "signature_delta" -> "thinking"
@@ -639,12 +639,12 @@ internal class AnthropicMessagesClient @Inject constructor(
                     canonicalBlocks += LocalCanonicalContent.Reasoning(it)
                 }
                 "tool_use" -> {
-                    val id = block["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                    val id = (block["id"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
                         ?: throw malformedToolArgumentsErrorStatic(
                             requestId ?: messageId, stopReason, streamEventsSeen,
                             issue = "missing_tool_id",
                         )
-                    val name = block["name"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+                    val name = (block["name"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
                         ?: throw malformedToolArgumentsErrorStatic(
                             requestId ?: messageId, stopReason, streamEventsSeen,
                             issue = "missing_tool_name",
@@ -767,14 +767,14 @@ internal class AnthropicMessagesClient @Inject constructor(
 
         companion object {
             fun from(block: JsonObject): StreamBlock {
-                val type = block["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                val type = (block["type"] as? JsonPrimitive)?.contentOrNull.orEmpty()
                 if (type !in setOf("text", "thinking", "redacted_thinking", "tool_use")) {
                     throw protocolErrorStatic("不支持的 Anthropic 内容块：$type", null)
                 }
                 return StreamBlock(
                     type = type,
-                    id = block["id"]?.jsonPrimitive?.contentOrNull,
-                    name = block["name"]?.jsonPrimitive?.contentOrNull,
+                    id = (block["id"] as? JsonPrimitive)?.contentOrNull,
+                    name = (block["name"] as? JsonPrimitive)?.contentOrNull,
                     initialInput = block["input"] as? JsonObject,
                     rawStart = block,
                     text = StringBuilder(block["text"]?.jsonPrimitive?.contentOrNull.orEmpty()),
