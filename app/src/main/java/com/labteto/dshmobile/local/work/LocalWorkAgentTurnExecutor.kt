@@ -141,7 +141,7 @@ internal class LocalWorkAgentTurnExecutor(
             sourceMessageId, resolveWorkUiDocumentSource(binding.eventLog, sourceMessageId),
             binding.state.value.messages.lastOrNull { it.role == "user" }?.id,
         )
-        var foregroundLease: LocalExecutionService.Companion.TurnLease? = null
+        var foregroundLease: LocalExecutionService.Companion.TurnLease? = binding.foregroundServiceLease
         var serviceReleased = false
         var cpuProjection: Job? = null
         // Publish the settled identity outside the Session owner's lexical scope.
@@ -198,7 +198,7 @@ internal class LocalWorkAgentTurnExecutor(
             }
             val foregroundSessionId = runSessionId
             var foregroundOutcome = LocalExecutionService.OUTCOME_COMPLETED
-            val lease = LocalExecutionService.acquireTurn(context, foregroundSessionId)
+            val lease = binding.foregroundServiceLease ?: LocalExecutionService.acquireTurn(context, foregroundSessionId)
             if (lease == null) {
                 val message = "系统未准许前台执行，当前 Work 回合未启动；进度已保留"
                 runEventLog.append("turn/foreground-start-rejected", buildJsonObject {
@@ -210,6 +210,7 @@ internal class LocalWorkAgentTurnExecutor(
                 return@withOwner
             }
             foregroundLease = lease
+            binding.foregroundServiceLease = lease
             cpuProjection = CoroutineScope(currentCoroutineContext()).launch {
                 workRunCpuDemand(binding).collect { lease.setCpuActive(it) }
             }
@@ -222,6 +223,47 @@ internal class LocalWorkAgentTurnExecutor(
                     kernel = it.kernel.copy(running = true),
                     error = null,
                 )
+            }
+            // Preserve the foreground execution owner across app/page switches AND between
+            // model-stream recovery turns. A network outage suspends this live Work task.
+            if (continuation != null && isWorkTransportContinuationCode(continuation.failureCode)) {
+                try {
+                    awaitWorkTransportRecovery(
+                        context = context,
+                        baseUrl = selectedRoute.baseUrl,
+                        continuationIndex = continuation.index,
+                        onWaiting = { reason ->
+                            binding.state.update { current ->
+                                current.copy(
+                                    work = current.work.copy(workflowProgress = LocalWorkflowProgress(
+                                        sessionId = binding.sessionId,
+                                        stage = "恢复连接",
+                                        task = "原任务保持执行，连接恢复后继续",
+                                        completed = 0,
+                                        total = 0,
+                                        blockedReason = reason,
+                                    )),
+                                    kernel = current.kernel.copy(running = true),
+                                    error = null,
+                                )
+                            }
+                            runEventLog.append("work/transport-waiting", buildJsonObject {
+                                put("source_message_id", uiSourceMessageId)
+                                put("failure_code", continuation.failureCode)
+                                put("continuation_index", continuation.index)
+                                put("reason", reason)
+                            })
+                        },
+                    )
+                } finally {
+                    binding.state.update { current ->
+                        current.copy(work = current.work.copy(workflowProgress = null))
+                    }
+                }
+                runEventLog.append("work/transport-resumed", buildJsonObject {
+                    put("source_message_id", uiSourceMessageId)
+                    put("continuation_index", continuation.index)
+                })
             }
             val declaredToolEvents = mutableMapOf<String, Pair<Long, Long>>()
             var outputLimitHasProgress = false
