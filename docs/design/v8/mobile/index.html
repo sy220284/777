@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>神言 V8 · 全新界面草案</title>
+<link rel="stylesheet" href="v8.css">
+<script src="v8.js" defer></script>
+</head>
+<body data-theme="light">
+<div class="stage">
+
+  <!-- 评审说明（设计稿外围，不是 App 界面） -->
+  <section class="stage-note">
+    <div class="eyebrow">SHENYAN / V8</div>
+    <h1>神言神语 <em>V8</em></h1>
+    <p>从功能与使用体验重新出发的一套界面：阅读优先、质感优先、动作分级。</p>
+    <p class="fine">本页是离线设计投影，不请求网络、不连接真实模型或账户；对话、人物、任务、文件全部为模拟数据，文案取自 App 真实资源。</p>
+    <nav class="stage-nav" id="stage-nav" aria-label="主路由"></nav>
+    <p class="fine">基准机 393 × 852，兼容 360 / 320 窄屏。<br>令牌唯一来源：docs/design/v8/tokens.json</p>
+  </section>
+
+  <!-- 应用本体 -->
+  <div class="app" id="app">
+    <div class="statusbar"><span>9:41</span><span class="glyph">●●● ▰</span></div>
+    <header class="topbar" id="topbar"></header>
+    <main class="screen" id="screen"></main>
+    <div id="dock"></div>
+    <div class="home-indicator"><span></span></div>
+
+    <!-- 浮层 -->
+    <div class="scrim" id="scrim-drawer" data-action="close-drawer"></div>
+    <aside class="drawer" id="drawer" aria-label="侧栏"></aside>
+    <div class="scrim" id="scrim-sheet" data-action="close-sheet"></div>
+    <section class="sheet" id="sheet" role="dialog" aria-label="当前操作" aria-hidden="true"></section>
+    <div class="menu-layer" id="menu-layer"></div>
+    <div class="dialog-layer" id="dialog-layer"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <!-- 令牌面板 -->
+  <aside class="stage-panel" id="stage-panel" aria-label="设计令牌"></aside>
+
+</div>
+</body>
+</html>
