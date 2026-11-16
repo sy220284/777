@@ -579,6 +579,14 @@ object LocalModelPresets {
         find(model, baseUrl)?.capabilities ?: setOf(LocalModelCapability.TEXT)
 
     /** Capabilities actually encoded by this client's current request/response transports. */
+    /** Official aliases and alternate documented protocol roots remain editable as a preset. */
+    fun editablePresetFor(model: String, baseUrl: String): LocalModelPreset? {
+        val resolved = find(model, baseUrl) ?: return null
+        return entries.firstOrNull {
+            it.provider == resolved.provider && it.model.equals(resolved.model, ignoreCase = true)
+        }
+    }
+
     fun clientCapabilitiesFor(
         model: String,
         baseUrl: String,
