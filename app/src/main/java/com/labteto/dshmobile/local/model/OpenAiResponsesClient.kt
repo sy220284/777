@@ -305,6 +305,12 @@ class OpenAiResponsesClient @Inject constructor(
                 requestId = admittedRequestId,
                 cause = error,
             )
+        } catch (error: IllegalArgumentException) {
+            if (eagerCalls.isNotEmpty()) return@withContext interruptedEagerReply()
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
+                throw responseProtocolError("模型流式响应字段类型不符合协议")
+            }
+            throw error
         }
     }
 
