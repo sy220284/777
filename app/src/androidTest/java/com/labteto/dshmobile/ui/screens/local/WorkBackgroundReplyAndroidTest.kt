@@ -18,6 +18,10 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.model.LocalStreamingPreviewStore
+import com.labteto.dshmobile.local.runtime.LocalExecutionService
+import android.accessibilityservice.AccessibilityService
+import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.runBlocking
 import com.labteto.dshmobile.ui.theme.DshTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -99,6 +103,32 @@ class WorkBackgroundReplyAndroidTest {
         compose.runOnIdle { output.value = (100..199).toList() }
         compose.waitForIdle()
         compose.runOnIdle { assertEquals(10, list.firstVisibleItemIndex) }
+    }
+
+    @Test fun admittedForegroundServiceRemainsLiveWhileAppIsOnHomeScreen() {
+        compose.setContent { DshTheme { Text("工作任务后台执行验证") } }
+        compose.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val lease = runBlocking {
+            LocalExecutionService.acquireTurn(context, "work-background-device-test")
+        }
+        assertNotNull("用户发起任务后，前台服务必须成功取得执行许可", lease)
+        try {
+            assertTrue("前台服务应接收任务进度", runBlocking { lease!!.updateStep(1) })
+            assertTrue("系统必须切换到桌面",
+                instrumentation.uiAutomation.performGlobalAction(
+                    AccessibilityService.GLOBAL_ACTION_HOME))
+            Thread.sleep(800)
+            // Actual Android Service, not a fake lifecycle or in-memory ViewModel.
+            assertTrue("用户没有停止任务，应用进入后台后服务不得失去许可",
+                runBlocking { lease!!.updateStep(2) })
+        } finally {
+            runBlocking { lease?.release(LocalExecutionService.OUTCOME_COMPLETED) }
+            // Restore the application for subsequent instrumentation methods.
+            val component = context.packageName + "/com.labteto.dshmobile.MainActivity"
+            instrumentation.uiAutomation.executeShellCommand("am start -n $component").close()
+        }
     }
 
     @Test fun backgroundRetryAndOutputAppearOnReturnWithNoNewDelta() {
