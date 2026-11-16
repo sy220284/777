@@ -49,6 +49,7 @@ internal fun localSettingsFeatureUiContribution(
         memorySourceMessageId = memorySourceMessageId,
         onCheckUpdate = onCheckUpdate,
         updateStatus = updateStatus,
-        handleRootSystemBack = false,
+        // Settings subpages and the root use the same system Back navigation.
+        handleRootSystemBack = true,
     )
 }
