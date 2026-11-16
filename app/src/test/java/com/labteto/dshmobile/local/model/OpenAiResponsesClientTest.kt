@@ -1870,4 +1870,119 @@ class OpenAiResponsesClientTest {
         assertEquals("durable-receipt", result.messages.last().content)
     }
 
+
+    @Test
+    fun deepSeekNativeResponsesPreservesToolContinuationAndOutputBudget() = runBlocking {
+        val requests = mutableListOf<JsonObject>()
+        val tools = Json.parseToJsonElement(
+            """[{"type":"function","function":{"name":"read","description":"读取文件","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}}]"""
+        ).jsonArray
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            assertEquals("https://api.deepseek.com/responses", chain.request().url.toString())
+            assertEquals("Bearer deepseek-test-key", chain.request().header("Authorization"))
+            requests += Json.parseToJsonElement(Buffer().also {
+                chain.request().body!!.writeTo(it)
+            }.readUtf8()).jsonObject
+            val result = if (requests.size == 1) {
+                """{"id":"ds-1","status":"completed","output":[{"type":"function_call","call_id":"call-1","name":"read","arguments":"{}","status":"completed"}],"usage":{"input_tokens":12,"output_tokens":7}}"""
+            } else {
+                """{"id":"ds-2","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"已读取"}]}],"usage":{"input_tokens":20,"output_tokens":5}}"""
+            }
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(("data: {\"type\":\"response.completed\",\"response\":" + result + "}\\n\\n")
+                    .toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val native = OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true })
+        val user = buildJsonObject { put("role", "user"); put("content", "读取文件") }
+        val first = native.completeStreaming(
+            accessToken = "deepseek-test-key", baseUrl = "https://api.deepseek.com",
+            model = "deepseek-v4-pro", messages = listOf(user), tools = tools,
+            reasoningEffort = "high", planSharing = false, maxTokens = 2048,
+        )
+        assertEquals("read", first.toolCalls.single().name)
+        assertEquals("call-1", first.toolCalls.single().id)
+        assertEquals("2048", requests[0]["max_output_tokens"]!!.jsonPrimitive.content)
+        assertEquals("high", requests[0]["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertFalse("include" in requests[0])
+        assertFalse("prompt_cache_options" in requests[0])
+        assertTrue(requests[0]["tools"]!!.jsonArray.isNotEmpty())
+        val toolResult = buildJsonObject {
+            put("role", "tool"); put("tool_call_id", "call-1"); put("content", "README 内容")
+        }
+        val second = native.completeStreaming(
+            accessToken = "deepseek-test-key", baseUrl = "https://api.deepseek.com",
+            model = "deepseek-v4-pro", messages = listOf(user, first.message, toolResult),
+            tools = tools, reasoningEffort = "none", planSharing = false,
+        )
+        assertEquals("已读取", second.content)
+        val input = requests[1]["input"]!!.jsonArray
+        assertTrue(input.any { it.jsonObject["type"]?.jsonPrimitive?.content == "function_call" })
+        assertTrue(input.any {
+            it.jsonObject["type"]?.jsonPrimitive?.content == "function_call_output" &&
+                it.jsonObject["call_id"]?.jsonPrimitive?.content == "call-1"
+        })
+        assertEquals("none", requests[1]["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun kimiCodeNativeResponsesUsesOriginalImageAndReasoningWithoutOpenAiExtensions() = runBlocking {
+        var posted: JsonObject? = null
+        val http = OkHttpClient.Builder().addInterceptor { chain ->
+            assertEquals("https://api.kimi.com/coding/v1/responses", chain.request().url.toString())
+            assertEquals("Bearer kimi-test-key", chain.request().header("Authorization"))
+            posted = Json.parseToJsonElement(Buffer().also {
+                chain.request().body!!.writeTo(it)
+            }.readUtf8()).jsonObject
+            val response = """data: {"type":"response.completed","response":{"id":"kimi-1","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"图像已识别"}]}],"usage":{"input_tokens":6,"output_tokens":4}}}""" + "\\n\\n"
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK").body(response.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val image = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject { put("type", "text"); put("text", "识别图片") })
+                add(buildJsonObject {
+                    put("type", "image_url")
+                    put("image_url", buildJsonObject { put("url", "data:image/png;base64,AQID") })
+                })
+            })
+        }
+        val result = OpenAiResponsesClient(http, Json { ignoreUnknownKeys = true }).completeStreaming(
+            accessToken = "kimi-test-key", baseUrl = "https://api.kimi.com/coding/v1",
+            model = "k3.1-pro", messages = listOf(image), tools = JsonArray(emptyList()),
+            reasoningEffort = "max", planSharing = false,
+        )
+        assertEquals("图像已识别", result.content)
+        val payload = requireNotNull(posted)
+        assertEquals("max", payload["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertFalse("include" in payload)
+        assertFalse("prompt_cache_key" in payload)
+        assertFalse("temperature" in payload)
+        val parts = payload["input"]!!.jsonArray.single().jsonObject["content"]!!.jsonArray
+        assertTrue(parts.any { it.jsonObject["type"]!!.jsonPrimitive.content == "input_image" &&
+            it.jsonObject["image_url"]!!.jsonPrimitive.content.startsWith("data:image/png;") })
+    }
+
+    @Test
+    fun kimiResponsesRejectsUnimplementedVideoInsteadOfSilentlyDroppingIt() {
+        val video = buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "video_url")
+                    put("video_url", buildJsonObject { put("url", "data:video/mp4;base64,AQID") })
+                })
+            })
+        }
+        val error = org.junit.Assert.assertThrows(LocalModelException::class.java) {
+            client.buildPayload(
+                model = "k3", messages = listOf(video), tools = JsonArray(emptyList()),
+                temperature = null, planSharing = false,
+            )
+        }
+        assertEquals("MODEL_PROTOCOL_INPUT_UNSUPPORTED", error.code)
+        assertTrue(error.message.orEmpty().contains("Responses API"))
+    }
+
 }
