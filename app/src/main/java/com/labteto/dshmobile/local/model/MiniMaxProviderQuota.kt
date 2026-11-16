@@ -105,7 +105,7 @@ internal class MiniMaxProviderQuotaClient @Inject constructor(
             LocalMiniMaxPolicy.isOfficial(profile.baseUrl)
         ) { "当前所选模型不支持 MiniMax 官方额度查询" }
         val uri = URI(normalizeModelBaseUrl(profile.baseUrl))
-        require(uri.scheme.equals("https", ignoreCase = true) && uri.port == -1) {
+        require(uri.scheme.equals("https", ignoreCase = true) && uri.port in setOf(-1, 443)) {
             "额度查询仅支持 MiniMax 官方 HTTPS 端点"
         }
         val credential = credentials.resolve(profile.model, profile.baseUrl, profile).bearerToken

@@ -26,6 +26,8 @@ class LocalKimiCompatibilityTest {
 
     @Test fun presetsUseSubscriptionNotPayAsYouGoModels() {
         val expected = mapOf(
+            "k3.1-pro" to 262_144,
+            "k3.1-pro-highspeed" to 1_048_576,
             "k3" to 262_144,
             "k3-256k" to 262_144,
             "kimi-for-coding" to 1_048_576,
@@ -39,12 +41,16 @@ class LocalKimiCompatibilityTest {
                 val preset = LocalModelPresets.find(id, endpoint)!!
                 assertEquals("Kimi Code", preset.provider)
                 assertEquals(window, preset.contextWindowTokens)
-                assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, preset.protocol)
+                assertEquals(LocalModelProtocol.RESPONSES, preset.protocol)
                 assertEquals(true, preset.imageInputSupported)
                 assertEquals("https://api.kimi.com/coding/v1/chat/completions", preset.chatEndpoint)
                 val wired = mutableSetOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE)
-                if (id != "k3-256k") wired += LocalModelCapability.VIDEO
                 assertEquals(wired, LocalModelPresets.clientCapabilitiesFor(id, endpoint))
+                if (id != "k3-256k") {
+                    wired += LocalModelCapability.VIDEO
+                }
+                assertEquals(wired, LocalModelPresets.clientCapabilitiesFor(
+                    id, endpoint, LocalModelProtocol.CHAT_COMPLETIONS))
             }
         }
         assertFalse(LocalModelCapability.VIDEO in LocalModelPresets.capabilitiesFor("k3-256k", cn))
@@ -72,9 +78,9 @@ class LocalKimiCompatibilityTest {
     }
 
     @Test fun reasoningControlsAndContextDoNotInventEntitlements() {
-        for (id in listOf("k3", "k3-256k", "kimi-for-coding")) {
+        for (id in listOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "k3-256k", "kimi-for-coding")) {
             val selection = LocalReasoningRequestPolicy.resolve(
-                LocalModelProfile("k", id, cn), withTools = true)!!
+                LocalModelProfile("k", id, cn, protocol = LocalModelProtocol.RESPONSES), withTools = true)!!
             assertEquals("low", selection.disabledEffort)
             assertEquals("high", selection.enabledEffort)
             assertEquals("max", selection.maxEffort)
@@ -84,6 +90,8 @@ class LocalKimiCompatibilityTest {
         assertNull(LocalReasoningRequestPolicy.resolve(
             LocalModelProfile("hs", "kimi-for-coding-highspeed", cn)))
         assertEquals(262_144, documentedContextWindowTokens("k3", cn, null))
+        assertEquals(262_144, documentedContextWindowTokens("k3.1-pro", cn, null))
+        assertEquals(1_048_576, documentedContextWindowTokens("k3.1-pro", cn, 1_048_576))
         assertEquals(1_048_576, documentedContextWindowTokens("k3", cn, 1_048_576))
         assertTrue(operationalInputLimitTokens("k3", cn, 1_048_576) >
             operationalInputLimitTokens("k3", cn))
@@ -213,9 +221,10 @@ class LocalKimiCompatibilityTest {
                 )))
             assertTrue(durable.toString().contains(LOCAL_FILE_REF))
             assertFalse(durable.toString().contains("base64"))
-            for (id in listOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
+            for (id in listOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
                 val materialized = prepareLocalMultimodalMessages(listOf(durable), root,
-                    LocalImageInputMode.NATIVE, model = id, baseUrl = cn)
+                    LocalImageInputMode.NATIVE, model = id, baseUrl = cn,
+                    profile = LocalModelProfile("legacy-$id", id, cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
                 val content = materialized.single()["content"]!!.jsonArray
                 val video = content.single { it.jsonObject["type"]?.jsonPrimitive?.content == "video_url" }
                     .jsonObject["video_url"]!!.jsonObject["url"]!!.jsonPrimitive.content
@@ -249,7 +258,8 @@ class LocalKimiCompatibilityTest {
             }
             val unsupported = runCatching {
                 prepareLocalMultimodalMessages(listOf(durable), root,
-                    LocalImageInputMode.NATIVE, model = "k3-256k", baseUrl = cn)
+                    LocalImageInputMode.NATIVE, model = "k3-256k", baseUrl = cn,
+                    profile = LocalModelProfile("legacy-256k", "k3-256k", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
             }.exceptionOrNull()
             assertTrue(unsupported is IllegalStateException)
             assertTrue(unsupported?.message.orEmpty().contains("不支持视频"))
@@ -260,9 +270,34 @@ class LocalKimiCompatibilityTest {
             val historical = prepareLocalMultimodalMessages(listOf(durable,
                 buildJsonObject { put("role", "assistant"); put("content", "已看完") },
                 buildJsonObject { put("role", "user"); put("content", "继续聊天") }),
-                root, LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn)
+                root, LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn,
+                profile = LocalModelProfile("legacy", "k3", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
             assertFalse(historical.toString().contains("video_url"))
             assertTrue(historical.toString().contains("历史文件引用"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun nativeResponsesRefusesVideoBeforeEncodingButSavedChatRouteStillWorks() = runBlocking {
+        val root = Files.createTempDirectory("kimi-protocol-video-").toFile()
+        try {
+            File(root, "clip.mp4").writeBytes(byteArrayOf(1, 2, 3))
+            val request = buildLocalUserModelMessage(
+                "分析视频", listOf(LocalImportedAttachment("clip.mp4", "clip.mp4", "video/mp4", 3))
+            )
+            val unsupported = runCatching {
+                prepareLocalMultimodalMessages(listOf(request), root, LocalImageInputMode.NATIVE,
+                    model = "k3", baseUrl = cn,
+                    profile = LocalModelProfile("new", "k3", cn, protocol = LocalModelProtocol.RESPONSES))
+            }.exceptionOrNull()
+            assertTrue(unsupported is IllegalStateException)
+            assertTrue(unsupported?.message.orEmpty().contains("Chat Completions"))
+
+            val legacy = prepareLocalMultimodalMessages(listOf(request), root, LocalImageInputMode.NATIVE,
+                model = "k3", baseUrl = cn,
+                profile = LocalModelProfile("saved", "k3", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
+            assertTrue(legacy.toString().contains("video_url"))
         } finally {
             root.deleteRecursively()
         }
@@ -300,7 +335,8 @@ class LocalKimiCompatibilityTest {
                 listOf(LocalImportedAttachment("clip.mp4", "clip.mp4", "video/mp4", clip.length())))
             val failure = runCatching {
                 prepareLocalMultimodalMessages(listOf(reference), root,
-                    LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn)
+                    LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn,
+                    profile = LocalModelProfile("legacy", "k3", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
             }.exceptionOrNull()
             assertTrue(failure is IllegalArgumentException)
             assertTrue(failure?.message.orEmpty().contains("上限") ||

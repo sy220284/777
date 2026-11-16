@@ -21,6 +21,7 @@ internal class LocalSubagentModelRequestBoundary(
         tools: JsonArray,
         subagentId: String,
         step: Int,
+        responseFormat: JsonObject? = null,
     ): LocalModelReply {
         return try {
             requestRuntime.complete(
@@ -28,6 +29,7 @@ internal class LocalSubagentModelRequestBoundary(
                 messages = messages,
                 tools = tools,
                 admission = admission,
+                responseFormat = responseFormat,
             )
         } catch (error: LocalModelException) {
             logSubagentProviderError(eventLog(), subagentId, step, error)

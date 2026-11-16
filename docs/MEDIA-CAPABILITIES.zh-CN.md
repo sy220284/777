@@ -4,7 +4,7 @@
 
 ## 概念边界
 
-- **理解能力**：当前聊天模型能否接收图片／音频／视频输入，在 `LocalModelPresets.runtimeCapabilitiesFor()` / `clientCapabilitiesFor()` 与模型请求网关中判断；以当前实际编码的请求协议为准。现行通用聊天传输只确认文字／图片可消费；它不意味着生成图片、音频、视频。
+- **理解能力**：当前聊天模型能否接收图片／音频／视频输入，在 `LocalModelPresets.runtimeCapabilitiesFor()` / `clientCapabilitiesFor()` 与模型请求网关中判断；以当前实际编码的请求协议为准。聊天模型的文字、图片已接通；视频按具体模型及协议区分，MiniMax M3 Anthropic Messages 和 Kimi Code 指定 Chat 路由已接通视频输入；这与生成图片、音频、视频属于不同功能。
 - **创作能力**：独立产品 API 的文生图、视频任务、TTS、ASR。它有自己的创作模型 ID、URL、请求与结果格式、计费规则；跟当前聊天模型分开。选中已配置的官方模型账户，仅借用该账户关联的 API 凭据；不把聊天模型 ID 错送到生成端点。
 - **文档已支持**：官方提供能力，但 777 尚无经过协议验证的适配器。此状态**不能**在手机 UI 宣称“可创作”，也不能把预置模型标成生成能力。
 - **已接通**：官方专属适配器、结果处理和用户入口都已编码。并不等同真实付费帐号在线验证通过。
@@ -14,13 +14,13 @@
 
 | 服务商 | 当前聊天模型/输入模态（777 实际支持） | 官方专业创作模型／能力 | 777 原生创作接入 |
 | --- | --- | --- | --- |
-| MiniMax | M3 图像理解；M2.7 文本（以现有模型输入协议为准） | `image-01` 文生图；`MiniMax-Hailuo-2.3` 文生视频；`speech-2.8-hd` TTS；`asr-1.0` ASR | **图片、视频、配音、转写已接通**，保留官方模型专用适配 |
+| MiniMax | M3/M3.1 Flash 经 Anthropic Messages 支持图片及单次 44MB 内的视频理解（MP4/AVI/MOV/MKV）；M2.7 仅保留历史路由元数据 | `image-01` 文生图；`MiniMax-Hailuo-2.3` 文生视频；`speech-2.8-hd` TTS；`asr-1.0` ASR | **图片、视频、配音、转写已接通**，保留官方模型专用适配 |
 | OpenAI | 官方支持的 GPT 聊天模型支持图像输入；原 `Responses image_generation` 工具独立保留 | `gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` 图片；`gpt-4o-mini-tts` 配音；`gpt-transcribe`、`gpt-4o-transcribe` 语音转文字 | **图片、配音、转写已接通**（官方 API Key；不包含 ChatGPT Plan OAuth） |
 | 阿里云 Qwen | `qwen3.8-*` 等输入图片的聊天能力按具体预置与兼容协议判断 | `qwen-image-3.0`、`qwen-image-3.0-pro` 文生图；万相 `wan2.7-t2v` 等视频模型 | **图片和 Wan 2.6 文生视频已接通**（图片走 OpenAI Images 兼容路径；视频走 DashScope 异步任务）；Wan 2.7 等其他版本尚未接通 |
 | Google Gemini | 可支持图片／视频理解；777 当前聊天请求仍按其已编码协议判断 | `gemini-3.1-flash-image`、`gemini-2.5-flash-image` 文生图；`veo-3.1-generate-preview` 视频；`lyria-3.5` 音乐 | **图片已接通**（原生 `generateContent`）；Veo/Lyria 文档已支持但尚未接通 |
 | DeepSeek | 官方 `deepseek-flash` 支持图片输入理解；其他模型不可据此泛化 | 本轮未查证可直接调用的官方图片／视频／语音生成产品 API | **未接通创作**；保留图像理解，不伪装图片生成为已支持 |
 | Anthropic Claude | 官方 Vision 允许图片理解 | Claude Messages 的图像输入不是图像合成端点；不能由 Vision 自动派生创作能力 | **未接通创作**，保留已有 Vision |
-| Kimi Code（会员订阅） | `k3`、`kimi-for-coding`、`kimi-for-coding-highspeed`：777 已接通文字、图片和 20MB 以内的视频理解输入；`k3-256k` 只支持文字和图片；聊天/工作附件走同一 `video_url` 请求链路 | Kimi Code 独立编程会员接口，具备推理档位和工具调用，不是独立图片/视频生成 API | **输入理解已实现、本地 Mock 验证待 CI；无真实订阅 Key 的线上视频联调**，音频及媒体生成未接入。详见 `KIMI-CODE-ADAPTATION.zh-CN.md` |
+| Kimi Code（会员订阅） | 默认 Responses：K3.1 Pro/K3 系列等六个模型均支持文字、图片；视频仅限手动选择 Chat Completions 的 `k3.1-pro`、`k3.1-pro-highspeed`、`k3`、`kimi-for-coding`、`kimi-for-coding-highspeed`（20MB 输入上限） | Kimi Code 独立编程会员 API，支持原生 Responses 推理、工具调用和流式输出；媒体生成另走独立服务 | **已具备本地请求编码与回归测试**；无真实会员 Key 的线上联调记录。详见 `KIMI-CODE-ADAPTATION.zh-CN.md` |
 | 智谱 GLM | 按具体 GLM 模型区分文本、图片理解 | 官方存在 CogView / CogVideo 家族专业生成产品，但本轮未核实与用户的聊天模型账户相同的模型、版本与专用端点细节 | **未接通创作**；有官方可用接口时新增适配器与模型条目 |
 | 自定义 OpenAI 兼容代理 | 仅能通过具体协议探测确认已实现的聊天／图像输入 | **不能**因为自称 OpenAI 兼容就默认兼容 `/images/generations`、语音、视频或账户费用 | **默认不接通付费创作**，必须明确配置可验证的专属适配 |
 

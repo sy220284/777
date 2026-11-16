@@ -133,7 +133,7 @@ internal class LocalSubagentRunner(
     private val requireTeamRootAuthorization: ((String) -> Unit)? = null,
     private val requireTeamWorkspaceMutation: (suspend (String, LocalToolCall) -> Unit)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
-    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
+    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, LocalModelProfile) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
     private val onUsage: (String, LocalModelReply, TokenUsageContext) -> Unit = { _, _, _ -> },
     private val onNativeImageAccepted: (String, String) -> Unit = { _, _ -> },
@@ -580,8 +580,7 @@ internal class LocalSubagentRunner(
                     val preparedHistory = prepareMessages(
                         durableHistory,
                         selectedMode,
-                        snapshot.modelState.baseUrl,
-                        routeModel,
+                        runProfile,
                     )
                     // Only record a delivery as submitted when the exact normalized message survived
                     // compaction and reached the model request. Dropped history remains unconfirmed.
@@ -608,6 +607,18 @@ internal class LocalSubagentRunner(
                             },
                             subagentId = subagentId,
                             step = modelStep,
+                            responseFormat = capabilities.outputSchema
+                                ?.takeIf {
+                                    runProfile.protocol == com.labteto.dshmobile.local.model.LocalModelProtocol.RESPONSES &&
+                                        com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy.isOfficial(
+                                            runProfile.model, runProfile.baseUrl)
+                                }?.let { schema ->
+                                    buildJsonObject {
+                                        put("type", "json_schema")
+                                        put("name", "subagent_result")
+                                        put("schema", schema)
+                                    }
+                                },
                             durableHistory = history,
                         ).also {
                             // An ancestor may lose its Run while a remote model request is in flight.

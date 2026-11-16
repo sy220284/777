@@ -143,6 +143,9 @@ internal fun LocalModelSettingsCard(
         model, baseUrl, apiKey, savedRoute || credentialSourceProfileId != null,
     ) else ApiModelEditorFormErrors()
     val selectedPreset = LocalModelPresets.find(model, baseUrl)
+    val advertisedProtocols = LocalModelPresets.editorProtocolsFor(model, baseUrl)
+    val contextWindowOptions = LocalModelPresets.editorContextWindowOptionsFor(model, baseUrl)
+    val recommendedProtocol = LocalModelPresets.editablePresetFor(model, baseUrl)?.protocol
     val editRoute: (String, String, String?) -> Unit = { name, url, id ->
         saveAttempted = false
         editorGeneration++
@@ -313,9 +316,9 @@ internal fun LocalModelSettingsCard(
                                     onClick = { viewModel.selectLocalModel(profile.id) }) else null,
                             SyMenuItem(text = stringResource(R.string.local_model_edit), onClick = {
                                 editRoute(profile.model, profile.baseUrl, profile.id)
-                                custom = LocalModelPresets.entries.none {
-                                    it.model == profile.model && it.baseUrl == profile.baseUrl
-                                }
+                                custom = LocalModelPresets.editablePresetFor(
+                                    profile.model, profile.baseUrl,
+                                ) == null
                                 showEditor = true
                             }),
                             SyMenuItem(text = stringResource(R.string.local_model_remove), danger = true,
@@ -370,9 +373,11 @@ internal fun LocalModelSettingsCard(
                     )
                     if (!errors.valid) {
                         testStatus = errors.model ?: errors.baseUrl ?: errors.apiKey
-                    } else if (selectedPreset?.provider == "Kimi Code" && selectedPreset.model == "k3" &&
+                    } else if (contextWindowOptions.isNotEmpty() &&
                         contextWindowTokens.isNotBlank() &&
-                        (contextWindowTokens.toIntOrNull() ?: -1) !in 4_096..1_048_576
+                        contextWindowTokens.toIntOrNull()?.let {
+                            it in contextWindowOptions
+                        } != true
                     ) {
                         testStatus = kimiK3ContextInvalid
                     } else {
@@ -456,22 +461,24 @@ internal fun LocalModelSettingsCard(
                         label = { Text(stringResource(R.string.advanced_endpoint)) },
                         isError = fieldErrors.baseUrl != null,
                         supportingText = { fieldErrors.baseUrl?.let { Text(it) } })
-                    LocalModelContextWindowField(contextWindowTokens) { contextWindowTokens = it; editorGeneration++; testStatus = null }
+                    if (selectedPreset == null) {
+                        LocalModelContextWindowField(contextWindowTokens) {
+                            contextWindowTokens = it
+                            editorGeneration++
+                            testStatus = null
+                        }
+                    }
                 } else {
                     Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                     selectedPreset?.let { preset ->
-                        Text(
-                            stringResource(
-                                R.string.local_model_request_endpoint,
-                                when (protocol) {
-                                    LocalModelProtocol.RESPONSES -> "${preset.baseUrl.trimEnd('/')}/responses"
-                                    LocalModelProtocol.ANTHROPIC_MESSAGES -> "${preset.baseUrl.trimEnd('/')}/messages"
-                                    LocalModelProtocol.CHAT_COMPLETIONS -> preset.chatEndpoint
-                                },
-                            ),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.textTertiary,
-                        )
+                        if (protocol in advertisedProtocols) {
+                            Text(
+                                stringResource(R.string.local_model_request_endpoint,
+                                    LocalModelPresets.editorRequestEndpointFor(model, baseUrl, protocol)),
+                                style = DsType.caption11.withReadingWeight(),
+                                color = colors.textTertiary,
+                            )
+                        }
                         preset.modelsEndpoint?.let { endpoint ->
                             Text(
                                 stringResource(R.string.local_model_models_endpoint, endpoint),
@@ -479,27 +486,60 @@ internal fun LocalModelSettingsCard(
                                 color = colors.textTertiary,
                             )
                         }
-                        if (preset.provider == "Kimi Code" && preset.model == "k3") {
-                            // Subscription tier determines whether K3 may use 1M instead of the 256K default.
-                            // Exposing the override only for K3 avoids implying other models are upgradeable.
-                            LocalModelContextWindowField(contextWindowTokens) {
-                                contextWindowTokens = it
-                                editorGeneration++
-                                testStatus = null
+                        val currentInputs = if (protocol in advertisedProtocols) {
+                            LocalModelPresets.clientCapabilitiesFor(model, baseUrl, protocol)
+                        } else emptySet()
+                        ModelCapabilityTags(currentInputs)
+                        if (LocalModelCapability.VIDEO in preset.capabilities) {
+                            val status = when {
+                                LocalModelCapability.VIDEO in currentInputs ->
+                                    R.string.local_model_video_input_available
+                                preset.provider == "Kimi Code" && protocol == LocalModelProtocol.RESPONSES ->
+                                    R.string.local_model_video_kimi_chat_only
+                                else -> R.string.local_model_video_input_unavailable
                             }
-                            Text("K3 默认 256K；仅已开通 Pro/Allegretto 及以上会员时填写 1048576。",
-                                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
-                        }
-                        ModelCapabilityTags(LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl))
-                        if (preset.capabilities.any { it == LocalModelCapability.VIDEO || it == LocalModelCapability.AUDIO }) {
+                            Text(stringResource(status), style = DsType.caption11.withReadingWeight(),
+                                color = colors.textTertiary)
+                        } else if (LocalModelCapability.AUDIO in preset.capabilities) {
                             Text(stringResource(R.string.local_model_media_not_connected),
                                 style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
                     }
                 }
-                if (custom) LocalModelProtocolPicker(protocol) {
-                    protocol = it; editorGeneration++; testStatus = null
-                    discoveredModels = emptyList(); catalogStatus = null
+                if (contextWindowOptions.size == 2) {
+                    val extended = contextWindowOptions.last().toString()
+                    SySegmented(
+                        segments = listOf(
+                            SySegment("default", "256K · 默认"),
+                            SySegment(extended, "1M · 会员"),
+                        ),
+                        selectedKey = if (contextWindowTokens == extended) extended else "default",
+                        onSelect = { choice ->
+                            contextWindowTokens = if (choice == extended) choice else ""
+                            editorGeneration++
+                            testStatus = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        stretch = true,
+                    )
+                    Text("K3 / K3.1 Pro 可选择 256K 或 1M；1M 需相应会员权益。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                }
+                if (protocol !in advertisedProtocols) {
+                    Text("当前保存的协议与官方模型不匹配，请在下方选择支持的协议并重新测试连接。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.dangerInk)
+                }
+                LocalModelProtocolPicker(protocol, available = advertisedProtocols) { selected ->
+                    baseUrl = LocalModelPresets.editorBaseUrlForProtocol(model, baseUrl, selected)
+                    protocol = selected
+                    editorGeneration++
+                    testStatus = null
+                    discoveredModels = emptyList()
+                    catalogStatus = null
+                }
+                if (recommendedProtocol != null && recommendedProtocol != protocol) {
+                    Text("当前协议已偏离预置推荐值：${recommendedProtocol.name}。切换协议后请测试连接。",
+                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
                 SyTextField(apiKey, onValueChange = {
                     apiKey = it.take(8000); editorGeneration++; testStatus = null

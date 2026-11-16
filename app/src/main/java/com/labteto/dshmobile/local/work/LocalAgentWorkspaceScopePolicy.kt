@@ -115,8 +115,9 @@ internal fun enforceTeamMemberWorkspaceMutation(
             requirePath(path)
         }
         "apply_patch" -> {
-            val patch = (args["patch"] as? kotlinx.serialization.json.JsonPrimitive)
+            val requestedPatch = (args["patch"] as? kotlinx.serialization.json.JsonPrimitive)
                 ?.takeIf { it.isString }?.content ?: error("TEAM_WRITE_PATCH_REQUIRED")
+            val patch = normalizeWorkspacePatch(requestedPatch, workspaceRoot)
             validateWorkspacePatchPaths(patch)
             require(!patch.contains("rename from ") && !patch.contains("rename to ") &&
                 !patch.contains("copy from ") && !patch.contains("copy to ") &&

@@ -44,6 +44,7 @@ import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.toEnvironmentRunSnapshot
 import com.labteto.dshmobile.local.work.validateWorkspacePatchPaths
+import com.labteto.dshmobile.local.work.normalizeWorkspacePatch
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Provider
@@ -303,8 +304,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             }
             "apply_patch" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
-                val patch = args.string("patch")
-                require(patch.length <= MAX_PATCH_CHARS) { "补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
+                val requestedPatch = args.string("patch")
+                require(requestedPatch.length <= MAX_PATCH_CHARS) { "补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
+                val patch = normalizeWorkspacePatch(requestedPatch, File(workspace.path))
+                require(patch.length <= MAX_PATCH_CHARS) { "转换后的补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
                 validateWorkspacePatchPaths(patch)
                 val check = root.process.execute(
                     ProcessRequest(

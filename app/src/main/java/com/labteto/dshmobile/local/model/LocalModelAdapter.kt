@@ -35,6 +35,7 @@ internal data class LocalModelAdapterRequest(
     val temperature: Double?,
     val reasoningEffort: String? = null,
     val maxTokens: Int? = null,
+    val responseFormat: kotlinx.serialization.json.JsonObject? = null,
     val allowImageGeneration: Boolean = false,
     val promptCacheComparisonResponseId: String? = null,
     val promptCacheKey: String? = null,
@@ -125,6 +126,8 @@ internal class OpenAiResponsesAdapter @Inject constructor(
             temperature = request.temperature,
             reasoningEffort = request.reasoningEffort,
             planSharing = request.route.authKind == LocalModelAuthKind.CHATGPT_PLAN,
+            maxTokens = request.maxTokens,
+            responseFormat = request.responseFormat,
             promptCacheComparisonResponseId = request.promptCacheComparisonResponseId,
             promptCacheKey = request.promptCacheKey,
             promptCacheTtl = request.promptCacheTtl,
@@ -154,6 +157,7 @@ internal class AnthropicMessagesAdapter @Inject constructor(
         streaming = streaming,
         onDelta = onDelta,
         reasoningEffort = request.reasoningEffort,
+        maxTokens = request.maxTokens,
     )
 }
 

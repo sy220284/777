@@ -51,6 +51,11 @@ class OpenAiResponsesClient @Inject constructor(
         // readTimeout still bounds idle sockets; the coroutine cancels the call when work stops.
         .callTimeout(0, TimeUnit.SECONDS)
         .build()
+    // DeepSeek may legitimately keep a thinking request pending for up to ten minutes.
+    // Preserve its established long-request transport window after moving to Responses.
+    private val deepSeekResponsesHttp = modelHttp.newBuilder()
+        .readTimeout(12, TimeUnit.MINUTES)
+        .build()
 
     suspend fun completeStreaming(
         accessToken: String,
@@ -61,6 +66,8 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double? = null,
         reasoningEffort: String? = null,
         planSharing: Boolean,
+        maxTokens: Int? = null,
+        responseFormat: JsonObject? = null,
         allowImageGeneration: Boolean = false,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
@@ -76,8 +83,12 @@ class OpenAiResponsesClient @Inject constructor(
             temperature = temperature,
             reasoningEffort = reasoningEffort,
             planSharing = planSharing,
+            maxTokens = maxTokens,
+            responseFormat = responseFormat,
             includeEncryptedReasoning = openAiContract,
             enforceOpenAiToolSchema = openAiContract,
+            openAiExtensions = openAiContract,
+            deepSeekCustomPatch = !openAiContract && DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl),
             promptCacheComparisonResponseId = promptCacheComparisonResponseId,
             promptCacheKey = promptCacheKey,
             promptCacheTtl = promptCacheTtl,
@@ -120,7 +131,7 @@ class OpenAiResponsesClient @Inject constructor(
         suspend fun acceptCompletedItem(event: JsonObject) {
             if (eager == null || event["type"]?.jsonPrimitive?.contentOrNull != "response.output_item.done") return
             val item = event["item"] as? JsonObject ?: return
-            if (item["type"]?.jsonPrimitive?.contentOrNull != "function_call" ||
+            if (item["type"]?.jsonPrimitive?.contentOrNull !in setOf("function_call", "custom_tool_call") ||
                 item["status"]?.jsonPrimitive?.contentOrNull != "completed") return
             val index = event["output_index"]?.jsonPrimitive?.intOrNull
                 ?.takeIf { it >= 0 } ?: throw responseProtocolError("完成工具项缺少输出序号")
@@ -139,7 +150,10 @@ class OpenAiResponsesClient @Inject constructor(
         }
 
         try {
-            withCancellableModelResponse(modelHttp.newCall(request), admissionTracker) { response ->
+            val requestHttp = if (!planSharing && DeepSeekChatRequestPolicy.isOfficialOrigin(baseUrl)) {
+                deepSeekResponsesHttp
+            } else modelHttp
+            withCancellableModelResponse(requestHttp.newCall(request), admissionTracker) { response ->
                 val requestId = response.header("x-request-id")
                     ?: response.header("openai-request-id")
                 val retryAfterMs = parseRetryAfterMillis(response.header("Retry-After"))
@@ -390,8 +404,12 @@ class OpenAiResponsesClient @Inject constructor(
         temperature: Double?,
         reasoningEffort: String? = null,
         planSharing: Boolean = true,
+        maxTokens: Int? = null,
+        responseFormat: JsonObject? = null,
         includeEncryptedReasoning: Boolean = true,
         enforceOpenAiToolSchema: Boolean = planSharing,
+        openAiExtensions: Boolean = true,
+        deepSeekCustomPatch: Boolean = false,
         promptCacheComparisonResponseId: String? = null,
         promptCacheKey: String? = null,
         promptCacheTtl: String? = null,
@@ -402,8 +420,23 @@ class OpenAiResponsesClient @Inject constructor(
         put("model", model)
         val systemInstructions = responseInstructions(messages)
         if (!planSharing) systemInstructions.takeIf(String::isNotBlank)?.let { put("instructions", it) }
-        put("store", false)
+        if (openAiExtensions) put("store", false)
         put("stream", true)
+        if (!planSharing) maxTokens?.let { tokens ->
+            require(tokens > 0) { "Responses API 最大输出 Token 数必须大于零" }
+            put("max_output_tokens", tokens)
+        }
+        responseFormat?.let { format ->
+            require(!planSharing) { "ChatGPT 套餐不接受本地自定义结构化输出" }
+            require(format["type"]?.jsonPrimitive?.contentOrNull in setOf("json_object", "json_schema")) {
+                "Responses text.format 只能为 json_object 或 json_schema"
+            }
+            if (format["type"]?.jsonPrimitive?.contentOrNull == "json_schema") {
+                require(format["name"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true &&
+                    format["schema"] is JsonObject) { "Responses json_schema 需要 name 与 schema" }
+            }
+            put("text", buildJsonObject { put("format", format) })
+        }
         if (planSharing || reasoningEffort != null) {
             put("reasoning", buildJsonObject {
                 if (planSharing) put("context", "all_turns")
@@ -411,18 +444,18 @@ class OpenAiResponsesClient @Inject constructor(
             })
         }
         if (planSharing) put("parallel_tool_calls", false)
-        if (!planSharing) {
+        if (!planSharing && openAiExtensions) {
             promptCacheKey?.trim()?.takeIf(String::isNotBlank)?.let { key ->
                 put("prompt_cache_key", key.take(MAX_PROMPT_CACHE_KEY_CHARS))
             }
         }
         val cacheComparison = promptCacheComparisonResponseId
-            ?.takeIf { !planSharing }
+            ?.takeIf { !planSharing && openAiExtensions }
             ?.trim()
             ?.takeIf(String::isNotBlank)
         val cacheTtl = promptCacheTtl
             ?.trim()
-            ?.takeIf { !planSharing && it in SUPPORTED_PROMPT_CACHE_TTLS }
+            ?.takeIf { !planSharing && openAiExtensions && it in SUPPORTED_PROMPT_CACHE_TTLS }
         if (cacheComparison != null || cacheTtl != null) {
             put("prompt_cache_options", buildJsonObject {
                 cacheComparison?.let { put("comparison_response_id", it.take(512)) }
@@ -436,6 +469,16 @@ class OpenAiResponsesClient @Inject constructor(
             put("include", buildJsonArray { add(JsonPrimitive("reasoning.encrypted_content")) })
         }
         val adaptedTools = responseTools(tools, planSharing, enforceOpenAiToolSchema)
+        val nativeTools = if (!planSharing && deepSeekCustomPatch) JsonArray(adaptedTools.map { raw ->
+            val function = raw as? JsonObject
+            if (function?.get("type")?.jsonPrimitive?.contentOrNull == "function" &&
+                function["name"]?.jsonPrimitive?.contentOrNull == "apply_patch"
+            ) buildJsonObject {
+                put("type", "custom")
+                put("name", "apply_patch")
+                put("format", buildJsonObject { put("type", "text") })
+            } else raw
+        }) else adaptedTools
         // Codex Responses Lite accepts executable namespaces as a developer input item.
         // Top-level tools belongs exclusively to the standard API-key Responses route.
         if (planSharing && adaptedTools.isEmpty() && explicitNativeWebSearchRequested(messages)) {
@@ -469,9 +512,9 @@ class OpenAiResponsesClient @Inject constructor(
             }
             responseInput(messages).forEach(::add)
         })
-        if (!planSharing && (adaptedTools.isNotEmpty() || nativeImageToolEnabled)) {
+        if (!planSharing && (nativeTools.isNotEmpty() || nativeImageToolEnabled)) {
             put("tools", buildJsonArray {
-                adaptedTools.forEach(::add)
+                nativeTools.forEach(::add)
                 if (nativeImageToolEnabled) {
                     add(buildJsonObject {
                         put("type", "image_generation")
@@ -569,6 +612,13 @@ class OpenAiResponsesClient @Inject constructor(
         }
 
     private fun responseInput(messages: List<JsonObject>): JsonArray = buildJsonArray {
+        val nativeCustomCallIds = messages.flatMap { message ->
+            (message[RESPONSES_OUTPUT_KEY] as? JsonArray).orEmpty().mapNotNull { raw ->
+                val item = raw as? JsonObject ?: return@mapNotNull null
+                if (item["type"]?.jsonPrimitive?.contentOrNull != "custom_tool_call") return@mapNotNull null
+                item["call_id"]?.jsonPrimitive?.contentOrNull
+            }
+        }.toSet()
         messages.forEach { message ->
             val role = message["role"]?.jsonPrimitive?.contentOrNull.orEmpty()
             val raw = message[RESPONSES_OUTPUT_KEY] as? JsonArray
@@ -612,7 +662,9 @@ class OpenAiResponsesClient @Inject constructor(
                 val callId = message["tool_call_id"]?.jsonPrimitive?.contentOrNull
                     ?: return@forEach
                 add(buildJsonObject {
-                    put("type", "function_call_output")
+                    put("type", if (callId in nativeCustomCallIds) {
+                        "custom_tool_call_output"
+                    } else "function_call_output")
                     put("call_id", callId)
                     put("output", message["content"]?.jsonPrimitive?.contentOrNull.orEmpty())
                 })
@@ -763,9 +815,19 @@ class OpenAiResponsesClient @Inject constructor(
                     }
                 }
                 "reasoning" -> {
-                    (obj["summary"] as? JsonArray).orEmpty().forEach { part ->
-                        val p = part as? JsonObject ?: return@forEach
-                        p["text"]?.jsonPrimitive?.contentOrNull?.let(reasoning::append)
+                    // DeepSeek Responses returns full reasoning in content.reasoning_text;
+                    // OpenAI may expose only a summary. Prefer the real native content when present.
+                    val fullText = (obj["content"] as? JsonArray).orEmpty()
+                        .mapNotNull { part ->
+                            val p = part as? JsonObject ?: return@mapNotNull null
+                            if (p["type"]?.jsonPrimitive?.contentOrNull != "reasoning_text") return@mapNotNull null
+                            p["text"]?.jsonPrimitive?.contentOrNull
+                        }.joinToString("")
+                    if (fullText.isNotBlank()) reasoning.append(fullText) else {
+                        (obj["summary"] as? JsonArray).orEmpty().forEach { part ->
+                            val p = part as? JsonObject ?: return@forEach
+                            p["text"]?.jsonPrimitive?.contentOrNull?.let(reasoning::append)
+                        }
                     }
                 }
                 "function_call" -> {
@@ -782,6 +844,19 @@ class OpenAiResponsesClient @Inject constructor(
                         json.parseToJsonElement(rawArguments) as? JsonObject
                     }.getOrNull() ?: throw responseProtocolError("工具参数不是合法 JSON 对象")
                     toolCalls += LocalToolCall(callId, name, arguments, rawArguments)
+                }
+                "custom_tool_call" -> {
+                    if (completionReason != LocalModelCompletionReason.COMPLETED) return@forEach
+                    val callId = obj["call_id"]?.jsonPrimitive?.contentOrNull
+                        ?.takeIf(String::isNotBlank)
+                        ?: throw responseProtocolError("custom 工具调用缺少 call_id")
+                    val name = obj["name"]?.jsonPrimitive?.contentOrNull
+                        ?: throw responseProtocolError("custom 工具调用缺少 name")
+                    if (name != "apply_patch") throw responseProtocolError("不支持的 custom 工具：$name")
+                    val patch = obj["input"]?.jsonPrimitive?.contentOrNull
+                        ?: throw responseProtocolError("apply_patch 输入必须是文本")
+                    val args = buildJsonObject { put("patch", patch) }
+                    toolCalls += LocalToolCall(callId, "apply_patch", args, args.toString())
                 }
                 "image_generation_call" -> {
                     val result = obj["result"]?.jsonPrimitive?.contentOrNull
@@ -830,6 +905,7 @@ class OpenAiResponsesClient @Inject constructor(
                     visibleParts.forEach(::add)
                 })
             }
+            settledReasoning?.let { put("reasoning_content", it) }
             if (toolCalls.isNotEmpty()) {
                 put("tool_calls", buildJsonArray {
                     toolCalls.forEach { call ->
