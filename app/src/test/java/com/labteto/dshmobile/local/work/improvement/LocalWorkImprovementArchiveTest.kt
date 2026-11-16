@@ -244,6 +244,9 @@ class LocalWorkImprovementArchiveTest {
             log.append("work/improvement-trial", buildJsonObject {
                 put("candidate_id", "trial-evidence-1"); put("goal_id", first.id)
             })
+            // A newly committed trial is authoritative before the asynchronous
+            // human-readable archive has been regenerated.
+            assertEquals(null, archive.adviceFor(second, "alpha", "model", "profile"))
             archive.refresh()
             assertEquals(null, archive.adviceFor(second, "alpha", "model", "profile"))
             log.append("work/improvement-evaluation", buildJsonObject {
@@ -253,6 +256,9 @@ class LocalWorkImprovementArchiveTest {
                 put("comparison", "natural_same_acceptance_observational")
                 put("source_receipt", "real-test-1")
             })
+            assertEquals(setOf("first"), archive.verifiedNaturalTrialGoalIds("trial-evidence-1"))
+            assertEquals("trial-evidence-1", archive.adviceFor(second,
+                "alpha", "model", "profile")?.id)
             archive.refresh()
             assertEquals(setOf("first"), archive.verifiedNaturalTrialGoalIds("trial-evidence-1"))
             assertEquals("trial-evidence-1", archive.adviceFor(second, "alpha", "model", "profile")?.id)

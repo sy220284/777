@@ -88,7 +88,12 @@ internal class LocalWorkImprovementArchive(
      * observations. They support a second user-initiated trial, not a causal A/B claim.
      */
     @Synchronized
-    internal fun verifiedNaturalTrialGoalIds(candidateId: String): Set<String> =
+    internal fun verifiedNaturalTrialGoalIds(candidateId: String): Set<String> {
+        syncFactsFromEvents()
+        return verifiedGoalIdsFromCache(candidateId)
+    }
+
+    private fun verifiedGoalIdsFromCache(candidateId: String): Set<String> =
         cached.values.asSequence().flatMap { it.evaluations.asSequence() }
             .filter { it.candidateId == candidateId && it.disposition == "adoptable" &&
                 it.comparison == "natural_same_acceptance_observational" &&
@@ -99,6 +104,9 @@ internal class LocalWorkImprovementArchive(
     fun adviceFor(goal: LocalGoal, projectId: String, model: String, profileId: String,
         routeFingerprint: String = ""): WorkImprovementAdvice? {
         if (goal.status != "active" || goal.id.isBlank() || goal.startedAtSequence < 0L) return null
+        // A new Goal can begin before the old turn's asynchronous report render.
+        // Eligibility must read the committed Session facts, never a stale report cache.
+        syncFactsFromEvents()
         val signature = workGoalComparisonKey(goal)
         val used = cached.values.flatMap { it.trialIds + it.retiredIds }.toSet()
         val usedForThisGoal = cached.values.flatMap { it.trialGoalIds.entries }
@@ -119,7 +127,7 @@ internal class LocalWorkImprovementArchive(
             val attempts = cached.values.flatMap { fact -> fact.trialGoalIds[it.id].orEmpty() }.toSet()
             it.id !in used || it.id in usedForThisGoal ||
                 (attempts.size == 1 && goal.id !in attempts &&
-                    verifiedNaturalTrialGoalIds(it.id) == attempts)
+                    verifiedGoalIdsFromCache(it.id) == attempts)
         }?.copy(active = false)
     }
 
@@ -189,9 +197,11 @@ internal class LocalWorkImprovementArchive(
      * document ledger is created. Indexing is bounded in RAM; source history stays on disk.
      * Called after a Work turn settles and at Work feature initialization, off the UI thread.
      */
-    @Synchronized
-    fun refresh() {
-        requireSafeArchiveDirectory()
+    /**
+     * Synchronize only the derived eligibility projection, no report rendering.
+     * Selection and evaluation can run between two Work turn report refreshes.
+     */
+    private fun syncFactsFromEvents() {
         val sources = eventLogs.historicalSources()
         cached.keys.retainAll(sources.map { it.id }.toSet())
         sources.forEach { source ->
@@ -215,6 +225,12 @@ internal class LocalWorkImprovementArchive(
                 }
             }
         }
+    }
+
+    @Synchronized
+    fun refresh() {
+        requireSafeArchiveDirectory()
+        syncFactsFromEvents()
         val facts = cached.values.toList()
         val turns = facts.sumOf(Facts::workTurns)
         val tools = facts.sumOf(Facts::toolReceipts)
