@@ -334,6 +334,7 @@ if (System.getenv("CI") == "true") {
     tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
         testLogging {
             events("started", "failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             showStandardStreams = false
         }
         if (name == "testDebugUnitTest") {

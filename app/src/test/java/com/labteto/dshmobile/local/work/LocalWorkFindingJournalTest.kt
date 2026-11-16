@@ -125,6 +125,65 @@ class LocalWorkFindingJournalTest {
         } finally { history.close() }
     }
 
+
+    @Test fun gatewayReceiptIdIsDiscoverableAndCanBeCited() {
+        val history = log()
+        try {
+            val source = history.append("tool/call", buildJsonObject {
+                put("id", "outer-tool-call-1")
+                put("goal_id", "goal-a")
+                put("name", "tool_call")
+                put("arguments", buildJsonObject { put("name", "read") })
+            })
+            history.append("tool/result", buildJsonObject {
+                put("id", "outer-tool-call-1")
+                put("is_error", false)
+                put("tool_declared_sequence", source.sequence)
+            })
+            val failed = runCatching {
+                LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                    put("action", "record")
+                    put("source_call_id", "unavailable-id")
+                    put("summary", "核实网关工具真实回执与目标的关联记录")
+                })
+            }.exceptionOrNull()!!.message.orEmpty()
+            assertTrue(failed, failed.contains("outer-tool-call-1（read）"))
+            val recorded = LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                put("action", "record")
+                put("source_call_id", "outer-tool-call-1")
+                put("summary", "已取得来自当前目标下的成功读取证据回执")
+            })
+            assertTrue(recorded.contains("来源回执=outer-tool-call-1"))
+        } finally { history.close() }
+    }
+
+    @Test fun workFindingGatewayReceiptCannotCiteItselfAsEvidence() {
+        val history = log()
+        try {
+            val source = history.append("tool/call", buildJsonObject {
+                put("id", "gateway-find-1")
+                put("goal_id", "goal-a")
+                put("name", "tool_call")
+                put("arguments", buildJsonObject { put("name", "work_finding") })
+            })
+            history.append("tool/result", buildJsonObject {
+                put("id", "gateway-find-1")
+                put("is_error", false)
+                put("tool_declared_sequence", source.sequence)
+            })
+            val failed = runCatching {
+                LocalWorkFindingJournal.execute(history, "goal-a", buildJsonObject {
+                    put("action", "record")
+                    put("source_call_id", "gateway-find-1")
+                    put("summary", "调查发现不能把自身回执作为事实来源")
+                })
+            }.exceptionOrNull()!!.message.orEmpty()
+            assertTrue(failed, failed.contains("来源工具不属于当前目标"))
+            assertFalse(failed.contains("可用的来源回执 ID：gateway-find-1"))
+            assertTrue(history.eventsOfTypesAfter(-1L, setOf("work/finding")).isEmpty())
+        } finally { history.close() }
+    }
+
     @Test fun rejectsInventedFailedOrOtherGoalReceiptsAndUnrelatedRevisions() {
         val history = log()
         try {

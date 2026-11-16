@@ -12,6 +12,7 @@ import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.CodeModePlugin
 import com.labteto.dshmobile.harness.plugin.HarnessContext
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonArray
 import com.labteto.dshmobile.harness.tools.functionToolSchema
@@ -1354,6 +1355,79 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals("dynamic", result.content)
         assertFalse(result.isError)
         assertEquals(1, invoked)
+    }
+
+
+    @Test fun directGatewayExecutesSchemaTypedNumbersThroughRealRegistry() = runBlocking {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        val observed = mutableMapOf<String, JsonObject>()
+        val names = listOf("bash", "list_files", "http_request", "write_chunk")
+        for (name in names) {
+            val schema = LocalToolCatalog.specs.first { item ->
+                item.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == name
+            }.jsonObject
+            registry.register(HarnessTool(
+                name = name,
+                schema = schema,
+                access = ToolAccess.READ_ONLY,
+                approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE,
+                metadata = ToolMetadata("真实类型校验"),
+                executor = HarnessToolExecutor { _, input, _ ->
+                    observed[name] = input
+                    ToolResult("typed")
+                },
+            ))
+        }
+        val mcpName = "mcp_selfcheck-mcp_add_pair"
+        registry.register(HarnessTool(
+            name = mcpName,
+            schema = Json.parseToJsonElement("""
+                {"type":"function","function":{"name":"mcp_selfcheck-mcp_add_pair",
+                "description":"测试数字型 MCP 参数",
+                "parameters":{"type":"object","properties":{
+                    "a":{"type":"number"},"b":{"type":"number"}},
+                    "required":["a","b"],"additionalProperties":false}}}
+            """.trimIndent()).jsonObject,
+            access = ToolAccess.READ_ONLY,
+            approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE,
+            metadata = ToolMetadata("MCP"),
+            executor = HarnessToolExecutor { _, input, _ ->
+                observed[mcpName] = input
+                ToolResult("typed")
+            },
+        ))
+        val executor = coordinator(registry)
+        suspend fun call(name: String, rawChild: String): com.labteto.dshmobile.harness.agent.AgentToolResult {
+            val args = buildJsonObject {
+                put("name", name)
+                put("arguments", Json.parseToJsonElement(rawChild).jsonObject)
+            }
+            return executor.executeScoped(
+                LocalToolCall("gateway-$name", "tool_call", args, args.toString()),
+                "s1", true, false, approval = { _, _, _ -> true },
+            )
+        }
+        val samples = listOf(
+            Triple("bash", """{"command":"echo ok","timeout_seconds":"30"}""", "timeout_seconds"),
+            Triple("list_files", """{"path":".","depth":"2"}""", "depth"),
+            Triple("http_request", """{"method":"GET","url":"https://example.com","max_bytes":"577"}""", "max_bytes"),
+            Triple("write_chunk", """{"path":"probe.bin","offset":"0","content":"abc"}""", "offset"),
+            Triple(mcpName, """{"a":"2.5","b":"-1.25"}""", "a"),
+        )
+        for ((name, args, field) in samples) {
+            val result = call(name, args)
+            assertFalse(name + ": " + result.errorCode + " " + result.content, result.isError)
+            assertFalse(name + " remains quoted", observed.getValue(name).getValue(field).jsonPrimitive.isString)
+        }
+        assertFalse(observed.getValue(mcpName).getValue("b").jsonPrimitive.isString)
+        val before = observed.size
+        val invalid = call("write_chunk", """{"path":"bad.bin","offset":"01","content":"x"}""")
+        assertTrue(invalid.isError)
+        assertEquals("INVALID_TOOL_ARGUMENTS", invalid.errorCode)
+        assertEquals(before, observed.size)
     }
 
     @Test fun directGatewayPreservesRealChildMutationAndApprovalAdmission() = runBlocking {

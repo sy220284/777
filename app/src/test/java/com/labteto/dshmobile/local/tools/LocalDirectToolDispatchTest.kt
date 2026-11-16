@@ -10,7 +10,10 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.model.LocalToolCall
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -48,6 +51,63 @@ class LocalDirectToolDispatchTest {
         }
         assertNull(LocalToolCall("bad", DIRECT_TOOL_CALL, recursive, recursive.toString())
             .directToolTarget())
+    }
+
+
+    @Test fun genericGatewayRestoresOnlySchemaDeclaredNumericFields() {
+        val contract = Json.parseToJsonElement("""
+            {"function":{"parameters":{"type":"object","properties":{
+                "timeout_seconds":{"type":"integer"},
+                "depth":{"type":"integer"},
+                "max_bytes":{"type":"integer"},
+                "offset":{"type":"integer"},
+                "a":{"type":"number"},
+                "b":{"type":"number"},
+                "opaque":{"type":"string"},
+                "nested":{"type":"object","properties":{"count":{"type":"integer"}}},
+                "items":{"type":"array","items":{"type":"object","properties":{"n":{"type":"integer"}}}},
+                "invalid":{"type":"integer"},
+                "nonfinite":{"type":"number"}
+            }}}}
+        """.trimIndent()).jsonObject
+        val input = Json.parseToJsonElement("""
+            {"timeout_seconds":"30","depth":"4","max_bytes":"1024","offset":"0",
+             "a":"2.5","b":"-1.25","opaque":"001",
+             "nested":{"count":"42"},"items":[{"n":"7"}],
+             "invalid":"01","nonfinite":"NaN"}
+        """.trimIndent()).jsonObject
+        val gateway = buildJsonObject {
+            put("name", "mcp_selfcheck-mcp_add_pair")
+            put("arguments", input)
+        }
+        val call = LocalToolCall("numeric", DIRECT_TOOL_CALL, gateway, gateway.toString())
+            .directToolTarget()!!.withSchemaTypedNumbers(contract)
+        val expected = Json.parseToJsonElement("""
+            {"timeout_seconds":30,"depth":4,"max_bytes":1024,"offset":0,
+             "a":2.5,"b":-1.25,"opaque":"001",
+             "nested":{"count":42},"items":[{"n":7}],
+             "invalid":"01","nonfinite":"NaN"}
+        """.trimIndent()).jsonObject
+        assertEquals(expected, call.arguments)
+        assertEquals(expected.toString(), call.rawArguments)
+        assertFalse(call.arguments.getValue("offset").jsonPrimitive.isString)
+        assertTrue(call.arguments.getValue("opaque").jsonPrimitive.isString)
+    }
+
+    @Test fun gatewayLeavesAlreadyTypedNumbersAndUntypedFieldsUntouched() {
+        val contract = Json.parseToJsonElement("""
+            {"function":{"parameters":{"type":"object","properties":{
+                "offset":{"type":"integer"},"raw":{"type":"object","additionalProperties":true}
+            }}}}
+        """.trimIndent()).jsonObject
+        val args = Json.parseToJsonElement(
+            """{"offset":0,"raw":{"not_declared_as_number":"123"}}"""
+        ).jsonObject
+        val existing = LocalToolCall("typed", "write_chunk", args, args.toString())
+        val result = existing.withSchemaTypedNumbers(contract)
+        assertTrue(existing === result)
+        assertTrue(result.arguments.getValue("raw").jsonObject
+            .getValue("not_declared_as_number").jsonPrimitive.isString)
     }
 
     @Test fun ordinarySubagentCannotReachLeadOrAutomationControl() {

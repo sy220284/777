@@ -19,6 +19,7 @@ import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.DIRECT_TOOL_CALL
 import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
 import com.labteto.dshmobile.local.tools.directToolTarget
+import com.labteto.dshmobile.local.tools.withSchemaTypedNumbers
 import com.labteto.dshmobile.local.tools.LocalWorkspaceReadWriteGate
 import com.labteto.dshmobile.local.work.LocalWorkGoalAcceptanceRejectedException
 import com.labteto.dshmobile.observability.AppLog
@@ -130,7 +131,7 @@ internal class LocalToolExecutionCoordinator(
                 readOnly = false, executionStarted = false,
             )
             val binding = currentCoroutineContext()[ToolBindingSnapshot]
-            val delegated = child.copy(id = call.id + "/direct")
+            val delegated = child.withSchemaTypedNumbers(handler.schema).copy(id = call.id + "/direct")
             val invoke: suspend () -> AgentToolResult = {
                 executeScoped(
                     original = delegated, sessionId = sessionId, allowMutation = allowMutation,

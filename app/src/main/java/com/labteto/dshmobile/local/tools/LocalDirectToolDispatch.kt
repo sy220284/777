@@ -9,6 +9,9 @@ import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.local.model.LocalToolCall
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -16,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 internal const val DIRECT_TOOL_CALL = "tool_call"
 internal const val DIRECT_TOOL_SEARCH = "tool_search"
+private val JSON_NUMBER_LITERAL = Regex("""-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?""")
 
 /** Shared immutable member-tool contract. Team feature and tool scope consume one source. */
 internal val DIRECT_TEAM_MEMBER_TOOL_NAMES = setOf(
@@ -31,6 +35,64 @@ internal fun LocalToolCall.directToolTarget(): LocalToolCall? {
     val args = arguments["arguments"] as? JsonObject ?: return null
     if (target == DIRECT_TOOL_CALL || target == DIRECT_TOOL_SEARCH) return null
     return copy(name = target, arguments = args, rawArguments = args.toString())
+}
+
+/**
+ * A generic tool_call gateway cannot expose all registered tools' field types in its static
+ * schema. Interpret only unambiguous JSON-number strings against the selected tool's live
+ * schema before normal registry validation. All other values retain their original types.
+ *
+ * This is a gateway boundary operation, never a relaxation of the target tool's schema.
+ */
+internal fun LocalToolCall.withSchemaTypedNumbers(toolSchema: JsonObject): LocalToolCall {
+    val parameters = ((toolSchema["function"] as? JsonObject)
+        ?.get("parameters") as? JsonObject) ?: return this
+
+    fun normalize(value: JsonElement, schema: JsonObject): JsonElement {
+        return when ((schema["type"] as? JsonPrimitive)?.contentOrNull) {
+            "integer", "number" -> {
+                val primitive = value as? JsonPrimitive
+                if (primitive == null || !primitive.isString ||
+                    !JSON_NUMBER_LITERAL.matches(primitive.content)) {
+                    value
+                } else {
+                    val parsed = runCatching { Json.parseToJsonElement(primitive.content) }
+                        .getOrNull() as? JsonPrimitive
+                    if (parsed != null && !parsed.isString &&
+                        parsed.content.toBigDecimalOrNull() != null) parsed else value
+                }
+            }
+            "object" -> {
+                val obj = value as? JsonObject ?: return value
+                val properties = schema["properties"] as? JsonObject
+                val additional = schema["additionalProperties"] as? JsonObject
+                var changed = false
+                val mapped = obj.mapValues { (key, child) ->
+                    val fieldSchema = (properties?.get(key) as? JsonObject) ?: additional
+                    val normalized = if (fieldSchema != null) normalize(child, fieldSchema) else child
+                    if (normalized !== child) changed = true
+                    normalized
+                }
+                if (changed) JsonObject(mapped) else value
+            }
+            "array" -> {
+                val array = value as? JsonArray ?: return value
+                val itemSchema = schema["items"] as? JsonObject ?: return value
+                var changed = false
+                val mapped = array.map { child ->
+                    val normalized = normalize(child, itemSchema)
+                    if (normalized !== child) changed = true
+                    normalized
+                }
+                if (changed) JsonArray(mapped) else value
+            }
+            else -> value
+        }
+    }
+
+    val normalized = normalize(arguments, parameters) as JsonObject
+    return if (normalized === arguments) this
+    else copy(arguments = normalized, rawArguments = normalized.toString())
 }
 
 /** Model step validation remains on the public gateway, while scope guards see the real child. */
