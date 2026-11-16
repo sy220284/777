@@ -194,18 +194,20 @@ private fun CapabilityRow(
     successLabel: String? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = SyMetric.gapSm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
-        StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
-        Column(Modifier.weight(1f)) {
-            Text(label, style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
-            Text(hint, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+            StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
+            Text(label, modifier = Modifier.weight(1f),
+                style = DsType.std14.withReadingWeight(), color = colors.text)
         }
+        Text(hint, modifier = Modifier.fillMaxWidth(),
+            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
         if (enabled) {
             Text(
                 successLabel ?: stringResource(R.string.advanced_available),

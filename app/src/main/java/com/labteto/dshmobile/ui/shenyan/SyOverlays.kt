@@ -269,8 +269,7 @@ fun SyPopupMenu(
         items.forEach { item ->
             DropdownMenuItem(
                 text = {
-                    Text(item.text, maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                    Text(item.text,
                         color = if (item.danger) p.dangerInk else p.text)
                 },
                 leadingIcon = if (item.icon == null) null else {
