@@ -18,7 +18,7 @@ class ToolBindingSnapshot internal constructor(
     fun registration(name: String): HarnessTool? = bindings[name]
     /** Frozen at model sampling; not part of the public tool list or a durable permission grant. */
     internal fun codeModeChild(name: String): HarnessTool? = codeModeChildren[name]
-    internal fun directChild(name: String): HarnessTool? = directChildren[name]
+    fun directChild(name: String): HarnessTool? = directChildren[name]
 }
 
 /** A first-party Code Mode executor may enter exactly one frozen child registration. */
@@ -30,7 +30,7 @@ internal class CodeModeStepScope(
 }
 
 /** An exact registry binding reached through the first-party tool_call gateway. */
-internal class DirectToolStepScope(
+class DirectToolStepScope(
     val snapshot: ToolBindingSnapshot,
     val registration: HarnessTool,
 ) : AbstractCoroutineContextElement(Key) {
