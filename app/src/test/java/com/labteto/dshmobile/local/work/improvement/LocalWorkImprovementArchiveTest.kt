@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work.improvement
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.nio.file.Files
@@ -288,10 +289,42 @@ class LocalWorkImprovementArchiveTest {
         log.append("work/improvement-adopted", buildJsonObject { put("candidate_id", "sample-proposal") })
         archive.refresh()
         val draft = workspace.readRaw("自我改进/技能草案/sample-proposal.md")
+        val skillFile = workspace.readRaw("自我改进/技能草案/sample-proposal/SKILL.md")
+        val skillName = Regex("""name: (work-method-[a-f0-9]+)""").find(skillFile)!!.groupValues[1]
+        val metadata = parseLocalSkillMetadata(skillName, skillFile)
+        assertFalse(metadata.modelInvocable)
+        assertTrue(skillFile.contains("先构建真实依赖关系"))
         assertTrue(draft.contains("未安装"))
         assertTrue(draft.contains("先构建真实依赖关系"))
         assertTrue(workspace.skills().isEmpty())
     }
+
+    @Test
+    fun untrustedCandidateIdCannotTraverseTheWorkspaceThroughDraftPath() =
+        withArchive { workspace, logs, archive ->
+            val source = logs.get("untrusted-proposal")
+            source.append("work/improvement-candidate", buildJsonObject {
+                put("id", "../../user-private")
+                put("category", "skill")
+                put("goal_signature", "same-acceptance")
+                put("project_id", "alpha")
+                put("model", "model")
+                put("profile_id", "profile")
+                put("guidance", "核对输入并记录结果")
+                put("baseline_tool_calls", 2)
+                put("baseline_tool_errors", 0)
+                put("baseline_test_verified", true)
+            })
+            source.append("work/improvement-adopted", buildJsonObject {
+                put("candidate_id", "../../user-private")
+            })
+            archive.refresh()
+            val draftFiles = workspace.files().map { it.path }
+            assertFalse(draftFiles.any { it.endsWith("user-private.md") })
+            assertFalse(java.io.File(workspace.path, "自我改进/user-private.md").exists())
+            assertTrue(java.io.File(workspace.path, "自我改进/技能草案").listFiles()
+                .orEmpty().any { it.name.startsWith("candidate-") })
+        }
 
     @Test
     fun goalAcceptanceFingerprintRequiresTheExactSameTestContract() {

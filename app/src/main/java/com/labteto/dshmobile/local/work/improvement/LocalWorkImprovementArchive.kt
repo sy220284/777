@@ -6,6 +6,7 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import com.labteto.dshmobile.local.work.LocalGoal
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -371,7 +372,8 @@ internal class LocalWorkImprovementArchive(
         // A skill proposal is a user-readable DRAFT only; ToolsFeature remains the sole
         // installer/editor. Creating this file never registers or enables a live skill.
         adopted.filter { it.category == "skill" }.forEach { proposal ->
-            val proposalPath = directory + "技能草案/" + proposal.id.take(36) + ".md"
+            val safeId = safeSkillDraftKey(proposal.id)
+            val proposalPath = directory + "技能草案/" + safeId + ".md"
             val fullPath = File(workspace.path, proposalPath)
             require(fullPath.canonicalFile.toPath().startsWith(File(workspace.path).canonicalFile.toPath()) &&
                 !Files.isSymbolicLink(fullPath.toPath())) { "技能草案路径不安全" }
@@ -382,6 +384,37 @@ internal class LocalWorkImprovementArchive(
                     "适用场景：" + proposal.cue.replace("\n", " ").take(120) + "\n\n" +
                     "建议方法：\n\n" + proposal.guidance.take(500) + "\n\n" +
                     "验证：已通过受限的相同验收条件比较；发布技能前仍须通过 ToolsFeature 格式/权限检查。\n")
+            }
+            // Create an actual importable SKILL.md proposal, not merely a report.
+            // It is user-only by default and stays outside .dsh/skills. The Tools
+            // owner alone can install/enable the result after explicit user review.
+            val skillName = "work-method-" + stableSkillDraftHash(proposal.id).take(20)
+            val skillPath = directory + "技能草案/" + safeId + "/SKILL.md"
+            val skillFile = File(workspace.path, skillPath)
+            require(skillFile.canonicalFile.toPath().startsWith(
+                File(workspace.path).canonicalFile.toPath()) &&
+                !Files.isSymbolicLink(skillFile.toPath())) { "技能包草案路径不安全" }
+            if (!skillFile.exists()) {
+                workspace.write(skillPath, """
+                    |---
+                    |name: $skillName
+                    |description: 经用户核验并授权后可采用的 Work 方法候选；来源与适用范围见草案
+                    |disable-model-invocation: true
+                    |---
+                    |# 待用户审阅的技能草案
+                    |
+                    |来源候选：${proposal.id.replace("\n", " ").take(100)}
+                    |
+                    |建议的适用场景：${proposal.cue.replace("\n", " ").take(120)}
+                    |
+                    |## 具体方法
+                    |${proposal.guidance.take(500)}
+                    |
+                    |## 使用要求
+                    |先依据当前任务复核方法适用性和独立测试结果。
+                    |用户通过工具与技能管理界面确认后再安装或启用。
+                    |该技能不授予额外工具权限，不自动重放外部副作用。
+                    """.trimMargin() + "\n")
             }
         }
         documents.forEach { (name, body) ->
@@ -555,6 +588,15 @@ internal class LocalWorkImprovementArchive(
         queue.addLast(value)
         if (queue.size > 50) queue.removeFirst()
     }
+
+    /** Untrusted candidate IDs never become unvalidated workspace paths. */
+    private fun safeSkillDraftKey(candidateId: String): String =
+        candidateId.takeIf { it.matches(Regex("[a-z][a-z0-9-]{1,35}")) }
+            ?: "candidate-" + stableSkillDraftHash(candidateId).take(16)
+
+    private fun stableSkillDraftHash(value: String): String =
+        MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     /** Workspace supports user-granted external roots; managed reports must stay app-private. */
     private fun requireSafeArchiveDirectory() {

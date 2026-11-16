@@ -17,7 +17,7 @@ class LocalToolArgumentContractTest {
             put("function", buildJsonObject {
                 put("parameters", buildJsonObject {
                     put("type", "object")
-                    put("required", buildJsonArray { add("z_required") })
+                    put("required", buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("z_required")) })
                     put("properties", buildJsonObject {
                         repeat(15) { index ->
                             put("optional_$index", buildJsonObject { put("type", "number") })

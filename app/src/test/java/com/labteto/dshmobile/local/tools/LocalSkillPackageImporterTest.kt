@@ -66,6 +66,26 @@ class LocalSkillPackageImporterTest {
         assertTrue(workspace.skills().contains("sample-skill"))
     }
 
+    @Test fun linkedLocalResourcesAreVerifiedBeforeAnySkillIsPublished() =
+        runInWorkspace { importer, workspace, root ->
+            val linked = example + "\n[核验脚本](scripts/verify.py)\n[资料](references/spec.md)\n"
+            val incomplete = archive(
+                "SKILL.md" to linked.toByteArray(),
+                "scripts/verify.py" to "print('ok')".toByteArray(),
+            )
+            assertThrows(IllegalArgumentException::class.java) {
+                importer.install("incomplete.zip", incomplete)
+            }
+            assertTrue(workspace.skills().isEmpty())
+            val complete = archive(
+                "SKILL.md" to linked.toByteArray(),
+                "scripts/verify.py" to "print('ok')".toByteArray(),
+                "references/spec.md" to "spec".toByteArray(),
+            )
+            assertEquals("sample-skill", importer.install("complete.zip", complete))
+            assertTrue(root.resolve(".dsh/skills/sample-skill/scripts/verify.py").isFile)
+        }
+
     @Test fun rejectsTraversalAndDoesNotExposePartialSkill() = runInWorkspace { importer, workspace, root ->
         val zipped = archive(
             "pkg/SKILL.md" to example.toByteArray(),
