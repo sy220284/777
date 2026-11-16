@@ -23,7 +23,16 @@
 - DeepSeek Responses 发送 `reasoning.effort`（`none/low/high/max`）、可选 `max_output_tokens`、函数工具及完整历史；官方接口无状态，不使用 `previous_response_id`。其 `store` 字段不生效，自动缓存也不接受 OpenAI 特有的 cache key。
 - Kimi Code Responses 发送官方支持的 `reasoning.effort`，K3.1 Pro 始终保持思考开启；服务端固定采样参数不传用户温度。用户是否拥有高速/1M 配额由官方账户判定。
 - OpenAI 专用 `reasoning.encrypted_content`、prompt cache options 继续仅用于适用的 OpenAI 路由。ChatGPT 套餐 Responses Lite 的工具封装与请求参数保持独立。
-- MiniMax M3.1 / M3 的 Anthropic Messages 保留 `max_tokens = 65536` 默认预算、Bearer 鉴权、原生分块思考与工具历史；已保存 MiniMax /v1 Chat 路由原样可用。
+- MiniMax M3.1 / M3 的 Anthropic Messages 默认 `max_tokens = 65536`，支持请求级输出预算、Bearer 鉴权、原生分块思考与工具历史；已保存 MiniMax /v1 Chat 路由保持原协议。
+
+## 已实现的协议扩展与边界（2026-11-16）
+
+- **DeepSeek Responses**：完整解析原生 `custom_tool_call`，其中 `apply_patch` 支持 `*** Begin Patch` 文本；本地统一转换为 Git diff，再经过路径校验、`git apply --check`、工作区写入权限及 Git 应用，工具续轮按原始 `call_id` 回传 `custom_tool_call_output`。其他普通函数工具继续使用 `function_call`。
+- **MiniMax 国内 Messages**：M3.1 Flash / M3 视频文件使用本轮临时 Base64 构造 `type=video`、`source.type=base64`，限 MP4/AVI/MOV/MKV；以 44MB 直接传输上限留足 64MB JSON 请求体空间。工作区历史只保存文件引用，完整文件不进入持续对话记录。旧视频、跨模型历史按协议投影处理。
+- **Responses 结构化输出**：网关已接通官方 DeepSeek 的 `text.format`（`json_object` 或 `json_schema`）；不将未验证的相同格式强行下发到其他兼容厂商。
+- **协议安全边界**：MiniMax 官方身份需同时匹配 HTTPS、允许的 API 域名及路径和端口；不会因为自定义服务器复用厂商模型名而继承官方鉴权、视频与额度能力。
+- **本轮只交付国内接口**：新模型预置固定 DeepSeek `api.deepseek.com`、MiniMax `api.minimaxi.com`、Kimi `api.kimi.com`；既有用户保存的历史兼容路由继续保留，不为海外地址新增预置或能力承诺。
+- **SDK 选择**：继续采用 OkHttp + Kotlinx Serialization 的统一模型适配器，复用单一准入、取消、历史续轮、事件日志与权限机制。官方 Java SDK 可作为后续协议对照验证工具；目前引入额外 SDK 会增加移动端体积、复杂度及第三方兼容分支，尚无必要。
 
 ## UI 与回复契约
 
