@@ -6,6 +6,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import com.labteto.dshmobile.local.LocalModelException
 import com.labteto.dshmobile.local.LocalModelFailureOrigin
+import com.labteto.dshmobile.local.model.LocalModelAdmissionState
 import com.labteto.dshmobile.local.model.modelTransportFailureKind
 import java.net.URI
 import kotlinx.coroutines.channels.awaitClose
@@ -19,7 +20,11 @@ import kotlinx.coroutines.flow.first
  * No accepted inference or tool call is replayed here.
  */
 internal fun isWorkTransportInterruption(error: LocalModelException?): Boolean {
-    if (error?.continuationEligible != true) return false
+    if (error == null) return false
+    // A request proven NOT_SENT is safe to retry indefinitely after connectivity returns.
+    if (error.admissionState == LocalModelAdmissionState.NOT_SENT &&
+        error.retryable && error.origin == LocalModelFailureOrigin.TRANSPORT) return true
+    if (!error.continuationEligible) return false
     if (error.origin == LocalModelFailureOrigin.TRANSPORT) return true
     if (error.code == "MODEL_PARTIAL_STREAM_INTERRUPTED") return true
     if (error.code == "MODEL_STREAM_STALLED_AFTER_ADMISSION") return true
