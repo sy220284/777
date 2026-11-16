@@ -4,6 +4,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.app.NotificationManager
+import android.app.ActivityManager
+import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.net.Uri
 import android.provider.Settings
@@ -23,6 +25,10 @@ data class DeviceCapabilitiesState(
     val notificationAccessGranted: Boolean = false,
     /** System permission for this app to POST notifications; independent from listener access. */
     val postingNotifications: Boolean? = null,
+    /** Doze exemption is user-controlled; visiting Settings never counts as granted. */
+    val batteryOptimizationExempt: Boolean = false,
+    /** A manually restricted app may lose foreground-service admission after navigation. */
+    val backgroundRestricted: Boolean = false,
     val virtualDisplay: Boolean = true,
     val error: String? = null,
 )
@@ -50,6 +56,33 @@ internal class DeviceCapabilitiesController(
             notificationAccessGranted = appContext.getSystemService(NotificationManager::class.java)
                 .isNotificationListenerAccessGranted(listenerComponent),
             postingNotifications = NotificationManagerCompat.from(appContext).areNotificationsEnabled(),
+            batteryOptimizationExempt = appContext.getSystemService(PowerManager::class.java)
+                .isIgnoringBatteryOptimizations(appContext.packageName),
+            backgroundRestricted = appContext.getSystemService(ActivityManager::class.java)
+                .isBackgroundRestricted,
+        )
+    }
+
+    /**
+     * Explicit user action only. Continuous on-device Work requires live network access
+     * while idle; this opens Android's visible consent dialog, never changes settings silently.
+     */
+    fun requestContinuousWorkBatteryExemption() {
+        if (appContext.getSystemService(ActivityManager::class.java).isBackgroundRestricted) {
+            openAppDetails() // Restricted state needs the full battery usage screen.
+            return
+        }
+        appContext.startActivity(
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(Uri.parse("package:" + appContext.packageName))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    fun openBatteryOptimizationSettings() {
+        appContext.startActivity(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 
