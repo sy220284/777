@@ -209,6 +209,7 @@ internal suspend fun prepareLocalMultimodalMessages(
     model: String? = null,
     baseUrl: String? = null,
     planSharing: Boolean = false,
+    profile: LocalModelProfile? = null,
     resourceScheduler: HarnessResourceScheduler? = null,
 ): List<JsonObject> = withContext(Dispatchers.IO) {
     val messages = expandToolImageMessages(messages, toolImageMode = mode == LocalImageInputMode.TOOL)
@@ -272,6 +273,16 @@ internal suspend fun prepareLocalMultimodalMessages(
                     }
                     val videoMime = LocalKimiPolicy.videoMediaType(name, mediaType)
                     if (videoMime != null && baseUrl != null && LocalKimiPolicy.isOfficial(baseUrl)) {
+                        val matchingProfile = profile?.takeIf {
+                            it.model == model &&
+                                normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
+                        }
+                        val protocol = matchingProfile?.let {
+                            resolveLocalModelProtocol(it.authKind, it, model.orEmpty(), baseUrl)
+                        } ?: LocalModelPresets.protocolFor(model.orEmpty(), baseUrl)
+                        check(protocol == LocalModelProtocol.CHAT_COMPLETIONS) {
+                            "Kimi Code 的 Responses 协议暂不支持视频输入；请在模型设置中选择 Chat Completions 协议后重试"
+                        }
                         if (model == null || !LocalKimiPolicy.videoInputSupported(model, baseUrl)) {
                             error("当前 Kimi Code 模型不支持视频输入；k3-256k 仅支持图片，请切换支持视频的型号")
                         }
