@@ -417,12 +417,35 @@ internal fun PluginInventoryBrowser(
                 backContentDescription = stringResource(R.string.common_back),
             )
             Row(
-                modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
+                modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                LazyRow(
+                    modifier = Modifier.weight(1f).testTag("plugin-category-list"),
+                    contentPadding = PaddingValues(start = SyMetric.gapSection, end = SyMetric.gapSm),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                ) {
+                    items(5) { category ->
+                        SyFilterChip(
+                            text = if (skillsOnly) when (category) {
+                                1 -> "已安装"
+                                2 -> "办公效率"
+                                3 -> "开发研究"
+                                4 -> "创意设计"
+                                else -> "发现"
+                            } else when (category) {
+                                1 -> "已连接"
+                                2 -> "已安装"
+                                3 -> "设备与自动化"
+                                4 -> "创意设计"
+                                else -> "发现"
+                            },
+                            selected = selectedCategory == category,
+                            onClick = { selectedCategory = category },
+                        )
+                    }
+                }
                 IconButton(
                     onClick = {
                         showSearch = !showSearch
@@ -450,31 +473,6 @@ internal fun PluginInventoryBrowser(
                     placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search
                         else R.string.tools_catalog_search),
                 )
-            }
-            LazyRow(
-                modifier = Modifier.testTag("plugin-category-list"),
-                contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            ) {
-                items(5) { category ->
-                    SyFilterChip(
-                        text = if (skillsOnly) when (category) {
-                            1 -> "已安装"
-                            2 -> "办公效率"
-                            3 -> "开发研究"
-                            4 -> "创意设计"
-                            else -> "发现"
-                        } else when (category) {
-                            1 -> "已连接"
-                            2 -> "已安装"
-                            3 -> "设备与自动化"
-                            4 -> "创意设计"
-                            else -> "发现"
-                        },
-                        selected = selectedCategory == category,
-                        onClick = { selectedCategory = category },
-                    )
-                }
             }
             if (loading && list.isNotEmpty()) {
                 Text(

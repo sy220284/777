@@ -17,6 +17,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -44,14 +46,14 @@ internal fun LocalWorkspaceBrowseToolbar(
         if (onImport != null) {
             SyButton(
                 text = if (importing) "导入中…" else "导入手机文件",
-                onClick = onImport, enabled = !importing,
+                onClick = onImport, enabled = enabled && !importing,
                 size = SyButtonSize.Small, variant = SyButtonVariant.Outline,
                 icon = FeatherIcons.Plus, modifier = Modifier.testTag("work_import_phone_file"),
             )
         }
         if (onSelect != null) {
             SyButton(
-                text = "选择文件", onClick = onSelect,
+                text = "选择文件", onClick = onSelect, enabled = enabled,
                 size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
                 modifier = Modifier.testTag("work_files_select"),
             )
@@ -59,10 +61,13 @@ internal fun LocalWorkspaceBrowseToolbar(
         if (onProjects != null || onReview != null || onDownloads != null) {
             Box {
                 SyButton(
-                    text = "更多操作", onClick = { expanded = true },
+                    text = "更多操作", onClick = { expanded = true }, enabled = enabled,
                     size = SyButtonSize.Small, variant = SyButtonVariant.Outline,
                     icon = FeatherIcons.MoreVertical,
-                    modifier = Modifier.testTag("work_files_more"),
+                    // The visible label is concise; the spoken label retains the full
+                    // action name used by screen readers and the existing navigation tests.
+                    modifier = Modifier.testTag("work_files_more")
+                        .semantics { contentDescription = "更多文件操作" },
                 )
                 SyPopupMenu(expanded = expanded, onDismiss = { expanded = false }) {
                     @Composable fun Entry(label: String, tag: String, action: (() -> Unit)?, available: Boolean = true, hint: String? = null) {

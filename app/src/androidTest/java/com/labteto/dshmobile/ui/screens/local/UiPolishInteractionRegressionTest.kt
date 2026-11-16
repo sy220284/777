@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -76,6 +77,7 @@ class UiPolishInteractionRegressionTest {
             }
         }
         compose.onNodeWithTag("work_files_select").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("更多文件操作").assertIsDisplayed()
         compose.onNodeWithTag("work_files_more").assertIsDisplayed().performClick()
         compose.onNodeWithTag("work_projects_open").assertExists().performClick()
         compose.runOnIdle {

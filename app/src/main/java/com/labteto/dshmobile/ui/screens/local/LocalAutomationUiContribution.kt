@@ -40,6 +40,8 @@ internal fun localAutomationFeatureUiContribution(
         initialSelectedTaskId = searchedTaskId,
         entryRequest = entryRequest,
         onCreateViaChat = onCreateViaChat,
-        handleRootSystemBack = false,
+        // The task editor owns its back action; at the task root, system Back
+        // returns to the calling Chat/Work screen.
+        handleRootSystemBack = true,
     )
 }
