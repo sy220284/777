@@ -711,6 +711,11 @@ internal fun DeepSeekPricingCard(
             style = DsType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
+        Text(
+            "计价单位：人民币元 / 100 万 Token",
+            style = DsType.small13.withReadingWeight(),
+            color = colors.textSecondary,
+        )
 
         state.models.forEach { model ->
             Column(modifier = Modifier.fillMaxWidth()) {

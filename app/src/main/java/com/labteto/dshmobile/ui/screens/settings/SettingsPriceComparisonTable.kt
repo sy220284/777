@@ -56,12 +56,6 @@ internal fun PriceComparisonTable(offPeak: PricePeriodValues, peak: PricePeriodV
         with(density) { maxOf(header, value).toDp() } + SyMetric.gapMd
     }
     val requiredWidth = valueWidths.fold(periodWidth) { total, width -> total + width }
-    Text(
-        text = "价格单位：人民币元 / 100 万 Token",
-        style = DsType.caption11.withReadingWeight(),
-        color = colors.textSecondary,
-        modifier = Modifier.fillMaxWidth(),
-    )
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val tableWidth = maxOf(maxWidth, requiredWidth)
         val extra = (tableWidth - requiredWidth) / headers.size
