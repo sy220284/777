@@ -28,6 +28,7 @@ internal object LocalModelProtocolRoutePolicy {
                 listOf(LocalModelProtocol.CHAT_COMPLETIONS)
             LocalKimiPolicy.isOfficial(baseUrl) && name in kimiModels -> bothChatAndResponses
             DeepSeekChatRequestPolicy.isOfficial(model, baseUrl) -> bothChatAndResponses
+            isOfficialOpenAi(model, baseUrl) -> bothChatAndResponses
             isOfficialClaude(model, baseUrl) -> listOf(LocalModelProtocol.ANTHROPIC_MESSAGES)
             else -> LocalModelProtocol.entries.toList()
         }
@@ -41,6 +42,13 @@ internal object LocalModelProtocolRoutePolicy {
         val normalized = normalizeModelBaseUrl(baseUrl)
         require(protocol in supportedProtocols(model, normalized)) {
             "当前官方模型不支持 ${protocol.name} 协议，请选择界面提供的协议"
+        }
+        if (DeepSeekChatRequestPolicy.isOfficial(model, normalized) &&
+            protocol == LocalModelProtocol.RESPONSES) {
+            // Old saved Chat routes may point directly to /v1/chat/completions.
+            // Responses always uses the documented API root, never that Chat path.
+            val uri = URI(normalized)
+            return "https://${uri.rawAuthority}"
         }
         if (!LocalMiniMaxPolicy.isOfficial(normalized) ||
             (model.trim().lowercase() !in miniMaxM3 &&
@@ -75,12 +83,25 @@ internal object LocalModelProtocolRoutePolicy {
         val old = normalizeModelBaseUrl(previous)
         val current = normalizeModelBaseUrl(next)
         if (old == current) return true
-        if (!LocalMiniMaxPolicy.isOfficial(old) || !LocalMiniMaxPolicy.isOfficial(current)) return false
+        val miniMax = LocalMiniMaxPolicy.isOfficial(old) && LocalMiniMaxPolicy.isOfficial(current)
+        val deepSeek = DeepSeekChatRequestPolicy.isOfficialOrigin(old) &&
+            DeepSeekChatRequestPolicy.isOfficialOrigin(current)
+        if (!miniMax && !deepSeek) return false
         val a = URI(old)
         val b = URI(current)
         return a.host.equals(b.host, true) &&
             (if (a.port == -1) 443 else a.port) == (if (b.port == -1) 443 else b.port)
     }
+
+    private fun isOfficialOpenAi(model: String, baseUrl: String): Boolean = runCatching {
+        val url = URI(normalizeModelBaseUrl(baseUrl))
+        model.trim().lowercase().startsWith("gpt-") &&
+            url.scheme.equals("https", true) &&
+            url.host.equals("api.openai.com", true) &&
+            url.port in setOf(-1, 443) &&
+            url.userInfo == null && url.rawQuery == null && url.rawFragment == null &&
+            url.path.trimEnd('/') == "/v1"
+    }.getOrDefault(false)
 
     private fun isOfficialClaude(model: String, baseUrl: String): Boolean = runCatching {
         val url = URI(normalizeModelBaseUrl(baseUrl))
