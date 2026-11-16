@@ -13,6 +13,10 @@ name: 777 聊天与工作真实设备交互回归
       - 'app/src/main/java/com/labteto/dshmobile/ui/screens/settings/**'
       - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/**'
       - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/settings/**'
+      - 'app/src/androidTest/java/com/shenyan/designsystem/**'
+      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/audit/**'
+      - 'app/src/main/java/com/shenyan/designsystem/**'
+      - 'app/src/main/java/com/labteto/dshmobile/ui/shenyan/**'
       - 'harness-core/src/**'
       - 'harness-interop/src/**'
       - 'harness-device-android/src/**'
@@ -54,7 +58,15 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest,com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest,com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest,com.labteto.dshmobile.ui.screens.settings.PermissionSetupFlowAndroidTest,com.labteto.dshmobile.notify.NotificationRoutingAndroidTest --stacktrace --console=plain
+          script: |
+            status=0
+            ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest,com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest,com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest,com.labteto.dshmobile.ui.screens.settings.PermissionSetupFlowAndroidTest,com.labteto.dshmobile.notify.NotificationRoutingAndroidTest,com.shenyan.designsystem.components.MobileActionReadabilityTest,com.labteto.dshmobile.ui.screens.local.WorkspaceBrowseLayoutTest --stacktrace --console=plain || status=$?
+            mkdir -p app/build/outputs/ui-audit
+            if ! adb pull /sdcard/Android/data/com.sy220284.dshmobile.debug/files/ui-audit/. app/build/outputs/ui-audit/; then
+              echo "::error::原生界面截图未能导出"
+              if [ "$status" -eq 0 ]; then status=1; fi
+            fi
+            exit "$status"
       - name: 失败时输出真实断言
         if: failure()
         run: |
@@ -67,5 +79,6 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
+            app/build/outputs/ui-audit/
           if-no-files-found: warn
           retention-days: 7
