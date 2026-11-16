@@ -11,12 +11,14 @@ import kotlin.coroutines.CoroutineContext
 class ToolBindingSnapshot internal constructor(
     private val bindings: Map<String, HarnessTool>,
     private val codeModeChildren: Map<String, HarnessTool> = emptyMap(),
+    private val directChildren: Map<String, HarnessTool> = emptyMap(),
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<ToolBindingSnapshot>
 
     fun registration(name: String): HarnessTool? = bindings[name]
     /** Frozen at model sampling; not part of the public tool list or a durable permission grant. */
     internal fun codeModeChild(name: String): HarnessTool? = codeModeChildren[name]
+    internal fun directChild(name: String): HarnessTool? = directChildren[name]
 }
 
 /** A first-party Code Mode executor may enter exactly one frozen child registration. */
@@ -25,4 +27,12 @@ internal class CodeModeStepScope(
     val registration: HarnessTool,
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<CodeModeStepScope>
+}
+
+/** An exact registry binding reached through the first-party tool_call gateway. */
+internal class DirectToolStepScope(
+    val snapshot: ToolBindingSnapshot,
+    val registration: HarnessTool,
+) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<DirectToolStepScope>
 }
