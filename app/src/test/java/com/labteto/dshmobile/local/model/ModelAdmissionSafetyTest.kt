@@ -155,6 +155,19 @@ class ModelAdmissionSafetyTest {
     }
 
     @Test
+    fun invalidModelToolArgumentsAreNotMistakenForTransportInterruptions() {
+        val error = com.labteto.dshmobile.local.LocalModelException(
+            code = "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
+            message = "tool_use 参数不是合法 JSON 对象",
+            retryable = false,
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
+        )
+        assertEquals("tool_arguments_invalid", modelFailureKind(error))
+        assertEquals(null, modelTransportFailureKind(error))
+    }
+
+    @Test
     fun diagnosticsDifferentiateDnsTruncationAndNonTransportRejection() {
         val dns = modelTransportFailure(
             "MODEL_NETWORK", "dns failed", LocalModelAdmissionTracker(), "req-dns",
