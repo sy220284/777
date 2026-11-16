@@ -65,7 +65,7 @@ internal suspend fun awaitWorkTransportRecovery(
     context: Context,
     baseUrl: String,
     continuationIndex: Int,
-    onWaiting: (String) -> Unit,
+    onWaiting: (reason: String, networkUnavailable: Boolean) -> Unit,
 ) {
     if (requiresInternet(baseUrl)) {
         val networks = context.getSystemService(ConnectivityManager::class.java)
@@ -76,7 +76,7 @@ internal suspend fun awaitWorkTransportRecovery(
                 return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             }
             if (!usable()) {
-                onWaiting("网络暂时不可用，任务正在等待连接恢复")
+                onWaiting("网络暂时不可用，任务正在等待连接恢复", true)
                 callbackFlow {
                     val callback = object : ConnectivityManager.NetworkCallback() {
                         override fun onAvailable(network: Network) {
@@ -97,7 +97,7 @@ internal suspend fun awaitWorkTransportRecovery(
     // Exponential pacing avoids hot loops and duplicate paid inference during an outage.
     val backoff = workTransportResumeBackoffMillis(continuationIndex)
     if (backoff > 0L) {
-        onWaiting("连接恢复确认中，任务进度已保留")
+        onWaiting("连接恢复确认中，任务进度已保留", false)
         delay(backoff)
     }
 }
