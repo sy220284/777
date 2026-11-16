@@ -23,7 +23,18 @@ class LocalModelProtocolRoutePolicyTest {
         val r = LocalModelProtocol.RESPONSES
         val a = LocalModelProtocol.ANTHROPIC_MESSAGES
         assertEquals(listOf(a, c),
-            LocalModelProtocolRoutePolicy.supportedProtocols(model, "$miniMax/anthropic/v1"))
+            LocalModelPresets.editorProtocolsFor(model, "$miniMax/anthropic/v1"))
+        assertEquals("MiniMax-M3",
+            LocalModelPresets.editablePresetFor(model, "$miniMax/v1")?.model)
+        assertEquals(LocalModelProtocol.ANTHROPIC_MESSAGES,
+            LocalModelPresets.editablePresetFor(model, "$miniMax/v1")?.protocol)
+        assertEquals(listOf(262_144, 1_048_576),
+            LocalModelPresets.editorContextWindowOptionsFor("k3.1-pro", "https://api.kimi.com/coding/v1"))
+        assertEquals(emptyList<Int>(),
+            LocalModelPresets.editorContextWindowOptionsFor(model, "$miniMax/v1"))
+        assertEquals("$miniMax/v1",
+            LocalModelProtocolRoutePolicy.baseUrlFor("MiniMax-M2.7",
+                "$miniMax/anthropic/v1", LocalModelProtocol.CHAT_COMPLETIONS))
         assertEquals(listOf(c),
             LocalModelProtocolRoutePolicy.supportedProtocols("MiniMax-M2.7", "$miniMax/v1"))
         assertEquals(listOf(r, c),
