@@ -88,6 +88,32 @@ class LocalMiniMaxCompatibilityTest {
         assertFalse(LocalMiniMaxPolicy.isOfficial("https://api.minimax.io.evil.example/v1"))
     }
 
+    @Test fun miniMaxOfficialAddressRequiresHttpsKnownPathAndNoRedirectLikeSuffix() {
+        for (base in listOf(
+            "https://api.minimaxi.com/v1",
+            "https://api.minimaxi.com/anthropic/v1",
+            "https://api.minimax.cn/anthropic/v1",
+            "https://api.minimaxi.com/v1/chat/completions",
+        )) {
+            assertTrue(base, LocalMiniMaxPolicy.isOfficial(base))
+        }
+        for (base in listOf(
+            "http://api.minimaxi.com/v1",
+            "https://api.minimaxi.com.evil.example/v1",
+            "https://api.minimaxi.com:8443/v1",
+            "https://user:password@api.minimaxi.com/v1",
+            "https://api.minimaxi.com/v1?token=secret",
+            "https://api.minimaxi.com/v1#anything",
+            "https://api.minimaxi.com/redirect",
+            "https://api.minimaxi.com/anthropic/v1/other",
+        )) {
+            assertFalse(base, LocalMiniMaxPolicy.isOfficial(base))
+            assertFalse(base, LocalMiniMaxPolicy.nativeVideoSupported(
+                "MiniMax-M3", base, LocalModelProtocol.ANTHROPIC_MESSAGES,
+            ))
+        }
+    }
+
     @Test fun miniMaxM3UsesNativeAnthropicProtocolWithoutIgnoredTemperature() {
         for (host in listOf("api.minimaxi.com", "api.minimax.io", "api.minimax.cn")) {
             val base = "https://$host/anthropic/v1"
