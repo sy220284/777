@@ -40,6 +40,7 @@ import com.labteto.dshmobile.local.usage.LocalTokenUsageContextBridge
 import com.labteto.dshmobile.local.usage.LocalTokenUsageSessionFacts
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 import com.labteto.dshmobile.local.work.LocalWorkComposition
+import com.labteto.dshmobile.local.work.LOCAL_WORK_BUILTIN_TOOL_NAMES
 import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.toEnvironmentRunSnapshot
@@ -177,8 +178,11 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
     ): String {
         val root = tools.get()
         val workspace = executionLocalWorkspace(this.workspace)
-        val webTools = root.webTools.atWorkspace(workspace)
-        val extensionWorkshop = if (workspace === this.workspace) this.extensionWorkshop else LocalExtensionWorkshop(workspace)
+        // Ordinary file, shell and device tools do not construct web or workshop owners.
+        val webTools by lazy(LazyThreadSafetyMode.NONE) { root.webTools.atWorkspace(workspace) }
+        val extensionWorkshop by lazy(LazyThreadSafetyMode.NONE) {
+            if (workspace === this.workspace) this.extensionWorkshop else LocalExtensionWorkshop(workspace)
+        }
         val args = call.arguments
         val binding = executionSessionId?.let(workRuns::get)
         val state = binding?.aggregateSnapshot() ?: runtimeStateStore.state.value
@@ -186,7 +190,13 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         if (state.work.planMode && call.name in PLAN_MODE_BLOCKED_TOOLS) {
             return "当前处于规划模式，只能检查和制定方案；请先通过 exit_plan_mode 提交计划。"
         }
-        work.get().executeBuiltin(call, allowMutation, binding)?.let { return it }
+        // Directly route known Work-owned tools. A shared file/web/device call must not
+        // construct the full Work feature (team lifecycle, recovery and archives).
+        if (call.name in LOCAL_WORK_BUILTIN_TOOL_NAMES) {
+            return requireNotNull(work.get().executeBuiltin(call, allowMutation, binding)) {
+                "Work 已声明工具但未处理：${call.name}"
+            }
+        }
 
         return when (call.name) {
             "read", "read_file" -> withContext(Dispatchers.IO) { runtimeStateStore.resourceScheduler.withResource(

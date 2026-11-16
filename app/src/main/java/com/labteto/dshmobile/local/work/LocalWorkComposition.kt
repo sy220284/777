@@ -50,6 +50,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** One Work-owned dispatch table, derived from actual handlers rather than copied into ToolRegistry. */
+internal val LOCAL_WORK_BUILTIN_TOOL_NAMES: Set<String> =
+    LocalWorkBuiltinToolRuntime.TOOL_NAMES +
+        LocalWorkMediaToolRuntime.TOOL_NAMES +
+        LocalAgentControlPlane.TOOL_NAMES
+
 /** WorkFeature composition owner for foreground turns, subagents and Work-owned built-ins. */
 @Singleton
 internal class LocalWorkComposition @Inject constructor(
