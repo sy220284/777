@@ -27,6 +27,11 @@ class LocalWorkspaceShareSelectionUiTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
+    private fun openReview() {
+        compose.onNodeWithContentDescription("更多文件操作").performClick()
+        compose.onNodeWithTag("work_git_review_entry").performClick()
+    }
+
     @Test
     fun workRootShowsSystemDocumentImportWithoutExtraConfiguration() {
         compose.setContent {
@@ -47,7 +52,8 @@ class LocalWorkspaceShareSelectionUiTest {
             compose.onAllNodesWithText("导入手机文件").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("work_import_phone_file").assertExists()
-        compose.onNodeWithText("打开下载").assertExists()
+        compose.onNodeWithContentDescription("更多文件操作").performClick()
+        compose.onNodeWithTag("work_downloads_open").assertExists()
     }
 
     @Test
@@ -88,11 +94,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("更多文件操作").performClick()
-        compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("代码审查").performClick()
+        openReview()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("local diff").fetchSemanticsNodes().isNotEmpty()
         }
@@ -138,11 +140,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("更多文件操作").performClick()
-        compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("代码审查").performClick()
+        openReview()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("upstream/release/v2").fetchSemanticsNodes().isNotEmpty()
         }
@@ -188,11 +186,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("更多文件操作").performClick()
-        compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("代码审查").performClick()
+        openReview()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("已保存的历史审查报告")
                 .fetchSemanticsNodes().isNotEmpty()
@@ -238,7 +232,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithText("代码审查").performClick()
+        openReview()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("独立代码历史仍可查看").fetchSemanticsNodes().isNotEmpty()
         }
@@ -285,7 +279,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithText("代码审查").performClick()
+        openReview()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("审查安全结论").fetchSemanticsNodes().isNotEmpty()
         }
@@ -330,7 +324,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithText("代码审查").performClick()
+        openReview()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("发现高危操作").fetchSemanticsNodes().isNotEmpty()
         }
@@ -354,11 +348,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("更多文件操作").performClick()
-        compose.waitUntil(5_000) {
-            compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("代码审查").performClick()
+        openReview()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("当前目录没有可比较的本地远端跟踪分支。请先在该 Git 仓库中获取远端分支。")
                 .fetchSemanticsNodes().isNotEmpty()

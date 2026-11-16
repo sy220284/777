@@ -62,7 +62,7 @@ internal fun LocalWorkspaceBrowseToolbar(
                     Entry("选择文件", "work_files_select", onSelect)
                     Entry("管理项目", "work_projects_open", onProjects, enabled)
                     Entry("代码审查", "work_git_review_entry", onReview, enabled)
-                    Entry("打开下载 · 已完成成果", "work_downloads_open", onDownloads)
+                    Entry("打开下载", "work_downloads_open", onDownloads)
                 }
             }
         }

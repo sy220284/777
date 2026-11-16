@@ -33,7 +33,15 @@ concurrency:
 
 jobs:
   user-journey:
-    name: Android 36 聊天工作权限与结果展示实测
+    name: Android ${{ matrix.android.api }} 聊天工作权限与结果展示实测
+    strategy:
+      fail-fast: false
+      matrix:
+        android:
+          - api: '36'
+            target: google_apis
+          - api: '37.0'
+            target: google_apis_ps16k
     runs-on: ubuntu-latest
     timeout-minutes: 70
     env:
@@ -55,8 +63,8 @@ jobs:
       - name: 模拟器执行聊天输入、工作进度、团队交互和授权引导回归
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: 36
-          target: google_apis
+          api-level: ${{ matrix.android.api }}
+          target: ${{ matrix.android.target }}
           arch: x86_64
           profile: pixel_6
           disable-animations: true
@@ -70,7 +78,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: runtime-user-journey-results
+          name: runtime-user-journey-results-${{ matrix.android.api }}
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
