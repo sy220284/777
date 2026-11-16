@@ -407,6 +407,22 @@ class AnthropicMessagesClientTest {
     }
 
     @Test
+    fun providerSseFieldTypeErrorBecomesCorrectableProtocolFailure() = runBlocking {
+        val start = """{"type":"message_start","message":{"id":"msg-malformed","usage":{"input_tokens":1}}}"""
+        val invalid = """{"type":"content_block_start","index":[],"content_block":{"type":"tool_use","id":"x","name":"tool_call","input":{}}}"""
+        val failure = runCatching {
+            fixture(listOf(start, invalid)).complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertNotNull(failure)
+        assertEquals("ANTHROPIC_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertEquals(LocalModelFailureOrigin.STREAM_PARSE, failure?.origin)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+        assertFalse(failure?.cause?.message.orEmpty().contains("index"))
+    }
+
+    @Test
     fun malformedToolJsonIsSafelyContinuableAndValidJsonFragmentsStillWork() = runBlocking {
         val start = """{"type":"message_start","message":{"id":"msg-tool","usage":{"input_tokens":4}}}"""
         val toolStart = """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"tool_call","input":{}}}"""
