@@ -54,8 +54,8 @@ object LocalToolCatalog {
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
         ), listOf("path", "old_text", "new_text")))
-        add(tool("apply_patch", "应用标准 unified diff 补丁到工作区；先执行 git apply --check，成功后原子式应用", properties(
-            "patch" to string("完整 unified diff 文本"),
+        add(tool("apply_patch", "通过 Git 预检及原子应用补丁；支持 unified diff 与 Codex *** Begin Patch 格式", properties(
+            "patch" to string("完整 unified diff，或 *** Begin Patch/End Patch 围住的 Codex 文件修改补丁"),
         ), listOf("patch")))
         add(tool("archive_list", "完整枚举 ZIP/TAR.GZ/TAR 等归档的内部文件；按 cursor 翻页直到 next_cursor=none，不能把预览当作全量结果", properties(
             "path" to string("工作区相对归档路径，如 .dsh/attachments/xxx.gz"),
