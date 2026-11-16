@@ -19,6 +19,13 @@ class LocalWorkBuiltinToolRuntimeTest {
 
     @Test
     fun onlyWorkOwnedToolsEnterTheWorkDispatcher() {
+        val ownerSets = listOf(
+            LocalWorkBuiltinToolRuntime.TOOL_NAMES,
+            LocalWorkMediaToolRuntime.TOOL_NAMES,
+            LocalAgentControlPlane.TOOL_NAMES,
+        )
+        assertEquals("One Work tool must be routed to exactly one owner",
+            ownerSets.sumOf { it.size }, LOCAL_WORK_BUILTIN_TOOL_NAMES.size)
         assertTrue(LOCAL_WORK_BUILTIN_TOOL_NAMES.containsAll(LocalWorkBuiltinToolRuntime.TOOL_NAMES))
         assertTrue(LOCAL_WORK_BUILTIN_TOOL_NAMES.containsAll(LocalWorkMediaToolRuntime.TOOL_NAMES))
         assertTrue(LOCAL_WORK_BUILTIN_TOOL_NAMES.containsAll(LocalAgentControlPlane.TOOL_NAMES))

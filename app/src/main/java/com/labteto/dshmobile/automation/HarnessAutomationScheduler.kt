@@ -638,22 +638,17 @@ class HarnessAutomationScheduler @Inject constructor(
         }
 
         resumed.forEach { (_, updated) ->
-            // A newer chat activity may have changed the run time before enqueue.
-            // Submit only while this exact schedule remains the durable authority.
-            store.withCurrentGeneration(updated.id, updated.scheduleGeneration) { latest ->
-                if (latest.status != AutomationStatus.SCHEDULED ||
-                    latest.nextRunAt != updated.nextRunAt ||
-                    latest.lastUserActivityAt != updated.lastUserActivityAt) return@withCurrentGeneration
-                if (usesChainedAutomationScheduling(latest) || latest.recurringMinutes == null) {
-                    enqueueOneTime(latest.id, latest.nextRunAt, latest.scheduleGeneration)
-                } else {
-                    enqueuePeriodic(
-                        latest.id,
-                        requireNotNull(latest.recurringMinutes),
-                        latest.nextRunAt,
-                        latest.scheduleGeneration,
-                    )
-                }
+            // Both enqueue paths already check the current generation, status and
+            // due time atomically. A second enclosing store read cannot add safety.
+            if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
+                enqueueOneTime(updated.id, updated.nextRunAt, updated.scheduleGeneration)
+            } else {
+                enqueuePeriodic(
+                    updated.id,
+                    requireNotNull(updated.recurringMinutes),
+                    updated.nextRunAt,
+                    updated.scheduleGeneration,
+                )
             }
         }
     }

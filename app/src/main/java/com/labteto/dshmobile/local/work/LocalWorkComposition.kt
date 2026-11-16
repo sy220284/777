@@ -409,9 +409,13 @@ internal class LocalWorkComposition @Inject constructor(
         allowMutation: Boolean,
         binding: LocalWorkRunBinding?,
     ): String? {
-        taskBuiltins.execute(call, binding)?.let { return it }
-        workMediaTools.execute(call, allowMutation, binding)?.let { return it }
-        return agentControlBuiltins.execute(call, allowMutation, binding)
+        // The tool name already determines its owner; do not probe three feature handlers.
+        return when (call.name) {
+            in LocalWorkBuiltinToolRuntime.TOOL_NAMES -> taskBuiltins.execute(call, binding)
+            in LocalWorkMediaToolRuntime.TOOL_NAMES -> workMediaTools.execute(call, allowMutation, binding)
+            in LocalAgentControlPlane.TOOL_NAMES -> agentControlBuiltins.execute(call, allowMutation, binding)
+            else -> null
+        }
     }
 
     internal fun automationRunner(
