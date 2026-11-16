@@ -292,8 +292,18 @@ class LocalWorkRunRegistryTest {
             put("role", "assistant")
             put("content", "stale historical reply")
         })
+        val abandonedProjection = Job()
+        oldOwner.runHandle.projectionJob = abandonedProjection
         registry.attach(oldOwner)
         registry.attach(currentOwner)
+        assertTrue("replaced run must be cancelled at ownership handover", oldJob.isCancelled)
+        assertTrue("replaced state collector must be cancelled", abandonedProjection.isCancelled)
+        assertNull(oldOwner.runHandle.projectionJob)
+        assertFalse(currentJob.isCancelled)
+        val beforeVisible = runtime.state.value
+        oldOwner.state.update { it.copy(error = "stale projection") }
+        registry.mirrorVisible(oldOwner)
+        assertEquals(beforeVisible, runtime.state.value)
         val oldCursor = runtime.foregroundRunHandle.transcriptProjectionCursor
         try {
             assertNull(registry.finishTurn(oldOwner, oldJob) { _, _ ->
