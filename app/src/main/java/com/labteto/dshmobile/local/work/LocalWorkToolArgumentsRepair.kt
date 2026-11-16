@@ -37,7 +37,7 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
                 put(
                     "content",
                     "上一轮模型生成的工具调用参数不是合法 JSON 对象，工具尚未执行。" +
-                        "请根据当前已提供的工具参数定义重新生成严格合法、完整的 JSON 对象参数，" +
+                        "如不确定工具名称或参数结构，先调用 tool_search 查明真实定义，再重新生成完整、合法的 JSON 对象参数，" +
                         "继续完成原任务。不要重复已在历史中有成功回执的工具操作。"
                 )
             }
