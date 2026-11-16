@@ -114,7 +114,7 @@ class LocalWorkToolArgumentsRepairTest {
     }
 
     @Test fun allAdmittedProviderProtocolErrorsProvideInStepCorrection() = runTest {
-        for (code in listOf("MODEL_STREAM_PROTOCOL", "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR")) {
+        for (code in listOf("MODEL_STREAM_PROTOCOL", "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR", "MODEL_EMPTY_RESPONSE")) {
             var samples = 0
             val failure = LocalModelException(
                 code = code,
