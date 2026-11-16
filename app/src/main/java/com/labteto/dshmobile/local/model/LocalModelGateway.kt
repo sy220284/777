@@ -454,9 +454,18 @@ internal fun prepareLocalModelAdapterRequest(
             tools = canonicalTools,
             temperature = routedTemperature,
             reasoningEffort = reasoningEffort,
-            maxTokens = if (route.protocol == LocalModelProtocol.CHAT_COMPLETIONS) {
-                DeepSeekChatRequestPolicy.checkedMaxTokens(route.model, route.baseUrl, maxTokens)
-            } else null,
+            maxTokens = when (route.protocol) {
+                LocalModelProtocol.CHAT_COMPLETIONS ->
+                    DeepSeekChatRequestPolicy.checkedMaxTokens(route.model, route.baseUrl, maxTokens)
+                LocalModelProtocol.RESPONSES -> if (route.authKind == LocalModelAuthKind.CHATGPT_PLAN) {
+                    null
+                } else if (DeepSeekChatRequestPolicy.isOfficial(route.model, route.baseUrl)) {
+                    DeepSeekChatRequestPolicy.checkedMaxTokens(route.model, route.baseUrl, maxTokens)
+                } else maxTokens?.also {
+                    require(it > 0) { "Responses API 最大输出 Token 数必须大于零" }
+                }
+                LocalModelProtocol.ANTHROPIC_MESSAGES -> null
+            },
             allowImageGeneration = allowImageGeneration && route.protocol == LocalModelProtocol.RESPONSES,
             promptCacheComparisonResponseId = promptCacheComparisonResponseId
                 ?.takeIf { route.protocol == LocalModelProtocol.RESPONSES && route.capabilities.promptCacheDiagnostics },
