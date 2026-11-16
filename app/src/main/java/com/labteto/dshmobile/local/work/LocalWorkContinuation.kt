@@ -110,6 +110,8 @@ internal fun queueAutomaticWorkContinuation(
         prompt = when {
             outputLimitProgress ->
                 "上一响应因输出上限暂停，部分正文已保存在历史中。接续正文末尾，只生成尚未完成的内容，不重复已有正文、已执行工具或副作用。"
+            error.code in setOf("MODEL_STREAM_PROTOCOL", "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR") ->
+                "继续当前任务。上一轮模型生成的工具调用或响应结构不符合当前协议，工具尚未执行。请仔细阅读错误原因，必要时使用 tool_search 查询注册工具的正确参数结构，重新生成有效调用并完成原目标；已有回执的工具操作不得重复执行。"
             error.code == "ANTHROPIC_PROTOCOL_ERROR" ->
                 "继续当前任务。上一轮服务商响应中的 SSE 或消息块结构不符合 Anthropic Messages 协议，且未形成可执行工具调用。请检查当前已保存回执，查明真实工具名及 Schema，重新生成合法的工具调用继续任务；已完成操作不可重复执行。"
             error.code == "ANTHROPIC_TOOL_ARGUMENTS_INVALID" ->
