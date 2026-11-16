@@ -22,6 +22,7 @@ import com.labteto.dshmobile.local.tools.localToolFailure
 import com.labteto.dshmobile.local.tools.LocalToolCapabilityIntent
 import com.labteto.dshmobile.local.tools.latestUserTurnHasArchive
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.local.tools.directToolTarget
 import com.labteto.dshmobile.local.tools.isParallelSafeReadTool
 import com.labteto.dshmobile.local.tools.LocalToolSchemaProjection
 import com.labteto.dshmobile.local.tools.LocalToolRouter
@@ -86,6 +87,10 @@ internal class LocalWorkTurnToolRuntime(
         name in PARALLEL_SUBAGENT_TOOLS ||
             isSafeParallelReadTool(registry.get(LocalToolPolicy.canonical(name)))
 
+    /** Unwrap the real child before planning parallelism; a gateway never grants read-safety. */
+    internal fun isParallel(call: LocalToolCall): Boolean =
+        call.directToolTarget()?.let { target -> isParallel(target.name) } ?: false
+
     internal suspend fun execute(
         binding: LocalWorkRunBinding,
         call: LocalToolCall,
@@ -124,7 +129,7 @@ internal class LocalWorkTurnToolRuntime(
         superseded: () -> Boolean = { false },
     ): List<Pair<LocalToolCall, AgentToolResult>> {
         val output = mutableListOf<Pair<LocalToolCall, AgentToolResult>>()
-        val groups = planLocalToolBatch(calls.size) { index -> isParallel(calls[index].name) }
+        val groups = planLocalToolBatch(calls.size) { index -> isParallel(calls[index]) }
         for (group in groups) {
             val part = calls.subList(group.startInclusive, group.endExclusive)
             if (!group.parallel) {
@@ -199,7 +204,9 @@ internal class LocalWorkTurnToolRuntime(
         detail: String,
     ): AgentToolResult = parallelToolFailure(
         call = call,
-        access = registry.get(LocalToolPolicy.canonical(call.name))?.access,
+        access = call.directToolTarget()?.let { target ->
+            registry.get(LocalToolPolicy.canonical(target.name))?.access
+        },
         detail = detail,
     )
 }
