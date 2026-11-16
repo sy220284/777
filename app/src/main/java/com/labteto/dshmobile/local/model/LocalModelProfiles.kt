@@ -556,6 +556,10 @@ object LocalModelPresets {
                         .takeIf { protocol == LocalModelProtocol.ANTHROPIC_MESSAGES },
                 )
             }
+            // Retired M2.7 presets still need official regional aliases for saved routes.
+            compatibilityMetadata.firstOrNull {
+                it.provider == "MiniMax" && it.model.equals(normalizedModel, ignoreCase = true)
+            }?.let { return it.copy(baseUrl = normalizedBaseUrl) }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
                 return compatibilityMetadata.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
