@@ -223,7 +223,8 @@ class LocalKimiCompatibilityTest {
             assertFalse(durable.toString().contains("base64"))
             for (id in listOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")) {
                 val materialized = prepareLocalMultimodalMessages(listOf(durable), root,
-                    LocalImageInputMode.NATIVE, model = id, baseUrl = cn)
+                    LocalImageInputMode.NATIVE, model = id, baseUrl = cn,
+                    profile = LocalModelProfile("legacy-$id", id, cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
                 val content = materialized.single()["content"]!!.jsonArray
                 val video = content.single { it.jsonObject["type"]?.jsonPrimitive?.content == "video_url" }
                     .jsonObject["video_url"]!!.jsonObject["url"]!!.jsonPrimitive.content
@@ -257,7 +258,8 @@ class LocalKimiCompatibilityTest {
             }
             val unsupported = runCatching {
                 prepareLocalMultimodalMessages(listOf(durable), root,
-                    LocalImageInputMode.NATIVE, model = "k3-256k", baseUrl = cn)
+                    LocalImageInputMode.NATIVE, model = "k3-256k", baseUrl = cn,
+                    profile = LocalModelProfile("legacy-256k", "k3-256k", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
             }.exceptionOrNull()
             assertTrue(unsupported is IllegalStateException)
             assertTrue(unsupported?.message.orEmpty().contains("不支持视频"))
@@ -268,9 +270,34 @@ class LocalKimiCompatibilityTest {
             val historical = prepareLocalMultimodalMessages(listOf(durable,
                 buildJsonObject { put("role", "assistant"); put("content", "已看完") },
                 buildJsonObject { put("role", "user"); put("content", "继续聊天") }),
-                root, LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn)
+                root, LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn,
+                profile = LocalModelProfile("legacy", "k3", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
             assertFalse(historical.toString().contains("video_url"))
             assertTrue(historical.toString().contains("历史文件引用"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun nativeResponsesRefusesVideoBeforeEncodingButSavedChatRouteStillWorks() = runBlocking {
+        val root = Files.createTempDirectory("kimi-protocol-video-").toFile()
+        try {
+            File(root, "clip.mp4").writeBytes(byteArrayOf(1, 2, 3))
+            val request = buildLocalUserModelMessage(
+                "分析视频", listOf(LocalImportedAttachment("clip.mp4", "clip.mp4", "video/mp4", 3))
+            )
+            val unsupported = runCatching {
+                prepareLocalMultimodalMessages(listOf(request), root, LocalImageInputMode.NATIVE,
+                    model = "k3", baseUrl = cn,
+                    profile = LocalModelProfile("new", "k3", cn, protocol = LocalModelProtocol.RESPONSES))
+            }.exceptionOrNull()
+            assertTrue(unsupported is IllegalStateException)
+            assertTrue(unsupported?.message.orEmpty().contains("Chat Completions"))
+
+            val legacy = prepareLocalMultimodalMessages(listOf(request), root, LocalImageInputMode.NATIVE,
+                model = "k3", baseUrl = cn,
+                profile = LocalModelProfile("saved", "k3", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
+            assertTrue(legacy.toString().contains("video_url"))
         } finally {
             root.deleteRecursively()
         }
@@ -308,7 +335,8 @@ class LocalKimiCompatibilityTest {
                 listOf(LocalImportedAttachment("clip.mp4", "clip.mp4", "video/mp4", clip.length())))
             val failure = runCatching {
                 prepareLocalMultimodalMessages(listOf(reference), root,
-                    LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn)
+                    LocalImageInputMode.NATIVE, model = "k3", baseUrl = cn,
+                    profile = LocalModelProfile("legacy", "k3", cn, protocol = LocalModelProtocol.CHAT_COMPLETIONS))
             }.exceptionOrNull()
             assertTrue(failure is IllegalArgumentException)
             assertTrue(failure?.message.orEmpty().contains("上限") ||
