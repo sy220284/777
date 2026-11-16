@@ -396,7 +396,7 @@ class AnthropicMessagesClientTest {
             listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"private"}}""", """{"type":"content_block_stop","index":0}""", delta, stop) to "ANTHROPIC_PROTOCOL_ERROR",
             listOf(start, stop) to "MODEL_FINISH_null",
             listOf(start, """{"type":"error","error":{"type":"overloaded_error","message":"busy"}}""") to "ANTHROPIC_STREAM_ERROR",
-            listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_PROTOCOL_ERROR",
+            listOf(start, """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t","name":"read","input":[]}}""", """{"type":"content_block_stop","index":0}""", """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""", stop) to "ANTHROPIC_TOOL_ARGUMENTS_INVALID",
         ).forEach { (frames, code) ->
             val error = runCatching {
                 fixture(frames).complete(route(), emptyList(), emptyList(), null, true)
@@ -434,6 +434,17 @@ class AnthropicMessagesClientTest {
         assertTrue(malformed.continuationEligible)
         assertEquals(LocalModelAdmissionState.ADMITTED, malformed.admissionState)
         assertEquals(LocalModelFailureOrigin.STREAM_PARSE, malformed.origin)
+
+        // Actual 777.400 diagnostic: all three MiniMax calls ended while building
+        // the unified tool_call wrapper: {"name": "bash", "arguments":
+        val diagnostic = runCatching {
+            fixture(
+                listOf(start, toolStart, part("{\"name\": \"bash\", \"arguments\": ")) + end,
+            ).complete(route(baseUrl = "https://api.minimaxi.com/anthropic/v1"), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertNotNull(diagnostic)
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", diagnostic?.code)
+        assertTrue(diagnostic?.continuationEligible == true)
 
         val valid = fixture(
             listOf(start, toolStart, part("{\"path\":"), part("\"a.txt\"}")) + end,
