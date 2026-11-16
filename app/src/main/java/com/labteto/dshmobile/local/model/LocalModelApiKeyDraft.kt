@@ -31,16 +31,20 @@ internal suspend fun resolveLocalModelApiKeyDraft(
     require(model.isNotBlank()) { "请选择模型" }
     val normalizedInputUrl = normalizeModelBaseUrl(baseUrl)
     val name = migrateOfficialClaudeModel(model.trim(), normalizedInputUrl)
-    val selectedProtocol = protocol ?: profiles.firstOrNull {
-        profileId != null && it.id == profileId && it.model == name
-    }?.protocol ?: LocalModelPresets.protocolFor(name, normalizedInputUrl)
-    val url = LocalModelProtocolRoutePolicy.baseUrlFor(name, normalizedInputUrl, selectedProtocol)
     val explicitKey = apiKey.trim().takeIf(String::isNotEmpty)
+    // Resolve saved identity before choosing a default protocol: old profiles retain their
+    // explicit transport even when the model's newly recommended preset has changed.
     val existing = when {
-        profileId != null -> profiles.apiKeyProfileForRoute(name, url, profileId)
-        explicitKey == null -> profiles.apiKeyProfileForRoute(name, url)
+        profileId != null -> profiles.apiKeyProfileForRoute(name, normalizedInputUrl, profileId)
+        explicitKey == null -> profiles.apiKeyProfileForRoute(name, normalizedInputUrl)
         else -> null
     }
+    val selectedProtocol = protocol ?: existing?.protocol ?:
+        LocalModelPresets.protocolFor(name, normalizedInputUrl)
+    val url = LocalModelProtocolRoutePolicy.baseUrlFor(name, normalizedInputUrl, selectedProtocol)
+    require(existing == null || LocalModelProtocolRoutePolicy.sameCredentialOrigin(
+        existing.baseUrl, url,
+    )) { "模型配置的凭据来源与协议地址不一致" }
     val id = existing?.id ?: allocateApiKeyProfileId(profiles, newProfileId)
     val key = explicitKey ?: readKey(id)
     require(!key.isNullOrBlank()) { "请填写该模型的密钥" }
