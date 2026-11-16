@@ -79,7 +79,20 @@ internal class ModelSseDataReader(
             if (data.isNotEmpty()) data.append('\n')
             val value = line.substring(5)
             data.append(if (value.startsWith(' ')) value.substring(1) else value)
+            // A complete terminal event is authoritative even if the provider omits
+            // the SSE blank delimiter and closes the connection with an error.
+            // Do not consume transport bytes after a terminal model response.
+            if (isTerminalModelEvent(data.toString())) return data.toString()
         }
+    }
+
+    private fun isTerminalModelEvent(data: String): Boolean {
+        if (data == "[DONE]") return true
+        val event = runCatching {
+            kotlinx.serialization.json.Json.parseToJsonElement(data) as? kotlinx.serialization.json.JsonObject
+        }.getOrNull() ?: return false
+        val type = (event["type"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+        return type in setOf("message_stop", "response.completed", "response.failed", "response.incomplete", "error")
     }
 
     private fun isCompleteModelEvent(data: String): Boolean =
