@@ -155,6 +155,7 @@ internal class AnthropicMessagesAdapter @Inject constructor(
         streaming = streaming,
         onDelta = onDelta,
         reasoningEffort = request.reasoningEffort,
+        maxTokens = request.maxTokens,
     )
 }
 
