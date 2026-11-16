@@ -18,6 +18,11 @@ internal class LocalToolSchemaProjection(
     private val registry: ToolRegistry,
     @Suppress("UNUSED_PARAMETER") executionCoordinator: LocalToolExecutionCoordinator,
 ) {
+    internal data class ToolSchemaSelection(
+        val schemas: JsonArray,
+        val omittedReasons: Map<String, String> = emptyMap(),
+    )
+
     private fun gatewaySchemas(): JsonArray = JsonArray(
         listOf(DIRECT_TOOL_SEARCH, DIRECT_TOOL_CALL).map { name ->
             requireNotNull(registry.get(name)) { "固定工具入口未注册：$name" }.schema
@@ -38,9 +43,7 @@ internal class LocalToolSchemaProjection(
         @Suppress("UNUSED_PARAMETER") allowMutation: Boolean,
         @Suppress("UNUSED_PARAMETER") allowVirtualScreen: Boolean,
         @Suppress("UNUSED_PARAMETER") enabledOptional: Set<String>,
-    ): LocalToolRouter.ToolSchemaSelection = LocalToolRouter.ToolSchemaSelection(
-        gatewaySchemas(), emptyMap(), emptySet(),
-    )
+    ): ToolSchemaSelection = ToolSchemaSelection(gatewaySchemas())
 
     fun modelSchemas(
         policy: LocalAgentRunPolicy,
@@ -60,10 +63,7 @@ internal class LocalToolSchemaProjection(
         @Suppress("UNUSED_PARAMETER") history: List<JsonObject>,
         @Suppress("UNUSED_PARAMETER") enabledOptional: Set<String>? = null,
         @Suppress("UNUSED_PARAMETER") agentTeamMode: Boolean = false,
-    ): LocalToolRouter.ToolSchemaSelection = LocalToolRouter.ToolSchemaSelection(
-        if (policy.toolsEnabled) gatewaySchemas() else JsonArray(emptyList()),
-        emptyMap(), emptySet(),
-    )
+    ): ToolSchemaSelection = ToolSchemaSelection(if (policy.toolsEnabled) gatewaySchemas() else JsonArray(emptyList()))
 
     fun names(schemas: JsonArray): List<String> = schemas.mapNotNull { element ->
         val function = (element as? JsonObject)?.get("function") as? JsonObject

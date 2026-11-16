@@ -456,9 +456,9 @@ internal class LocalWorkAgentTurnExecutor(
                         // Replace this request's layer, never append catalog updates to history.
                         workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
-                    // Select a provisional tool surface for compaction cost only.
-                    // The actual model-visible selection is frozen after compaction.
-                    val preliminarySelection = workTurnToolRuntime.selectSchemas(runPolicy, binding)
+                    // The gateway surface is fixed for this run; reuse it for both
+                    // context accounting and the actual model request.
+                    val modelToolSchemas = workTurnToolRuntime.schemas(runPolicy, binding)
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
                             estimateModelTokens(workPromptContext.dynamic + improvementGuidance +
@@ -466,7 +466,7 @@ internal class LocalWorkAgentTurnExecutor(
                             estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         LocalWorkSummarySettings.attach(context)
-                        val extra = productContextTokens + estimateModelTokens(preliminarySelection.schemas.toString())
+                        val extra = productContextTokens + estimateModelTokens(modelToolSchemas.toString())
                         if (LocalWorkSummarySettings.state.value) {
                             val outcome = sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
                                 workModelHistoryRuntime.compactSemanticallyBeforeStep(binding, extra) { request ->
@@ -513,7 +513,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
                         }
                     }
-                    val advertisedTools = runToolSurface.next(preliminarySelection.schemas)
+                    val advertisedTools = runToolSurface.next(modelToolSchemas)
                     latestAcceptedSamplingRevision = observedSteer
                     val tools = modelToolStepSurface.capture(
                         advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),

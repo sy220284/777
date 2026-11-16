@@ -61,26 +61,21 @@ internal class LocalWorkTurnToolRuntime(
 ) {
     internal fun captureBindings(schemas: JsonArray) = registry.captureBindings(schemas)
 
-    /** Stable two-function model protocol; actual tools are resolved by the executor. */
-    internal fun selectSchemas(
+    /** Model-facing tool definitions are the two fixed gateway schemas. */
+    internal fun schemas(
         policy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding,
-    ): LocalToolRouter.ToolSchemaSelection = schemas.modelSelection(
+    ): JsonArray = schemas.modelSchemas(
         policy = policy,
         modelState = binding.state.value.modelState,
         planModeEnabled = binding.state.value.work.planMode,
         history = binding.runHandle.modelHistory.snapshot(),
     )
 
-    internal fun schemas(
-        policy: LocalAgentRunPolicy,
-        binding: LocalWorkRunBinding,
-    ): JsonArray = selectSchemas(policy, binding).schemas
-
     internal fun names(
         policy: LocalAgentRunPolicy,
         binding: LocalWorkRunBinding,
-    ): List<String> = schemas.names(selectSchemas(policy, binding).schemas)
+    ): List<String> = schemas.names(schemas(policy, binding))
 
     /** Pure read proven by the registered tool contract, not by its display name alone. */
     internal fun isParallel(name: String): Boolean =
