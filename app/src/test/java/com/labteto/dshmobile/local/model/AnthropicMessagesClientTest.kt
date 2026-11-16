@@ -474,6 +474,27 @@ class AnthropicMessagesClientTest {
         assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", unknown?.code)
         assertEquals("unknown_tool_delta", unknown?.toolInputIssue)
 
+        val invalidToolStartCases = listOf(
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","name":"bash","input":{}}}""" to "missing_tool_id",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","input":{}}}""" to "missing_tool_name",
+        )
+        invalidToolStartCases.forEach { (toolStartCase, expectedIssue) ->
+            val error = runCatching {
+                fixture(listOf(start, toolStartCase, part("{}")) + end)
+                    .complete(route(), emptyList(), emptyList(), null, true)
+            }.exceptionOrNull() as? LocalModelException
+            assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", error?.code)
+            assertEquals(expectedIssue, error?.toolInputIssue)
+            assertTrue(error?.continuationEligible == true)
+        }
+        val wrongDelta = """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"unexpected"}}"""
+        val mismatch = runCatching {
+            fixture(listOf(start, toolStart, wrongDelta) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", mismatch?.code)
+        assertEquals("tool_delta_type_mismatch", mismatch?.toolInputIssue)
+
         val multiLineMessage = """{"type":"message_delta","delta":""" +
             "\ndata: " + """{"stop_reason":"tool_use"}}"""
         val multipart = fixture(
