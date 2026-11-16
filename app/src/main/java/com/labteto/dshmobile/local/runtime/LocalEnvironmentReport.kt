@@ -32,7 +32,6 @@ internal data class LocalEnvironmentRunSnapshot(
     val contextChars: Int,
     val contextBudgetChars: Int,
     val pendingInputs: Int,
-    val enabledOptionalTools: Set<String>,
     val workBudget: LocalEnvironmentWorkBudget? = null,
 )
 

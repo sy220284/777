@@ -59,10 +59,7 @@ class LocalAgentLspDiscoveryTest {
                 requestApproval = { _, _, _ -> true },
             )
             val projection = LocalToolSchemaProjection(ctx.tools, coordinator)
-            assertEquals(listOf("tool_search", "tool_call"), projection.names(projection.modelSchemas(
-                policy = localAgentRunPolicy(LocalUsageMode.WORK),
-                modelState = LocalModelState(), planModeEnabled = false, history = emptyList(),
-            )))
+            assertEquals(listOf("tool_search", "tool_call"), projection.names(projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK))))
             val args = kotlinx.serialization.json.buildJsonObject {
                 put("name", "lsp_status")
                 put("arguments", kotlinx.serialization.json.buildJsonObject {})

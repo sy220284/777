@@ -50,6 +50,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** One Work-owned dispatch table, derived from actual handlers rather than copied into ToolRegistry. */
+internal val LOCAL_WORK_BUILTIN_TOOL_NAMES: Set<String> =
+    LocalWorkBuiltinToolRuntime.TOOL_NAMES +
+        LocalWorkMediaToolRuntime.TOOL_NAMES +
+        LocalAgentControlPlane.TOOL_NAMES
+
 /** WorkFeature composition owner for foreground turns, subagents and Work-owned built-ins. */
 @Singleton
 internal class LocalWorkComposition @Inject constructor(
@@ -173,11 +179,7 @@ internal class LocalWorkComposition @Inject constructor(
             createWorkspace = tools::forkAgentWorkspace,
             factory = subagentFactory,
             schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-                tools.schemas.subagentSchemas(
-                    allowMutation = allowMutation,
-                    allowVirtualScreen = allowVirtualScreen,
-                    enabledOptional = enabledOptional,
-                )
+                tools.schemas.subagentSchemas()
             },
             executeTool = { binding, call, allowMutation, _, _ ->
                 turnToolRuntime.execute(binding, call, allowMutation)
@@ -224,11 +226,7 @@ internal class LocalWorkComposition @Inject constructor(
                     executionWorkspaceGuidance = workspaceBinding?.guidance,
                     runKind = LocalAgentRunKind.SUBAGENT,
                     schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-                        tools.schemas.subagentSchemas(
-                            allowMutation = allowMutation,
-                            allowVirtualScreen = allowVirtualScreen,
-                            enabledOptional = enabledOptional,
-                        )
+                        tools.schemas.subagentSchemas()
                     },
                     executeTool = { call, allowMutation, memoryTools, enabledOptional ->
                         backgroundTools.executePersistentSubagentTool(
@@ -296,23 +294,12 @@ internal class LocalWorkComposition @Inject constructor(
                     "job_kill", "json_query", "environment_info", "download_file",
                 )
                 val activeOptional = defaultOptional + grantedExtensions
-                val exposed = tools.schemas.names(
-                    tools.schemas.subagentSchemas(
-                        allowMutation = roleBinding.allowMutation,
-                        allowVirtualScreen = false,
-                        enabledOptional = activeOptional,
-                    ),
-                ).toSet()
-                val roleExposed = roleBinding.toolAllowlist?.let { exposed.intersect(it) } ?: exposed
-                val missing = grantedExtensions - roleExposed
-                require(missing.isEmpty()) {
-                    "TEAM_EXTENSION_NOT_EXPOSED：已授权工具未进入成员实际工具表（数量或上下文预算限制）：" +
-                        missing.sorted().joinToString("、")
-                }
-                require(roleBinding.toolAllowlist?.contains("skill") == false ||
-                    "skill" !in tools.registry.names() || "skill" in roleExposed) {
-                    "TEAM_SKILL_NOT_EXPOSED：技能工具未进入成员实际工具表"
-                }
+                // Direct tool gateway never exposes child schemas. Validate the real
+                // Lead grant against the member role; ToolRegistry and execution
+                // scope enforce actual registration and authorization on every call.
+                com.labteto.dshmobile.local.agent.requireTeamExtensionMatchesRole(
+                    grantedExtensions, roleBinding.toolAllowlist,
+                )
                 agentSpawns.startPersistent(binding, LocalPersistentAgentLaunchRequest(
                     task = task,
                     model = model ?: roleBinding.modelOverride,
@@ -422,9 +409,13 @@ internal class LocalWorkComposition @Inject constructor(
         allowMutation: Boolean,
         binding: LocalWorkRunBinding?,
     ): String? {
-        taskBuiltins.execute(call, binding)?.let { return it }
-        workMediaTools.execute(call, allowMutation, binding)?.let { return it }
-        return agentControlBuiltins.execute(call, allowMutation, binding)
+        // The tool name already determines its owner; do not probe three feature handlers.
+        return when (call.name) {
+            in LocalWorkBuiltinToolRuntime.TOOL_NAMES -> taskBuiltins.execute(call, binding)
+            in LocalWorkMediaToolRuntime.TOOL_NAMES -> workMediaTools.execute(call, allowMutation, binding)
+            in LocalAgentControlPlane.TOOL_NAMES -> agentControlBuiltins.execute(call, allowMutation, binding)
+            else -> null
+        }
     }
 
     internal fun automationRunner(
@@ -436,11 +427,7 @@ internal class LocalWorkComposition @Inject constructor(
         boundState = boundState,
         runKind = LocalAgentRunKind.AUTOMATION,
         schemasProvider = { allowMutation, allowVirtualScreen, enabledOptional ->
-            tools.schemas.subagentSchemas(
-                allowMutation = allowMutation,
-                allowVirtualScreen = allowVirtualScreen,
-                enabledOptional = enabledOptional,
-            )
+            tools.schemas.subagentSchemas()
         },
         executeTool = { call, allowMutation, memoryTools, enabledOptional ->
             backgroundTools.executeAutomationSubagentTool(

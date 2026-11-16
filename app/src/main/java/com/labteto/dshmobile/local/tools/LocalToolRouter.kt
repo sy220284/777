@@ -2,30 +2,25 @@ package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.harness.tools.HarnessTool
 import com.labteto.dshmobile.harness.tools.ToolExposure
-import com.labteto.dshmobile.local.model.estimateModelTokens
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Keeps the model-facing tool surface small without hiding capabilities permanently.
+ * Provides live capability search and task-driven device-permission hints.
  *
  * Exposure and discovery are declared by each tool through the shared HarnessTool contract.
- * No tool is classified by name prefix or a hand-maintained allowlist.
+ * Model-facing schemas are fixed gateways; this router never selects model tool definitions.
  */
 internal object LocalToolRouter {
     fun isOptional(tool: HarnessTool): Boolean = tool.exposure == ToolExposure.OPTIONAL
 
     /**
-     * Finds optional capabilities that are already explicit in the current task intent.
+     * Finds optional capabilities needed for device-permission hints.
      *
      * This is deliberately conservative: only declared discovery keywords or the concrete tool
      * name can pre-activate a capability. Ambiguous natural-language inference stays with
-     * capability_search so an unrelated task does not silently re-inflate the prompt.
+     * the live registry so an unrelated task does not request unrelated permissions.
      */
     fun relevantOptionalToolNames(
         tools: List<HarnessTool>,
@@ -90,94 +85,9 @@ internal object LocalToolRouter {
     private fun Char.isAsciiIdentifierChar(): Boolean =
         this in 'a'..'z' || this in '0'..'9' || this == '_'
 
-    internal data class ToolSchemaSelection(
-        val schemas: JsonArray,
-        val omittedReasons: Map<String, String>,
-        val compactedNames: Set<String>,
-        /** Capacity omissions are typed; execution/recovery never parse display text. */
-        val budgetOmittedNames: Set<String> = emptySet(),
-    )
-
-    fun visibleSchemas(
-        tools: List<HarnessTool>,
-        enabledOptional: Set<String>,
-        maxOptionalDefinitionTokens: Int = DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-    ): JsonArray = selectSchemas(tools, enabledOptional, maxOptionalDefinitionTokens).schemas
-
     /**
-     * Tool capability discovery is never the authority for admission. Selection reports why a
-     * requested registered tool was not exposed. Oversized human descriptions are abbreviated
-     * without altering argument types, required fields or the runtime's full validator schema.
-     */
-    internal fun selectSchemas(
-        tools: List<HarnessTool>,
-        enabledOptional: Set<String>,
-        maxOptionalDefinitionTokens: Int = DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-    ): ToolSchemaSelection {
-        val core = tools
-            .filter { it.exposure == ToolExposure.CORE }
-            .sortedBy(HarnessTool::name)
-        val optionalByName = tools
-            .asSequence()
-            .filter { it.exposure == ToolExposure.OPTIONAL }
-            .associateBy(HarnessTool::name)
-
-        var remainingTokens = maxOptionalDefinitionTokens.coerceAtLeast(0)
-        val optionalSchemas = ArrayList<JsonElement>()
-        val omitted = linkedMapOf<String, String>()
-        val compacted = linkedSetOf<String>()
-        val budgetOmitted = linkedSetOf<String>()
-        for (name in enabledOptional) {
-            val tool = optionalByName[name] ?: continue // Missing tools remain absent on purpose.
-            // A valid, large MCP/plug-in schema is not an admission error merely because
-            // it has many properties or nested objects. Let the actual model-facing
-            // definition budget decide; runtime argument validation still uses the
-            // complete registered schema.
-            val original = tool.schema
-            if (remainingTokens <= 0) {
-                budgetOmitted += name
-                omitted[name] = "本轮可选工具定义预算已用尽；按精确名称重新选择可优先装入"
-                continue
-            }
-
-            val originalCost = estimateModelTokens(original.toString())
-            val reduced = if (originalCost > remainingTokens) {
-                compactDescriptiveAnnotations(original)
-            } else original
-            val selectedCost = estimateModelTokens(reduced.toString())
-            if (selectedCost > remainingTokens) {
-                budgetOmitted += name
-                omitted[name] = "工具参数定义需要约 $selectedCost Token，当前可用 $remainingTokens；已尝试精简说明文本"
-                continue
-            }
-            optionalSchemas += reduced
-            if (reduced != original) compacted += name
-            remainingTokens -= selectedCost
-        }
-
-        // The core surface remains byte-for-byte stable for cache continuity.
-        return ToolSchemaSelection(JsonArray(core.map(HarnessTool::schema) + optionalSchemas),
-            omitted, compacted, budgetOmitted)
-    }
-
-    private fun compactDescriptiveAnnotations(value: JsonElement, propertyNames: Boolean = false): JsonElement =
-        when (value) {
-            is JsonObject -> JsonObject(value.mapValues { (key, child) ->
-                when {
-                    key == "description" && !propertyNames && child is JsonPrimitive &&
-                        child.isString && child.content.length > MAX_COMPACT_DESCRIPTION_CHARS ->
-                        JsonPrimitive(child.content.take(MAX_COMPACT_DESCRIPTION_CHARS) + "…")
-                    else -> compactDescriptiveAnnotations(child, propertyNames = key == "properties")
-                }
-            })
-            is JsonArray -> JsonArray(value.map { compactDescriptiveAnnotations(it) })
-            else -> value
-        }
-
-    /**
-     * Exact multi-tool discovery, e.g. select:github_status,github_search.
-     * This never infers additional capabilities from descriptions or old task text.
-     * The execution coordinator still enforces the current registry, schema budget and approval.
+     * Exact multi-name lookup in the capability-directory UI, not model tool activation.
+     * Real execution enforces its own registry, permissions and approval.
      */
     fun exactSelection(query: String): List<String>? {
         val command = query.trim()
@@ -290,41 +200,6 @@ internal object LocalToolRouter {
         }
     }
 
-    fun capabilitySummary(
-        tools: List<HarnessTool>,
-        enabledOptional: Set<String>,
-        blocked: Set<String> = emptySet(),
-    ): String {
-        val optional = tools.filter(::isOptional)
-        if (optional.isEmpty()) return "可选扩展能力：无"
-        return buildString {
-            appendLine("可选扩展能力（已注册；以下为本轮选择状态，并非连接或授权状态）：")
-            optional
-                .groupBy { it.metadata.family }
-                .toSortedMap(String.CASE_INSENSITIVE_ORDER)
-                .forEach { (family, familyTools) ->
-                    val enabled = familyTools.count { it.name in enabledOptional }
-                    append("- ").append(family).append("：")
-                    append(if (enabled == familyTools.size) "本轮已选用" else if (enabled == 0) "本轮未选用" else "本轮部分选用")
-                    append(" ").append(enabled).append("/").append(familyTools.size)
-                    val requirements = familyTools.flatMap { it.metadata.requirements }.distinct()
-                    if (requirements.isNotEmpty()) {
-                        val shown = requirements.take(MAX_SUMMARY_REQUIREMENTS_PER_FAMILY)
-                        append("；前置条件：").append(shown.joinToString("；"))
-                        if (requirements.size > shown.size) {
-                            append("；另有 ").append(requirements.size - shown.size).append(" 项")
-                        }
-                    }
-                    val blockedTools = familyTools.filter { it.name in blocked }
-                    if (blockedTools.isNotEmpty()) {
-                        append("；运行策略关闭：").append(blockedTools.joinToString(", ") { it.name })
-                    }
-                    appendLine()
-                }
-            append("本轮未选用的能力仍已注册，可由智能体按需发现；是否能执行须以实际连接、授权和模型工具表为准。")
-        }.trimEnd()
-    }
-
     /** Generic inventory requests must browse the live registry instead of failing fuzzy search. */
     fun isInventoryRequest(query: String): Boolean {
         val normalized = query.trim().lowercase().replace(Regex("\\s+"), "")
@@ -336,40 +211,11 @@ internal object LocalToolRouter {
         )
     }
 
-    /** The directory is generated from currently registered tools, including dynamic MCP tools. */
-    fun capabilityDirectory(
-        tools: List<HarnessTool>,
-        enabledOptional: Set<String>,
-        blocked: Set<String> = emptySet(),
-    ): String = buildString {
-            val listed = tools.filter { it.exposure != ToolExposure.INTERNAL }
-            val optionalCount = listed.count(::isOptional)
-            val coreCount = listed.size - optionalCount
-            appendLine("当前可供智能体发现的工具：${listed.size} 个（核心 ${coreCount}，扩展 ${optionalCount}），分 ${listed.map { it.metadata.family }.distinct().size} 类。")
-            listed.groupBy { it.metadata.family }
-                .toSortedMap(String.CASE_INSENSITIVE_ORDER)
-                .forEach { (family, members) ->
-                    val selected = members.count { it.exposure == ToolExposure.CORE || it.name in enabledOptional }
-                    appendLine("- $family：已注册 ${members.size}，本轮已选 ${selected}；工具：" +
-                        members.joinToString(", ") { tool ->
-                            tool.name + if (tool.name in blocked) "（当前设置已关闭）" else ""
-                        })
-                }
-            append("目录由实时注册表生成；核心工具默认提供，可选扩展按需通过 capability_search 加载。本轮未选不代表未注册；实际执行仍需满足连接与授权条件。")
-        }.trimEnd()
-
     fun description(tool: HarnessTool): String =
         tool.schema["function"]?.jsonObject
             ?.get("description")?.jsonPrimitive?.contentOrNull
             .orEmpty()
 
-    fun conciseDescription(tool: HarnessTool): String =
-        description(tool).take(MAX_CAPABILITY_DESCRIPTION_CHARS)
-
-    internal const val DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS = 16_000
-    private const val MAX_COMPACT_DESCRIPTION_CHARS = 240
-    private const val MAX_SUMMARY_REQUIREMENTS_PER_FAMILY = 4
-    private const val MAX_CAPABILITY_DESCRIPTION_CHARS = 480
     private val CAPABILITY_WORDS = Regex("[\\p{L}\\p{N}_-]{2,}")
     private val CAPABILITY_HAN = Regex("[\u4e00-\u9fff]{2,}")
     private val CAPABILITY_ASCII = Regex("[a-z][a-z0-9_-]*")

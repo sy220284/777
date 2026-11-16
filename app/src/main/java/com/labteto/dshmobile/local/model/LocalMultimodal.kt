@@ -595,10 +595,19 @@ internal fun hasMaterializedImageUrls(messages: List<JsonObject>): Boolean =
         }
     }
 
-internal fun redactModelImages(messages: List<JsonObject>): List<JsonObject> =
-    messages.map { message ->
+internal fun redactModelImages(messages: List<JsonObject>): List<JsonObject> {
+    var changed = false
+    val redacted = messages.map { message ->
         val content = message["content"] as? JsonArray ?: return@map message
-        val redacted = buildJsonArray {
+        val hasSensitiveMedia = content.any { part ->
+            when ((part as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull) {
+                "input_file", "image_url", "video_url" -> true
+                else -> false
+            }
+        }
+        if (!hasSensitiveMedia) return@map message
+        changed = true
+        val safeContent = buildJsonArray {
             content.forEach { part ->
                 val obj = part as? JsonObject
                 val type = obj?.get("type")?.jsonPrimitive?.contentOrNull
@@ -622,8 +631,12 @@ internal fun redactModelImages(messages: List<JsonObject>): List<JsonObject> =
                 }
             }
         }
-        JsonObject(message.toMutableMap().apply { put("content", redacted) })
+        JsonObject(message.toMutableMap().apply { put("content", safeContent) })
     }
+    // Most requests have no inline image/file data. Preserve the same message
+    // surface and reuse its evidence instead of hashing a second equivalent copy.
+    return if (changed) redacted else messages
+}
 
 internal fun imageInputUnsupported(error: Throwable): Boolean {
     val modelError = error as? LocalModelException ?: return false

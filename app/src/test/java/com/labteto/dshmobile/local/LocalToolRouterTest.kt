@@ -8,10 +8,10 @@ import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolMetadata
 import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
-import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
+import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -22,92 +22,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolRouterTest {
-    @Test fun coreToolsAreSearchableWithoutAddingOptionalDefinitions() {
-        val registered = listOf(
-            tool("read", "读取文件", ToolExposure.CORE, "文件"),
-            tool("write", "写文件", ToolExposure.CORE, "文件"),
-            tool("screen_reader", "读取安卓屏幕", ToolExposure.OPTIONAL, "Android", setOf("屏幕")),
-        )
-        val result = LocalCapabilityDiscovery.resolve(registered, "read")
-        assertEquals(listOf("read"), result.core)
-        assertTrue(result.optional.isEmpty())
-        assertEquals(listOf("read"),
-            LocalCapabilityDiscovery.searchCatalogue(registered, "read", 12).map { it.name })
-        assertEquals(listOf("read", "write"),
-            LocalCapabilityDiscovery.catalogue(registered)
-                .filter { it.access.isNotBlank() && it.name != "screen_reader" }.map { it.name })
-    }
-
-    @Test fun registeredSchemaCanUseTheCapacityGrantedByTheModelBudget() {
-        val large = tool("large_contract", "大型工具契约", ToolExposure.OPTIONAL, "扩展",
-            setOf("大型契约")).let { tool ->
-            val function = tool.schema["function"]!!.jsonObject
-            tool.copy(schema = kotlinx.serialization.json.JsonObject(tool.schema + ("function" to
-                kotlinx.serialization.json.JsonObject(function + ("parameters" to buildJsonObject {
-                    put("type", "object")
-                    put("properties", buildJsonObject {
-                        put("value", buildJsonObject {
-                            put("type", "string")
-                            put("enum", kotlinx.serialization.json.JsonArray((1..800).map {
-                                kotlinx.serialization.json.JsonPrimitive("value$it" + "x".repeat(200))
-                            }))
-                        })
-                    })
-                })))))
-        }
-        val registry = com.labteto.dshmobile.harness.tools.ToolRegistry()
-        registry.register(large)
-        val registered = requireNotNull(registry.get(large.name))
-        val tokens = estimateModelTokens(registered.schema.toString())
-        assertTrue(tokens > 24_000)
-        assertEquals(listOf("large_contract"), names(LocalToolRouter.selectSchemas(
-            listOf(registered), setOf("large_contract"), tokens + 100).schemas))
-        assertTrue("large_contract" in LocalToolRouter.selectSchemas(
-            listOf(registered), setOf("large_contract"), 1).budgetOmittedNames)
-    }
-
-    @Test fun uiCapabilitySearchFindsCoreToolsWithoutExposingInternalTools() {
-        val registered = listOf(
-            tool("read", "读取文件", ToolExposure.CORE, "文件"),
-            tool("private_read", "读取文件", ToolExposure.INTERNAL, "文件"),
-            tool("web_search", "网页搜索", ToolExposure.OPTIONAL, "网络"),
-        )
-        assertEquals(listOf("read"),
-            LocalCapabilityDiscovery.searchCatalogue(registered, "读取文件", 50).map { it.name })
-        assertEquals(listOf("read"),
-            LocalCapabilityDiscovery.searchCatalogue(registered, "read", 50).map { it.name })
-        // Model admission still selects optional tools only; CORE is already exposed.
-        assertTrue(LocalCapabilityDiscovery.resolve(registered, "读取文件").optional.isEmpty())
-    }
-
-    @Test fun exactDiscoveryLimitDoesNotLabelRegisteredToolsUnavailable() {
-        val registered = listOf(
-            tool("first_tool", "第一工具", ToolExposure.OPTIONAL, "扩展"),
-            tool("second_tool", "第二工具", ToolExposure.OPTIONAL, "扩展"),
-        )
-        val result = LocalCapabilityDiscovery.resolve(registered, "select:first_tool,second_tool,missing", 1)
-        assertEquals(listOf("first_tool"), result.optional.map { it.name })
-        assertEquals(listOf("missing"), result.unavailable)
-    }
-
-    @Test fun modelAndUiUseOneCapabilityMatcherAndDirectory() {
-        val registered = listOf(
-            tool("read", "文件读取", ToolExposure.CORE, "文件"),
-            tool("web_search", "网页搜索", ToolExposure.OPTIONAL, "网络", setOf("联网", "网页搜索")),
-            tool("team_spawn", "创建智能体团队", ToolExposure.OPTIONAL, "智能体", setOf("创建团队")),
-        )
-        val model = LocalCapabilityDiscovery.resolve(registered, "创建团队")
-        val ui = LocalCapabilityDiscovery.searchCatalogue(registered, "创建团队", 50)
-        assertEquals(model.optional.map { it.name }, ui.map { it.name })
-        assertEquals(listOf("read", "team_spawn"),
-            LocalCapabilityDiscovery.resolve(registered, "select:read,team_spawn").let {
-                it.core + it.optional.map { tool -> tool.name }
-            })
-        assertEquals(3, LocalCapabilityDiscovery.catalogue(registered).size)
-        assertTrue(LocalCapabilityDiscovery.resolve(registered, "select:missing").unavailable.contains("missing"))
-    }
-
-
     @Test
     fun liveCatalogueSearchReturnsOnlySelectedSchemasAndRejectsInvalidPageSize() {
         val tools = listOf(
@@ -131,42 +45,6 @@ class LocalToolRouterTest {
         assertEquals(selected, LocalToolRouter.exactSelection(
             "select:" + (selected + selected.first()).joinToString(",")
         ))
-    }
-
-    @Test
-    fun optionalToolsStayHiddenUntilCapabilitySearchEnablesThem() {
-        val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
-        val android = tool(
-            "device_action", "按屏幕坐标点击", ToolExposure.OPTIONAL, "Android",
-            setOf("安卓", "界面"),
-        )
-        val vision = tool(
-            "screen_analysis", "分析当前屏幕", ToolExposure.OPTIONAL, "视觉",
-            setOf("视觉", "图片"),
-        )
-        val all = listOf(core, android, vision)
-
-        assertEquals(listOf("read"), names(LocalToolRouter.visibleSchemas(all, emptySet())))
-
-        val matches = LocalToolRouter.search(all, "安卓 界面")
-        assertEquals(listOf("device_action"), matches.map(HarnessTool::name))
-        val enabled = matches.map(HarnessTool::name).toSet()
-        assertTrue("device_action" in names(LocalToolRouter.visibleSchemas(all, enabled)))
-        assertTrue("screen_analysis" !in names(LocalToolRouter.visibleSchemas(all, enabled)))
-    }
-
-    @Test
-    fun workspaceImageAnalyzerCanBeCoreWithoutDependingOnItsName() {
-        val read = tool("read", "读取文件", ToolExposure.CORE, "文件")
-        val image = tool("workspace_pixels", "分析工作区图片", ToolExposure.CORE, "视觉")
-        val screen = tool(
-            "screen_analysis", "分析当前屏幕", ToolExposure.OPTIONAL, "视觉",
-            setOf("视觉", "屏幕"),
-        )
-
-        val visible = names(LocalToolRouter.visibleSchemas(listOf(read, image, screen), emptySet()))
-
-        assertEquals(listOf("read", "workspace_pixels"), visible)
     }
 
     @Test
@@ -306,10 +184,8 @@ class LocalToolRouterTest {
             )
         )
         val modelSchemas = projection.modelSchemas(
-            policy = com.labteto.dshmobile.local.agent.localAgentRunPolicy(
+            com.labteto.dshmobile.local.agent.localAgentRunPolicy(
                 com.labteto.dshmobile.local.LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = false, history = emptyList(),
         )
         assertEquals(listOf("tool_search", "tool_call"), projection.names(modelSchemas))
         val fullCost = LocalToolCatalog.specs.sumOf {
@@ -317,27 +193,6 @@ class LocalToolRouterTest {
         }
         val fixedCost = modelSchemas.sumOf { estimateModelTokens(it.toString()) }
         assertTrue(fixedCost * 100 < fullCost * 10)
-    }
-
-    @Test
-    fun optionalToolActivationPreservesStableCoreAndOnlyAppends() {
-        val tools = listOf(
-            tool("z_core", "核心二", ToolExposure.CORE, "文件"),
-            tool("a_core", "核心一", ToolExposure.CORE, "文件"),
-            tool("repo_status", "仓库状态", ToolExposure.OPTIONAL, "GitHub", setOf("仓库")),
-            tool("external_extra", "外部扩展", ToolExposure.OPTIONAL, "MCP", setOf("外部工具")),
-            tool("internal_only", "内部工具", ToolExposure.INTERNAL, "内部"),
-        )
-        val enabled = linkedSetOf("repo_status")
-        val first = names(LocalToolRouter.visibleSchemas(tools, enabled))
-
-        enabled += "external_extra"
-        val second = names(LocalToolRouter.visibleSchemas(tools.reversed(), enabled))
-
-        assertEquals(listOf("a_core", "z_core", "repo_status"), first)
-        assertEquals(first, second.take(first.size))
-        assertEquals("external_extra", second.last())
-        assertTrue("internal_only" !in second)
     }
 
     @Test
@@ -377,144 +232,6 @@ class LocalToolRouterTest {
         assertEquals(1_000, first.size)
         assertEquals(first.map(HarnessTool::name), second.map(HarnessTool::name))
         assertEquals("remote_0000", first.first().name)
-    }
-
-    @Test
-    fun activatedOptionalToolCountIsNotArtificiallyLimited() {
-        val tools = (0 until 80).map { index ->
-            tool("new_plugin_$index", "插件新能力", ToolExposure.OPTIONAL, "自动扩展", setOf("自动扩展"))
-        }
-        val selected = tools.map(HarnessTool::name).toSet()
-        val schemas = LocalToolRouter.visibleSchemas(tools, selected, maxOptionalDefinitionTokens = 24_000)
-        assertEquals(80, names(schemas).size)
-        assertEquals(80, LocalToolRouter.relevantOptionalToolNames(tools, "使用自动扩展").size)
-    }
-
-    @Test
-    fun chineseNaturalLanguageFindsCapabilityAndInventoryUsesLiveRegistry() {
-        val tools = listOf(
-            tool("android_screen", "检查手机屏幕", ToolExposure.OPTIONAL, "Android", setOf("屏幕")),
-            tool("mcp_newly_connected", "新服务工具", ToolExposure.OPTIONAL, "MCP", setOf("外部服务")),
-        )
-        assertTrue(LocalToolRouter.search(tools, "请检查手机当前屏幕").any { it.name == "android_screen" })
-        assertTrue(LocalToolRouter.isInventoryRequest("工具与能力检测"))
-        val directory = LocalToolRouter.capabilityDirectory(tools, emptySet())
-        assertTrue(directory.contains("android_screen"))
-        assertTrue(directory.contains("mcp_newly_connected"))
-        assertTrue(directory.contains("本轮已选 0"))
-    }
-
-    @Test
-    fun optionalPromptBudgetNeverDropsCoreAndLoadsExplicitLargeSchemaWhenBudgetAllows() {
-        val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
-        val small = tool("small_remote", "小型远端工具", ToolExposure.OPTIONAL, "MCP")
-        val huge = tool(
-            "huge_remote",
-            "超大远端工具" + "x".repeat(30_000),
-            ToolExposure.OPTIONAL,
-            "MCP",
-        )
-
-        assertEquals(
-            listOf("read"),
-            names(
-                LocalToolRouter.visibleSchemas(
-                    tools = listOf(core, small, huge),
-                    enabledOptional = linkedSetOf("small_remote", "huge_remote"),
-                    maxOptionalDefinitionTokens = 0,
-                ),
-            ),
-        )
-        assertEquals(
-            listOf("read", "small_remote", "huge_remote"),
-            names(
-                LocalToolRouter.visibleSchemas(
-                    tools = listOf(core, small, huge),
-                    enabledOptional = linkedSetOf("small_remote", "huge_remote"),
-                    maxOptionalDefinitionTokens = LocalToolRouter.DEFAULT_OPTIONAL_TOOL_PROMPT_TOKENS,
-                ),
-            ),
-        )
-    }
-
-    @Test
-    fun oversizedDescriptionIsCompactedWithoutChangingArgumentContract() {
-        val properties = buildJsonObject {
-            // A property literally named "description" must never disappear.
-            put("description", buildJsonObject {
-                put("type", "string")
-                put("description", "输入说明" + "冗长".repeat(60_000))
-            })
-            put("payload", buildJsonObject { put("type", "array") })
-        }
-        val tool = tool("verbose_tool", "工具文档" + "文字".repeat(60_000),
-            ToolExposure.OPTIONAL, "MCP").copy(
-            schema = functionToolSchema(
-                "verbose_tool", "工具文档" + "文字".repeat(60_000),
-                properties = properties,
-                required = setOf("description"),
-            ),
-        )
-
-        val result = LocalToolRouter.selectSchemas(
-            tools = listOf(tool), enabledOptional = linkedSetOf("verbose_tool"),
-        )
-        assertEquals(listOf("verbose_tool"), names(result.schemas))
-        assertTrue("verbose_tool" in result.compactedNames)
-        assertTrue(result.omittedReasons.isEmpty())
-        val args = result.schemas.first().jsonObject["function"]!!.jsonObject["parameters"]!!.jsonObject
-        assertTrue("description" in args["properties"]!!.jsonObject)
-        assertEquals("string", args["properties"]!!.jsonObject["description"]!!.jsonObject["type"]!!.jsonPrimitive.content)
-        assertEquals("description", args["required"]!!.toString().trim('[', ']', '"'))
-    }
-
-    @Test
-    fun exhaustedBudgetReturnsConcreteOmissionReason() {
-        val big = tool("big", "文档" + "文字".repeat(60_000), ToolExposure.OPTIONAL, "MCP")
-        val result = LocalToolRouter.selectSchemas(listOf(big), setOf("big"), 0)
-        assertTrue(result.schemas.isEmpty())
-        assertTrue(result.omittedReasons["big"].orEmpty().contains("预算"))
-    }
-
-    @Test
-    fun validDeepAndWideSchemasRemainUsableWhenTheyFitTheActualBudget() {
-        var nested = buildJsonObject { put("type", "string") }
-        repeat(15) {
-            val child = nested
-            nested = buildJsonObject {
-                put("type", "object")
-                put("properties", buildJsonObject { put("next", child) })
-            }
-        }
-        val properties = buildJsonObject {
-            put("nested", nested)
-            repeat(300) { index ->
-                put("p" + index, buildJsonObject { put("type", "string") })
-            }
-        }
-        val complex = tool("complex_remote", "真实复杂扩展", ToolExposure.OPTIONAL, "MCP").copy(
-            schema = functionToolSchema(
-                "complex_remote", "真实复杂扩展",
-                properties = properties,
-                required = setOf("nested"),
-            ),
-        )
-        val selection = LocalToolRouter.selectSchemas(
-            listOf(complex), linkedSetOf("complex_remote"), 24_000,
-        )
-        assertEquals(listOf("complex_remote"), names(selection.schemas))
-        assertTrue(selection.omittedReasons.isEmpty())
-        assertEquals(complex.schema, selection.schemas.first())
-    }
-
-    @Test
-    fun staleEnabledNameCannotResurrectAnUnregisteredTool() {
-        val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
-        val removed = tool("removed", "已卸载工具", ToolExposure.OPTIONAL, "MCP", setOf("MCP"))
-        val enabled = setOf("removed")
-
-        assertTrue("removed" in names(LocalToolRouter.visibleSchemas(listOf(core, removed), enabled)))
-        assertEquals(listOf("read"), names(LocalToolRouter.visibleSchemas(listOf(core), enabled)))
     }
 
     @Test
@@ -590,60 +307,6 @@ class LocalToolRouterTest {
         }
 
         assertEquals(listOf("target"), LocalToolRouter.search(listOf(target), hugeQuery).map(HarnessTool::name))
-    }
-
-    @Test
-    fun capabilitySummaryComesFromRegisteredMetadataAndEnabledState() {
-        val tools = listOf(
-            tool(
-                "device_action", "设备操作", ToolExposure.OPTIONAL, "Android",
-                setOf("安卓"), listOf("需要无障碍授权"),
-            ),
-            tool("repo_reader", "仓库读取", ToolExposure.OPTIONAL, "GitHub", setOf("仓库")),
-        )
-
-        val summary = LocalToolRouter.capabilitySummary(tools, setOf("repo_reader"))
-
-        assertTrue(summary.contains("Android：本轮未选用 0/1"))
-        assertTrue(summary.contains("需要无障碍授权"))
-        assertTrue(summary.contains("GitHub：本轮已选用 1/1"))
-    }
-
-    @Test
-    fun capabilitySummaryBoundsRepeatedFamilyRequirements() {
-        val tools = (0 until 8).map { index ->
-            tool(
-                "remote_$index",
-                "远端工具 $index",
-                ToolExposure.OPTIONAL,
-                "MCP",
-                setOf("mcp"),
-                listOf("连接条件-$index"),
-            )
-        }
-
-        val summary = LocalToolRouter.capabilitySummary(tools, emptySet())
-
-        assertTrue(summary.contains("连接条件-0"))
-        assertTrue(summary.contains("连接条件-3"))
-        assertTrue(summary.contains("另有 4 项"))
-        assertTrue(!summary.contains("连接条件-7"))
-    }
-
-    @Test
-    fun capacityOmissionsAreTypedWhileUserFacingReasonsRemainReadable() {
-        val core = tool("read", "读取文件", ToolExposure.CORE, "文件")
-        val optional = tool("remote_action", "远端工具", ToolExposure.OPTIONAL, "MCP")
-        val omitted = LocalToolRouter.selectSchemas(
-            listOf(core, optional), setOf("remote_action"), maxOptionalDefinitionTokens = 0)
-        assertEquals(setOf("remote_action"), omitted.budgetOmittedNames)
-        assertTrue("remote_action" in omitted.omittedReasons)
-        assertEquals(listOf("read"), names(omitted.schemas))
-
-        val included = LocalToolRouter.selectSchemas(
-            listOf(core, optional), setOf("remote_action"), maxOptionalDefinitionTokens = 16_000)
-        assertTrue(included.budgetOmittedNames.isEmpty())
-        assertTrue("remote_action" in names(included.schemas))
     }
 
     private fun tool(

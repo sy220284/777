@@ -320,7 +320,8 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
         }
         val requestEvidence = buildLocalRequestEvidence(requestMessages, tools, nativeTools)
-        val replayEvidence = buildLocalRequestEvidence(logMessages, tools, nativeTools)
+        val replayEvidence = if (logMessages === requestMessages) requestEvidence
+            else buildLocalRequestEvidence(logMessages, tools, nativeTools)
         val evidenceKey = snapshot.sessionId + "\u0000" + routeFingerprint
         val evidenceLogSequence = log.latestSequence()
         val messageSurfaceSeq = evidenceSurfaces.ensureMessages(
@@ -701,8 +702,13 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             }
                 executor.execute { providerAttempt ->
                     val activeLogMessages = redactModelImages(activeMessages)
-                    val activeEvidence = buildLocalRequestEvidence(activeMessages, tools, nativeTools)
-                    val activeReplayEvidence = buildLocalRequestEvidence(activeLogMessages, tools, nativeTools)
+                    val activeEvidence = if (activeMessages === requestMessages) requestEvidence
+                        else buildLocalRequestEvidence(activeMessages, tools, nativeTools)
+                    val activeReplayEvidence = when {
+                        activeLogMessages === activeMessages -> activeEvidence
+                        activeMessages === requestMessages -> replayEvidence
+                        else -> buildLocalRequestEvidence(activeLogMessages, tools, nativeTools)
+                    }
                     val activeMessageSurfaceSeq = evidenceSurfaces.ensureMessages(
                         log = log,
                         key = evidenceKey,

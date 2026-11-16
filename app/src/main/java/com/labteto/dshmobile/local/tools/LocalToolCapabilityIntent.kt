@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-/** Bounded task-intent projection used only to decide which optional tool schemas to pre-attach. */
+/** Identifies task-specific provider readiness hints without selecting model tool schemas. */
 internal data class LocalToolCapabilityIntent(
     val requestsGitHub: Boolean,
 ) {
@@ -19,7 +19,7 @@ internal data class LocalToolCapabilityIntent(
         ): LocalToolCapabilityIntent {
             // The latest real request decides which provider is needed. Historical
             // GitHub mentions are relevant only for an explicit "continue" command.
-            // Do not resurrect credentials and tool schemas from unrelated old tasks.
+            // Do not resurrect provider hints from unrelated old tasks.
             val current = githubIntentSignal(input)
             val recent = if (current == null &&
                 isContinuationTaskRequest(input)

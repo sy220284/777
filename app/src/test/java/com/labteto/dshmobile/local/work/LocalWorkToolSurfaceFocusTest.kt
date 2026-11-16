@@ -43,11 +43,7 @@ class LocalWorkToolSurfaceFocusTest {
             registry = registry, currentSessionId = { "work" }, planMode = { plan },
             requestApproval = { _, _, _ -> true },
         )).let { projection ->
-            projection.names(projection.modelSchemas(
-                policy = localAgentRunPolicy(LocalUsageMode.WORK),
-                modelState = LocalModelState(), planModeEnabled = plan,
-                history = emptyList(), enabledOptional = optional,
-            ))
+            projection.names(projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK)))
         }
 
     @Test fun modelSurfaceIsStableWhenPluginsAndPreviousSelectionsChange() {
@@ -81,9 +77,6 @@ class LocalWorkToolSurfaceFocusTest {
             registry = registry, currentSessionId = { "chat" }, planMode = { false },
             requestApproval = { _, _, _ -> true },
         ))
-        assertTrue(projection.modelSelection(
-            policy = localAgentRunPolicy(LocalUsageMode.CHAT),
-            modelState = LocalModelState(), planModeEnabled = false, history = emptyList(),
-        ).schemas.isEmpty())
+        assertTrue(projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.CHAT)).isEmpty())
     }
 }

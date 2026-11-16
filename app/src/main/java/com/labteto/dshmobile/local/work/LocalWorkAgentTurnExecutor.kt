@@ -40,7 +40,6 @@ import com.labteto.dshmobile.local.model.localToolHistoryMessage
 import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
-import com.labteto.dshmobile.local.model.toRunModelSurface
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
@@ -59,7 +58,6 @@ import com.labteto.dshmobile.local.runtime.adaptiveAgentStepLimit
 import com.labteto.dshmobile.local.runtime.localForegroundStepLimitExtender
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
-import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.local.tools.pendingToolSettlements
 import java.io.File
 import kotlinx.coroutines.ensureActive
@@ -237,9 +235,6 @@ internal class LocalWorkAgentTurnExecutor(
             val runSnapshot = runState.value
             val goalAtTurnStart = runSnapshot.work.goal
             val steeringRevisionAtTurnStart = binding.steeringRevision.value
-            var runToolSurface = LocalRunToolSurface(
-                runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
-            )
             val mainMaxSteps = runSnapshot.mainMaxSteps
             val mainStepLimit = if (runPolicy.allowToolExecution) {
                 adaptiveAgentStepLimit(
@@ -253,6 +248,9 @@ internal class LocalWorkAgentTurnExecutor(
             } else 1
             val continuationParentRunId = binding.continuationParentRunId
             binding.continuationParentRunId = null
+            // PR928's two model gateways are immutable for the whole run.
+            // Build them once and share that same surface with run metadata and all steps.
+            val modelToolSchemas = workTurnToolRuntime.schemas(runPolicy)
             val runContext = agentRunCoordinator.start(
                 sessionId = foregroundSessionId,
                 usageMode = runSnapshot.usageMode,
@@ -273,7 +271,7 @@ internal class LocalWorkAgentTurnExecutor(
                     maxVirtualDisplays = resourceScheduler.budget.maxVirtualDisplays,
                     maxLanguageServers = resourceScheduler.budget.maxLanguageServers,
                 ),
-                toolNames = workTurnToolRuntime.names(runPolicy, binding),
+                toolNames = workTurnToolRuntime.names(modelToolSchemas),
                 contextChars = runSnapshot.kernel.contextChars,
                 parentRunId = continuationParentRunId,
             )
@@ -328,20 +326,11 @@ internal class LocalWorkAgentTurnExecutor(
                     agentRunCoordinator.ensureCurrentOwner(runContext)
                     // Persistent history stays compact; user rules, recalled memory and handoff are
                     // assembled per request and are deliberately never written back into runHistory.
-                    if (!requestPrepared) {
+                    val firstRequestPreparation = !requestPrepared
+                    var needsContextRefresh = firstRequestPreparation
+                    if (firstRequestPreparation) {
                         workModelHistoryRuntime.repairInterleavedPromptUpdates(binding)
                         workModelHistoryRuntime.ensureSystemMessage(binding)
-                        val snapshot = runState.value
-                        workPromptContext = contextComposer.composeWorkTurnContext(
-                            input = input,
-                            snapshot = snapshot,
-                            workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(
-                                sessionStorage.files.workspace, input,
-                                selectedInvocations = pinnedInvocations.current(),
-                            ),
-                        )
-                        if (memoryInput.isNotBlank()) workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                         requestPrepared = true
                     }
                     while (true) {
@@ -362,18 +351,7 @@ internal class LocalWorkAgentTurnExecutor(
                                 selectedModel.modelSelection.activeProfileId,
                             ))
                         }
-                        runToolSurface = LocalRunToolSurface(
-                            selectedModel.modelSelection.activeProfile?.toRunModelSurface(),
-                        )
-                        workPromptContext = contextComposer.composeWorkTurnContext(
-                            input = input,
-                            snapshot = runState.value,
-                            workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(
-                                sessionStorage.files.workspace, input,
-                                selectedInvocations = pinnedInvocations.current(),
-                            ),
-                        )
+                        needsContextRefresh = true
                         workModelHistoryRuntime.updateContextMetrics(binding)
                     }
                     val snapshot = runState.value
@@ -384,16 +362,23 @@ internal class LocalWorkAgentTurnExecutor(
                             ?.takeIf(String::isNotBlank) ?: input
                         effectiveSkillInput = effectiveInput
                         binding.explicitlySelectedSkill = explicitLocalSkillName(effectiveInput)
+                        projectedSteeringRevision = observedSteer
+                        needsContextRefresh = true
+                    }
+                    if (needsContextRefresh) {
+                        // Route changes and user steering share one context rebuild.
+                        // The live skill directory is read only at the model boundary.
                         workPromptContext = contextComposer.composeWorkTurnContext(
-                            input = effectiveInput,
+                            input = effectiveSkillInput,
                             snapshot = snapshot,
                             workspacePath = workspacePath,
-                            skillGuidance = resolveLocalWorkSkillGuidance(
-                                sessionStorage.files.workspace, effectiveInput,
-                                selectedInvocations = pinnedInvocations.current(),
-                            ),
+                            skillGuidance = "",
                         )
-                        projectedSteeringRevision = observedSteer
+                    }
+                    // Preserve first-request recall semantics: record new memory directives
+                    // after building this request's recalled context, just once per turn.
+                    if (firstRequestPreparation && memoryInput.isNotBlank()) {
+                        workMemoryRuntime.captureAutoMemoryDirective(memoryInput, sourceMessageId, binding)
                     }
                     // An unverified strategy can be tried only on a naturally
                     // requested Goal with the identical acceptance contract as its verified
@@ -448,6 +433,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val reusableDiscoveryContext = improvementArchive.relevantDiscoveries(
                         snapshot.projectId.orEmpty(), effectiveSkillInput,
                     )
+                    // Read the live skill catalog only at the real model-request boundary.
                     val skillGuidance = resolveLocalWorkSkillGuidance(
                         sessionStorage.files.workspace, effectiveSkillInput,
                         selectedInvocations = pinnedInvocations.current(),
@@ -456,9 +442,8 @@ internal class LocalWorkAgentTurnExecutor(
                         // Replace this request's layer, never append catalog updates to history.
                         workPromptContext = workPromptContext.copy(skill = skillGuidance)
                     }
-                    // Select a provisional tool surface for compaction cost only.
-                    // The actual model-visible selection is frozen after compaction.
-                    val preliminarySelection = workTurnToolRuntime.selectSchemas(runPolicy, binding)
+                    // Reuse the run's fixed gateway schema; live registry bindings
+                    // are captured separately at each execution step.
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
                             estimateModelTokens(workPromptContext.dynamic + improvementGuidance +
@@ -466,7 +451,7 @@ internal class LocalWorkAgentTurnExecutor(
                             estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         LocalWorkSummarySettings.attach(context)
-                        val extra = productContextTokens + estimateModelTokens(preliminarySelection.schemas.toString())
+                        val extra = productContextTokens + estimateModelTokens(modelToolSchemas.toString())
                         if (LocalWorkSummarySettings.state.value) {
                             val outcome = sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
                                 workModelHistoryRuntime.compactSemanticallyBeforeStep(binding, extra) { request ->
@@ -513,7 +498,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
                         }
                     }
-                    val advertisedTools = runToolSurface.next(preliminarySelection.schemas)
+                    val advertisedTools = modelToolSchemas
                     latestAcceptedSamplingRevision = observedSteer
                     val tools = modelToolStepSurface.capture(
                         advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),

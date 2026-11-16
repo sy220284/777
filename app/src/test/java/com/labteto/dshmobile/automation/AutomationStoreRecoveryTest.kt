@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.automation
 
 import java.nio.file.Files
+import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -95,6 +96,65 @@ class AutomationStoreRecoveryTest {
             assertTrue(directory.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText().contains("broken") })
             assertTrue(directory.listFiles().orEmpty().any { it.name.contains(".corrupt-") && it.readText() == "{broken-backup" })
             assertThrows(IllegalStateException::class.java) { AutomationStore(file, json).list() }
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+
+
+    @Test
+    fun oneChatActivityUpdatesMultipleTasksWithOneDurableJournalMutation() {
+        val directory = Files.createTempDirectory("automation-batch-chat-activity").toFile()
+        val file = directory.resolve("automations.json")
+        val journal = directory.resolve("automations.json.wal.jsonl")
+        try {
+            val store = AutomationStore(file, json)
+            store.upsert(task("first", 1_000L).copy(
+                mode = AutomationMode.CHAT, targetSessionId = "chat-a",
+                status = AutomationStatus.WAITING_USER,
+            ))
+            store.upsert(task("second", 2_000L).copy(
+                mode = AutomationMode.CHAT, targetSessionId = "chat-a",
+                status = AutomationStatus.WAITING_USER,
+            ))
+            store.upsert(task("other", 3_000L).copy(
+                mode = AutomationMode.CHAT, targetSessionId = "chat-b",
+                status = AutomationStatus.WAITING_USER,
+            ))
+            val before = if (journal.isFile) journal.readLines().size else 0
+            val modified = store.updateMatching(
+                predicate = { it.targetSessionId == "chat-a" },
+            ) { it.copy(status = AutomationStatus.SCHEDULED, lastUserActivityAt = 88_000L) }
+            val after = if (journal.isFile) journal.readLines().size else 0
+            assertEquals(2, modified.size)
+            assertEquals(1, after - before)
+            val reopened = AutomationStore(file, json)
+            assertEquals(88_000L, reopened.get("first")!!.lastUserActivityAt)
+            assertEquals(AutomationStatus.SCHEDULED, reopened.get("second")!!.status)
+            assertEquals(AutomationStatus.WAITING_USER, reopened.get("other")!!.status)
+            val noChanges = store.updateMatching({ it.targetSessionId == "chat-a" }) { it.copy() }
+            assertTrue(noChanges.isEmpty())
+            assertEquals(after, journal.readLines().size)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun unchangedTaskUpdateDoesNotAppendAnotherDurableMutation() {
+        val directory = Files.createTempDirectory("automation-noop-update").toFile()
+        try {
+            val file = directory.resolve("automations.json")
+            val store = AutomationStore(file, json)
+            val existing = store.upsert(task("fixed", 15_000L)).admitted
+            val before = directory.walkTopDown().filter(File::isFile)
+                .associate { it.relativeTo(directory).path to it.readBytes().toList() }
+            assertEquals(existing, store.update("fixed") { it.copy() })
+            val after = directory.walkTopDown().filter(File::isFile)
+                .associate { it.relativeTo(directory).path to it.readBytes().toList() }
+            assertEquals(before, after)
+            assertEquals(existing, store.get("fixed"))
         } finally {
             directory.deleteRecursively()
         }

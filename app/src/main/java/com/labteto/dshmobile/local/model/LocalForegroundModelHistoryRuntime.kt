@@ -66,7 +66,7 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
         val eventLog = sessionStorage.eventLogs.get(expectedSessionId)
         val sourceAsOfSequence = eventLog.latestSequence()
         val sourceCheckpointSequence = eventLog.latest(ModelHistoryCheckpointCodec.EVENT_TYPE)?.sequence
-        val sourceMessageCount = history.snapshot().size
+        val sourceMessageCount = history.size
         val compaction = history.compact(
             compactor = compactor,
             budget = budget,
@@ -83,7 +83,7 @@ internal class LocalForegroundModelHistoryRuntime @Inject constructor(
             put("source_as_of_sequence", sourceAsOfSequence)
             sourceCheckpointSequence?.let { put("source_checkpoint_sequence", it) }
             put("source_message_count", sourceMessageCount)
-            put("result_message_count", history.snapshot().size)
+            put("result_message_count", history.size)
             put("omitted_messages", compaction.omittedMessages)
             put("summary", compaction.summary)
             put("summary_digest", stableJsonSha256(JsonPrimitive(compaction.summary)))

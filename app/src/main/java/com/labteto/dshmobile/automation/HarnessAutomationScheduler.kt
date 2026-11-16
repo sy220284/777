@@ -526,18 +526,18 @@ class HarnessAutomationScheduler @Inject constructor(
             else -> firstRunAtMillis.coerceAtLeast(now)
         }
         require(current.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
+        var scheduleChanged = false
         val updated = store.updateIf(
             id,
             predicate = { it.scheduleGeneration == current.scheduleGeneration },
         ) { latest ->
-            latest.copy(
+            val candidate = latest.copy(
                 prompt = prompt.trim(),
                 nextRunAt = nextRun,
                 recurringMinutes = recurring,
                 scheduleType = scheduleType,
                 dispatchPolicy = automationDispatchPolicy(scheduleType, recurring),
                 scheduleAnchorAt = if (scheduleType == AutomationScheduleType.SILENCE) now else nextRun,
-                scheduleGeneration = latest.scheduleGeneration + 1L,
                 silenceMinutes = if (scheduleType == AutomationScheduleType.SILENCE) silenceMinutes else null,
                 windowStartMinuteOfDay = if (scheduleType == AutomationScheduleType.WINDOW) {
                     windowStartMinuteOfDay
@@ -557,7 +557,13 @@ class HarnessAutomationScheduler @Inject constructor(
                 lastError = null,
                 failureStreak = 0,
             )
+            if (candidate == latest) latest else {
+                scheduleChanged = true
+                candidate.copy(scheduleGeneration = latest.scheduleGeneration + 1L)
+            }
         } ?: return false
+        // Saving unchanged settings must not cancel a live WorkManager request.
+        if (!scheduleChanged) return true
         if (updated.status != AutomationStatus.PAUSED) {
             if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
                 enqueueOneTime(id, nextRun, updated.scheduleGeneration)
@@ -611,46 +617,40 @@ class HarnessAutomationScheduler @Inject constructor(
     }
 
     fun onChatUserActivity(sessionId: String, userMessageAt: Long) {
-        store.list()
-            .filter {
-                it.mode == AutomationMode.CHAT &&
-                    it.targetSessionId == sessionId
+        // One user event updates every affected task in one durable store mutation.
+        val resumed = store.updateMatching(
+            predicate = { it.mode == AutomationMode.CHAT && it.targetSessionId == sessionId },
+        ) { current ->
+            val latestActivity = maxOf(current.lastUserActivityAt ?: Long.MIN_VALUE, userMessageAt)
+            if (current.status == AutomationStatus.WAITING_USER) {
+                current.copy(
+                    status = AutomationStatus.SCHEDULED,
+                    nextRunAt = nextAutomationRunAfterUserActivity(current, latestActivity),
+                    lastUserActivityAt = latestActivity,
+                    lastError = null,
+                )
+            } else {
+                current.copy(lastUserActivityAt = latestActivity)
             }
-            .forEach { task ->
-                var resumedFromWaiting = false
-                val updated = store.update(task.id) { current ->
-                    if (
-                        current.mode != AutomationMode.CHAT ||
-                        current.targetSessionId != sessionId
-                    ) {
-                        current
-                    } else {
-                        val latestActivity = maxOf(current.lastUserActivityAt ?: Long.MIN_VALUE, userMessageAt)
-                        resumedFromWaiting = current.status == AutomationStatus.WAITING_USER
-                        if (resumedFromWaiting) {
-                            current.copy(
-                                status = AutomationStatus.SCHEDULED,
-                                nextRunAt = nextAutomationRunAfterUserActivity(current, latestActivity),
-                                lastUserActivityAt = latestActivity,
-                                lastError = null,
-                            )
-                        } else {
-                            current.copy(lastUserActivityAt = latestActivity)
-                        }
-                    }
-                } ?: return@forEach
-                if (updated.status != AutomationStatus.SCHEDULED || !resumedFromWaiting) return@forEach
-                if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
-                    enqueueOneTime(updated.id, updated.nextRunAt, updated.scheduleGeneration)
-                } else {
-                    enqueuePeriodic(
-                        updated.id,
-                        requireNotNull(updated.recurringMinutes),
-                        updated.nextRunAt,
-                        updated.scheduleGeneration,
-                    )
-                }
+        }.filter { (before, after) ->
+            before.status == AutomationStatus.WAITING_USER &&
+                after.status == AutomationStatus.SCHEDULED
+        }
+
+        resumed.forEach { (_, updated) ->
+            // Both enqueue paths already check the current generation, status and
+            // due time atomically. A second enclosing store read cannot add safety.
+            if (usesChainedAutomationScheduling(updated) || updated.recurringMinutes == null) {
+                enqueueOneTime(updated.id, updated.nextRunAt, updated.scheduleGeneration)
+            } else {
+                enqueuePeriodic(
+                    updated.id,
+                    requireNotNull(updated.recurringMinutes),
+                    updated.nextRunAt,
+                    updated.scheduleGeneration,
+                )
             }
+        }
     }
 
     fun cancelTask(id: String): Boolean {

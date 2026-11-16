@@ -8,6 +8,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -15,6 +16,32 @@ class LocalWorkBuiltinToolRuntimeTest {
     private val runtime = LocalWorkBuiltinToolRuntime(
         persist = { error("无绑定路径不得持久化") },
     )
+
+    @Test
+    fun onlyWorkOwnedToolsEnterTheWorkDispatcher() {
+        val ownerSets = listOf(
+            LocalWorkBuiltinToolRuntime.TOOL_NAMES,
+            LocalWorkMediaToolRuntime.TOOL_NAMES,
+            LocalAgentControlPlane.TOOL_NAMES,
+        )
+        assertEquals("One Work tool must be routed to exactly one owner",
+            ownerSets.sumOf { it.size }, LOCAL_WORK_BUILTIN_TOOL_NAMES.size)
+        assertTrue(LOCAL_WORK_BUILTIN_TOOL_NAMES.containsAll(LocalWorkBuiltinToolRuntime.TOOL_NAMES))
+        assertTrue(LOCAL_WORK_BUILTIN_TOOL_NAMES.containsAll(LocalWorkMediaToolRuntime.TOOL_NAMES))
+        assertTrue(LOCAL_WORK_BUILTIN_TOOL_NAMES.containsAll(LocalAgentControlPlane.TOOL_NAMES))
+        listOf("read", "read_file", "write", "web_fetch", "web_search",
+            "skill", "bash", "run_shell", "tool_search", "tool_call"
+        ).forEach { shared ->
+            assertFalse("Shared built-in was misrouted to Work: $shared",
+                shared in LOCAL_WORK_BUILTIN_TOOL_NAMES)
+        }
+        listOf("update_plan", "create_goal", "media_image_create", "subagent",
+            "list_agent_roles", "workflow"
+        ).forEach { workOwned ->
+            assertTrue("Work built-in must have a direct owner: $workOwned",
+                workOwned in LOCAL_WORK_BUILTIN_TOOL_NAMES)
+        }
+    }
 
     @Test
     fun unrelatedBuiltinIsLeftForSharedRouting() = runBlocking {

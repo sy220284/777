@@ -69,6 +69,18 @@ class LocalSubagentCapabilitiesTest {
         )
     }
 
+
+    @Test
+    fun teamCanUseMoreThanTwentyFourExplicitlyAuthorizedExtensions() {
+        val caps = LocalSubagentCapabilities(
+            allowMutation = true,
+            continuable = true,
+            teamManaged = true,
+            initialOptionalTools = (1..80).map { "mcp_tool_$it" }.toSet(),
+        )
+        assertEquals(80, validateLocalSubagentLaunchSpec(launch(caps)).capabilities.initialOptionalTools.size)
+    }
+
     @Test
     fun rejectsOversizedStableInstructionsBeforeExecution() {
         val spec = LocalSubagentLaunchSpec(

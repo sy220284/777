@@ -129,10 +129,9 @@ class LocalToolExecutionCoordinatorTest {
         registerGateways(registry)
         registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("preview") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-        val selected = projection.modelSelection(localAgentRunPolicy(LocalUsageMode.WORK),
-            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList())
-        assertEquals(listOf("tool_search", "tool_call"), projection.names(selected.schemas))
-        assertFalse("read" in projection.names(selected.schemas))
+        val selected = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertEquals(listOf("tool_search", "tool_call"), projection.names(selected))
+        assertFalse("read" in projection.names(selected))
     }
 
     @Test fun planModeRunsReadOnlyCodeModeWithoutExtraPromptsAndRejectsMixedScript() = runBlocking {
@@ -1181,7 +1180,7 @@ class LocalToolExecutionCoordinatorTest {
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
         for (mutation in listOf(false, true)) for (virtual in listOf(false, true)) {
             assertEquals(listOf("tool_search", "tool_call"), projection.names(
-                projection.subagentSchemas(mutation, virtual, setOf("download_file"))))
+                projection.subagentSchemas()))
         }
     }
 
@@ -1190,9 +1189,8 @@ class LocalToolExecutionCoordinatorTest {
         registerGateways(registry)
         registry.register(webFetchTool { ToolResult("ok") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-        val work = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK),
-            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList())
-        val child = projection.subagentSchemas(false, false, emptySet())
+        val work = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK))
+        val child = projection.subagentSchemas()
         assertEquals(work, child)
         assertEquals(listOf("tool_search", "tool_call"), projection.names(work))
         assertFalse("web_fetch" in projection.names(work))
@@ -1203,8 +1201,7 @@ class LocalToolExecutionCoordinatorTest {
         registerGateways(registry)
         registry.register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) { ToolResult("ok") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-        val surface = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK),
-            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList(), setOf("write"))
+        val surface = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK))
         assertEquals(listOf("tool_search", "tool_call"), projection.names(surface))
     }
 
@@ -1296,11 +1293,8 @@ class LocalToolExecutionCoordinatorTest {
             ToolExposure.OPTIONAL) { ToolResult("ok") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry,
             networkSearchEnabled = { false }))
-        val actual = projection.modelSelection(localAgentRunPolicy(LocalUsageMode.WORK),
-            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList(),
-            setOf("web_search", "missing_extension"))
-        assertEquals(listOf("tool_search", "tool_call"), projection.names(actual.schemas))
-        assertTrue(actual.omittedReasons.isEmpty())
+        val actual = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK))
+        assertEquals(listOf("tool_search", "tool_call"), projection.names(actual))
     }
 
     private fun directArgs(name: String) = buildJsonObject {

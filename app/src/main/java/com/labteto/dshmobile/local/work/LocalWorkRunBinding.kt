@@ -51,7 +51,6 @@ internal class LocalWorkRunBinding(
     /** Exact live tool bodies, including question waits; settled by the shared execution boundary. */
     val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
-    val enabledOptionalTools = linkedSetOf<String>()
     /** Per-run MCP registrations discovered after a model step, not a global permission grant. */
     internal val mcpDiscovery = LocalWorkRunMcpDiscovery()
     internal val workflowAdmission = kotlinx.coroutines.sync.Mutex()
