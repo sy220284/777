@@ -17,6 +17,8 @@ class LocalModelReplyValidationTest {
             assertEquals("MODEL_EMPTY_RESPONSE", error.code)
             assertEquals("request-1", error.requestId)
             assertFalse(error.retryable)
+            assertEquals(LocalModelAdmissionState.ADMITTED, error.admissionState)
+            org.junit.Assert.assertTrue(error.continuationEligible)
         }
     }
 
