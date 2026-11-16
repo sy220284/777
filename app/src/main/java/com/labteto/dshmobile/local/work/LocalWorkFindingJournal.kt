@@ -23,6 +23,35 @@ internal object LocalWorkFindingJournal {
     private fun JsonObject.text(key: String): String =
         (get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
 
+    /** tool_call records the public gateway as its name; evidence uses the actual target. */
+    private fun JsonObject.sourceToolName(): String =
+        if (text("name") == "tool_call") (get("arguments") as? JsonObject)?.text("name").orEmpty()
+        else text("name")
+
+    /** Surface exact settled IDs on an invalid citation, without weakening source verification. */
+    private fun recentSourceHint(log: LocalSessionEventLog, goalId: String): String {
+        val declarations = log.eventsOfTypesAfter(-1L, setOf("tool/call"))
+            .associateBy { it.sequence }
+        val eligible = log.eventsOfTypesAfter(-1L, setOf("tool/result"))
+            .asReversed().mapNotNull { result ->
+                if (result.data.text("is_error") != "false" ||
+                    result.data.text("error_code").isNotBlank()) return@mapNotNull null
+                val sequence = (result.data["tool_declared_sequence"] as? JsonPrimitive)
+                    ?.longOrNull ?: return@mapNotNull null
+                val declaration = declarations[sequence] ?: return@mapNotNull null
+                val id = result.data.text("id")
+                val name = declaration.data.sourceToolName()
+                if (id.isBlank() || name.isBlank() || name == "work_finding" ||
+                    declaration.sequence >= result.sequence ||
+                    declaration.data.text("id") != id ||
+                    declaration.data.text("goal_id") != goalId) return@mapNotNull null
+                "$" + "{id}（$" + "{name}）"
+            }.distinct().take(5)
+        return if (eligible.isEmpty()) {
+            "当前工作目标下没有可关联的成功工具回执；请先完成真实工具调用并确认目标一致"
+        } else "当前目标可用的来源回执 ID：" + eligible.joinToString("；")
+    }
+
     fun execute(
         log: LocalSessionEventLog,
         goalId: String,
@@ -69,16 +98,16 @@ internal object LocalWorkFindingJournal {
                     val source = log.latestMatching(setOf("tool/result")) { it.text("id") == sourceCallId }
                     require(source != null && source.data.text("is_error") == "false" &&
                         source.data.text("error_code").isBlank()) {
-                        "没有找到成功且已结算的来源工具回执"
+                        "没有找到成功且已结算的来源工具回执；${recentSourceHint(log, goalId)}"
                     }
                     val declaration = log.latestMatching(setOf("tool/call")) { data ->
                         data.text("id") == sourceCallId && data.text("goal_id") == goalId
                     }
                     val sourceDeclaration = (source.data["tool_declared_sequence"] as? JsonPrimitive)?.longOrNull
                     require(declaration != null && declaration.sequence < source.sequence &&
-                        declaration.data.text("name") != "work_finding" &&
+                        declaration.data.sourceToolName() != "work_finding" &&
                         sourceDeclaration == declaration.sequence) {
-                        "来源工具不属于当前目标或尚未结算"
+                        "来源工具不属于当前目标或尚未结算；${recentSourceHint(log, goalId)}"
                     }
                     val findingId = if (action == "record") {
                         require(args.text("finding_id").isBlank()) { "新发现不接受历史 ID" }
