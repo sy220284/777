@@ -29,6 +29,18 @@ internal fun isWorkTransportInterruption(error: LocalModelException?): Boolean {
     )
 }
 
+/**
+ * Continuation commands persist only the failure code, not Throwable trees. Recognize the
+ * same interruption family after a cold restore without broadening to HTTP/auth failures.
+ */
+internal fun isWorkTransportContinuationCode(code: String): Boolean =
+    code in setOf(
+        "MODEL_NETWORK", "MODEL_TIMEOUT", "MODEL_PARTIAL_STREAM_INTERRUPTED",
+        "MODEL_STREAM_STALLED_AFTER_ADMISSION", "MODEL_RESPONSE_INTERRUPTED_AFTER_ADMISSION",
+        "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION", "RESPONSES_STREAM_INTERRUPTED_AFTER_ADMISSION",
+        "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION", "CHATGPT_PLAN_STREAM_INTERRUPTED",
+    ) || code.endsWith("_STREAM_INTERRUPTED")
+
 /** Delays repeated *new* checkpoint requests without abandoning the user's task. */
 internal fun workTransportResumeBackoffMillis(continuationIndex: Int): Long =
     (2_000L shl (continuationIndex - 1).coerceIn(0, 6)).coerceAtMost(120_000L)
