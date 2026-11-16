@@ -24,6 +24,7 @@ internal fun isWorkTransportInterruption(error: LocalModelException?): Boolean {
     // A request proven NOT_SENT is safe to retry indefinitely after connectivity returns.
     if (error.admissionState == LocalModelAdmissionState.NOT_SENT &&
         error.retryable && error.origin == LocalModelFailureOrigin.TRANSPORT) return true
+    if (error.code == "WORK_RUNTIME_INTERRUPTED" && error.continuationEligible) return true
     if (!error.continuationEligible) return false
     if (error.origin == LocalModelFailureOrigin.TRANSPORT) return true
     if (error.code == "MODEL_PARTIAL_STREAM_INTERRUPTED") return true
@@ -41,6 +42,7 @@ internal fun isWorkTransportInterruption(error: LocalModelException?): Boolean {
 internal fun isWorkTransportContinuationCode(code: String): Boolean =
     code in setOf(
         "MODEL_NETWORK", "MODEL_TIMEOUT", "MODEL_PARTIAL_STREAM_INTERRUPTED",
+        "WORK_RUNTIME_INTERRUPTED",
         "MODEL_STREAM_STALLED_AFTER_ADMISSION", "MODEL_RESPONSE_INTERRUPTED_AFTER_ADMISSION",
         "MODEL_STREAM_INTERRUPTED_AFTER_ADMISSION", "RESPONSES_STREAM_INTERRUPTED_AFTER_ADMISSION",
         "ANTHROPIC_STREAM_INTERRUPTED_AFTER_ADMISSION", "CHATGPT_PLAN_STREAM_INTERRUPTED",
