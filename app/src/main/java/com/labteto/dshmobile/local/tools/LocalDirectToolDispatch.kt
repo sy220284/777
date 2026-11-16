@@ -55,6 +55,7 @@ internal class LocalSubagentExecutionScope(
         val name = tool.name
         if (tool.exposure == ToolExposure.INTERNAL) return false
         if (name in setOf(DIRECT_TOOL_CALL, DIRECT_TOOL_SEARCH)) return true
+        if (name in DIRECT_TEAM_MEMBER_TOOL_NAMES && !capabilities.teamManaged) return false
         // The gateway must preserve every per-agent exclusion of the previous actual schema.
         // Team members only own their explicitly defined member commands; nested delegation
         // is enabled solely when the runner has acquired the delegation admission.
