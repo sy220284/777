@@ -13,6 +13,13 @@ internal fun subagentContinuationMessage(
     completedContinuations: Int,
 ): JsonObject? {
     val continuation = SUBAGENT_CONTINUATION_POLICY.message(error, completedContinuations) ?: return null
+    if (error.code == "ANTHROPIC_PROTOCOL_ERROR") {
+        return kotlinx.serialization.json.JsonObject(
+            continuation + ("content" to kotlinx.serialization.json.JsonPrimitive(
+                "上一轮模型响应的 SSE 或消息块格式异常，当前调用没有执行工具。请检查已有真实工具回执，通过 tool_search 查找工具参数后重新发起合法调用，继续原子任务；不得重复已经执行的操作。"
+            ))
+        )
+    }
     if (error.code != "ANTHROPIC_TOOL_ARGUMENTS_INVALID") return continuation
     return kotlinx.serialization.json.JsonObject(
         continuation + ("content" to kotlinx.serialization.json.JsonPrimitive(
