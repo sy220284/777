@@ -417,8 +417,10 @@ class ToolsViewModel @Inject constructor(
         bundledSkillIds: List<String> = listOf(installedId),
     ) {
         require(bundledSkillIds.isNotEmpty()) { "安装结果没有技能" }
+        // One authoritative inventory snapshot serves the visible list and dependency checks.
+        val installedSkills = localTools.installedSkills()
         _state.value = _state.value.copy(
-            skills = localTools.installedSkills(),
+            skills = installedSkills,
             presets = localTools.presetSkills(),
             createdSkillId = installedId,
         )
@@ -433,7 +435,7 @@ class ToolsViewModel @Inject constructor(
         }
         val declared = buildList {
             officialRequest?.let(::add)
-            localTools.installedSkills()
+            installedSkills
                 .filter { it.name in bundledSkillIds }
                 .flatMap { it.requirements }
                 .filter { it.type.equals("mcp", ignoreCase = true) && !it.registered }
@@ -503,7 +505,7 @@ class ToolsViewModel @Inject constructor(
         val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
             else "技能 ${installedId}"
         val officialStatus = com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
-            localTools.servers(), officialDetail?.mcpServerId, officialDetail?.mcpUrl)
+            _state.value.servers, officialDetail?.mcpServerId, officialDetail?.mcpUrl)
         _state.value = _state.value.copy(
             feedback = when {
                 failures.isNotEmpty() -> "${scope}已安装；${failures.size} 项服务授权未完成（" +
