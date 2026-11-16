@@ -39,8 +39,17 @@ class LocalMiniMaxCompatibilityTest {
             )
             val raw = prepared.single()["content"]!!.jsonArray.last().jsonObject
             assertEquals("video_url", raw["type"]!!.jsonPrimitive.content)
+            // Verify the real gateway preflight retains the active video content block.
+            val preparedRoute = route(model, base)
+            val gatewayRequest = prepareLocalModelAdapterRequest(
+                route = preparedRoute, messages = prepared, tools = JsonArray(emptyList()),
+                temperature = null, streaming = true,
+            )
+            assertTrue(gatewayRequest.request.messages.single().content.any {
+                it is LocalCanonicalContent.Raw
+            })
             val encoded = AnthropicMessagesClient(OkHttpClient(), json).buildPayload(
-                route(model, base), LocalCanonicalModelCodec.messages(prepared), emptyList(), null
+                preparedRoute, gatewayRequest.request.messages, emptyList(), null
             )
             val native = encoded["messages"]!!.jsonArray.single().jsonObject
                 .getValue("content").jsonArray.last().jsonObject
