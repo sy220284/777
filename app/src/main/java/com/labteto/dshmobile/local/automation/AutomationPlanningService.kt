@@ -123,7 +123,8 @@ class AutomationPlanningService @Inject constructor(
             initialMessages = messages,
             maxAttempts = 2,
             retryable = { error ->
-                (error as? LocalModelException)?.retryable == true || error is java.io.IOException
+                // Unclassified IO errors cannot prove an inference request was never admitted.
+                com.labteto.dshmobile.local.model.canRetryModelAttemptAfterOutput(error, streamedChars = 0)
             },
             backoffMillis = { failedAttempt, error ->
                 (error as? LocalModelException)?.providerRetryAfterMs?.coerceIn(0L, 30_000L)
