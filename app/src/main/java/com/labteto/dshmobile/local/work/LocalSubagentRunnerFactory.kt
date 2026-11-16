@@ -191,6 +191,7 @@ internal class LocalSubagentRunnerFactory(
                     it.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN &&
                         it.model == model && it.baseUrl.trimEnd('/') == baseUrl.trimEnd('/')
                 } == true,
+                profile = runnerState.value.modelState.modelSelection.activeProfile,
                 resourceScheduler = resourceScheduler,
             )
         },
