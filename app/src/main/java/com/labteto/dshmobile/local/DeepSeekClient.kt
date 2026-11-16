@@ -574,6 +574,11 @@ class DeepSeekClient @Inject constructor(
                 requestId = requestId,
                 cause = error,
             )
+        } catch (error: IllegalArgumentException) {
+            if (admissionTracker.snapshot() == LocalModelAdmissionState.ADMITTED) {
+                throw streamProtocolError("模型流式响应字段类型不符合协议", error)
+            }
+            throw error
         }
     }
 
