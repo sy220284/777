@@ -21,6 +21,8 @@ internal class LocalModelHistoryBuffer {
     var estimatedTokens: Int = 0
         private set
 
+    val size: Int get() = messages.size
+
     fun snapshot(): List<JsonObject> = messages.toList()
 
     fun dropLast(count: Int): List<JsonObject> = messages.dropLast(count)

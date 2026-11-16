@@ -43,6 +43,7 @@ class LocalModelHistoryBufferTest {
         expected: List<kotlinx.serialization.json.JsonObject>,
     ) {
         assertEquals(expected, buffer.snapshot())
+        assertEquals(expected.size, buffer.size)
         assertEquals(expected.sumOf { it.toString().length }, buffer.encodedChars)
         assertEquals(expected.sumOf { estimateModelTokens(it.toString()) }, buffer.estimatedTokens)
     }
