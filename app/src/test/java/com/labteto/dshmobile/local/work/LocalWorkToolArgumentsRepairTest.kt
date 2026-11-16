@@ -113,6 +113,58 @@ class LocalWorkToolArgumentsRepairTest {
         assertTrue(instruction.contains("tool_search"))
     }
 
+    @Test fun allAdmittedProviderProtocolErrorsProvideInStepCorrection() = runTest {
+        for (code in listOf("MODEL_STREAM_PROTOCOL", "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR")) {
+            var samples = 0
+            val failure = LocalModelException(
+                code = code,
+                message = "服务商工具参数不是完整 JSON",
+                retryable = false,
+                admissionState = LocalModelAdmissionState.ADMITTED,
+                continuationEligible = true,
+            )
+            var correction = ""
+            val result = sampleWithToolArgumentsRepair(
+                revisions = MutableStateFlow(0L),
+                observedRevision = 0L,
+                originalMessages = original,
+                canRepair = { true },
+                onRepair = {},
+            ) { request ->
+                samples++
+                if (samples == 1) throw failure
+                correction = request.last().getValue("content").jsonPrimitive.content
+                "已纠正"
+            }
+            assertEquals(LocalWorkSamplingOutcome.Completed("已纠正"), result)
+            assertEquals(2, samples)
+            assertTrue(correction.contains(code))
+            assertTrue(correction.contains("tool_search"))
+        }
+    }
+
+    @Test fun preAdmissionErrorsDoNotCreateCorrectiveModelRequest() = runTest {
+        var requests = 0
+        val error = LocalModelException(
+            code = "MODEL_STREAM_PROTOCOL",
+            message = "本地输入校验失败",
+            retryable = false,
+            admissionState = LocalModelAdmissionState.NOT_SENT,
+            continuationEligible = false,
+        )
+        val rejected = runCatching {
+            sampleWithToolArgumentsRepair(
+                revisions = MutableStateFlow(0L), observedRevision = 0L,
+                originalMessages = original, canRepair = { true }, onRepair = {},
+            ) {
+                requests++
+                throw error
+            }
+        }.exceptionOrNull()
+        assertEquals(error, rejected)
+        assertEquals(1, requests)
+    }
+
     @Test fun boundedRepairDoesNotRepeatIndefinitely() = runTest {
         val attempts = mutableListOf<Int>()
         var requests = 0
