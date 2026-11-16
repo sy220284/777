@@ -291,7 +291,9 @@ internal class LocalWorkComposition @Inject constructor(
                 // Direct tool gateway never exposes child schemas. Validate the real
                 // Lead grant against the member role; ToolRegistry and execution
                 // scope enforce actual registration and authorization on every call.
-                requireTeamExtensionMatchesRole(grantedExtensions, roleBinding.toolAllowlist)
+                com.labteto.dshmobile.local.agent.requireTeamExtensionMatchesRole(
+                    grantedExtensions, roleBinding.toolAllowlist,
+                )
                 agentSpawns.startPersistent(binding, LocalPersistentAgentLaunchRequest(
                     task = task,
                     model = model ?: roleBinding.modelOverride,
