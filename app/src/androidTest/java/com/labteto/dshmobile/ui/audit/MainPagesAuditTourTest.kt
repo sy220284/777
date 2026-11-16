@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.performScrollTo
@@ -123,7 +124,7 @@ class MainPagesAuditTourTest {
             captureUiAudit(compose, "main-connectors")
         }
         page(R.string.settings_title, "main-settings") {
-            compose.onNodeWithText(text(R.string.settings_page_models)).performScrollTo().performClick()
+            compose.onAllNodesWithText(text(R.string.settings_page_models)).filter(hasClickAction()).onFirst().performScrollTo().performClick()
             compose.onNodeWithText(text(R.string.local_api_model_add)).performClick()
             captureUiAudit(compose, "main-model-connection-form")
             back()
