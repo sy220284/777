@@ -304,6 +304,12 @@ class LocalWorkRunRegistry internal constructor(
             persistDerivedBinding(binding)
             successor = startNext(next, binding)
             binding.runHandle.job = successor
+            // A successor may be cancelled before its lazy coroutine body is entered.
+            // Register teardown on the Job itself so the shared foreground service lease
+            // cannot remain held indefinitely after such a cancellation.
+            successor.invokeOnCompletion {
+                releaseCompletedTurn(binding, successor)
+            }
             successor
         } catch (error: Exception) {
             if (error is CancellationException) throw error
