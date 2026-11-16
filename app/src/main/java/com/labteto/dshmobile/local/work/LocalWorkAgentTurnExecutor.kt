@@ -40,7 +40,6 @@ import com.labteto.dshmobile.local.model.localToolHistoryMessage
 import com.labteto.dshmobile.local.model.prepareLocalMultimodalMessages
 import com.labteto.dshmobile.local.recordForeground
 import com.labteto.dshmobile.local.model.resolveLocalImageInputMode
-import com.labteto.dshmobile.local.model.toRunModelSurface
 import com.labteto.dshmobile.local.model.routeFingerprint
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.model.withModelToolCallEventData
@@ -59,7 +58,6 @@ import com.labteto.dshmobile.local.runtime.adaptiveAgentStepLimit
 import com.labteto.dshmobile.local.runtime.localForegroundStepLimitExtender
 import com.labteto.dshmobile.local.session.encodeTranscriptMessages
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
-import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.local.tools.pendingToolSettlements
 import java.io.File
 import kotlinx.coroutines.ensureActive
@@ -237,9 +235,6 @@ internal class LocalWorkAgentTurnExecutor(
             val runSnapshot = runState.value
             val goalAtTurnStart = runSnapshot.work.goal
             val steeringRevisionAtTurnStart = binding.steeringRevision.value
-            var runToolSurface = LocalRunToolSurface(
-                runSnapshot.modelState.modelSelection.activeProfile?.toRunModelSurface(),
-            )
             val mainMaxSteps = runSnapshot.mainMaxSteps
             val mainStepLimit = if (runPolicy.allowToolExecution) {
                 adaptiveAgentStepLimit(
@@ -362,9 +357,6 @@ internal class LocalWorkAgentTurnExecutor(
                                 selectedModel.modelSelection.activeProfileId,
                             ))
                         }
-                        runToolSurface = LocalRunToolSurface(
-                            selectedModel.modelSelection.activeProfile?.toRunModelSurface(),
-                        )
                         workPromptContext = contextComposer.composeWorkTurnContext(
                             input = input,
                             snapshot = runState.value,
@@ -513,7 +505,7 @@ internal class LocalWorkAgentTurnExecutor(
                             workModelHistoryRuntime.compactIfNeeded(binding = binding, extraTokens = extra)
                         }
                     }
-                    val advertisedTools = runToolSurface.next(modelToolSchemas)
+                    val advertisedTools = modelToolSchemas
                     latestAcceptedSamplingRevision = observedSteer
                     val tools = modelToolStepSurface.capture(
                         advertisedTools, workTurnToolRuntime.captureBindings(advertisedTools),

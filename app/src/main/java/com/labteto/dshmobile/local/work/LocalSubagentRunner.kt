@@ -77,7 +77,6 @@ import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
 import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
 import com.labteto.dshmobile.local.tools.directToolTarget
-import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -306,7 +305,6 @@ internal class LocalSubagentRunner(
         val routeModel = runSurface.model
         val runHistoryBudget = historyBudget?.invoke(runProfile)
         val runCachePolicy = runSurface.promptCachePolicy
-        val runToolSurface = LocalRunToolSurface(runSurface)
         val stepLimit = adaptiveAgentStepLimit(
             configuredBase = maxSteps,
             task = task,
@@ -597,11 +595,9 @@ internal class LocalSubagentRunner(
                         modelStepExecutor.complete(
                             surface = runSurface,
                             history = preparedHistory,
-                            tools = runToolSurface.next(
-                                filterLocalSubagentSchemas(
-                                    executionSchemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
-                                    capabilities,
-                                ),
+                            tools = filterLocalSubagentSchemas(
+                                executionSchemas(allowMutation, virtualScreenId != null, enabledOptionalTools),
+                                capabilities,
                             ).let { advertised ->
                                 modelToolStepSurface.capture(advertised, captureToolBindings?.invoke(advertised))
                             },

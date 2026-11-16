@@ -296,23 +296,10 @@ internal class LocalWorkComposition @Inject constructor(
                     "job_kill", "json_query", "environment_info", "download_file",
                 )
                 val activeOptional = defaultOptional + grantedExtensions
-                val exposed = tools.schemas.names(
-                    tools.schemas.subagentSchemas(
-                        allowMutation = roleBinding.allowMutation,
-                        allowVirtualScreen = false,
-                        enabledOptional = activeOptional,
-                    ),
-                ).toSet()
-                val roleExposed = roleBinding.toolAllowlist?.let { exposed.intersect(it) } ?: exposed
-                val missing = grantedExtensions - roleExposed
-                require(missing.isEmpty()) {
-                    "TEAM_EXTENSION_NOT_EXPOSED：已授权工具未进入成员实际工具表（数量或上下文预算限制）：" +
-                        missing.sorted().joinToString("、")
-                }
-                require(roleBinding.toolAllowlist?.contains("skill") == false ||
-                    "skill" !in tools.registry.names() || "skill" in roleExposed) {
-                    "TEAM_SKILL_NOT_EXPOSED：技能工具未进入成员实际工具表"
-                }
+                // Direct tool gateway never exposes child schemas. Validate the real
+                // Lead grant against the member role; ToolRegistry and execution
+                // scope enforce actual registration and authorization on every call.
+                requireTeamExtensionMatchesRole(grantedExtensions, roleBinding.toolAllowlist)
                 agentSpawns.startPersistent(binding, LocalPersistentAgentLaunchRequest(
                     task = task,
                     model = model ?: roleBinding.modelOverride,

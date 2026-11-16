@@ -11,6 +11,7 @@ import com.labteto.dshmobile.harness.tools.functionToolSchema
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.local.tools.LocalToolRouter
+import com.labteto.dshmobile.local.model.estimateModelTokens
 import com.labteto.dshmobile.local.tools.LocalCapabilityDiscovery
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

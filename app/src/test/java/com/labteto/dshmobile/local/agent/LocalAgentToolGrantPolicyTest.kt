@@ -23,11 +23,30 @@ class LocalAgentToolGrantPolicyTest {
         val caps = LocalSubagentCapabilities(
             toolAllowlist = setOf("read", "web_search"),
         )
-        assertEquals(setOf("read", "web_search"),
+        assertEquals(setOf("read"),
             admitLocalAgentScopedToolGrants(caps, setOf("read")))
         assertTrue(runCatching {
             admitLocalAgentScopedToolGrants(caps, setOf("mcp_unexpected"))
         }.exceptionOrNull()?.message.orEmpty().contains("AGENT_TOOL_GRANT_RECOVERY_ESCALATION"))
+    }
+
+
+    @Test fun roleAllowlistDoesNotInflateOptionalGrantsForTeamMembers() {
+        val caps = LocalSubagentCapabilities(
+            continuable = true,
+            teamManaged = true,
+            toolAllowlist = setOf("read", "github_status"),
+            initialOptionalTools = setOf("github_status"),
+        )
+        assertEquals(
+            setOf("github_status"),
+            admitLocalAgentScopedToolGrants(caps, emptySet()),
+        )
+        requireTeamExtensionMatchesRole(setOf("github_status"), caps.toolAllowlist)
+        assertTrue(runCatching {
+            requireTeamExtensionMatchesRole(setOf("unapproved_extension"), caps.toolAllowlist)
+        }.exceptionOrNull()?.message.orEmpty().contains("TEAM_EXTENSION_NOT_ALLOWED_BY_ROLE"))
+        requireTeamExtensionMatchesRole(setOf("mcp_new"), null)
     }
 
     @Test fun unconstrainedStandaloneAgentRetainsItsOwnRecoveredCapabilities() {

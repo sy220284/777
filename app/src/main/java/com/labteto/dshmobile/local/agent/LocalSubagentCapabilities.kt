@@ -96,8 +96,7 @@ internal fun validateLocalSubagentLaunchSpec(
     }
     require(!spec.capabilities.workflowManaged || (spec.backgroundJobId != null &&
         spec.capabilities.continuable && !spec.capabilities.teamManaged)) { "SUBAGENT_WORKFLOW_REQUIRES_PERSISTENT_JOB" }
-    require(spec.capabilities.initialOptionalTools.size <= 24 &&
-        spec.capabilities.initialOptionalTools.none(String::isBlank)) {
+    require(spec.capabilities.initialOptionalTools.none(String::isBlank)) {
         "SUBAGENT_TEAM_GRANTS_INVALID：扩展授权列表无效"
     }
     spec.capabilities.toolAllowlist?.let { allowlist ->

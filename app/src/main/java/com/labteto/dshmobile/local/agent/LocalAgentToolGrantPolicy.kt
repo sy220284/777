@@ -24,10 +24,23 @@ internal fun admitLocalAgentScopedToolGrants(
             "AGENT_TEAM_GRANT_RECOVERY_ESCALATION"
         }
     }
-    return (recoveredOptionalTools + capabilities.toolAllowlist.orEmpty() +
-        capabilities.initialOptionalTools).also { admitted ->
+    // A role allowlist restricts actual child calls. It does not activate tools
+    // or enlarge the set of Lead-approved optional grants.
+    return (recoveredOptionalTools + capabilities.initialOptionalTools).also { admitted ->
         require(!capabilities.teamManaged || admitted.all { it in capabilities.initialOptionalTools }) {
             "AGENT_TEAM_GRANT_OUTSIDE_LEAD_ADMISSION"
         }
+    }
+}
+
+/** Validate explicit Lead grants without comparing to the fixed model gateway schema. */
+internal fun requireTeamExtensionMatchesRole(
+    grantedExtensions: Set<String>,
+    roleAllowlist: Set<String>?,
+) {
+    val denied = roleAllowlist?.let { grantedExtensions - it }.orEmpty()
+    require(denied.isEmpty()) {
+        "TEAM_EXTENSION_NOT_ALLOWED_BY_ROLE：成员角色未授权这些扩展：" +
+            denied.sorted().joinToString("、")
     }
 }
