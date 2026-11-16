@@ -481,3 +481,6 @@ document.addEventListener('keydown', ev => {
 });
 
 render();
+
+// 供设计稿画廊切换变体 / 主题 / 路由使用（仅评审工具，不进入产品）
+window.V8_APP = { state: state, render: render };
