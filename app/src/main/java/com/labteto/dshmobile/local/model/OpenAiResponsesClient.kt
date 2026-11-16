@@ -407,7 +407,7 @@ class OpenAiResponsesClient @Inject constructor(
         if (!planSharing) systemInstructions.takeIf(String::isNotBlank)?.let { put("instructions", it) }
         put("store", false)
         put("stream", true)
-        maxTokens?.let { tokens ->
+        if (!planSharing) maxTokens?.let { tokens ->
             require(tokens > 0) { "Responses API 最大输出 Token 数必须大于零" }
             put("max_output_tokens", tokens)
         }
