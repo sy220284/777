@@ -8,6 +8,7 @@ OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
 CLASSES=[
  'com.shenyan.designsystem.components.MobileActionReadabilityTest',
  'com.labteto.dshmobile.ui.screens.local.WorkspaceBrowseLayoutTest',
+ 'com.labteto.dshmobile.ui.screens.local.UiPolishInteractionRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalWorkspaceShareSelectionUiTest',
  'com.labteto.dshmobile.ui.audit.SettingsPageAuditTest',
  'com.labteto.dshmobile.ui.audit.MainPagesAuditTourTest',
