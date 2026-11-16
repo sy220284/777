@@ -91,7 +91,7 @@ internal object LocalEffectiveModelContracts {
                 ))
             }
         val documented = LocalModelPresets.capabilitiesFor(model, baseUrl)
-        val client = LocalModelPresets.clientCapabilitiesFor(model, baseUrl)
+        val client = LocalModelPresets.clientCapabilitiesFor(model, baseUrl, protocol)
         val reasoningProfile = exactProfile ?: LocalModelProfile(
             id = "",
             model = model,
