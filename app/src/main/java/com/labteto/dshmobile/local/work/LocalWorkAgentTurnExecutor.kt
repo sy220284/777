@@ -986,8 +986,11 @@ internal class LocalWorkAgentTurnExecutor(
                                 // new continuation using the existing durable Inbox contract.
                                 if (continuationEligible) {
                                     workModelHistoryRuntime.checkpointAtTurnBoundary(binding,
-                                        if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") "turn/budget-continuation"
-                                        else "turn/stream-interrupted")
+                                        when (lastModelError?.code) {
+                                            "WORK_BUDGET_EXHAUSTED" -> "turn/budget-continuation"
+                                            "ANTHROPIC_TOOL_ARGUMENTS_INVALID" -> "turn/tool-arguments-repair"
+                                            else -> "turn/stream-interrupted"
+                                        })
                                 }
                                 val continuationQueued = continuationEligible &&
                                     queueAutomaticWorkContinuation(
@@ -997,10 +1000,10 @@ internal class LocalWorkAgentTurnExecutor(
                                 if (continuationQueued) {
                                     runEventLog.append("turn/end", buildJsonObject {
                                         put("source_message_id", uiSourceMessageId)
-                                        put("reason", if (lastModelError?.code == "WORK_BUDGET_EXHAUSTED") {
-                                            "budget_exhausted_continuation"
-                                        } else {
-                                            "stream_interrupted_continuation"
+                                        put("reason", when (lastModelError?.code) {
+                                            "WORK_BUDGET_EXHAUSTED" -> "budget_exhausted_continuation"
+                                            "ANTHROPIC_TOOL_ARGUMENTS_INVALID" -> "tool_arguments_repair_continuation"
+                                            else -> "stream_interrupted_continuation"
                                         })
                                         put("detail", detail)
                                         put("messages", runState.value.transcriptIndex.totalMessageCount)
