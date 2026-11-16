@@ -84,6 +84,10 @@ internal fun PermissionSetupFlow(
             when (feature) {
                 PermissionSetupFeature.SCREEN_CONTROL -> controller.openAccessibilitySettings()
                 PermissionSetupFeature.NOTIFICATION_READ -> controller.repairNotificationAccess()
+                PermissionSetupFeature.BACKGROUND_EXECUTION -> {
+                    if (forceAppSettings || feature in visited) controller.openAppDetails()
+                    else controller.requestContinuousWorkBatteryExemption()
+                }
                 PermissionSetupFeature.TASK_ALERTS -> {
                     if (!forceAppSettings && notificationGrantAction(Build.VERSION.SDK_INT, feature in visited) ==
                         NotificationGrantAction.REQUEST_RUNTIME) {
@@ -312,15 +316,21 @@ private fun PermissionSetupFeature.titleRes(): Int = when (this) {
     PermissionSetupFeature.SCREEN_CONTROL -> R.string.permission_setup_screen
     PermissionSetupFeature.NOTIFICATION_READ -> R.string.permission_setup_read_notifications
     PermissionSetupFeature.TASK_ALERTS -> R.string.permission_setup_task_alerts
+    PermissionSetupFeature.BACKGROUND_EXECUTION -> R.string.permission_setup_background_work
 }
 
 private fun PermissionSetupFeature.reasonRes(): Int = when (this) {
     PermissionSetupFeature.SCREEN_CONTROL -> R.string.permission_setup_screen_hint
     PermissionSetupFeature.NOTIFICATION_READ -> R.string.permission_setup_read_notifications_hint
     PermissionSetupFeature.TASK_ALERTS -> R.string.permission_setup_task_alerts_hint
+    PermissionSetupFeature.BACKGROUND_EXECUTION -> R.string.permission_setup_background_work_hint
 }
 
 private fun PermissionSetupStatus.labelRes(feature: PermissionSetupFeature): Int = when {
+    feature == PermissionSetupFeature.BACKGROUND_EXECUTION && this == PermissionSetupStatus.READY ->
+        R.string.permission_setup_background_allowed
+    feature == PermissionSetupFeature.BACKGROUND_EXECUTION ->
+        R.string.permission_setup_background_not_allowed
     feature == PermissionSetupFeature.TASK_ALERTS && this == PermissionSetupStatus.READY ->
         R.string.permission_setup_notification_allowed
     feature == PermissionSetupFeature.TASK_ALERTS && this == PermissionSetupStatus.VISITED_NOT_GRANTED ->
