@@ -48,11 +48,15 @@ internal suspend fun resolveLocalModelApiKeyDraft(
     val contextOverride = when {
         // V6 explicitly supported subscription-dependent K3 windows. This value expresses
         // the user's selected ceiling; it does not grant or claim provider entitlement.
-        preset?.provider == "Kimi Code" && preset.model in setOf("k3", "k3.1-pro") -> when (contextWindowTokensOverride) {
+        preset?.provider == "Kimi Code" &&
+            LocalKimiPolicy.supportsContextChoice(name, url) -> when (contextWindowTokensOverride) {
             null -> existing?.contextWindowTokensOverride
             0 -> null
-            262_144, 1_048_576 -> contextWindowTokensOverride
-            else -> throw IllegalArgumentException("Kimi K3/K3.1 Pro 上下文只支持 262144 或 1048576 Token")
+            in LocalKimiPolicy.selectableContextTokens -> contextWindowTokensOverride
+            else -> throw IllegalArgumentException(
+                "Kimi K3/K3.1 Pro 上下文只支持 ${LocalKimiPolicy.standardContextTokens} " +
+                    "或 ${LocalKimiPolicy.extendedContextTokens} Token",
+            )
         }
         preset != null -> null
         contextWindowTokensOverride == null -> existing?.contextWindowTokensOverride
