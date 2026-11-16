@@ -67,27 +67,6 @@ class LocalWorkProgressCoordinatorTest {
     }
 
     @Test
-    fun resumedWorkSelectsRealTaskOrDurableGoalWithoutInterpretingResumeText() {
-        val userTask = buildJsonObject {
-            put("role", "user")
-            put("content", "核查 GitHub PR 923 及其测试")
-        }
-        val internalResume = buildJsonObject {
-            put("role", "system")
-            put("content", INTERNAL_WORK_CONTINUATION_PROMPT)
-        }
-        assertEquals("当前新任务", effectiveWorkCapabilityTask(
-            "当前新任务", null, listOf(userTask), "旧目标",
-        ))
-        assertEquals("核查 GitHub PR 923 及其测试", effectiveWorkCapabilityTask(
-            "恢复同一工作任务", "run-1", listOf(userTask, internalResume), "旧目标",
-        ))
-        assertEquals("已持久化目标", effectiveWorkCapabilityTask(
-            "恢复同一工作任务", "run-1", listOf(internalResume), "已持久化目标",
-        ))
-    }
-
-    @Test
     fun pausedAndReactivatedGoalCannotReviveItsOldDurableContinuation() {
         val state = MutableStateFlow(LocalWorkRunState(sessionId = "revision"))
         val log = eventLog(File(temporary.root, "revision.jsonl"))

@@ -12,13 +12,11 @@ import com.labteto.dshmobile.local.runtime.LocalEnvironmentWorkContextAssessment
 internal fun LocalWorkRunBinding.toEnvironmentRunSnapshot(
     contextBudgetChars: Int,
 ): LocalEnvironmentRunSnapshot {
-    val optionalTools = synchronized(enabledOptionalTools) { enabledOptionalTools.toSet() }
     return LocalEnvironmentRunSnapshot(
         sessionId = sessionId,
         contextChars = runHandle.modelHistory.encodedChars,
         contextBudgetChars = contextBudgetChars,
         pendingInputs = runHandle.pendingInputs.size(),
-        enabledOptionalTools = optionalTools,
         workBudget = executionControl.budget.snapshot().toEnvironmentWorkBudget(),
     )
 }
