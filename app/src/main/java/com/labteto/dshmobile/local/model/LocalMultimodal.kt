@@ -271,15 +271,36 @@ internal suspend fun prepareLocalMultimodalMessages(
                         })
                         return@forEach
                     }
+                    val matchingProfile = profile?.takeIf {
+                        it.model == model &&
+                            normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl.orEmpty())
+                    }
+                    val protocol = matchingProfile?.let {
+                        resolveLocalModelProtocol(it.authKind, it, model.orEmpty(), baseUrl.orEmpty())
+                    } ?: LocalModelPresets.protocolFor(model.orEmpty(), baseUrl.orEmpty())
+                    val miniMaxVideoMime = LocalMiniMaxPolicy.videoMediaType(name, mediaType)
+                    if (miniMaxVideoMime != null && baseUrl != null && model != null &&
+                        LocalMiniMaxPolicy.nativeVideoSupported(model, baseUrl, protocol)
+                    ) {
+                        // 44 MB inline binary fits inside MiniMax's 64 MB JSON body after base64 encoding.
+                        // Larger recordings require a separate MiniMax Files upload, not an over-limit request.
+                        val inlineLimit = 44_000_000L
+                        require(file.length() in 1..inlineLimit &&
+                            activeVideoBytes + file.length() <= inlineLimit) {
+                            "MiniMax 视频直接传输的总文件大小最多 44 MB（受 64 MB 请求体限制）；较大视频请先压缩"
+                        }
+                        require(++activeVideos <= 1) { "单次请求最多处理一个视频，请分批分析" }
+                        activeVideoBytes += file.length()
+                        add(buildJsonObject {
+                            put("type", "video_url")
+                            put("video_url", buildJsonObject {
+                                put("url", encodeLocalFileDataUrl(file, miniMaxVideoMime, inlineLimit))
+                            })
+                        })
+                        return@forEach
+                    }
                     val videoMime = LocalKimiPolicy.videoMediaType(name, mediaType)
                     if (videoMime != null && baseUrl != null && LocalKimiPolicy.isOfficial(baseUrl)) {
-                        val matchingProfile = profile?.takeIf {
-                            it.model == model &&
-                                normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
-                        }
-                        val protocol = matchingProfile?.let {
-                            resolveLocalModelProtocol(it.authKind, it, model.orEmpty(), baseUrl)
-                        } ?: LocalModelPresets.protocolFor(model.orEmpty(), baseUrl)
                         check(protocol == LocalModelProtocol.CHAT_COMPLETIONS) {
                             "Kimi Code 的 Responses 协议暂不支持视频输入；请在模型设置中选择 Chat Completions 协议后重试"
                         }
