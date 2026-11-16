@@ -2043,7 +2043,7 @@ class OpenAiResponsesClientTest {
         val completed = Json.parseToJsonElement(
             """{"id":"native-patch-1","status":"completed","output":[
                 {"type":"custom_tool_call","call_id":"patch-1","name":"apply_patch",
-                 "input":"*** Begin Patch\\n*** Add File: a.txt\\n+hello\\n*** End Patch"}
+                 "input":"*** Begin Patch\n*** Add File: a.txt\n+hello\n*** End Patch"}
             ]}"""
         ).jsonObject
         val reply = client.parseCompleted(completed, TokenPromptBreakdown())
