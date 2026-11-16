@@ -30,6 +30,10 @@ import java.util.UUID
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -64,6 +68,7 @@ class LocalWorkRunRegistry internal constructor(
     ) { bindApprovalPreferences(preferences) }
 
     private val bindings = java.util.concurrent.ConcurrentHashMap<String, LocalWorkRunBinding>()
+    private val leaseCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobProjectionLock = Any()
     private val resourceProjectionLock = Any()
     private var approvalPreferences: LocalApprovalPreferences? = null
@@ -309,8 +314,25 @@ class LocalWorkRunRegistry internal constructor(
 
     /** Also covers cancellation before a lazy turn starts and failures during turn setup. */
     internal fun releaseCompletedTurn(binding: LocalWorkRunBinding, completedJob: Job) {
-        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
-            if (binding.runHandle.job === completedJob) releaseFinishedBinding(binding)
+        val abandonedLease = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            if (binding.runHandle.job !== completedJob) null
+            else {
+                // Covers a lazily launched successor cancelled before its coroutine body runs.
+                // A normally finished run already releases its lease and clears this slot.
+                val lease = binding.foregroundServiceLease
+                binding.foregroundServiceLease = null
+                releaseFinishedBinding(binding)
+                lease
+            }
+        }
+        abandonedLease?.let { lease ->
+            leaseCleanupScope.launch {
+                lease.release(
+                    if (binding.runHandle.cancellationRequested)
+                        com.labteto.dshmobile.local.runtime.LocalExecutionService.OUTCOME_CANCELLED
+                    else com.labteto.dshmobile.local.runtime.LocalExecutionService.OUTCOME_FAILED,
+                )
+            }
         }
     }
 
