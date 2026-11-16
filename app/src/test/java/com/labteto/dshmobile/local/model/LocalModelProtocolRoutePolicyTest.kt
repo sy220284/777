@@ -153,6 +153,35 @@ class LocalModelProtocolRoutePolicyTest {
             "https://api.deepseek.com.evil.example/v1"))
     }
 
+    @Test fun legacySavedProtocolRemainsSelectedWhenCallerOmitsOptionalProtocol() = runBlocking {
+        val source = LocalModelProfile(
+            "legacy-deepseek", "deepseek-flash", "https://api.deepseek.com",
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+        )
+        val draft = resolveLocalModelApiKeyDraft(
+            "", source.model, source.baseUrl, null, listOf(source),
+            { id -> if (id == source.id) "legacy-key" else null },
+        )
+        assertEquals(source.id, draft.profile.id)
+        assertEquals("legacy-key", draft.key)
+        assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, draft.profile.protocol)
+        assertEquals(source.baseUrl, draft.profile.baseUrl)
+
+        val oldMiniMaxRoute = LocalModelProfile(
+            "legacy-mm-route", "MiniMax-M3", "https://api.minimaxi.com/anthropic/v1",
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS,
+        )
+        val repaired = resolveLocalModelApiKeyDraft(
+            "", oldMiniMaxRoute.model, oldMiniMaxRoute.baseUrl, null,
+            listOf(oldMiniMaxRoute),
+            { id -> if (id == oldMiniMaxRoute.id) "same-key" else null },
+        )
+        assertEquals(oldMiniMaxRoute.id, repaired.profile.id)
+        assertEquals("same-key", repaired.key)
+        assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, repaired.profile.protocol)
+        assertEquals("https://api.minimaxi.com/v1", repaired.profile.baseUrl)
+    }
+
     @Test fun structuredOutputCapabilityAndGatewayAdmissionMatchTheSameDeepSeekRoute() {
         val r = LocalModelProtocol.RESPONSES
         val deepSeek = LocalModelPresets.runtimeCapabilitiesFor(
