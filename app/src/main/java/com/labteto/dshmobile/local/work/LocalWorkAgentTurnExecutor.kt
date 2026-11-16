@@ -189,6 +189,11 @@ internal class LocalWorkAgentTurnExecutor(
             }
             binding.executionControl.budget.beginExecutionSlice(effectiveModel.executionBudget)
             val runPolicy = localAgentRunPolicy(LocalUsageMode.WORK)
+            val continuationParentRunId = binding.continuationParentRunId
+            val resumedFailureCode = continuation?.failureCode ?: binding.continuationFailureCode
+            val resumedContinuationIndex = continuation?.index ?: binding.automaticContinuationCount
+            binding.continuationParentRunId = null
+            binding.continuationFailureCode = null
             // A continuation belongs to the same user task. Keep the already admitted
             // tool selection instead of clearing it and re-discovering from a synthetic
             // "continue" user message. A newly recovered binding starts with no selection.
@@ -301,11 +306,6 @@ internal class LocalWorkAgentTurnExecutor(
                     kind = LocalAgentRunKind.FOREGROUND,
                 )
             } else 1
-            val continuationParentRunId = binding.continuationParentRunId
-            val resumedFailureCode = continuation?.failureCode ?: binding.continuationFailureCode
-            val resumedContinuationIndex = continuation?.index ?: binding.automaticContinuationCount
-            binding.continuationParentRunId = null
-            binding.continuationFailureCode = null
             val runContext = agentRunCoordinator.start(
                 sessionId = foregroundSessionId,
                 usageMode = runSnapshot.usageMode,
