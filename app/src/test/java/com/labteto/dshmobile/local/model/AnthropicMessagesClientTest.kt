@@ -407,6 +407,43 @@ class AnthropicMessagesClientTest {
     }
 
     @Test
+    fun malformedToolJsonIsSafelyContinuableAndValidJsonFragmentsStillWork() = runBlocking {
+        val start = """{"type":"message_start","message":{"id":"msg-tool","usage":{"input_tokens":4}}}"""
+        val toolStart = """{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool-1","name":"tool_call","input":{}}}"""
+        fun part(fragment: String) = buildJsonObject {
+            put("type", "content_block_delta")
+            put("index", 0)
+            put("delta", buildJsonObject {
+                put("type", "input_json_delta")
+                put("partial_json", fragment)
+            })
+        }.toString()
+        val end = listOf(
+            """{"type":"content_block_stop","index":0}""",
+            """{"type":"message_delta","delta":{"stop_reason":"tool_use"}}""",
+            """{"type":"message_stop"}""",
+        )
+
+        val malformed = runCatching {
+            fixture(listOf(start, toolStart, part("{\"name\":")) + end)
+                .complete(route(), emptyList(), emptyList(), null, true)
+        }.exceptionOrNull() as? LocalModelException
+        assertNotNull(malformed)
+        assertEquals("ANTHROPIC_TOOL_ARGUMENTS_INVALID", malformed!!.code)
+        assertFalse(malformed.retryable)
+        assertTrue(malformed.continuationEligible)
+        assertEquals(LocalModelAdmissionState.ADMITTED, malformed.admissionState)
+        assertEquals(LocalModelFailureOrigin.STREAM_PARSE, malformed.origin)
+
+        val valid = fixture(
+            listOf(start, toolStart, part("{\"path\":"), part("\"a.txt\"}")) + end,
+        ).complete(route(), emptyList(), emptyList(), null, true)
+        assertEquals(1, valid.toolCalls.size)
+        assertEquals("tool-1", valid.toolCalls.single().id)
+        assertEquals("a.txt", valid.toolCalls.single().arguments.getValue("path").jsonPrimitive.content)
+    }
+
+    @Test
     fun canonicalTextWinsWhileThinkingSignatureAndParallelResultsSurvive() {
         val currentRoute = route()
         val assistant = LocalCanonicalMessage(LocalCanonicalRole.ASSISTANT,
