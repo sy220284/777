@@ -45,7 +45,7 @@ internal object LocalWorkFindingJournal {
                     declaration.sequence >= result.sequence ||
                     declaration.data.text("id") != id ||
                     declaration.data.text("goal_id") != goalId) return@mapNotNull null
-                "$" + "{id}（$" + "{name}）"
+                "${id}（${name}）"
             }.distinct().take(5)
         return if (eligible.isEmpty()) {
             "当前工作目标下没有可关联的成功工具回执；请先完成真实工具调用并确认目标一致"
