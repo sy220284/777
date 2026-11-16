@@ -1110,11 +1110,14 @@ internal class LocalWorkAgentTurnExecutor(
                             failureSettledInEvent = true
                         }
                         is AgentEvent.TurnCancelled -> {
-                            settlePendingTools("cancelled")
-                            val transcriptMessage = runTranscript.newMessage("system", "本轮已停止。")
+                            val userStopped = binding.runHandle.cancellationRequested
+                            settlePendingTools(if (userStopped) "cancelled" else "runtime_interrupted")
+                            val transcriptMessage = runTranscript.newMessage("system",
+                                if (userStopped) "本轮已停止。"
+                                else "执行环境暂时中断，已保存进度，正在恢复未完成任务。")
                             val turnEnd = runEventLog.append("turn/end", buildJsonObject {
                                     put("source_message_id", uiSourceMessageId)
-                                put("reason", "aborted")
+                                put("reason", if (userStopped) "aborted" else "runtime_interrupted")
                                 put("messages", runState.value.transcriptIndex.totalMessageCount + 1L)
                                 put("transcript", encodeTranscriptMessages(listOf(transcriptMessage)))
                             })
@@ -1152,10 +1155,26 @@ internal class LocalWorkAgentTurnExecutor(
                 AppLog.failure("WorkAgentTurn", "foreground_operation_timeout", timeout,
                     sessionId = foregroundSessionId, runId = runContext.runId)
                 binding.state.update { it.copy(error = "后台操作超时，已保留当前进度；请查看诊断原因后继续") }
-            } catch (_: CancellationException) {
-                binding.runHandle.cancellationRequested = true
-                foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
-                // TurnCancelled durably records and projects the visible stop message.
+            } catch (cancelled: CancellationException) {
+                if (binding.runHandle.cancellationRequested) {
+                    foregroundOutcome = LocalExecutionService.OUTCOME_CANCELLED
+                } else {
+                    // OS/lifecycle cancellation is a recoverable interruption of the
+                    // executing coroutine. It must not become a synthetic user STOP.
+                    foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
+                    val interruption = LocalModelException(
+                        code = "WORK_RUNTIME_INTERRUPTED",
+                        message = cancelled.message ?: "运行环境暂时中断",
+                        retryable = false,
+                        continuationEligible = true,
+                    )
+                    val queued = queueAutomaticWorkContinuation(
+                        binding, runContext.runId, interruption, uiSourceMessageId,
+                    )
+                    if (!queued) binding.state.update {
+                        it.copy(error = "执行环境发生中断，检查点已保留；待处理操作需要核对后恢复。")
+                    }
+                }
             } catch (error: Exception) {
                 foregroundOutcome = LocalExecutionService.OUTCOME_FAILED
                 if (!failureSettledInEvent) {
