@@ -7,6 +7,7 @@ import com.labteto.dshmobile.local.model.stableJsonSha256
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -16,7 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** V5 to V6 upgrades must keep every original sequence, digest and recoverable request. */
+/** Released legacy request surfaces must survive upgrades into the current event schema. */
 @RunWith(AndroidJUnit4::class)
 class SqliteRequestDeltaMigrationAndroidTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -51,7 +52,7 @@ class SqliteRequestDeltaMigrationAndroidTest {
                 db.writableDatabase.version = 5
             }
             SqliteSessionEventDatabase(context, Json, name).use { upgraded ->
-                assertEquals(6, upgraded.readableDatabase.version)
+                assertEquals(7, upgraded.readableDatabase.version)
                 assertTrue(upgraded.needsRequestVacuum())
                 assertEquals(44L, upgraded.latestSequence("work"))
                 var afterBytes = 0L
@@ -97,6 +98,64 @@ class SqliteRequestDeltaMigrationAndroidTest {
         } finally {
             context.deleteDatabase(name)
         }
+    }
+
+    @Test fun existingV6DeltaChainUpgradesToV7WithoutRewritingRequestEvidence() {
+        val name = "request-v6-to-v7-" + UUID.randomUUID() + ".db"
+        try {
+            val initial = buildJsonObject {
+                put("role", "system")
+                put("content", "已经投入使用的 V6 历史请求")
+            }
+            val final = buildJsonObject {
+                put("role", "user")
+                put("content", "升级后仍要保留完整原文")
+            }
+            val messages = JsonArray(listOf(initial, final))
+            val delta = buildJsonObject {
+                put("version", 3)
+                put("digest", stableJsonSha256(messages))
+                put("base_surface_seq", 0L)
+                put("keep", 1)
+                put("tail", buildJsonArray { add(final) })
+                put("depth", 1)
+                put("redacted", false)
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                db.append("work", "request/message-surface", buildJsonObject {
+                    put("version", 3)
+                    put("digest", stableJsonSha256(JsonArray(listOf(initial))))
+                    put("messages", JsonArray(listOf(initial)))
+                    put("redacted", false)
+                })
+                db.append("work", "request/message-surface", delta)
+                // Produce the released V6 schema with a real delta, without
+                // relying on the V5 full-message migration fixture.
+                db.writableDatabase.execSQL("DROP TABLE local_asset_backfill_progress")
+                db.writableDatabase.execSQL("DROP TABLE local_asset_pending_references")
+                db.writableDatabase.version = 6
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { upgraded ->
+                assertEquals(7, upgraded.readableDatabase.version)
+                assertEquals(1L, upgraded.latestSequence("work"))
+                assertFalse(upgraded.needsRequestVacuum())
+                val events = upgraded.pageAfter("work", -1L, 5).associateBy { it.sequence }
+                assertEquals(delta, events.getValue(1L).data)
+                val issues = mutableListOf<String>()
+                val last = events.getValue(1L).let {
+                    LocalSessionEventLog.Event(it.sequence, it.type, it.createdAt, it.data)
+                }
+                val reconstructed = replayLocalRequestMessageSurface(
+                    last, eventAt = { sequence -> events[sequence]?.let {
+                        LocalSessionEventLog.Event(it.sequence, it.type, it.createdAt, it.data)
+                    } }, issues = issues,
+                )
+                assertTrue(issues.toString(), issues.isEmpty())
+                assertEquals(listOf(initial, final), reconstructed)
+                upgraded.append("work", "turn/end", buildJsonObject {})
+                assertEquals(2L, upgraded.latestSequence("work"))
+            }
+        } finally { context.deleteDatabase(name) }
     }
 
     @Test fun migratedDeltaWithInvalidOriginalDigestAbortsWholeUpgrade() {

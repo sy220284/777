@@ -104,7 +104,7 @@ internal class LocalWorkAgentTurnExecutor(
     private val workTurnToolRuntime: LocalWorkTurnToolRuntime,
     private val improvementArchive: LocalWorkImprovementArchive,
     private val replyDocuments: com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentPublisher,
-    private val onTurnSettled: (LocalWorkRunBinding, String, WorkImprovementAdvice?) -> Unit = { _, _, _ -> },
+    private val onTurnSettled: (LocalWorkRunBinding, String, WorkImprovementAdvice?, LocalHarnessState) -> Unit = { _, _, _, _ -> },
     private val onRootExecutionSliceStarted: suspend (LocalWorkRunBinding) -> Unit = {},
 ) {
     init { LocalWorkSummarySettings.attach(context) }
@@ -147,6 +147,7 @@ internal class LocalWorkAgentTurnExecutor(
         // Publish the settled identity outside the Session owner's lexical scope.
         var settledRunId: String? = null
         var settledImprovement: WorkImprovementAdvice? = null
+        var settledSnapshot: LocalHarnessState? = null
         try {
             LocalSessionRuntimeRegistry.withOwner(
                 binding.sessionId,
@@ -328,6 +329,7 @@ internal class LocalWorkAgentTurnExecutor(
             }
 
             var effectiveSkillInput = input
+            binding.explicitlySelectedSkill = explicitLocalSkillName(input)
             val loop = AgentTurnEngine(
                 model = AgentModel {
                     agentRunCoordinator.ensureCurrentOwner(runContext)
@@ -388,6 +390,7 @@ internal class LocalWorkAgentTurnExecutor(
                             ?.get("content")?.let { it as? JsonPrimitive }?.contentOrNull
                             ?.takeIf(String::isNotBlank) ?: input
                         effectiveSkillInput = effectiveInput
+                        binding.explicitlySelectedSkill = explicitLocalSkillName(effectiveInput)
                         workPromptContext = contextComposer.composeWorkTurnContext(
                             input = effectiveInput,
                             snapshot = snapshot,
@@ -1153,6 +1156,9 @@ internal class LocalWorkAgentTurnExecutor(
                         }
                         finally { serviceReleased = true }
                     } finally {
+                        // Freeze the model/project identity before the queued successor
+                        // selects a new route. The Goal is finalized by onIdle below.
+                        val closing = binding.aggregateSnapshot()
                         workRunRegistry.finishTurn(binding, ownerJob, onIdle = {
                             if (shouldAutoContinueWorkGoalAfterForm(
                                     completedGoalDisposition, waitingForReplyFormSubmission)) {
@@ -1186,6 +1192,9 @@ internal class LocalWorkAgentTurnExecutor(
                                 )
                             }
                         }?.start()
+                        settledSnapshot = closing.copy(
+                            work = closing.work.copy(goal = binding.workState.snapshot().goal),
+                        )
                     }
                 }
             }
@@ -1228,7 +1237,11 @@ internal class LocalWorkAgentTurnExecutor(
                     }
                 }
                 // Derived archive refresh does not change the completed Work result.
-                settledRunId?.let { runId -> onTurnSettled(binding, runId, settledImprovement) }
+                settledRunId?.let { runId ->
+                    settledSnapshot?.let { captured ->
+                        onTurnSettled(binding, runId, settledImprovement, captured)
+                    }
+                }
             }
         }
     }

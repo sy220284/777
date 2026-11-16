@@ -5,6 +5,11 @@ import com.labteto.dshmobile.local.files.LocalSkillMetadata
 import java.util.Locale
 import com.labteto.dshmobile.local.tools.LocalPinnedInvocation
 
+/** The same explicit selection parser is used for prompt injection and resource access. */
+internal fun explicitLocalSkillName(input: String): String? =
+    Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)")
+        .find(input)?.groupValues?.get(1)
+
 /** Selected skill instructions are loaded once per model step and never persisted in history. */
 internal fun resolveLocalWorkSkillGuidance(
     workspace: LocalWorkspace,
@@ -13,10 +18,10 @@ internal fun resolveLocalWorkSkillGuidance(
 ): String {
     // User-selected skills are part of the requested task. The model request's real
     // context budget, not a separate character quota, decides whether they fit.
-    val explicitName = Regex("^@skill:([a-z][a-z0-9-]{1,47})(?:\\r?\\n|$)").find(input)?.groupValues?.get(1)
+    val explicitName = explicitLocalSkillName(input)
     val explicitDocument = explicitName?.let { name ->
         try {
-            workspace.readSkill(name)
+            workspace.readSkillSnapshot(name)
         } catch (error: Exception) {
             throw IllegalArgumentException("所选技能 ${name} 已移除或无法读取，请返回技能页重新选择。", error)
         }
@@ -28,7 +33,7 @@ internal fun resolveLocalWorkSkillGuidance(
         it.kind == LocalPinnedInvocation.Kind.SKILL && it.id != explicitName
     }.map { selection ->
         val document = try {
-            workspace.readSkill(selection.id)
+            workspace.readSkillSnapshot(selection.id)
         } catch (error: Exception) {
             throw IllegalArgumentException("已固定技能 ${selection.id} 无法加载，请检查技能文件后重试。", error)
         }
@@ -36,8 +41,11 @@ internal fun resolveLocalWorkSkillGuidance(
     }
     // Include every selected rule. Silent truncation can remove the operative
     // instruction and make a user-pinned skill behave differently on each turn.
-    val pinnedSkillInstructions = pinnedSkills.joinToString("\n\n") { (name, document) ->
-        "[已固定技能：$name]\n$document\n[技能结束]"
+
+    val pinnedSkillInstructions = pinnedSkills.joinToString("\n\n") { (name, rules) ->
+        "[已固定技能：$name]\n[技能规则版本：${rules.revision}]\n" +
+            "按需调用 skill(name=$name, resource=相对路径, revision=${rules.revision}) 加载专项资料。\n" +
+            rules.text + "\n[技能结束]"
     }
     val pinnedNote = if (pinnedConnectors.isEmpty() && pinnedSkills.isEmpty()) "" else """
         [用户明确固定的调用来源]
@@ -52,7 +60,8 @@ internal fun resolveLocalWorkSkillGuidance(
         return """
             [本轮技能已加载：${explicitName}]
             用户明确选择了此技能。以下技能文件仅提供执行方法和默认约定；与本轮用户明确要求冲突时以用户要求为准，不得仅因技能规则拒绝执行。
-            ${document}
+            [技能规则版本：${document.revision}；专项资料按 skill(name=${explicitName},resource=相对路径,revision=${document.revision}) 加载]
+            ${document.text}
             [技能规则结束]
             $pinnedNote
         """.trimIndent()

@@ -111,11 +111,39 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         )
     }
 
-    private fun readAuthorizedSkill(name: String): String =
-        if (pinnedInvocations.current().any {
-                it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
-            }) workspace.readSkill(name)
-        else workspace.readModelSkill(name)
+
+    private fun isPinnedSkill(name: String) = pinnedInvocations.current().any {
+        it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
+    }
+
+    private fun isUserSelectedSkill(name: String, sessionId: String?): Boolean =
+        isPinnedSkill(name) ||
+            (sessionId != null && workRuns[sessionId]?.explicitlySelectedSkill == name)
+
+    private fun readAuthorizedSkill(name: String, sessionId: String?): String {
+        val rules = if (isUserSelectedSkill(name, sessionId)) workspace.readSkillSnapshot(name)
+            else workspace.readModelSkillSnapshot(name)
+        return "[技能主规则：$name；版本=${rules.revision}]\n" +
+            "专项资料调用 skill(name=$name,resource=references/文件.md,revision=${rules.revision}) 按需读取。\n" +
+            rules.text
+    }
+
+    private fun skillRequest(name: String, args: kotlinx.serialization.json.JsonObject, sessionId: String?): String {
+        val resource = args.optionalString("resource")?.takeIf(String::isNotBlank)
+        val referenceQuery = args.optionalString("reference_query")?.takeIf(String::isNotBlank)
+        if (resource == null && referenceQuery == null) return readAuthorizedSkill(name, sessionId)
+        require(isUserSelectedSkill(name, sessionId) || workspace.skillMetadata(name).modelInvocable) {
+            "SKILL_USER_ONLY：此技能仅支持用户主动调用"
+        }
+        val revision = args.optionalString("revision").orEmpty()
+        return if (resource != null) workspace.readSkillResource(
+            name, resource, revision,
+            args.int("start_line", 1), args.int("end_line", args.int("start_line", 1) + 199),
+        ) else workspace.searchSkillReferences(
+            name, requireNotNull(referenceQuery), revision,
+            args.optionalString("cursor"),
+        )
+    }
 
     internal suspend fun executeResult(call: LocalToolCall, allowMutation: Boolean, executionSessionId: String?): com.labteto.dshmobile.harness.tools.ToolResult {
         val workspace = executionLocalWorkspace(this.workspace)
@@ -474,10 +502,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 args.string("kind"), args.string("id"),
                 root.registry.names().toSet(), root.plugins.installedPluginIds().toSet(),
             )
-            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(::readAuthorizedSkill)
+            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let { skillRequest(it, args, boundSessionId) }
                 ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
-            "read_skill" -> readAuthorizedSkill(args.string("name"))
+            "read_skill" -> skillRequest(args.string("name"), args, boundSessionId)
             "session_search" -> sessionAccess.search(
                 args.string("query"), boundSessionId, args.optionalString("cursor"),
             )

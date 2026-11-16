@@ -275,6 +275,56 @@ class LocalWorkRunRegistryTest {
     }
 
     @Test
+    fun staleWorkBindingCannotCheckpointOrOverwriteCurrentSessionAfterReplacement() {
+        val runtime = LocalRuntimeStateStore()
+        runtime.initialize(LocalHarnessState(
+            loading = false, sessionId = "session-a", usageMode = LocalUsageMode.WORK,
+            modelState = LocalModelState(configured = true),
+        ))
+        val registry = LocalWorkRunRegistry(runtime)
+        val oldOwner = binding("session-a")
+        val currentOwner = binding("session-a")
+        val oldJob = Job()
+        val currentJob = Job()
+        oldOwner.runHandle.job = oldJob
+        currentOwner.runHandle.job = currentJob
+        oldOwner.runHandle.modelHistory.append(buildJsonObject {
+            put("role", "assistant")
+            put("content", "stale historical reply")
+        })
+        val abandonedProjection = Job()
+        oldOwner.runHandle.projectionJob = abandonedProjection
+        registry.attach(oldOwner)
+        registry.attach(currentOwner)
+        assertTrue("replaced run must be cancelled at ownership handover", oldJob.isCancelled)
+        assertTrue("replaced state collector must be cancelled", abandonedProjection.isCancelled)
+        assertNull(oldOwner.runHandle.projectionJob)
+        assertFalse(currentJob.isCancelled)
+        val beforeVisible = runtime.state.value
+        oldOwner.state.value = oldOwner.state.value.copy(error = "stale projection")
+        registry.mirrorVisible(oldOwner)
+        assertEquals(beforeVisible, runtime.state.value)
+        val oldCursor = runtime.foregroundRunHandle.transcriptProjectionCursor
+        try {
+            assertNull(registry.finishTurn(oldOwner, oldJob) { _, _ ->
+                error("outdated binding must never claim queued input")
+            })
+            registry.releaseCompletedTurn(oldOwner, oldJob)
+            assertSame(currentOwner, registry["session-a"])
+            assertSame(currentJob, currentOwner.runHandle.job)
+            assertEquals(oldCursor, runtime.foregroundRunHandle.transcriptProjectionCursor)
+            assertFalse(runtime.foregroundRunHandle.modelHistory.snapshot()
+                .toString().contains("stale historical reply"))
+            assertNull(oldOwner.eventLog.latest(ModelHistoryCheckpointCodec.EVENT_TYPE))
+        } finally {
+            oldJob.cancel()
+            currentJob.cancel()
+            oldOwner.eventLog.close()
+            currentOwner.eventLog.close()
+        }
+    }
+
+    @Test
     fun finishTurnDetachesIdleBindingAndMirrorsDurableHistoryToVisibleRuntime() {
         val runtime = LocalRuntimeStateStore()
         runtime.initialize(

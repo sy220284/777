@@ -19,8 +19,8 @@ internal object SqliteAssetEventIndex {
 
         /**
          * Called WITHIN the same SQL transaction that appends a user/assistant
-         * message event. Only assets already published and registered are indexed.
-         * Missing legacy/generated assets are left for the non-destructive backfill.
+         * message event. Missing legacy/generated assets leave a durable pending
+         * reference that is promoted atomically once their bytes are registered.
          */
         fun indexCommittedMessageAssets(
             db: SQLiteDatabase,
@@ -58,16 +58,31 @@ internal object SqliteAssetEventIndex {
             }
             visit(payload)
             digests.forEach { digest ->
-                // SELECT from local_assets gives an intentional no-op for assets
-                // that were generated before catalog registration, preserving
-                // the durable event even with incomplete metadata coverage.
+                // An unresolved local image must remain visible to the catalog even
+                // before its file metadata can be verified. Never invent a file row.
+                val registered = db.rawQuery(
+                    "SELECT 1 FROM local_assets WHERE asset_id=?", arrayOf(digest),
+                ).use { it.moveToFirst() }
+                val target = if (registered) "local_asset_references"
+                    else "local_asset_pending_references"
                 db.execSQL(
-                    "INSERT OR IGNORE INTO local_asset_references " +
-                        "(session_id,message_id,asset_id,reference_kind) " +
-                        "SELECT ?,?,?,? FROM local_assets WHERE asset_id=?",
-                    arrayOf(sessionId, "event-$sequence", digest, kind, digest),
+                    "INSERT OR IGNORE INTO $target " +
+                        "(session_id,message_id,asset_id,reference_kind) VALUES (?,?,?,?)",
+                    arrayOf(sessionId, "event-$sequence", digest, kind),
                 )
             }
+        }
+
+        /** Same transaction as registering verified content; pending rows have session FK. */
+        fun promotePendingReferences(db: SQLiteDatabase, assetId: String) {
+            db.execSQL(
+                "INSERT OR IGNORE INTO local_asset_references " +
+                    "(session_id,message_id,asset_id,reference_kind) " +
+                    "SELECT session_id,message_id,asset_id,reference_kind " +
+                    "FROM local_asset_pending_references WHERE asset_id=?",
+                arrayOf(assetId),
+            )
+            db.execSQL("DELETE FROM local_asset_pending_references WHERE asset_id=?", arrayOf(assetId))
         }
 
         fun createSchema(db: SQLiteDatabase) {
@@ -99,6 +114,29 @@ internal object SqliteAssetEventIndex {
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS local_asset_locations_by_asset " +
                     "ON local_asset_locations(asset_id)"
+            )
+            // Preserve committed references even when legacy/generated media metadata is
+            // missing. Session deletion cascades; a later verified file promotion is atomic.
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_asset_pending_references (" +
+                    "session_id TEXT NOT NULL REFERENCES session_event_cursors(session_id) ON DELETE CASCADE, " +
+                    "message_id TEXT NOT NULL, asset_id TEXT NOT NULL, reference_kind TEXT NOT NULL, " +
+                    "PRIMARY KEY(session_id,message_id,asset_id,reference_kind))"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS local_asset_pending_by_asset " +
+                    "ON local_asset_pending_references(asset_id)"
+            )
+            // A durable, ordered cursor allows old SQLite rows to be backfilled in
+            // bounded transactions without rebuilding at each process start.
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_asset_backfill_progress (" +
+                    "id INTEGER PRIMARY KEY CHECK(id=1), " +
+                    "last_session TEXT NOT NULL, last_sequence INTEGER NOT NULL)"
+            )
+            db.execSQL(
+                "INSERT OR IGNORE INTO local_asset_backfill_progress " +
+                    "(id,last_session,last_sequence) VALUES (1,'',-1)"
             )
             // v3 pilot data already has one canonical path in local_assets.
             // Backfill it idempotently when upgrading and on fresh creation.

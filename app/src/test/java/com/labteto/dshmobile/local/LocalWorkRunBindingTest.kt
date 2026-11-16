@@ -51,6 +51,9 @@ class LocalWorkRunBindingTest {
                 ),
             )
 
+            // A visible projection must originate from the currently registered
+            // Work owner; the real runtime always attaches before projecting.
+            registry.attach(binding)
             registry.mirrorVisible(binding)
 
             assertTrue(runtime.state.value.toWorkSurfaceUiState().deviceApprovalLease)
