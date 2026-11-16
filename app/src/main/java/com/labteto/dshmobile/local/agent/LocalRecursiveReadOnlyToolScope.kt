@@ -18,7 +18,7 @@ import kotlinx.serialization.json.jsonPrimitive
 internal object LocalRecursiveReadOnlyToolScope {
     val allowedNames: Set<String> = setOf(
         "read", "tool_output_read", "file_inspect", "list_files", "glob", "grep",
-        "web_search", "web_fetch", "subagent",
+        "web_search", "web_fetch", "subagent", "tool_call", "tool_search",
     )
 
     fun permits(name: String, capabilities: LocalSubagentCapabilities): Boolean {
