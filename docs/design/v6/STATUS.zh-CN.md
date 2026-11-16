@@ -2,6 +2,14 @@
 
 > **2026-11-16 复核基线** main `73d86a8db525d22336c8ff45fbc7bdd1d2f4f9c9` + PR #926 界面改进（最终增量已完成源码审阅，按用户要求停止编译构建）。这是视觉/业务行为复核台账，而不是历史 38 张示例卡片的浏览器通过计数。下一轮尚未实现的目标见 [V6.4 设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。参照 [现行规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)、[页面清单](current-ui.json) 和 [手机设计投影](mobile/app.html)。
 
+## 2026-11-16 Material3 配色构造器统一（S2a）
+
+- **问题**：默认色卡与换色卡各走一套 Material3 scheme；默认路径（`ShenyanFoundation.kt`）**没有设置** `outline` / `outlineVariant` / `surfaceTint` / `primaryContainer` / `inverseSurface` / `scrim`，Material 控件会落回 M3 基线紫（`surfaceTint` 的紫色调）；换色卡路径（`Theme.kt`）单独补了 `outline`，于是**换色卡改描边**、两套路径表现不一致。
+- **本轮**：在设计系统新增唯一构造器 `syColorScheme(colors: SyColors, dark: Boolean): ColorScheme`——输入只有 V6 调色板，所有角色都从 `SyColors` 推导（`outline` = `border`、`outlineVariant` = border 半透明度、`surfaceTint` = `canvas`、`primaryContainer` = `selected`、`scrim` = `overlay`、`inverseSurface` = `materialL5`），默认色卡改用它。
+- **未做（需截图证据，另行 PR）**：换色卡路径接入同一构造器。`Theme.kt:389-392` 目前仍在 `projected.isDefaultAccent` 时用默认 scheme、否则用旧 `materialLightScheme(DsColors)`；直接替换会改变换色卡用户的实际观感，需按仓库规矩先出截图证据再改。
+- **遗留调色板不是死代码**：`ui/theme/Color.kt` 的 `DsColors` 仍有 4 个消费文件、18 处引用（`AccentTheme.kt` / `AppBackground.kt` / `ShenyanColorHarmony.kt` / `Theme.kt`），删除前必须先迁消费路径。
+- **验证**：三项视觉门禁本地通过；本轮只新增 Material 角色、不改现有角色的取值方向，无既有测试断言这些角色。
+
 ## 2026-11-16 离线原型同源回填与 UI 视觉门禁接线
 
 - **根因**：PR #926 的离线原型改动（选项条滚动规则、工作区操作行、`更多文件操作`／`导入手机文件` 两个弹窗）只落在编译产物 `mobile/app.html`，**没有回填可编辑源** `mobile/index.html` / `mobile/v6.css` / `mobile/v6.js`，导致 `build-standalone.py --check` 必然判定"离线页与设计源分叉"，`check-ui-design-system-boundaries.py` 随之失败。

@@ -220,6 +220,50 @@ val LocalSyReduceMotion = staticCompositionLocalOf { false }
 val LocalSyMotionTempo = staticCompositionLocalOf { 1f }
 val LocalSyReduceTransparency = staticCompositionLocalOf { false }
 
+/**
+ * 唯一的 Material3 配色构造器：输入只有 V6 调色板。
+ *
+ * 背景：此前默认色卡与换色卡各走一套 scheme，且默认路径没有设置 outline /
+ * outlineVariant / surfaceTint / primaryContainer 等角色，Material 控件会落回
+ * M3 基线紫（surfaceTint 的紫色调），换色卡又单独补了 outline，于是两条路径
+ * 描边表现不一致。统一构造器后，两条路径只能通过调色板输入产生差异。
+ */
+fun syColorScheme(colors: SyColors, dark: Boolean): ColorScheme {
+    val outline = colors.border
+    val outlineVariant = colors.border.copy(alpha = colors.border.alpha * .55f)
+    val surfaceTint = colors.canvas
+    val primaryContainer = colors.selected
+    val onPrimaryContainer = colors.text
+    val inverseSurface = colors.materialL5
+    val inverseOnSurface = colors.text
+    val scrim = colors.overlay
+    return if (dark) darkColorScheme(
+        primary = colors.primary, onPrimary = colors.onPrimary,
+        primaryContainer = primaryContainer, onPrimaryContainer = onPrimaryContainer,
+        secondary = colors.mint, tertiary = colors.lilac,
+        background = colors.canvas, onBackground = colors.text,
+        surface = colors.surfaceSolid, onSurface = colors.text,
+        surfaceVariant = colors.surfaceRaised, onSurfaceVariant = colors.textSecondary,
+        surfaceTint = surfaceTint,
+        outline = outline, outlineVariant = outlineVariant,
+        inverseSurface = inverseSurface, inverseOnSurface = inverseOnSurface,
+        scrim = scrim,
+        error = colors.danger
+    ) else lightColorScheme(
+        primary = colors.primary, onPrimary = colors.onPrimary,
+        primaryContainer = primaryContainer, onPrimaryContainer = onPrimaryContainer,
+        secondary = colors.mint, tertiary = colors.lilac,
+        background = colors.canvas, onBackground = colors.text,
+        surface = colors.surfaceSolid, onSurface = colors.text,
+        surfaceVariant = colors.surfaceRaised, onSurfaceVariant = colors.textSecondary,
+        surfaceTint = surfaceTint,
+        outline = outline, outlineVariant = outlineVariant,
+        inverseSurface = inverseSurface, inverseOnSurface = inverseOnSurface,
+        scrim = scrim,
+        error = colors.danger
+    )
+}
+
 @Composable
 fun ShenyanTheme(
     mode: ShenyanMode = ShenyanMode.LIGHT,
@@ -232,19 +276,7 @@ fun ShenyanTheme(
         ShenyanMode.DARK -> Dark
         ShenyanMode.MATTE -> Matte
     }
-    val scheme = (if (mode == ShenyanMode.LIGHT) lightColorScheme(
-        primary = colors.primary, onPrimary = colors.onPrimary,
-        background = colors.canvas, onBackground = colors.text,
-        surface = colors.surfaceSolid, onSurface = colors.text,
-        surfaceVariant = colors.surfaceRaised, onSurfaceVariant = colors.textSecondary,
-        secondary = colors.mint, tertiary = colors.lilac, error = colors.danger
-    ) else darkColorScheme(
-        primary = colors.primary, onPrimary = colors.onPrimary,
-        background = colors.canvas, onBackground = colors.text,
-        surface = colors.surfaceSolid, onSurface = colors.text,
-        surfaceVariant = colors.surfaceRaised, onSurfaceVariant = colors.textSecondary,
-        secondary = colors.mint, tertiary = colors.lilac, error = colors.danger
-    ))
+    val scheme = syColorScheme(colors, dark = mode != ShenyanMode.LIGHT)
     CompositionLocalProvider(LocalSyColors provides colors, LocalSyReduceMotion provides reduceMotion,
         LocalSyReduceTransparency provides reduceTransparency) {
         MaterialTheme(
