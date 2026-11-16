@@ -36,6 +36,8 @@ class PermissionSetupModelTest {
             accessibility = true, accessibilityGranted = true,
             notifications = true, notificationAccessGranted = true,
             postingNotifications = true,
+            batteryOptimizationExempt = true,
+            backgroundRestricted = false,
         )
         PermissionSetupFeature.entries.forEach { feature ->
             assertEquals(PermissionSetupStatus.READY, permissionSetupStatus(feature, state))
@@ -43,7 +45,7 @@ class PermissionSetupModelTest {
     }
 
     @Test fun openingSettingsDoesNotCountAsAuthorization() {
-        val state = DeviceCapabilitiesState(postingNotifications = false)
+        val state = DeviceCapabilitiesState(postingNotifications = false, batteryOptimizationExempt = false)
         assertEquals(
             PermissionSetupStatus.VISITED_NOT_GRANTED,
             permissionSetupStatus(PermissionSetupFeature.NOTIFICATION_READ, state, visited = true),
@@ -52,6 +54,21 @@ class PermissionSetupModelTest {
             PermissionSetupStatus.NOT_GRANTED,
             permissionSetupStatus(PermissionSetupFeature.TASK_ALERTS, state),
         )
+        assertEquals(
+            PermissionSetupStatus.VISITED_NOT_GRANTED,
+            permissionSetupStatus(PermissionSetupFeature.BACKGROUND_EXECUTION, state, visited = true),
+        )
+    }
+
+    @Test fun backgroundWorkNeedsRealDozeExemptionAndUnrestrictedBatteryMode() {
+        assertEquals(PermissionSetupStatus.NOT_GRANTED,
+            permissionSetupStatus(PermissionSetupFeature.BACKGROUND_EXECUTION, DeviceCapabilitiesState()))
+        assertEquals(PermissionSetupStatus.NOT_GRANTED,
+            permissionSetupStatus(PermissionSetupFeature.BACKGROUND_EXECUTION,
+                DeviceCapabilitiesState(batteryOptimizationExempt = true, backgroundRestricted = true)))
+        assertEquals(PermissionSetupStatus.READY,
+            permissionSetupStatus(PermissionSetupFeature.BACKGROUND_EXECUTION,
+                DeviceCapabilitiesState(batteryOptimizationExempt = true, backgroundRestricted = false)))
     }
 
     @Test fun systemGrantWithDisconnectedServiceIsNotReady() {
@@ -74,6 +91,7 @@ class PermissionSetupModelTest {
             PermissionSetupFeature.SCREEN_CONTROL to PermissionSetupStatus.READY,
             PermissionSetupFeature.NOTIFICATION_READ to PermissionSetupStatus.VISITED_NOT_GRANTED,
             PermissionSetupFeature.TASK_ALERTS to PermissionSetupStatus.NOT_GRANTED,
+            PermissionSetupFeature.BACKGROUND_EXECUTION to PermissionSetupStatus.NOT_GRANTED,
         )
         assertEquals(1, nextPermissionSetupIndex(chosen, 0, emptySet()) { statuses.getValue(it) })
         assertEquals(2, nextPermissionSetupIndex(chosen, 0,
