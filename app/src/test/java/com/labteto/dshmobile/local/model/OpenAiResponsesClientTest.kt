@@ -181,6 +181,26 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun malformedCompletedFunctionArgumentsAreContinuableBeforeExecution() = runBlocking {
+        val frame = """{"type":"response.completed","response":{"id":"resp-bad-tools","output":[{"type":"function_call","call_id":"call-1","name":"tool_call","arguments":"{\"name\":\"bash\",\"arguments\":"}]}}"""
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(("data: " + frame + "\n\n").toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val failure = runCatching {
+            OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "mock-token", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
+                messages = chatPostTurnModelMessages("检查工具"), tools = JsonArray(emptyList()),
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+    }
+
+    @Test
     fun exactReportedCancelWithoutSpaceIsRetryable() {
         val error = client.networkFailure(IOException("stream was reset:CANCEL"))
         assertEquals("MODEL_NETWORK", error.code)
