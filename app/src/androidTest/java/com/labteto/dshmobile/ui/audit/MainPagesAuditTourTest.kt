@@ -144,6 +144,9 @@ class MainPagesAuditTourTest {
             back()
             compose.onNodeWithText(PersonaPresetCatalog.presets.first().persona.name).performClick()
             captureUiAudit(compose, "main-persona-detail")
+            // The profile is inside the explicit fourth (settings) persona section.
+            // Follow the real tab flow instead of assuming a retired top-level button.
+            compose.onNodeWithTag("personaDesignSection:3").performClick()
             compose.onNodeWithText(text(R.string.persona_gallery_view_profile)).performScrollTo().performClick()
             captureUiAudit(compose, "main-persona-profile")
             back()
