@@ -2414,6 +2414,12 @@
     <string name="permission_setup_read_notifications_hint">使用通知使用权读取其他应用的当前通知，与任务提醒权限分开授权。</string>
     <string name="permission_setup_task_alerts">接收任务提醒</string>
     <string name="permission_setup_task_alerts_hint">允许 777 发送任务进度、完成和异常提醒。</string>
+    <string name="permission_setup_background_work">持续后台执行任务</string>
+    <string name="permission_setup_background_work_hint">任务在切换应用或锁屏后继续运行，需要允许 777 在省电模式下保持网络连接。仅执行你主动发起的任务；授权由系统确认。</string>
+    <string name="permission_setup_background_restricted_hint">系统目前限制了 777 的后台活动。请在电池使用设置中改为“不受限制”，再返回重新检测。</string>
+    <string name="permission_setup_background_allowed">已允许后台网络执行</string>
+    <string name="permission_setup_background_not_allowed">尚未允许持续后台运行</string>
+    <string name="permission_setup_background_open">开启后台执行</string>
     <string name="permission_setup_begin">逐项开启</string>
     <string name="permission_setup_later">稍后再说</string>
     <string name="permission_setup_step_count">第 %1$d 项，共 %2$d 项</string>
