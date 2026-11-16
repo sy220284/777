@@ -119,8 +119,8 @@ internal fun queueAutomaticWorkContinuation(
             error.code == "ANTHROPIC_TOOL_ARGUMENTS_INVALID" ->
                 "继续当前任务。上一轮工具参数解析失败（" + (error.toolInputIssue ?: "invalid_json_object") +
                     "），目标=" + (error.providerParam ?: "tool_use") + "，该工具尚未执行。先核对历史真实回执；" +
-                    "对未知参数用 tool_search 查询真实 Schema，重新生成完整可解析的 JSON 对象并继续任务；" +
-                    "已有回执的副作用不能重复执行。"
+                    "对未知参数用 tool_search 查询真实 Schema，重新生成完整、可解析的 JSON 对象参数并继续任务；" +
+                    "已完成的工具副作用不能重复执行。"
             else -> INTERNAL_WORK_CONTINUATION_PROMPT
         },
     )
