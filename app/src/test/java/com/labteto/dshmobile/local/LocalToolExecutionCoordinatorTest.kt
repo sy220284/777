@@ -1413,7 +1413,7 @@ class LocalToolExecutionCoordinatorTest {
         val samples = listOf(
             Triple("bash", """{"command":"echo ok","timeout_seconds":"30"}""", "timeout_seconds"),
             Triple("list_files", """{"path":".","depth":"2"}""", "depth"),
-            Triple("http_request", """{"url":"https://example.com","max_bytes":"577"}""", "max_bytes"),
+            Triple("http_request", """{"method":"GET","url":"https://example.com","max_bytes":"577"}""", "max_bytes"),
             Triple("write_chunk", """{"path":"probe.bin","offset":"0","content":"abc"}""", "offset"),
             Triple(mcpName, """{"a":"2.5","b":"-1.25"}""", "a"),
         )
