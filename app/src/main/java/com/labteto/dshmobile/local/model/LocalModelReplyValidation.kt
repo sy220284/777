@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.LocalModelException
+import com.labteto.dshmobile.local.LocalModelFailureOrigin
 
 /** Completed answers need visible content; partial results must reach the existing usage owner. */
 internal fun validateUsableModelReply(reply: LocalModelReply) {
@@ -17,6 +18,10 @@ internal fun validateUsableModelReply(reply: LocalModelReply) {
             message = "模型已结束响应，但没有返回正文、图片或工具调用；本轮未自动重发，请检查模型状态后重试。",
             retryable = false,
             requestId = reply.requestId,
+            providerCode = "empty_model_reply_after_admission",
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
+            origin = LocalModelFailureOrigin.STREAM_PARSE,
         )
     }
 }
