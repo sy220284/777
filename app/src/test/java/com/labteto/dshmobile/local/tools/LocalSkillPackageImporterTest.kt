@@ -66,6 +66,39 @@ class LocalSkillPackageImporterTest {
         assertTrue(workspace.skills().contains("sample-skill"))
     }
 
+    @Test fun linkedLocalResourcesAreVerifiedBeforeAnySkillIsPublished() =
+        runInWorkspace { importer, workspace, root ->
+            val linked = example + "\n[核验脚本](scripts/verify.py)\n[资料](references/spec.md)\n"
+            val incomplete = archive(
+                "SKILL.md" to linked.toByteArray(),
+                "scripts/verify.py" to "print('ok')".toByteArray(),
+            )
+            assertThrows(IllegalArgumentException::class.java) {
+                importer.install("incomplete.zip", incomplete)
+            }
+            assertTrue(workspace.skills().isEmpty())
+            val complete = archive(
+                "SKILL.md" to linked.toByteArray(),
+                "scripts/verify.py" to "print('ok')".toByteArray(),
+                "references/spec.md" to "spec".toByteArray(),
+            )
+            assertEquals("sample-skill", importer.install("complete.zip", complete))
+            assertTrue(root.resolve(".dsh/skills/sample-skill/scripts/verify.py").isFile)
+        }
+
+    @Test fun largeReferencedSkillCanBeInstalledWithoutWholeDocumentLinkAllocation() =
+        runInWorkspace { importer, workspace, root ->
+            val body = example + "\n" + "审计说明".repeat(60_000) +
+                "\n[专项规则](references/verified.md)\n"
+            val zipped = archive(
+                "SKILL.md" to body.toByteArray(),
+                "references/verified.md" to "单独查阅的资料".toByteArray(),
+            )
+            assertEquals("sample-skill", importer.install("large-referenced.zip", zipped))
+            assertTrue(workspace.readSkill("sample-skill").contains("审计说明"))
+            assertTrue(root.resolve(".dsh/skills/sample-skill/references/verified.md").isFile)
+        }
+
     @Test fun rejectsTraversalAndDoesNotExposePartialSkill() = runInWorkspace { importer, workspace, root ->
         val zipped = archive(
             "pkg/SKILL.md" to example.toByteArray(),

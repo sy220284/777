@@ -126,6 +126,132 @@ class SqliteLocalAssetCatalogAndroidTest {
         }
     }
 
+    @Test fun pendingImageReferencesBecomeLiveWhenItsFileIsRegistered() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-pending-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                val payload = buildJsonObject {
+                    put("content", buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", LOCAL_IMAGE_REF)
+                            put("attachmentId", digest)
+                        })
+                    })
+                }
+                events.append("pending", "assistant/message", payload)
+                assertEquals(0L, catalog.referenceCount(digest))
+                assertEquals(1L, catalog.pendingReferenceCount(digest))
+                catalog.register(image)
+                assertEquals(1L, catalog.referenceCount(digest))
+                assertEquals(0L, catalog.pendingReferenceCount(digest))
+                catalog.register(image)
+                assertEquals(1L, catalog.referenceCount(digest))
+                events.clearSession("pending")
+                assertEquals(0L, catalog.referenceCount(digest))
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
+    @Test fun interruptedLegacyEventReindexResumesWithoutDuplicateReferences() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-reindex-${UUID.randomUUID()}.db"
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                val payload = buildJsonObject {
+                    put("content", buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", LOCAL_IMAGE_REF)
+                            put("attachmentId", digest)
+                        })
+                    })
+                }
+                events.append("old", "assistant/message", payload)
+                events.append("old", "assistant/message", payload)
+                // Simulate a pre-v7 historical database: committed events exist
+                // without indexed references or any deferred rows.
+                events.writableDatabase.execSQL("DELETE FROM local_asset_pending_references")
+                assertEquals(0L, catalog.pendingReferenceCount(digest))
+                assertEquals(1, catalog.reconcileCommittedEvents(1))
+                assertEquals(1L, catalog.pendingReferenceCount(digest))
+            }
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                assertEquals(1, catalog.reconcileCommittedEvents(1))
+                assertEquals(2L, catalog.pendingReferenceCount(digest))
+                assertEquals(0, catalog.reconcileCommittedEvents(1))
+                catalog.register(image)
+                assertEquals(2L, catalog.referenceCount(digest))
+                assertEquals(0L, catalog.pendingReferenceCount(digest))
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
+    @Test fun existingHashNamedMediaBackfillsWithoutDeletingUnknownOrInvalidFiles() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-published-${UUID.randomUUID()}.db"
+        val root = File(context.cacheDir, "asset-backfill-${UUID.randomUUID()}")
+        val directory = File(root, ".dsh/attachments").apply { mkdirs() }
+        try {
+            SqliteSessionEventDatabase(context, Json, name).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                val contents = "historical attachment".toByteArray()
+                val hash = java.security.MessageDigest.getInstance("SHA-256").digest(contents)
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                val valid = File(directory, "$hash.txt").apply { writeBytes(contents) }
+                val unknown = File(directory, "old-note.txt").apply { writeText("keep") }
+                val first = catalog.reconcilePublishedFiles(root, listOf(valid, unknown))
+                assertEquals(1, first.registered)
+                assertEquals(1, first.unclassified)
+                assertEquals(listOf(".dsh/attachments/$hash.txt"), catalog.locations(hash))
+                assertEquals(0, catalog.reconcilePublishedFiles(root, listOf(valid)).registered)
+                assertTrue(unknown.isFile)
+                assertEquals("keep", unknown.readText())
+                val corrupted = File(directory, "${"b".repeat(64)}.txt").apply {
+                    writeText("wrong content")
+                }
+                assertTrue(runCatching {
+                    catalog.reconcilePublishedFiles(root, listOf(corrupted))
+                }.isFailure)
+                assertTrue(corrupted.isFile)
+            }
+        } finally {
+            context.deleteDatabase(name)
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun importerCanRefineLegacyRecoveredMediaTypeWithoutChangingContentId() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "asset-refine-${UUID.randomUUID()}.db"
+        val root = File(context.cacheDir, "asset-refine-${UUID.randomUUID()}")
+        val folder = File(root, ".dsh/attachments").apply { mkdirs() }
+        try {
+            val bytes = "# A Markdown file".toByteArray()
+            val id = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val file = File(folder, "$id.md").apply { writeBytes(bytes) }
+            SqliteSessionEventDatabase(context, Json, name).use { db ->
+                val catalog = SqliteLocalAssetCatalog(db)
+                assertEquals(1, catalog.reconcilePublishedFiles(root, listOf(file)).registered)
+                assertEquals("application/octet-stream", catalog.asset(id)?.mediaType)
+                catalog.register(LocalImportedAttachment(
+                    name = file.name, relativePath = ".dsh/attachments/$id.md",
+                    mediaType = "text/markdown", bytes = bytes.size.toLong(),
+                    attachmentId = id,
+                ))
+                assertEquals("text/markdown", catalog.asset(id)?.mediaType)
+                assertEquals(listOf(".dsh/attachments/$id.md"), catalog.locations(id))
+                assertEquals(0, catalog.reconcilePublishedFiles(root, listOf(file)).registered)
+            }
+        } finally {
+            context.deleteDatabase(name)
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun duplicateContentUnderTwoSafeExtensionsKeepsBothLocations() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "asset-alias-${UUID.randomUUID()}.db"

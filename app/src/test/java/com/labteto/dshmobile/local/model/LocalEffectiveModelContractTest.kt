@@ -56,7 +56,7 @@ class LocalEffectiveModelContractTest {
                 contract.documentedContextWindowTokens,
             )
             assertEquals(
-                LocalModelPresets.clientCapabilitiesFor(route.model, route.baseUrl),
+                LocalModelPresets.clientCapabilitiesFor(route.model, route.baseUrl, route.protocol),
                 contract.clientModalities,
             )
             assertEquals(

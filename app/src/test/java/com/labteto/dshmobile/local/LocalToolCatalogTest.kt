@@ -36,7 +36,7 @@ class LocalToolCatalogTest {
                     "read", "file_inspect", "archive_list", "archive_read", "write", "edit", "apply_patch", "glob", "grep", "bash", "job_list",
                     "web_search", "web_fetch", "http_request", "download_file", "json_query",
                     "media_image_options", "media_image_create", "media_image_status",
-                    "network_diagnose", "environment_info", "capability_search",
+                    "network_diagnose", "environment_info", "tool_call", "tool_search",
                     "skill", "todo_write", "create_goal",
                     "ask_user_question", "subagent", "subagent_fork", "workflow",
                     "session_search", "session_event_search", "session_trace",
@@ -187,8 +187,10 @@ class LocalToolCatalogTest {
             properties("create_goal").getValue("review_requirements").jsonObject
                 .getValue("items").jsonObject.getValue("enum")
                 .jsonArray.map { it.jsonPrimitive.content }.toSet())
-        assertTrue(byName.getValue("capability_search").jsonObject["function"]!!
-            .jsonObject.getValue("description").jsonPrimitive.content.contains("候选"))
+        assertTrue(byName.getValue("tool_call").jsonObject["function"]!!
+            .jsonObject.getValue("description").jsonPrimitive.content.contains("直接调用"))
+        assertTrue(byName.getValue("tool_search").jsonObject["function"]!!
+            .jsonObject.getValue("description").jsonPrimitive.content.contains("不加载"))
     }
 
     @Test

@@ -23,12 +23,13 @@ class LocalModelProfilesTest {
         LocalModelPresets.entries.forEach { preset ->
             val wired = LocalModelPresets.clientCapabilitiesFor(preset.model, preset.baseUrl)
             assertFalse(LocalModelCapability.AUDIO in wired || LocalModelCapability.MUSIC in wired)
-            // Video input is wired for Kimi Code (excluding K3-256K), not a general
-            // promise that every provider or the creative-media API can accept video.
-            assertEquals(
-                preset.provider == "Kimi Code" && preset.model != "k3-256k",
-                LocalModelCapability.VIDEO in wired,
-            )
+            // Kimi Responses supports text/images; video remains available on explicitly
+            // configured Chat Completions routes for video-capable subscription models.
+            assertEquals(preset.provider == "MiniMax", LocalModelCapability.VIDEO in wired)
+            if (preset.provider == "Kimi Code" && preset.model != "k3-256k") {
+                assertTrue(LocalModelCapability.VIDEO in LocalModelPresets.clientCapabilitiesFor(
+                    preset.model, preset.baseUrl, LocalModelProtocol.CHAT_COMPLETIONS))
+            }
             if (preset.provider == "Kimi Code") {
                 assertTrue(LocalModelCapability.IMAGE in wired)
             }
@@ -89,7 +90,6 @@ class LocalModelProfilesTest {
 
     @Test fun representativeProvidersKeepTheirDeclaredTransportProtocols() {
         val chatCompletionRoutes = listOf(
-            "deepseek-flash" to "https://api.deepseek.com",
             "MiniMax-M3" to "https://api.minimaxi.com/v1",
             "gemini-3.8-flash" to "https://generativelanguage.googleapis.com/v1beta/openai",
             "qwen3.8-max" to "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -99,6 +99,15 @@ class LocalModelProfilesTest {
                 LocalModelProtocol.CHAT_COMPLETIONS,
                 LocalModelPresets.protocolFor(model, baseUrl),
             )
+        }
+        for (model in listOf("deepseek-flash", "deepseek-v4-pro")) {
+            assertEquals(LocalModelProtocol.RESPONSES,
+                LocalModelPresets.protocolFor(model, "https://api.deepseek.com"))
+        }
+        for (model in listOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "k3-256k",
+            "kimi-for-coding", "kimi-for-coding-highspeed")) {
+            assertEquals(LocalModelProtocol.RESPONSES,
+                LocalModelPresets.protocolFor(model, "https://api.kimi.com/coding/v1"))
         }
         for (model in listOf("gpt-5.6", "gpt-5.6-sol", "gpt-6-astra",
             "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna")) {
@@ -224,6 +233,8 @@ class LocalModelProfilesTest {
         val miniMaxText = LocalModelPresets.find("MiniMax-M2.7", "https://api.minimaxi.com/v1")!!
         assertEquals(setOf(LocalModelCapability.TEXT), miniMaxText.capabilities)
         assertEquals(false, miniMaxText.imageInputSupported)
+        assertFalse(LocalModelPresets.entries.any { it.model.startsWith("MiniMax-M2.7") })
+        assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, miniMaxText.protocol)
 
         val kimi = LocalModelPresets.find("k3", "https://api.kimi.com/coding/v1")!!
         assertTrue(LocalModelCapability.IMAGE in kimi.capabilities)
@@ -291,11 +302,11 @@ class LocalModelProfilesTest {
             .toSet()
 
         assertEquals(
-            setOf("MiniMax-M3.1-Flash", "MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.7-highspeed"),
+            setOf("MiniMax-M3.1-Flash", "MiniMax-M3"),
             models("MiniMax"),
         )
         assertEquals(
-            setOf("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"),
+            setOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed"),
             models("Kimi Code"),
         )
         assertEquals(emptySet<String>(), models("智谱 GLM"))

@@ -1,53 +1,38 @@
 # Kimi Code 订阅模型适配（777）
 
-更新：2026-10-14。这里接入的是 **Kimi Code 会员订阅接口**，不是按量计费的 Kimi API 开放平台。使用统一模型网关，不新建一套会话/工具/计费逻辑。
+更新：2026-11-16。本方案接入 Kimi Code 会员专用 API Key，和按量计费的 Kimi API 开放平台相互独立。所有对话与工具通过唯一 `LocalModelGateway` / Session / Agent 运行链路完成。
 
-## 用户如何配置
+## 用户配置和协议
 
-777 的“添加模型”预置 API 菜单仅保留 DeepSeek、MiniMax、Kimi Code（国内）。Claude、通义千问、Gemini、GLM、OpenAI API 已从预置菜单移除；ChatGPT 订阅套餐的 OAuth 账户与动态模型目录保持独立且不受影响。既有用户配置及密钥保留，用户仍可自行管理自定义 API 路由，不执行数据删除。
+777 设置 → 模型配置 → 添加模型 → Kimi Code，可从 6 个预置模型中选择。使用国内官方地址 `https://api.kimi.com/coding/v1`，新增预置默认 Responses，完整路径 `/coding/v1/responses`。用户可以在预置编辑界面手动选择 Chat Completions（`/coding/v1/chat/completions`）后测试连接。历史已保存的 Chat 路由保留，不暗中改写凭据、协议或会话路由。
 
-1. 在 [Kimi Code 控制台](https://www.kimi.com/code) 创建**订阅专用 API Key**，该 Key 与开放平台 Key 不通用；会员资格和可用模型以账号权益为准。
-2. 777 设置 → 模型配置 → 选择提供商「Kimi Code」，从预置中选择模型 ID 并保存订阅 Key，协议为「Chat Completions」。
-3. 仅保留国内订阅入口 `https://api.kimi.com/coding/v1`；完整请求为 `/coding/v1/chat/completions`。海外 `https://api.kimi.ai/coding/v1` 不再属于内置支持的官方订阅路由。
-4. **不要**填 `https://api.moonshot.cn/v1`、`https://api.moonshot.ai/v1` 或开放平台 API Key；本次没有新增这些按量计费路由或模型。
+Kimi 官方文档推荐具备原生 Responses 的工具优先使用 Responses；响应包括语义流、reasoning、function calling。用户名、套餐 Key、模型权限由官方控制；不能混用 Kimi 按量平台 Key，也不伪造官方客户端身份。
 
-## 订阅模型与限制
+## 模型、权益及能力
 
-| 777 Model ID | 2026-10-14 官方对应模型 | 默认上下文 | 推理控制 | 输入能力 |
+| 模型 ID | 实际型号 | 默认本地上下文 | 思考控制 | 原生输入 |
 | --- | --- | --- | --- | --- |
-| `k3` | K3 | 安全默认 **256K**；Pro/Allegretto 及以上可在模型配置中明确指定 **1,048,576** | `reasoning_effort=low/high/max`；Fast 对应 low，不自动关闭思考 | 文字、图片；官方另支持视频输入 |
-| `k3-256k` | K3 256K 版 | 262,144 | 同上 | 文字、图片；**不支持视频** |
-| `kimi-for-coding` | K2.8 Preview | 1,048,576 | 同上 | 文字、图片；官方另支持视频输入 |
-| `kimi-for-coding-highspeed` | K2.7 Code 高速版 | 262,144 | 官方声明 Thinking ON；没有开放独立的档位选择 | 文字、图片；官方另支持视频输入 |
+| `k3.1-pro` | K3.1 Pro | 256K（合格套餐可手动升至 1M） | 仅思考；low/high/max | Responses 文字、图片；Chat 支持视频 |
+| `k3.1-pro-highspeed` | K3.1 Pro 高速 | 1M（需要 Pro/Allegretto 以上权益） | 仅思考；low/high/max | Responses 文字、图片；Chat 支持视频 |
+| `k3` | K3 | 256K（合格套餐可手动升至 1M） | low/high/max | 文字、图片；Chat 协议可处理视频 |
+| `k3-256k` | K3 256K | 256K | low/high/max | 文字、图片 |
+| `kimi-for-coding` | K2.8 Preview | 1M | low/high/max | 文字、图片；Chat 协议可处理视频 |
+| `kimi-for-coding-highspeed` | K2.7 Code 高速 | 256K | 固定思考；不展示手动档位 | 文字、图片；Chat 协议可处理视频 |
 
-- Model ID 必须与上表一致。不同 Kimi 会员套餐拥有不同的模型和上下文权限：新套餐 Plus 可以使用 K3 的 256K 上下文；Pro 及以上才有 K3 的 1M 与高速版，老套餐使用 Moderato/Allegretto 对应档位。K3 预置编辑页现可填写上下文窗口（留空默认 256K，Pro/Allegretto 及以上可填写 `1048576`；超过官方 1M 的自定义值不会生效）。配置了大窗口并不代表账号已开通；权限不足时返回服务商原始错误，不偷换模型与账户。
-- 官方目前说明关闭 K3 系列 Thinking 会路由到 K2.8 Preview 的非思考版本。为避免界面仍显示 K3 却暗中换模型，777 当前只提供 `low/high/max` 三档，快速模式对应 low。
-- 切换 Model ID 或思考档位会影响提示词缓存；K3 转入 K3-256K 时，超过 256K 的历史应先压缩（复用 777 原有历史预算与摘要）；不要在新型号中沿用超限的视频输入。
-- 777 **已接通 Kimi Code 的文字、图片理解链路**：聊天附件只持久化工作区引用，在请求时转为 `data:image/...;base64,...` 的 `image_url` 内容块，统一适配器及 SSE/非流式接口透传；PDF 可以解析文字及按图片预算渲染页面。增加了实际附件→规范消息→Kimi 请求体的回归用例。此处仅代表本地代码链路，不等于已使用真实订阅 Key 的线上测试。
-- Kimi Code 模型的采样温度使用官方固定值：不会向订阅 Chat Completions 的普通或流式请求附加自定义 `temperature` 参数。
-- **视频理解现已在客户端请求链路接通**：对 Kimi Code 国内订阅 `k3`、`kimi-for-coding`、`kimi-for-coding-highspeed`，附件经工作区引用按需读取，转换为 `{ "type": "video_url", "video_url": {"url": "data:video/mp4;base64,..." } }` 并由既有 Chat Completions 网关发出；聊天、群聊、工作模式和子智能体使用同一个底座。支持 MP4/M4V、MOV、WebM、AVI、MKV、MPEG 输入，单轮最多一个视频且压缩前文件总量最多 20 MB。超过限制明确报错而不是悄悄发送纯文字占位。
-- `k3-256k` 不支持视频，选择该模型并提交视频时明确报错；对于非 Kimi Code API 不推断视频传输能力，继续按通用文件附件处理。视频历史仅保留轻量文件引用，旧视频不会每轮重新发送；请求日志会将 `video_url` 的 Base64 内容脱敏。**目前仍未持有真实 Kimi 订阅 Key 做线上视频验收**。
-- Kimi Code 没有在 777 接通专属音频理解、语音合成、语音转写或图片/视频生成；视频输入理解不等于视频创作 API。
+会员档位由官方权益决定。K3 / K3.1 Pro 只接受 262144、1048576 两档的用户上限请求，默认 256K；填写 1M 不会使不具备权限的账户自动升级。K3.1 Pro 始终使用思考模式，快速模式映射到 low，禁止在请求里设置 `none` 关闭思考；新型号建议新建会话，避免跨代历史影响缓存与效果。
 
-## 实现与账本
+## 图片、视频及连续工具运行
 
-- Kimi Code 走同一 `LocalModelGateway` → OpenAI 兼容 Chat adapter → `DeepSeekClient`；带真实会员 Key 的 Bearer 授权，不伪造官方客户端标识或复用其他账户。
-- 统一解析 SSE 增量、独立的 `reasoning_content`、工具调用、取消及错误终态。原生思考历史只在同一请求路由续轮保留，不跨订阅 Key、模型或兼容代理回放。
-- Kimi Code **按会员权益、使用额度与窗口限流**，不是按请求 token 现金结算。现有 Token 账本可以记录服务商返回用量，但未获得服务商账单前不估计成已支付 API 金额。
-- 新套餐（Plus/Pro）保留每 5 小时用量窗口，取消旧套餐的每周窗口；老套餐仍有每周与滚动窗口。账户有月度共享权益上限，实际可用量以 Kimi Code 控制台为准，不虚构本机额度查询 API。HTTP 401 可能是 Key 错误、套餐不支持模型或上下文；HTTP 403 可能是 5 小时/周/月额度不足。运行时保留服务商返回的原因，不盲目重试。
+- Responses 路由在本机将图片附件转成 `input_image`，通过 `reasoning.effort` 设置思考，按 OpenAI Responses 流式事件提取正文、思考、函数调用和 Token 用量，沿同一路由恢复工具结果与对话。
+- **Kimi 官方 Responses 目前不支持视频输入。** 777 对该路由不声明视频能力，错误发送 `video_url` 时显式拒绝，不将视频悄悄丢弃。用户需要视频时，在模型编辑页选择 Chat Completions；旧 Chat 多模态路径保留 `video_url` 和 20MB 输入上限。
+- 对可用 Chat 视频路由，`k3.1-pro`、`k3.1-pro-highspeed`、`k3`、`kimi-for-coding`、`kimi-for-coding-highspeed` 具备现有视频格式编码；`k3-256k` 不支持视频。仅按实际协议向设置页提供能力标识。
+- 聊天、工作模式、子智能体共用同一 Session 和附件持久引用；图像/视频 Base64 在日志中脱敏，历史文件引用不会每轮重新上传。
+- Kimi 的账号权益属于订阅配额，本地 Token 账本只记录服务商返回的用量，不虚构已支付的按量金额。调用失败保留供应商原始 HTTP 诊断。
 
-## 验证边界
+## 验收和来源
 
-`LocalKimiCompatibilityTest` 验证官方国内路由、拒绝海外官方识别、4 个订阅 Model ID、套餐默认上下文及用户明确升级窗口、Fast/Deep 推理参数、非流式与 SSE 思考内容、Token usage、Kimi 图片/视频请求体、视频日志脱敏与同路由回放隔离。
+源码回归覆盖六个预置模型、模型上下文上限、协议切换、Kimi 原生 Responses 图片/思考/工具、Chat 视频旧路线以及附件隐私投影。真实订阅 Key 的在线联调与设备 UI 测试以实际回执为准。
 
-Kimi Code 的官方定位是**智能编程及第三方开发工具**，不同于开放平台面向产品集成的 API。客户端使用须遵循 Kimi 的服务条款和订阅权益范围，尤其不要冒充官方产品的客户端标识。
-
-官方来源：
-- https://www.kimi.com/help/kimi-code/models
-- https://www.kimi.com/code/docs/
-- https://www.kimi.com/help/kimi-code/benefits
-- https://www.kimi.com/code/docs/kimi-code/error-reference.html
-
-## UI 3.0 模型列表（精简）
-
-API 模型行仅显示一行：**模型名 ·（当前模型显示“使用中”）· 14–15 dp 多模态小图标 · 更多菜单**。图片/视频/语音图标在“使用中”状态右侧，依照客户端真实输入或独立媒体生成接入确定，分别提供无障碍说明；不在列表行显示 API URL、endpoint、上下文大小、工作预算和展开的能力文字。模型编辑界面仍保留必要的 API 地址和上下文配置以免丢失管理能力。所有列表继续复用 UI 3.0 的 Sy 组件/材质层级，避免另引入白底大卡片。
+- [Kimi Code 官方模型配置](https://www.kimi.com/code/docs/kimi-code/models.html)
+- [Codex 原生 Responses 文档](https://www.kimi.com/code/docs/third-party-tools/codex.html)
+- [官方模型更新公告](https://www.kimi.com/code/docs/kimi-code/whats-new.html)

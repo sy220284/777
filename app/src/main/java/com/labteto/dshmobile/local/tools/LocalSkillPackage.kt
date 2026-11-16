@@ -41,6 +41,7 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
                 "技能包缺少 SKILL.md"
             }
             val id = readSkillId(document)
+            verifyLocalReferences(selected, document)
             require(LocalPresetSkillCatalog.entries.none { it.id == id }) {
                 "预置技能标识已保留"
             }
@@ -113,6 +114,32 @@ internal class LocalSkillPackageImporter(private val workspace: LocalWorkspace) 
         val prefix = roots.single().substringBefore('/') + "/"
         require(files.all { it.startsWith(prefix) }) { "技能包包含技能目录以外的文件" }
         return File(unpacked, prefix)
+    }
+
+    /**
+     * An explicit relative Markdown link into a package asset must resolve before
+     * publication. Missing script/reference files leave a broken installed skill;
+     * validation is read-only and never executes or authorizes bundled code.
+     */
+    private fun verifyLocalReferences(root: File, document: File) {
+        val base = root.canonicalFile.toPath()
+
+        // The installer only needs links; streaming avoids materializing the full
+        // document a second time after front-matter validation.
+        val links = Regex("""]\((?:\./)?((?:scripts|references|assets)/[^)\s#]+)(?:#[^)]*)?\)""")
+        document.forEachLine(Charsets.UTF_8) { line ->
+            for (match in links.findAll(line)) {
+                val relative = match.groupValues[1]
+                require(relative.split('/').none { it == "." || it == ".." }) {
+                    "技能包包含越界资源链接：$relative"
+                }
+                val target = File(root, relative)
+                require(target.canonicalFile.toPath().startsWith(base) &&
+                    !Files.isSymbolicLink(target.toPath()) && target.isFile) {
+                    "技能包引用的本地文件不存在或不安全：$relative"
+                }
+            }
+        }
     }
 
     /** 只解析元数据，不将整份技能规则与全部资源装入内存。 */

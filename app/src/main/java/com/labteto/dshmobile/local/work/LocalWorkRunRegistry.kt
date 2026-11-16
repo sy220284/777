@@ -212,7 +212,10 @@ class LocalWorkRunRegistry internal constructor(
         onIdle: () -> Unit = {},
         startNext: (QueuedAgentInput, LocalWorkRunBinding) -> Job,
     ): Job? = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
-        if (binding.runHandle.job !== completedJob) return@synchronized null
+        // A previous binding may settle after a session was reopened with the same id.
+        // Only the registry's current binding can write a checkpoint or claim inbox work.
+        if (bindings[binding.sessionId] !== binding ||
+            binding.runHandle.job !== completedJob) return@synchronized null
 
         var successor: Job? = null
         try {
@@ -310,7 +313,8 @@ class LocalWorkRunRegistry internal constructor(
     /** Also covers cancellation before a lazy turn starts and failures during turn setup. */
     internal fun releaseCompletedTurn(binding: LocalWorkRunBinding, completedJob: Job) {
         synchronized(runtimeStateStore.foregroundRunHandle.lock) {
-            if (binding.runHandle.job === completedJob) releaseFinishedBinding(binding)
+            if (bindings[binding.sessionId] === binding &&
+                binding.runHandle.job === completedJob) releaseFinishedBinding(binding)
         }
     }
 
@@ -330,11 +334,12 @@ class LocalWorkRunRegistry internal constructor(
 
     private fun releaseFinishedBinding(binding: LocalWorkRunBinding) {
         binding.runHandle.job = null
-        detach(binding)
+        val wasCurrentOwner = detach(binding)
         binding.runHandle.projectionJob?.cancel()
         binding.runHandle.projectionJob = null
         binding.state.update { current -> current.copy(kernel = current.kernel.copy(running = false)) }
         if (
+            wasCurrentOwner &&
             runtimeStateStore.currentSessionId == binding.sessionId &&
             runtimeStateStore.state.value.sessionId == binding.sessionId
         ) {
@@ -343,7 +348,7 @@ class LocalWorkRunRegistry internal constructor(
             foreground.transcriptProjectionCursor = binding.runHandle.transcriptProjectionCursor
             foreground.cancellationRequested = binding.runHandle.cancellationRequested
             binding.runHandle.pendingInputs.transferTo(foreground.pendingInputs)
-            mirrorVisible(binding)
+            projectVisibleSnapshot(binding)
         }
     }
 
@@ -376,10 +381,20 @@ class LocalWorkRunRegistry internal constructor(
     }
 
     internal fun attach(binding: LocalWorkRunBinding): LocalWorkRunBinding? {
-        val previous = synchronized(approvalProjectionLock) {
-            bindings.put(binding.sessionId, binding).also {
-                it?.stopApprovalProjection()
-                approvalPreferences?.let(binding::observeApprovalMode)
+        val previous = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            synchronized(approvalProjectionLock) {
+                bindings.put(binding.sessionId, binding).also { old ->
+                    if (old !== binding) {
+                        old?.stopApprovalProjection()
+                        // Ownership handover closes the obsolete UI collector and run.
+                        // The new binding is the only owner allowed to project or execute.
+                        old?.runHandle?.projectionJob?.cancel()
+                        old?.runHandle?.projectionJob = null
+                        old?.runHandle?.cancellationRequested = true
+                        old?.runHandle?.job?.cancel()
+                    }
+                    approvalPreferences?.let(binding::observeApprovalMode)
+                }
             }
         }
         synchronized(resourceProjectionLock) {
@@ -390,14 +405,18 @@ class LocalWorkRunRegistry internal constructor(
     }
 
     internal fun detach(sessionId: String): LocalWorkRunBinding? =
-        synchronized(approvalProjectionLock) {
-            bindings.remove(sessionId)?.also { it.stopApprovalProjection() }
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            synchronized(approvalProjectionLock) {
+                bindings.remove(sessionId)?.also { it.stopApprovalProjection() }
+            }
         }
 
     internal fun detach(binding: LocalWorkRunBinding): Boolean =
-        synchronized(approvalProjectionLock) {
-            bindings.remove(binding.sessionId, binding).also { removed ->
-                if (removed) binding.stopApprovalProjection()
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            synchronized(approvalProjectionLock) {
+                bindings.remove(binding.sessionId, binding).also { removed ->
+                    if (removed) binding.stopApprovalProjection()
+                }
             }
         }
 
@@ -409,11 +428,17 @@ class LocalWorkRunRegistry internal constructor(
 
     internal fun anyLive(): Boolean = bindings.values.any { it.runHandle.hasLiveJob() }
 
-    internal fun mirrorVisible(binding: LocalWorkRunBinding) {
-        if (
-            runtimeStateStore.currentSessionId != binding.sessionId ||
-            runtimeStateStore.state.value.sessionId != binding.sessionId
-        ) return
+    internal fun mirrorVisible(binding: LocalWorkRunBinding) =
+        synchronized(runtimeStateStore.foregroundRunHandle.lock) {
+            // The session ID alone is insufficient: after a binding handover the
+            // old flow collector may still deliver its last queued emission.
+            if (bindings[binding.sessionId] === binding) projectVisibleSnapshot(binding)
+        }
+
+    /** Invoked while holding the foreground ownership lock, including final detach. */
+    private fun projectVisibleSnapshot(binding: LocalWorkRunBinding) {
+        if (runtimeStateStore.currentSessionId != binding.sessionId ||
+            runtimeStateStore.state.value.sessionId != binding.sessionId) return
         runtimeStateStore.projection.projectVisibleWorkRun(
             sessionId = binding.sessionId,
             snapshot = binding.aggregateSnapshot(),

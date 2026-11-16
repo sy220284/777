@@ -35,8 +35,7 @@ internal class LocalWorkStrategyLearning(
     private val auxiliary: LocalAuxiliaryModelRequestRuntime,
     private val usage: DeepSeekUsageTracker,
 ) {
-    suspend fun reflect(bound: LocalWorkRunBinding, sourceRunId: String) {
-        val snapshot = bound.aggregateSnapshot()
+    suspend fun reflect(bound: LocalWorkRunBinding, sourceRunId: String, snapshot: LocalHarnessState) {
         if (snapshot.usageMode != LocalUsageMode.WORK || !snapshot.modelState.configured) return
         val goal = snapshot.work.goal ?: return
         if (goal.status != "completed" || goal.id.isBlank() || goal.startedAtSequence < 0L) return
@@ -107,13 +106,20 @@ internal class LocalWorkStrategyLearning(
 
         // Acquire the existing Session maintenance lease only at commit time; do not hold
         // it across the provider request or block the user's foreground Work.
-        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.tryAcquire(
+        // A paid reflection that already completed must wait for a valid commit
+        // slot instead of discarding its proposal when the user starts another turn.
+        val lease = com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry.acquire(
             expectedSession, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind.MAINTENANCE,
-        ) ?: return
+        )
         try {
-        if (bound.sessionId != expectedSession || bound.workState.snapshot().goal?.id != goal.id ||
-            bound.workState.snapshot().goal?.revision != expectedRevision ||
-            bound.workState.snapshot().goal?.status != "completed") return
+        // The Goal is captured at the actual turn boundary. A later user turn
+        // may change the live binding; only the original durable goal/state
+        // event authorizes a historical proposal commit.
+        if (log.latestMatching(setOf("goal/state")) {
+                it.string("id") == goal.id &&
+                    it.string("revision") == expectedRevision.toString() &&
+                    it.string("status") == "completed"
+            } == null) return
         log.withWriterLease {
             if (log.latestMatching(setOf("work/improvement-candidate")) {
                     it.string("goal_id") == goal.id && it.string("goal_revision") == expectedRevision.toString()

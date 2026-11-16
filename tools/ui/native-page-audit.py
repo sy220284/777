@@ -13,7 +13,7 @@ strings={e.attrib['name']:''.join(e.itertext()) for e in ET.parse('app/src/main/
 visited=[]
 def adb(*args,timeout=60):
  p=subprocess.run(['adb',*args],capture_output=True,timeout=timeout)
- if p.returncode:raise RuntimeError(f'adb {args}: {p.stderr.decode(errors="replace")}')
+ if p.returncode:raise RuntimeError(f'adb {args}: {p.stdout.decode(errors="replace")}\n{p.stderr.decode(errors="replace")}')
  return p.stdout
 
 def tree():
@@ -66,7 +66,7 @@ def home():
 def page(resource,name):
  drawer();tap(strings[resource]);snapshot(name);home()
 
-adb('install','-r',str(apk),timeout=180)
+adb('install','--no-streaming','-r',str(apk),timeout=180)
 package=adb('shell','-n','dumpsys','package',a.package).decode()
 if 'versionName=' not in package:raise RuntimeError('Installed package version could not be verified')
 metadata={'apk_sha256':digest,'package':a.package,'version':re.search(r'versionName=(\S+)',package).group(1),
@@ -74,7 +74,7 @@ metadata={'apk_sha256':digest,'package':a.package,'version':re.search(r'versionN
  'abis':adb('shell','-n','getprop','ro.product.cpu.abilist').decode().strip()}
 (out/'installed.json').write_text(json.dumps(metadata,indent=2))
 adb('shell','-n','pm','grant',a.package,'android.permission.POST_NOTIFICATIONS')
-adb('shell','-n','am','start','-W','-n',a.package+'/com.labteto.dshmobile.MainActivity')
+adb('shell','-n','am','start','-W','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',a.package)
 end=time.monotonic()+45
 while True:
  t=tree()

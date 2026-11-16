@@ -32,6 +32,13 @@ class LocalWorkSkillActivationTest {
     }
 
     @Test
+    fun explicitSkillNameTracksOnlyUserSelectedTurn() {
+        assertEquals("private-notes", explicitLocalSkillName("@skill:private-notes\n审查参考资料"))
+        assertEquals(null, explicitLocalSkillName("继续上一个已完成任务"))
+        assertEquals(null, explicitLocalSkillName("提到了 @skill:private-notes，但未选择"))
+    }
+
+    @Test
     fun explicitOnlySkillRunsWhenPinnedAndMissingPinFailsClearly() {
         val root = Files.createTempDirectory("skill-pin-disabled").toFile()
         try {
@@ -78,6 +85,9 @@ class LocalWorkSkillActivationTest {
             val context = resolveLocalWorkSkillGuidance(workspace, "@skill:writing-polish\n帮我修改这段文字")
             assertTrue(context.contains("[本轮技能已加载：writing-polish]"))
             assertTrue(context.contains("Keep voice and meaning."))
+            assertTrue(context.contains("技能规则版本：sha256:"))
+            assertTrue(context.contains("resource=相对路径"))
+            assertFalse(context.contains("本轮自动加载 references"))
             assertTrue(context.contains("与本轮用户明确要求冲突时以用户要求为准"))
             assertFalse(context.contains("本地技能目录"))
         } finally {

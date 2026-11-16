@@ -193,7 +193,7 @@ class LocalRecursiveSubagentRunnerAndroidTest {
                 executedReads.incrementAndGet()
                 AgentToolResult(evidence.readText())
             },
-            prepareMessages = { messages, _, _, _ -> messages }, resolveImageMode = { mode, _, _ -> mode },
+            prepareMessages = { messages, _, _ -> messages }, resolveImageMode = { mode, _, _ -> mode },
             resourceScheduler = scheduler, runCoordinator = coordinator, compactionPolicy = LocalWorkSubagentCompactionPolicy,
         )
         try {

@@ -58,6 +58,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         streaming: Boolean,
         onDelta: (LocalModelDelta) -> Unit = {},
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
     ): LocalModelReply = withContext(Dispatchers.IO) {
         require(route.bearerToken.isNotBlank()) { "当前模型 API Key 为空" }
         require(route.model.isNotBlank()) { "当前模型名称为空" }
@@ -74,6 +75,7 @@ internal class AnthropicMessagesClient @Inject constructor(
             tools = tools,
             temperature = temperature,
             reasoningEffort = reasoningEffort,
+            maxTokens = maxTokens,
         )
         val wirePayload = payload.toString().toByteArray(Charsets.UTF_8)
         val maxRequestBytes = if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) 64_000_000 else 32_000_000
@@ -90,7 +92,9 @@ internal class AnthropicMessagesClient @Inject constructor(
                     header("x-api-key", route.bearerToken)
                 }
             }
-            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("anthropic-version", if (isOfficialAnthropicCachingRoute(route.baseUrl)) {
+                CLAUDE_API_VERSION
+            } else ANTHROPIC_COMPATIBILITY_VERSION)
             .header("accept", "text/event-stream")
             .header("content-type", "application/json")
             .post(wirePayload.toRequestBody(JSON_MEDIA).withModelAdmissionTracking(admissionTracker))
@@ -167,6 +171,7 @@ internal class AnthropicMessagesClient @Inject constructor(
         tools: List<LocalCanonicalToolDefinition>,
         temperature: Double?,
         reasoningEffort: String? = null,
+        maxTokens: Int? = null,
     ): JsonObject {
         // Keep instruction provenance until wire serialization: Claude caches tools -> system
         // -> messages, so the stable system prefix can be reused across changing turn context.
@@ -181,7 +186,12 @@ internal class AnthropicMessagesClient @Inject constructor(
         val system = systemFragments.joinToString("\n\n") { it.first }
         return buildJsonObject {
             put("model", route.model)
-            put("max_tokens", route.capabilities.defaultMaxOutputTokens ?: DEFAULT_MAX_TOKENS)
+            val outputBudget = maxTokens ?: route.capabilities.defaultMaxOutputTokens ?: DEFAULT_MAX_TOKENS
+            require(outputBudget > 0) { "Anthropic 最大输出 Token 数必须大于零" }
+            if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                require(outputBudget <= 524_288) { "MiniMax M3 输出 Token 数最大为 524288" }
+            }
+            put("max_tokens", outputBudget)
             if (LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
                 LocalMiniMaxPolicy.writeThinking(this, route.model, reasoningEffort, anthropic = true)
             }
@@ -268,7 +278,12 @@ internal class AnthropicMessagesClient @Inject constructor(
                     })
                 }
             })
-            temperature?.takeIf { route.capabilities.temperature }?.let { put("temperature", it) }
+            // Claude 2026-10-21 rejects temperature/top_p/top_k even when set to defaults.
+            // MiniMax ignores temperature, so forwarding it is never useful either.
+            if (!isOfficialAnthropicCachingRoute(route.baseUrl) &&
+                !LocalMiniMaxPolicy.isOfficial(route.baseUrl)) {
+                temperature?.takeIf { route.capabilities.temperature }?.let { put("temperature", it) }
+            }
         }
     }
 
@@ -329,6 +344,36 @@ internal class AnthropicMessagesClient @Inject constructor(
                     add(buildJsonObject {
                         put("type", "text")
                         put("text", block.text)
+                    })
+                }
+                is LocalCanonicalContent.Raw -> {
+                    val type = block.value["type"]?.jsonPrimitive?.contentOrNull
+                    val videoSource = (block.value["video_url"] as? JsonObject)
+                        ?.get("url")?.jsonPrimitive?.contentOrNull
+                    val safeType = type?.take(48)?.takeIf { value ->
+                        value.isNotBlank() && value.all { c -> c.isLetterOrDigit() || c == '_' || c == '-' }
+                    } ?: "unknown"
+                    if (type != "video_url" || videoSource.isNullOrBlank() ||
+                        !LocalMiniMaxPolicy.nativeVideoSupported(route.model, route.baseUrl, route.protocol)) {
+                        throw LocalModelException(
+                            "MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                            "当前 Messages 模型无法接收输入类型 $safeType；请选用支持该附件的模型或通过工作区读取",
+                            false,
+                            origin = LocalModelFailureOrigin.PROTOCOL_ENCODE,
+                        )
+                    }
+                    val source = parseDataVideo(videoSource)
+                    add(buildJsonObject {
+                        put("type", "video")
+                        put("source", buildJsonObject {
+                            if (source.first == "url") {
+                                put("type", "url"); put("url", source.second)
+                            } else {
+                                put("type", "base64")
+                                put("media_type", source.first)
+                                put("data", source.second)
+                            }
+                        })
                     })
                 }
                 is LocalCanonicalContent.Image -> {
@@ -694,6 +739,30 @@ internal class AnthropicMessagesClient @Inject constructor(
         }
     }
 
+    /** MiniMax M3 native Messages video source; the canonical model retains request-only bytes. */
+    private fun parseDataVideo(value: String): Pair<String, String> {
+        if (value.startsWith("https://")) return "url" to value
+        if (value.startsWith("mm_file://") &&
+            value.removePrefix("mm_file://").matches(Regex("[A-Za-z0-9_-]{1,128}"))) {
+            return "url" to value
+        }
+        val split = value.indexOf(";base64,")
+        val mediaType = if (split > 5) value.substring(5, split).lowercase() else ""
+        if (!value.startsWith("data:video/") || split <= 5 ||
+            mediaType !in setOf("video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska")) {
+            throw LocalModelException("MODEL_PROTOCOL_INPUT_UNSUPPORTED",
+                "MiniMax 视频格式必须为 MP4、MOV、AVI、MKV", false,
+                origin = LocalModelFailureOrigin.PROTOCOL_ENCODE)
+        }
+        val data = value.substring(split + 8)
+        val decodedBytes = data.length.toLong() / 4 * 3 -
+            (if (data.endsWith("==")) 2 else if (data.endsWith("=")) 1 else 0)
+        require(data.isNotEmpty() && data.length % 4 == 0 && decodedBytes in 1..44_000_000L) {
+            "MiniMax 视频超过 44 MB 内联请求预算"
+        }
+        return mediaType to data
+    }
+
     private fun parseDataImage(value: String, maxImageBytes: Long): Pair<String, String> {
         if (value.startsWith("https://")) return "url" to value
         val split = value.indexOf(";base64,")
@@ -849,7 +918,8 @@ internal class AnthropicMessagesClient @Inject constructor(
         )
 
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
-        const val ANTHROPIC_VERSION = "2023-06-01"
+        const val CLAUDE_API_VERSION = "2026-10-21"
+        const val ANTHROPIC_COMPATIBILITY_VERSION = "2023-06-01"
         const val DEFAULT_MAX_TOKENS = 8192
         const val CONNECT_TIMEOUT_SECONDS = 20L
         const val READ_TIMEOUT_SECONDS = 300L

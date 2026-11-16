@@ -30,7 +30,7 @@ class SqliteSessionEventDatabase(
     private val json: Json,
     name: String = "local_session_events_v1.db",
     private val clock: () -> Long = System::currentTimeMillis,
-) : SQLiteOpenHelper(context, name, null, 6) {
+) : SQLiteOpenHelper(context, name, null, 7) {
     private val searchBlockIndex = SqliteSessionSearchBlockIndex(json)
     init { setWriteAheadLoggingEnabled(true) }
 
@@ -66,7 +66,7 @@ class SqliteSessionEventDatabase(
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..5 && newVersion == 6) {
+        require(oldVersion in 1..6 && newVersion == 7) {
             "不支持的会话事件数据库版本：$oldVersion -> $newVersion"
         }
         // Idempotent even if an older pilot schema omitted this table.
@@ -95,7 +95,10 @@ class SqliteSessionEventDatabase(
         SqliteAssetEventIndex.createSchema(db)
         searchBlockIndex.createSchema(db)
         createRequestMigrationMarker(db)
-        migrateLegacyRequestMessages(db)
+        // V6 already stores validated request/message-surface deltas with base_surface_seq.
+        // Re-running the V5 full-message migration would reject valid V6 data and
+        // prevent opening the Session database. V7 only adds asset projections.
+        if (oldVersion <= 5) migrateLegacyRequestMessages(db)
     }
 
     /**
@@ -384,6 +387,12 @@ class SqliteSessionEventDatabase(
                         put("payload", payload.toString())
                         put("visible_hint", if (isVisibleTranscriptCandidate(event.type, event.data)) 1 else 0)
                     })
+                    // Legacy sessions may be imported after the ordered historical
+                    // backfill cursor passed their IDs. Index their references
+                    // in this same migration transaction so they cannot be lost.
+                    SqliteAssetEventIndex.indexCommittedMessageAssets(
+                        db, sessionId, event.sequence, event.type, payload,
+                    )
                     expected++
                 }
                 check(expected - 1L == historicalLatest) {

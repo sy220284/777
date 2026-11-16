@@ -36,10 +36,9 @@ internal object LocalToolPolicy {
     /**
      * Model-facing exposure is an explicit policy decision, just like access and approval.
      *
-     * Keep the tools needed for ordinary coding/execution loops permanently visible. Capabilities
-     * that are only useful for a narrower user intent stay registered but are exposed on demand
-     * through task-intent pre-activation or capability_search. This removes repeated schema cost
-     * without removing the capability itself.
+     * The model sees the fixed tool_call/tool_search gateway. CORE/OPTIONAL describes
+     * registered capability metadata (and agent authorization boundaries) only, not
+     * per-turn schema admission or any preloading queue.
      */
     fun exposure(name: String): ToolExposure = when (canonical(name)) {
         "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
@@ -57,7 +56,7 @@ internal object LocalToolPolicy {
         "session_event_trace", "session_event_read", "present", "archive_list", "archive_read", "read_chunk", "write_chunk",
         "file_version", "file_write_if_version" -> ToolExposure.OPTIONAL
         "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect", "list_files",
-        "glob", "grep", "bash", "capability_search", "update_plan", "exit_plan_mode",
+        "glob", "grep", "bash", "tool_call", "tool_search", "update_plan", "exit_plan_mode",
         "ask_user_question", "subagent", "list_subagent_models", "list_agent_roles", "session_event_search" -> ToolExposure.CORE
         else -> error("内置工具尚未声明模型暴露策略：$name")
     }
@@ -116,7 +115,7 @@ internal object LocalToolPolicy {
         "http_request", "media_image_create", "mcp_start_local" -> ToolAccess.PRIVILEGED
         "read", "read_chunk", "file_version", "tool_output_read", "file_inspect", "archive_list", "archive_read", "list_files", "glob", "grep", "job_list", "job_output", "json_query",
         "media_image_options", "media_image_status",
-        "environment_info", "capability_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree", "agent_inspect", "agent_watch",
+        "environment_info", "tool_call", "tool_search", "get_goal", "skill", "extension_inspect", "list_subagent_models", "list_agent_roles", "list_agents", "agent_tree", "agent_inspect", "agent_watch",
         "session_event_search", "session_search", "memory_search", "memory_list",
         "session_trace", "session_event_trace", "session_event_read",
         "team_members", "team_member_status", "team_messages", "team_message_receipt", "team_wait_for_message",
@@ -132,7 +131,7 @@ internal object LocalToolPolicy {
             "bash", "job_list", "job_output", "job_kill" -> "运行时"
             "web_search", "web_fetch", "http_request", "network_diagnose" -> "网络"
             "media_image_options", "media_image_create", "media_image_status" -> "媒体创作"
-            "environment_info", "capability_search" -> "环境"
+            "environment_info", "tool_call", "tool_search" -> "环境"
             "update_plan", "exit_plan_mode", "todo_write", "create_goal", "get_goal", "update_goal",
             "ask_user_question", "work_finding" -> "任务"
             "skill", "skill_create", "skill_update", "skill_rollback" -> "技能"

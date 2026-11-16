@@ -372,16 +372,6 @@ internal class LocalToolCompositionRoot @Inject constructor(
             currentSessionId = runtimeStateStore::currentSessionId,
             planMode = { runtimeStateStore.state.value.work.planMode },
             networkSearchEnabled = networkSearchSettings::isEnabled,
-            pinnedConnectorIds = {
-                pinnedInvocations.current()
-                    .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.CONNECTOR }
-                    .map { it.id }
-            },
-            pinnedSkillIds = {
-                pinnedInvocations.current()
-                    .filter { it.kind == com.labteto.dshmobile.local.tools.LocalPinnedInvocation.Kind.SKILL }
-                    .map { it.id }
-            },
             requestApproval = { call, tool, summary ->
                 approvalRuntime.approve(call, tool, summary)
             },

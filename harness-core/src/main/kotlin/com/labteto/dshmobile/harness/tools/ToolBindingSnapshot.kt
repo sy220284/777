@@ -26,3 +26,11 @@ internal class CodeModeStepScope(
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<CodeModeStepScope>
 }
+
+/** An exact registry binding reached through the first-party tool_call gateway. */
+class DirectToolStepScope(
+    val snapshot: ToolBindingSnapshot,
+    val registration: HarnessTool,
+) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<DirectToolStepScope>
+}

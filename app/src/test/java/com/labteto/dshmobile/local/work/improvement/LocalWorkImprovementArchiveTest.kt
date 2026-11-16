@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work.improvement
 
 import com.labteto.dshmobile.local.files.LocalWorkspace
+import com.labteto.dshmobile.local.files.parseLocalSkillMetadata
 import com.labteto.dshmobile.local.work.LocalGoal
 import com.labteto.dshmobile.local.session.LocalSessionEventLogRegistry
 import java.nio.file.Files
@@ -215,6 +216,63 @@ class LocalWorkImprovementArchiveTest {
     }
 
     @Test
+    fun naturalTrialRequiresTwoDifferentVerifiedGoalsBeforeScopeLimitedAdoption() =
+        withArchive { _, logs, archive ->
+            val source = logs.get("advice-source")
+            source.append("work/improvement-candidate", buildJsonObject {
+                put("id", "trial-evidence-1")
+                put("source_run_id", "baseline-run")
+                put("goal_signature", workGoalComparisonKey(LocalGoal("核验输入",
+                    artifactPaths = listOf("result.md"), verificationCommands = listOf("test"))))
+                put("project_id", "alpha")
+                put("model", "model")
+                put("profile_id", "profile")
+                put("category", "workflow")
+                put("guidance", "检查事实，再调用工具")
+                put("baseline_tool_calls", 6)
+                put("baseline_tool_errors", 0)
+                put("baseline_test_verified", true)
+            })
+            archive.refresh()
+            val first = LocalGoal("核验输入", "active", id = "first",
+                startedAtSequence = 0L, artifactPaths = listOf("result.md"),
+                verificationCommands = listOf("test"))
+            val second = first.copy(id = "second")
+            val third = first.copy(id = "third")
+            val log = logs.get("advice-trials")
+            assertEquals("trial-evidence-1", archive.adviceFor(first, "alpha", "model", "profile")?.id)
+            log.append("work/improvement-trial", buildJsonObject {
+                put("candidate_id", "trial-evidence-1"); put("goal_id", first.id)
+            })
+            // A newly committed trial is authoritative before the asynchronous
+            // human-readable archive has been regenerated.
+            assertEquals(null, archive.adviceFor(second, "alpha", "model", "profile"))
+            archive.refresh()
+            assertEquals(null, archive.adviceFor(second, "alpha", "model", "profile"))
+            log.append("work/improvement-evaluation", buildJsonObject {
+                put("candidate_id", "trial-evidence-1")
+                put("goal_id", first.id)
+                put("disposition", "adoptable")
+                put("comparison", "natural_same_acceptance_observational")
+                put("source_receipt", "real-test-1")
+            })
+            assertEquals(setOf("first"), archive.verifiedNaturalTrialGoalIds("trial-evidence-1"))
+            assertEquals("trial-evidence-1", archive.adviceFor(second,
+                "alpha", "model", "profile")?.id)
+            archive.refresh()
+            assertEquals(setOf("first"), archive.verifiedNaturalTrialGoalIds("trial-evidence-1"))
+            assertEquals("trial-evidence-1", archive.adviceFor(second, "alpha", "model", "profile")?.id)
+            log.append("work/improvement-trial", buildJsonObject {
+                put("candidate_id", "trial-evidence-1"); put("goal_id", second.id)
+            })
+            archive.refresh()
+            assertEquals(null, archive.adviceFor(third, "alpha", "model", "profile"))
+            // A separate observationally successful goal permits promotion by the
+            // evaluator, which still checks an actual test receipt and user scope.
+            assertEquals(setOf("first"), archive.verifiedNaturalTrialGoalIds("trial-evidence-1"))
+        }
+
+    @Test
     fun promotedSkillRemainsAnUninstalledDraftInUserWorkspace() = withArchive { workspace, logs, archive ->
         val log = logs.get("sample")
         log.append("work/improvement-candidate", buildJsonObject {
@@ -237,10 +295,42 @@ class LocalWorkImprovementArchiveTest {
         log.append("work/improvement-adopted", buildJsonObject { put("candidate_id", "sample-proposal") })
         archive.refresh()
         val draft = workspace.readRaw("自我改进/技能草案/sample-proposal.md")
+        val skillFile = workspace.readRaw("自我改进/技能草案/sample-proposal/SKILL.md")
+        val skillName = Regex("""name: (work-method-[a-f0-9]+)""").find(skillFile)!!.groupValues[1]
+        val metadata = parseLocalSkillMetadata(skillName, skillFile)
+        assertFalse(metadata.modelInvocable)
+        assertTrue(skillFile.contains("先构建真实依赖关系"))
         assertTrue(draft.contains("未安装"))
         assertTrue(draft.contains("先构建真实依赖关系"))
         assertTrue(workspace.skills().isEmpty())
     }
+
+    @Test
+    fun untrustedCandidateIdCannotTraverseTheWorkspaceThroughDraftPath() =
+        withArchive { workspace, logs, archive ->
+            val source = logs.get("untrusted-proposal")
+            source.append("work/improvement-candidate", buildJsonObject {
+                put("id", "../../user-private")
+                put("category", "skill")
+                put("goal_signature", "same-acceptance")
+                put("project_id", "alpha")
+                put("model", "model")
+                put("profile_id", "profile")
+                put("guidance", "核对输入并记录结果")
+                put("baseline_tool_calls", 2)
+                put("baseline_tool_errors", 0)
+                put("baseline_test_verified", true)
+            })
+            source.append("work/improvement-adopted", buildJsonObject {
+                put("candidate_id", "../../user-private")
+            })
+            archive.refresh()
+            val draftFiles = workspace.files().map { it.path }
+            assertFalse(draftFiles.any { it.endsWith("user-private.md") })
+            assertFalse(java.io.File(workspace.path, "自我改进/user-private.md").exists())
+            assertTrue(java.io.File(workspace.path, "自我改进/技能草案").listFiles()
+                .orEmpty().any { it.name.startsWith("candidate-") })
+        }
 
     @Test
     fun goalAcceptanceFingerprintRequiresTheExactSameTestContract() {

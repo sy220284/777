@@ -28,14 +28,14 @@ internal object LocalReasoningRequestPolicy {
             .getOrNull()?.lowercase() ?: return null
         val model = profile.model.trim().lowercase()
         if (profile.authKind == LocalModelAuthKind.API_KEY && host == "api.deepseek.com" &&
-            profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
+            profile.protocol in setOf(LocalModelProtocol.CHAT_COMPLETIONS, LocalModelProtocol.RESPONSES) &&
             model in setOf("deepseek-flash", "deepseek-v4-pro")
         ) return LocalReasoningSelection("high", "none", "low", "max")
         if (profile.authKind == LocalModelAuthKind.API_KEY && LocalMiniMaxPolicy.isOfficial(profile.baseUrl) &&
             profile.protocol in setOf(LocalModelProtocol.CHAT_COMPLETIONS, LocalModelProtocol.ANTHROPIC_MESSAGES)
         ) return LocalMiniMaxPolicy.selection(model)
         if (profile.authKind == LocalModelAuthKind.API_KEY &&
-            profile.protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
+            profile.protocol in setOf(LocalModelProtocol.CHAT_COMPLETIONS, LocalModelProtocol.RESPONSES) &&
             LocalKimiPolicy.isOfficial(profile.baseUrl)
         ) return LocalKimiPolicy.selection(model)
         if (host != "api.openai.com") return null

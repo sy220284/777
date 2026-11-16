@@ -21,7 +21,10 @@ import com.labteto.dshmobile.local.tools.LocalArchiveReader
 import com.labteto.dshmobile.local.tools.LocalFileInspector
 import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
-import com.labteto.dshmobile.local.tools.toolCapabilityTarget
+import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
+import com.labteto.dshmobile.local.tools.LocalToolRouter
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
+import com.labteto.dshmobile.harness.tools.ToolExposure
 import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +44,7 @@ import com.labteto.dshmobile.local.work.LocalWorkRunBinding
 import com.labteto.dshmobile.local.work.LocalWorkRunRegistry
 import com.labteto.dshmobile.local.work.toEnvironmentRunSnapshot
 import com.labteto.dshmobile.local.work.validateWorkspacePatchPaths
+import com.labteto.dshmobile.local.work.normalizeWorkspacePatch
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Provider
@@ -111,11 +115,39 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         )
     }
 
-    private fun readAuthorizedSkill(name: String): String =
-        if (pinnedInvocations.current().any {
-                it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
-            }) workspace.readSkill(name)
-        else workspace.readModelSkill(name)
+
+    private fun isPinnedSkill(name: String) = pinnedInvocations.current().any {
+        it.kind == LocalPinnedInvocation.Kind.SKILL && it.id == name
+    }
+
+    private fun isUserSelectedSkill(name: String, sessionId: String?): Boolean =
+        isPinnedSkill(name) ||
+            (sessionId != null && workRuns[sessionId]?.explicitlySelectedSkill == name)
+
+    private fun readAuthorizedSkill(name: String, sessionId: String?): String {
+        val rules = if (isUserSelectedSkill(name, sessionId)) workspace.readSkillSnapshot(name)
+            else workspace.readModelSkillSnapshot(name)
+        return "[技能主规则：$name；版本=${rules.revision}]\n" +
+            "专项资料调用 skill(name=$name,resource=references/文件.md,revision=${rules.revision}) 按需读取。\n" +
+            rules.text
+    }
+
+    private fun skillRequest(name: String, args: kotlinx.serialization.json.JsonObject, sessionId: String?): String {
+        val resource = args.optionalString("resource")?.takeIf(String::isNotBlank)
+        val referenceQuery = args.optionalString("reference_query")?.takeIf(String::isNotBlank)
+        if (resource == null && referenceQuery == null) return readAuthorizedSkill(name, sessionId)
+        require(isUserSelectedSkill(name, sessionId) || workspace.skillMetadata(name).modelInvocable) {
+            "SKILL_USER_ONLY：此技能仅支持用户主动调用"
+        }
+        val revision = args.optionalString("revision").orEmpty()
+        return if (resource != null) workspace.readSkillResource(
+            name, resource, revision,
+            args.int("start_line", 1), args.int("end_line", args.int("start_line", 1) + 199),
+        ) else workspace.searchSkillReferences(
+            name, requireNotNull(referenceQuery), revision,
+            args.optionalString("cursor"),
+        )
+    }
 
     internal suspend fun executeResult(call: LocalToolCall, allowMutation: Boolean, executionSessionId: String?): com.labteto.dshmobile.harness.tools.ToolResult {
         val workspace = executionLocalWorkspace(this.workspace)
@@ -272,8 +304,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
             }
             "apply_patch" -> {
                 if (!allowMutation) return "该子任务处于只读模式"
-                val patch = args.string("patch")
-                require(patch.length <= MAX_PATCH_CHARS) { "补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
+                val requestedPatch = args.string("patch")
+                require(requestedPatch.length <= MAX_PATCH_CHARS) { "补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
+                val patch = normalizeWorkspacePatch(requestedPatch, File(workspace.path))
+                require(patch.length <= MAX_PATCH_CHARS) { "转换后的补丁超过 ${MAX_PATCH_CHARS} 字符上限" }
                 validateWorkspacePatchPaths(patch)
                 val check = root.process.execute(
                     ProcessRequest(
@@ -418,13 +452,40 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                     runtimeStateStore.historyBudgetFor(binding.aggregateSnapshot()).maxHistoryChars,
                 ),
             )
-            "capability_search" -> {
-                val target = toolCapabilityTarget(currentCoroutineContext(), binding?.enabledOptionalTools)
-                if (target == null) {
-                    root.execution.searchCapabilities(args.string("query"))
-                } else {
-                    root.execution.searchCapabilities(args.string("query"), target)
-                }
+            "tool_search" -> {
+                val query = args.string("query").trim()
+                require(query.isNotEmpty()) { "请输入工具名称或功能关键词" }
+                val scope = currentCoroutineContext()[LocalSubagentExecutionScope]
+                val available = root.registry.names().mapNotNull(root.registry::get)
+                    .filter { it.exposure != ToolExposure.INTERNAL &&
+                        it.name !in setOf("tool_call", "tool_search") }
+                    .filter { tool ->
+                        scope == null || scope.canDiscover(tool)
+                    }
+                    .filter { tool ->
+                        !state.work.planMode ||
+                            LocalToolPolicy.allowedInPlan(tool.name, tool.access) ||
+                            tool.name == "code_mode_run"
+                    }
+                    .filter { tool -> root.execution.isNetworkSearchPermitted(tool.name) }
+                val inventory = LocalToolRouter.isInventoryRequest(query)
+                val exact = available.firstOrNull { it.name.equals(query, ignoreCase = true) }
+                val found = if (exact != null) listOf(exact)
+                    else if (inventory) available.sortedBy { it.name }
+                    else LocalToolRouter.search(available, query, limit = 12, includeCore = true)
+                buildJsonObject {
+                    put("total_registered", available.size)
+                    put("matched", found.size)
+                    put("tools", kotlinx.serialization.json.JsonArray(found.map { tool ->
+                        buildJsonObject {
+                            put("name", tool.name)
+                            put("family", tool.metadata.family)
+                            put("access", tool.access.name.lowercase())
+                            if (!inventory) put("schema", tool.schema)
+                        }
+                    }))
+                    put("instruction", "使用 tool_call(name, arguments) 直接调用；每次独立校验实际参数、连接与审批。")
+                }.toString()
             }
             "skill_create" -> {
                 require(allowMutation) { "当前子任务没有写入技能的权限" }
@@ -474,10 +535,10 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                 args.string("kind"), args.string("id"),
                 root.registry.names().toSet(), root.plugins.installedPluginIds().toSet(),
             )
-            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let(::readAuthorizedSkill)
+            "skill" -> args.optionalString("name")?.takeIf(String::isNotBlank)?.let { skillRequest(it, args, boundSessionId) }
                 ?: workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
             "list_skills" -> workspace.modelSkillCatalog(offset = args.int("offset", 0), query = args.optionalString("query").orEmpty())
-            "read_skill" -> readAuthorizedSkill(args.string("name"))
+            "read_skill" -> skillRequest(args.string("name"), args, boundSessionId)
             "session_search" -> sessionAccess.search(
                 args.string("query"), boundSessionId, args.optionalString("cursor"),
             )

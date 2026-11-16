@@ -1,7 +1,11 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.DeepSeekClient
+import com.labteto.dshmobile.local.LocalModelException
 import kotlinx.coroutines.runBlocking
+import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import java.io.File
+import java.nio.file.Files
 import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,6 +20,61 @@ class LocalMiniMaxCompatibilityTest {
         LocalResolvedModelRoute("mm", "MiniMax", model, base, LocalModelAuthKind.API_KEY,
             LocalModelProtocol.ANTHROPIC_MESSAGES, "test", LocalModelPresets.runtimeCapabilitiesFor(model, base))
 
+    @Test fun miniMaxVideoUsesNativeMessagesVideoSourceAndNeverLeaksIntoDurableHistory() = runBlocking {
+        val root = Files.createTempDirectory("minimax-native-video").toFile()
+        try {
+            val bytes = byteArrayOf(0, 1, 2, 3, 4, 5)
+            File(root, "clip.mp4").writeBytes(bytes)
+            val durable = buildLocalUserModelMessage("分析录像", listOf(
+                LocalImportedAttachment("clip.mp4", "clip.mp4", "video/mp4", bytes.size.toLong())
+            ))
+            val model = "MiniMax-M3.1-Flash"
+            val base = "https://api.minimaxi.com/anthropic/v1"
+            assertFalse(durable.toString().contains("base64"))
+            val prepared = prepareLocalMultimodalMessages(
+                messages = listOf(durable), workspaceRoot = root,
+                mode = LocalImageInputMode.NATIVE, model = model, baseUrl = base,
+                profile = LocalModelProfile("mm-video", model, base,
+                    protocol = LocalModelProtocol.ANTHROPIC_MESSAGES),
+            )
+            val raw = prepared.single()["content"]!!.jsonArray.last().jsonObject
+            assertEquals("video_url", raw["type"]!!.jsonPrimitive.content)
+            // Verify the real gateway preflight retains the active video content block.
+            val preparedRoute = route(model, base)
+            val gatewayRequest = prepareLocalModelAdapterRequest(
+                route = preparedRoute, messages = prepared, tools = JsonArray(emptyList()),
+                temperature = null, streaming = true,
+            )
+            assertTrue(gatewayRequest.request.messages.single().content.any {
+                it is LocalCanonicalContent.Raw
+            })
+            val encoded = AnthropicMessagesClient(OkHttpClient(), json).buildPayload(
+                preparedRoute, gatewayRequest.request.messages, emptyList(), null
+            )
+            val native = encoded["messages"]!!.jsonArray.single().jsonObject
+                .getValue("content").jsonArray.last().jsonObject
+            assertEquals("video", native["type"]!!.jsonPrimitive.content)
+            val source = native["source"]!!.jsonObject
+            assertEquals("base64", source["type"]!!.jsonPrimitive.content)
+            assertEquals("video/mp4", source["media_type"]!!.jsonPrimitive.content)
+            assertEquals(java.util.Base64.getEncoder().encodeToString(bytes),
+                source["data"]!!.jsonPrimitive.content)
+            assertEquals(true, LocalModelCapability.VIDEO in
+                LocalModelPresets.clientCapabilitiesFor(model, base))
+            assertFalse(LocalModelCapability.VIDEO in LocalModelPresets.clientCapabilitiesFor(
+                model, "https://api.minimaxi.com/v1", LocalModelProtocol.CHAT_COMPLETIONS
+            ))
+            val other = route(model, base).copy(baseUrl = "https://api.anthropic.com/v1")
+            val denied = runCatching {
+                AnthropicMessagesClient(OkHttpClient(), json).buildPayload(
+                    other, LocalCanonicalModelCodec.messages(prepared), emptyList(), null)
+            }.exceptionOrNull()
+            assertEquals("MODEL_PROTOCOL_INPUT_UNSUPPORTED", (denied as LocalModelException).code)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun officialRegionalRoutesShareCapabilitiesWithoutTrustingProxies() {
         for (host in listOf("api.minimax.io", "api.minimax.cn", "api.minimaxi.com")) {
             for (path in listOf("/v1", "/anthropic/v1")) {
@@ -25,11 +84,43 @@ class LocalMiniMaxCompatibilityTest {
                 assertEquals(true, LocalModelPresets.documentedImageInputSupport("MiniMax-M3.1-Flash", base))
                 assertEquals(204_800, LocalModelPresets.find("MiniMax-M2.5", base)?.contextWindowTokens)
                 assertEquals(false, LocalModelPresets.documentedImageInputSupport("MiniMax-M2.7", base))
+                for (legacy in listOf("MiniMax-M2.7", "MiniMax-M2.7-highspeed")) {
+                    val retained = requireNotNull(LocalModelPresets.find(legacy, base))
+                    assertEquals(base, retained.baseUrl)
+                    assertEquals(LocalModelProtocol.CHAT_COMPLETIONS, retained.protocol)
+                    assertEquals(204_800, retained.contextWindowTokens)
+                }
                 assertEquals(10_000_000L, LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", base))
             }
         }
         assertNull(LocalModelPresets.find("MiniMax-M3", "https://proxy.example/v1"))
         assertFalse(LocalMiniMaxPolicy.isOfficial("https://api.minimax.io.evil.example/v1"))
+    }
+
+    @Test fun miniMaxOfficialAddressRequiresHttpsKnownPathAndNoRedirectLikeSuffix() {
+        for (base in listOf(
+            "https://api.minimaxi.com/v1",
+            "https://api.minimaxi.com/anthropic/v1",
+            "https://api.minimax.cn/anthropic/v1",
+            "https://api.minimaxi.com/v1/chat/completions",
+        )) {
+            assertTrue(base, LocalMiniMaxPolicy.isOfficial(base))
+        }
+        for (base in listOf(
+            "http://api.minimaxi.com/v1",
+            "https://api.minimaxi.com.evil.example/v1",
+            "https://api.minimaxi.com:8443/v1",
+            "https://user:password@api.minimaxi.com/v1",
+            "https://api.minimaxi.com/v1?token=secret",
+            "https://api.minimaxi.com/v1#anything",
+            "https://api.minimaxi.com/redirect",
+            "https://api.minimaxi.com/anthropic/v1/other",
+        )) {
+            assertFalse(base, LocalMiniMaxPolicy.isOfficial(base))
+            assertFalse(base, LocalMiniMaxPolicy.nativeVideoSupported(
+                "MiniMax-M3", base, LocalModelProtocol.ANTHROPIC_MESSAGES,
+            ))
+        }
     }
 
     @Test fun miniMaxM3UsesNativeAnthropicProtocolWithoutIgnoredTemperature() {
@@ -64,6 +155,7 @@ class LocalMiniMaxCompatibilityTest {
         val miniMax = route("MiniMax-M3.1-Flash", "https://api.minimaxi.com/anthropic/v1")
         runCatching { client.complete(miniMax, emptyList(), emptyList(), null, streaming = true) }
         assertEquals("Bearer test", captured.single().header("Authorization"))
+        assertEquals("2023-06-01", captured.single().header("anthropic-version"))
         assertNull(captured.single().header("x-api-key"))
         captured.clear()
 
@@ -74,7 +166,28 @@ class LocalMiniMaxCompatibilityTest {
         )
         runCatching { client.complete(claude, emptyList(), emptyList(), null, streaming = true) }
         assertEquals("test", captured.single().header("x-api-key"))
+        assertEquals("2026-10-21", captured.single().header("anthropic-version"))
         assertNull(captured.single().header("Authorization"))
+    }
+
+    @Test fun messagesBudgetForMiniMaxAndClaudeIsPassedWithoutUnsupportedSampling() {
+        val client = AnthropicMessagesClient(OkHttpClient(), json)
+        val mm = client.buildPayload(route(), emptyList(), emptyList(), 0.2,
+            maxTokens = 131_072)
+        assertEquals(131_072, mm["max_tokens"]!!.jsonPrimitive.int)
+        assertFalse("temperature" in mm)
+        assertEquals(65_536, client.buildPayload(route(), emptyList(), emptyList(), null)
+            ["max_tokens"]!!.jsonPrimitive.int)
+        assertThrows(IllegalArgumentException::class.java) {
+            client.buildPayload(route(), emptyList(), emptyList(), null, maxTokens = 524_289)
+        }
+        val claude = client.buildPayload(
+            route("claude-sonnet-5-5", "https://api.anthropic.com/v1"),
+            emptyList(), emptyList(), temperature = 0.3, maxTokens = 4096)
+        assertFalse("temperature" in claude)
+        assertEquals(4096, claude["max_tokens"]!!.jsonPrimitive.int)
+        assertEquals(LocalModelProtocol.ANTHROPIC_MESSAGES,
+            LocalModelPresets.protocolFor("MiniMax-M3", "https://api.minimaxi.com/anthropic/v1"))
     }
 
     @Test fun nativeMiniMaxStreamKeepsThinkingReplyToolAndSameRouteReplay() = runBlocking {

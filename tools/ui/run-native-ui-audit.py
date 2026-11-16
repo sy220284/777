@@ -8,7 +8,9 @@ OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
 CLASSES=[
  'com.shenyan.designsystem.components.MobileActionReadabilityTest',
  'com.labteto.dshmobile.ui.screens.local.WorkspaceBrowseLayoutTest',
+ 'com.labteto.dshmobile.ui.screens.local.LocalWorkspaceShareSelectionUiTest',
  'com.labteto.dshmobile.ui.audit.SettingsPageAuditTest',
+ 'com.labteto.dshmobile.ui.audit.MainPagesAuditTourTest',
  'com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest',
@@ -52,11 +54,11 @@ def export_components():
  return checked(['adb','pull','/sdcard/Android/data/com.sy220284.dshmobile.debug/files/ui-audit/.',str(OUT/'components')])
 phase('export-native-component-images',export_components)
 
-release=OUT/'777.394.apk'
+release=OUT/'777.397.apk'
 def baseline():
- url='https://github.com/sy220284/777/releases/download/v0.12.0-777.394/app-release.apk'
+ url='https://github.com/sy220284/777/releases/download/v0.12.0-777.397/app-release.apk'
  urllib.request.urlretrieve(url,release)
- digest='1383c41f03e20eef38d4b3369c21f7cae0740822a3b06ccde80547cadc06e734'
+ digest='f0b7ae6bb74fce0978582057cd342608cde45a2eba07f5703bbd0a30aac28555'
  if hashlib.sha256(release.read_bytes()).hexdigest()!=digest:raise RuntimeError('Official release checksum mismatch')
  try:
   return checked(['python3','tools/ui/native-page-audit.py','--apk',str(release),'--package','com.sy220284.dshmobile','--expected-sha256',digest,'--output',str(OUT/'baseline')],timeout=420)

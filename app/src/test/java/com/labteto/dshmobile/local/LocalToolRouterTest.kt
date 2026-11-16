@@ -282,11 +282,13 @@ class LocalToolRouterTest {
     }
 
     @Test
-    fun deferredBuiltInsCutBaseSchemaCostWhileKeepingCoreExecutionSurface() {
-        val tools = LocalToolCatalog.specs.map { schemaElement ->
-            val schema = schemaElement.jsonObject
-            val name = schema["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
-            HarnessTool(
+    fun fixedGatewayAvoidsPublishingBuiltinSchemasToModel() {
+        val registry = com.labteto.dshmobile.harness.tools.ToolRegistry()
+        for (name in listOf("tool_search", "tool_call", "read", "bash")) {
+            val schema = LocalToolCatalog.specs.first {
+                it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == name
+            }.jsonObject
+            registry.register(HarnessTool(
                 name = name,
                 schema = schema,
                 access = LocalToolPolicy.access(name),
@@ -294,27 +296,27 @@ class LocalToolRouterTest {
                 exposure = LocalToolPolicy.exposure(name),
                 metadata = LocalToolPolicy.metadata(name),
                 executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
-            )
+            ))
         }
-        val fullTokens = tools.sumOf { tool -> estimateModelTokens(tool.schema.toString()) }
-        val coreSchemas = LocalToolRouter.visibleSchemas(tools, emptySet())
-        val coreTokens = coreSchemas.sumOf { schema -> estimateModelTokens(schema.toString()) }
-        val coreNames = names(coreSchemas)
-
-        assertTrue(coreTokens * 100 <= fullTokens * 55)
-        assertTrue(coreNames.size <= 18)
-        assertTrue(coreTokens <= 4_500)
-        assertTrue("read" in coreNames)
-        assertTrue("bash" in coreNames)
-        assertTrue("subagent" in coreNames)
-        assertTrue("list_subagent_models" in coreNames)
-        assertTrue("session_event_search" in coreNames)
-        assertTrue("workflow" !in coreNames)
-        assertTrue("environment_info" !in coreNames)
-        assertTrue("memory_search" !in coreNames)
-        assertTrue("web_search" !in coreNames)
-        assertTrue("memory_update" !in coreNames)
-        assertEquals(LocalToolCatalog.specs.size, tools.size)
+        val projection = com.labteto.dshmobile.local.tools.LocalToolSchemaProjection(
+            registry,
+            com.labteto.dshmobile.local.LocalToolExecutionCoordinator(
+                registry, currentSessionId = { "test" }, planMode = { false },
+                requestApproval = { _, _, _ -> true },
+            )
+        )
+        val modelSchemas = projection.modelSchemas(
+            policy = com.labteto.dshmobile.local.agent.localAgentRunPolicy(
+                com.labteto.dshmobile.local.LocalUsageMode.WORK),
+            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
+            planModeEnabled = false, history = emptyList(),
+        )
+        assertEquals(listOf("tool_search", "tool_call"), projection.names(modelSchemas))
+        val fullCost = LocalToolCatalog.specs.sumOf {
+            estimateModelTokens(it.toString())
+        }
+        val fixedCost = modelSchemas.sumOf { estimateModelTokens(it.toString()) }
+        assertTrue(fixedCost * 100 < fullCost * 10)
     }
 
     @Test

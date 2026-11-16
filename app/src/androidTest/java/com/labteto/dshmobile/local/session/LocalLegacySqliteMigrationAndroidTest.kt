@@ -3,6 +3,9 @@ package com.labteto.dshmobile.local.session
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.harness.session.VersionedSessionStore
+import com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalog
+import com.labteto.dshmobile.local.model.LOCAL_IMAGE_REF
+import kotlinx.serialization.json.buildJsonArray
 import java.io.File
 import java.util.UUID
 import kotlinx.serialization.json.Json
@@ -16,6 +19,40 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LocalLegacySqliteMigrationAndroidTest {
+    @Test fun lateImportedLegacyImagesKeepUnresolvedReferencesAcrossHistoricalCursor() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val key = UUID.randomUUID().toString().replace("-", "")
+        val eventDb = "legacy-pending-$key.db"
+        val file = File(ctx.cacheDir, "legacy-image-$key.jsonl")
+        val hash = "d".repeat(64)
+        try {
+            SqliteSessionEventDatabase(ctx, Json, eventDb).use { events ->
+                val catalog = SqliteLocalAssetCatalog(events)
+                // Simulate a background backfill that already scanned all old rows.
+                assertEquals(0, catalog.reconcileCommittedEvents())
+                val legacy = LocalSessionEventLog(file, Json)
+                try {
+                    legacy.append("assistant/message", buildJsonObject {
+                        put("content", buildJsonArray {
+                            add(buildJsonObject {
+                                put("type", LOCAL_IMAGE_REF)
+                                put("attachmentId", hash)
+                            })
+                        })
+                    })
+                    events.importLegacyEvents("a-older-session", legacy)
+                    assertEquals(1L, catalog.pendingReferenceCount(hash))
+                    assertEquals(0, catalog.reconcileCommittedEvents())
+                } finally { legacy.close() }
+                events.clearSession("a-older-session")
+                assertEquals(0L, catalog.pendingReferenceCount(hash))
+            }
+        } finally {
+            ctx.deleteDatabase(eventDb)
+            file.delete()
+        }
+    }
+
     @Test fun existingJsonAndJsonlRemainVisibleAndMigrationIsIdempotent() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val key = UUID.randomUUID().toString().replace("-", "")

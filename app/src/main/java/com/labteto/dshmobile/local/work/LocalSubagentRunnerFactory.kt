@@ -176,7 +176,9 @@ internal class LocalSubagentRunnerFactory(
         schemas = schemasProvider,
         execute = executeTool,
         spillToolOutput = { callId, output -> toolOutputStore.store(toolOutputSessionId(), callId, output) != null },
-        prepareMessages = { messages, mode, baseUrl, model ->
+        prepareMessages = { messages, mode, profile ->
+            val model = profile.model
+            val baseUrl = profile.baseUrl
             prepareLocalMultimodalMessages(
                 messages = messages,
                 // Attachment references belong to the shared attachment importer, including
@@ -187,10 +189,8 @@ internal class LocalSubagentRunnerFactory(
                 maxImageBytes = LocalModelPresets.maxNativeImageBytesFor(model, baseUrl),
                 model = model,
                 baseUrl = baseUrl,
-                planSharing = runnerState.value.modelState.modelSelection.activeProfile?.let {
-                    it.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN &&
-                        it.model == model && it.baseUrl.trimEnd('/') == baseUrl.trimEnd('/')
-                } == true,
+                planSharing = profile.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.CHATGPT_PLAN,
+                profile = profile,
                 resourceScheduler = resourceScheduler,
             )
         },

@@ -447,7 +447,7 @@ class LspPlugin(
         /**
          * Use per-operation intent. The former shared "代码/定义/引用/诊断"
          * keywords activated every semantic tool for a single ordinary code request.
-         * capability_search still indexes the LSP family and tool descriptions.
+         * tool_search still indexes the live LSP family and tool descriptions.
          */
         private fun discoveryKeywordsFor(name: String): Set<String> = when (name) {
             "lsp_status" -> setOf("语言服务器状态", "代码智能状态", "lsp状态", "lsp_status")

@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +37,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -209,48 +213,71 @@ fun SySegmentedControl(
     val p = LocalSyColors.current
     val reduceMotion = LocalSyReduceMotion.current
     val shape = RoundedCornerShape(SyMetric.radiusControl)
-    Row(
-        modifier = modifier.selectableGroup()
-            .then(if (stretch) Modifier else Modifier.horizontalScroll(rememberScrollState()))
-            .clip(shape).background(syMaterialColor(SyMaterialTier.L2_BAR))
-            .border(1.dp, p.border, shape).padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        segments.forEach { option ->
-            val selected = option.id == selectedId
-            val background by animateColorAsState(
-                if (selected) p.selected else Color.Transparent,
-                animationSpec = tween(if (reduceMotion) 0 else SyMotion.selectMs),
-                label = "sySegment",
-            )
-            val itemModifier = if (stretch) Modifier.weight(1f) else Modifier
-            Column(
-                modifier = itemModifier.heightIn(min = SyMetric.touch)
-                    .clip(shape).background(background)
-                    .selectable(
-                        selected = selected,
-                        enabled = enabled && option.enabled,
-                        role = role,
-                        onClick = { onSelect(option.id) },
-                    )
-                    .padding(horizontal = if (stretch) 7.dp else 14.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    option.label,
-                    color = when {
-                        !enabled || !option.enabled -> p.textTertiary
-                        selected -> p.text
-                        else -> p.textSecondary
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    textAlign = TextAlign.Center,
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val labelStyle = MaterialTheme.typography.labelMedium
+    val widths = segments.map { option ->
+        with(density) { measurer.measure(option.label, style = labelStyle, softWrap = false).size.width.toDp() }
+    }
+    val scroll = rememberScrollState()
+    BoxWithConstraints(modifier.selectableGroup()) {
+        // Equal tracks are useful only when every complete label fits. Otherwise retain
+        // the natural reading direction and let the single choice track scroll.
+        val equalTracks = stretch &&
+            ((widths.maxOrNull() ?: 0.dp) + 14.dp) * segments.size +
+                2.dp * (segments.size - 1).coerceAtLeast(0) + 4.dp <= maxWidth
+        val naturalWidths = widths.map { (it + 28.dp).coerceAtLeast(SyMetric.touch) }
+        val selectedIndex = segments.indexOfFirst { it.id == selectedId }
+        LaunchedEffect(selectedId, maxWidth, density.fontScale, equalTracks, naturalWidths) {
+            if (!equalTracks && selectedIndex >= 0) {
+                val left = naturalWidths.take(selectedIndex).fold(0.dp) { total, width -> total + width + 2.dp }
+                val target = (left - (maxWidth - naturalWidths[selectedIndex]) / 2).coerceAtLeast(0.dp)
+                scroll.scrollTo(with(density) { target.roundToPx() })
+            }
+        }
+        Row(
+            modifier = Modifier.then(if (equalTracks) Modifier.fillMaxWidth() else Modifier.horizontalScroll(scroll))
+                .clip(shape).background(syMaterialColor(SyMaterialTier.L2_BAR))
+                .border(1.dp, p.border, shape).padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            segments.forEachIndexed { index, option ->
+                val selected = option.id == selectedId
+                val background by animateColorAsState(
+                    if (selected) p.selected else Color.Transparent,
+                    animationSpec = tween(if (reduceMotion) 0 else SyMotion.selectMs),
+                    label = "sySegment",
                 )
-                if (role == Role.Tab) {
-                    Spacer(Modifier.height(3.dp))
-                    Spacer(Modifier.width(if (selected) 18.dp else 0.dp).height(2.dp)
-                        .background(p.primary, shape))
+                val itemModifier = if (equalTracks) Modifier.weight(1f) else Modifier.width(naturalWidths[index])
+                Column(
+                    modifier = itemModifier.heightIn(min = SyMetric.touch)
+                        .clip(shape).background(background)
+                        .selectable(
+                            selected = selected,
+                            enabled = enabled && option.enabled,
+                            role = role,
+                            onClick = { onSelect(option.id) },
+                        )
+                        .padding(horizontal = if (equalTracks) 7.dp else 14.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        option.label,
+                        color = when {
+                            !enabled || !option.enabled -> p.textTertiary
+                            selected -> p.text
+                            else -> p.textSecondary
+                        },
+                        style = labelStyle,
+                        softWrap = false,
+                        textAlign = TextAlign.Center,
+                    )
+                    if (role == Role.Tab) {
+                        Spacer(Modifier.height(3.dp))
+                        Spacer(Modifier.width(if (selected) 18.dp else 0.dp).height(2.dp)
+                            .background(p.primary, shape))
+                    }
                 }
             }
         }

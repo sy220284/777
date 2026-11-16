@@ -2,6 +2,12 @@ package com.labteto.dshmobile.local.attachment
 
 import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.security.MessageDigest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import com.labteto.dshmobile.local.session.SqliteSessionConsistencyGate
 import com.labteto.dshmobile.local.session.SqliteSessionEventDatabase
 import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
@@ -16,8 +22,9 @@ import kotlinx.serialization.json.contentOrNull
  * Incrementally populated local asset metadata catalog, stored IN the authoritative
  * event database so existing WAL backups also copy these tables.
  *
- * Until old/generated assets are backfilled and all mutation paths emit reference
- * updates, this catalog must NEVER be used as the sole authority for physical GC.
+ * Unresolved references are retained separately until their original file bytes
+ * have been verified. The directory is not a physical GC authority until ALL
+ * historical/live references and mutation paths have been reconciled.
  */
 internal class SqliteLocalAssetCatalog(
     private val events: SqliteSessionEventDatabase,
@@ -79,9 +86,25 @@ internal class SqliteLocalAssetCatalog(
                     check(rows.moveToFirst()) { "附件路径登记失败" }
                     Triple(rows.getString(0), rows.getLong(1), rows.getString(2))
                 }
-                check(registered == Triple(id, imported.bytes, imported.mediaType)) {
-                    "附件路径登记与原记录冲突"
+                check(registered.first == id && registered.second == imported.bytes) {
+                    "附件路径登记与内容哈希冲突"
                 }
+                if (registered.third != imported.mediaType) {
+                    // A recovered file's MIME was guessed from its extension.
+                    // The later actual importer can refine the presentation
+                    // metadata without changing the content-addressed identity.
+                    check(db.update("local_asset_locations", ContentValues().apply {
+                        put("media_type", imported.mediaType)
+                    }, "relative_path=? AND asset_id=?",
+                        arrayOf(imported.relativePath, id)) == 1) {
+                        "附件真实媒体类型更新失败"
+                    }
+                    db.update("local_assets", ContentValues().apply {
+                        put("media_type", imported.mediaType)
+                    }, "asset_id=? AND relative_path=?",
+                        arrayOf(id, imported.relativePath))
+                }
+                SqliteAssetEventIndex.promotePendingReferences(db, id)
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
@@ -135,6 +158,132 @@ internal class SqliteLocalAssetCatalog(
         ).use { rows ->
             buildList { while (rows.moveToNext()) add(rows.getString(0)) }
         }
+    }
+
+    fun pendingReferenceCount(assetId: String): Long {
+        require(SHA256.matches(assetId))
+        return events.readableDatabase.rawQuery(
+            "SELECT COUNT(*) FROM local_asset_pending_references WHERE asset_id=?",
+            arrayOf(assetId),
+        ).use { rows -> if (rows.moveToFirst()) rows.getLong(0) else 0L }
+    }
+
+    /**
+     * Replay a bounded ordered page of original, committed events. This runs under
+     * the Session mutation gate, writes references and the cursor in ONE transaction,
+     * and resumes after process death without replaying any external tools.
+     */
+    fun reconcileCommittedEvents(limit: Int = 128): Int {
+        require(limit in 1..512)
+        val guard = SqliteSessionConsistencyGate.acquireMutation()
+        try {
+            val db = events.writableDatabase
+            db.beginTransactionNonExclusive()
+            try {
+                val progress = db.rawQuery(
+                    "SELECT last_session,last_sequence FROM local_asset_backfill_progress WHERE id=1", null,
+                ).use { rows ->
+                    check(rows.moveToFirst()) { "资源回填游标丢失" }
+                    rows.getString(0) to rows.getLong(1)
+                }
+                var session = progress.first
+                var sequence = progress.second
+                var count = 0
+                db.rawQuery(
+                    "SELECT session_id,sequence,event_type,payload FROM session_events " +
+                        "WHERE session_id>? OR (session_id=? AND sequence>?) " +
+                        "ORDER BY session_id,sequence LIMIT ?",
+                    arrayOf(session, session, sequence.toString(), limit.toString()),
+                ).use { rows ->
+                    while (rows.moveToNext()) {
+                        session = rows.getString(0)
+                        sequence = rows.getLong(1)
+                        val eventType = rows.getString(2)
+                        val payload = Json.parseToJsonElement(rows.getString(3)).jsonObject
+                        SqliteAssetEventIndex.indexCommittedMessageAssets(
+                            db, session, sequence, eventType, payload,
+                        )
+                        count++
+                    }
+                }
+                if (count > 0) {
+                    val values = ContentValues().apply {
+                        put("last_session", session)
+                        put("last_sequence", sequence)
+                    }
+                    check(db.update("local_asset_backfill_progress", values, "id=1", null) == 1) {
+                        "资源回填游标无法持久化"
+                    }
+                }
+                db.setTransactionSuccessful()
+                return count
+            } finally {
+                db.endTransaction()
+            }
+        } finally {
+            guard.unlock()
+        }
+    }
+
+    internal data class PublishedBackfill(val registered: Int, val unclassified: Int)
+
+    /**
+     * Re-register previously published content-addressed files. Never publish paths
+     * found via symlinks or unverified bytes; unknown legacy filenames stay untouched
+     * and are reported, not silently treated as garbage.
+     */
+    fun reconcilePublishedFiles(workspaceRoot: File, files: List<File>): PublishedBackfill {
+        val dir = File(workspaceRoot, ".dsh/attachments")
+        check(!Files.isSymbolicLink(workspaceRoot.toPath()) &&
+            !Files.isSymbolicLink(File(workspaceRoot, ".dsh").toPath()) &&
+            !Files.isSymbolicLink(dir.toPath())) { "附件根目录存在符号链接" }
+        val expectedParent = dir.canonicalFile
+        var added = 0
+        var unclassified = 0
+        for (file in files) {
+            check(file.parentFile.canonicalFile == expectedParent &&
+                Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                "发现不安全的历史附件文件：${file.name}"
+            }
+            if (file.name.startsWith(".")) continue // unpublished temporary file
+            val digest = file.name.substringBefore('.')
+            val suffix = file.name.substringAfter('.', "")
+            if (!SHA256.matches(digest) ||
+                (suffix.isNotEmpty() && !suffix.matches(Regex("[a-z0-9]{1,10}")))) {
+                unclassified++
+                continue
+            }
+            val path = ".dsh/attachments/${file.name}"
+            if (locations(digest).contains(path)) continue
+            val hash = MessageDigest.getInstance("SHA-256")
+            file.inputStream().buffered().use { input ->
+                val buffer = ByteArray(32 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    hash.update(buffer, 0, read)
+                }
+            }
+            check(hash.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) } == digest) {
+                "历史附件文件名与真实内容哈希冲突：${file.name}"
+            }
+            val mediaType = when (suffix) {
+                "png" -> "image/png"
+                "jpg", "jpeg" -> "image/jpeg"
+                "webp" -> "image/webp"
+                "gif" -> "image/gif"
+                "txt" -> "text/plain"
+                "json" -> "application/json"
+                "pdf" -> "application/pdf"
+                else -> "application/octet-stream"
+            }
+            register(LocalImportedAttachment(
+                name = file.name, relativePath = path, mediaType = mediaType,
+                bytes = file.length(), attachmentId = digest,
+            ))
+            added++
+        }
+        return PublishedBackfill(added, unclassified)
     }
 
     fun referenceCount(assetId: String): Long {

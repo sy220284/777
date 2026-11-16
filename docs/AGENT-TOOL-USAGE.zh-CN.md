@@ -4,7 +4,7 @@
 
 ## 1. 工具编排：直接引用真实返回正文
 
-`code_mode_run` 中的 `steps` 从 **1** 开始编号。先执行有结果的工具，后续的 `when.step` 引用此前的步骤；`when.path` 是**该工具返回的正文 JSON 内部的字段**。不需要拼 `steps[0].content`、`result.output` 等外围结构。
+通过 `tool_call` 执行 `code_mode_run` 时，其 `steps` 从 **1** 开始编号。先执行有结果的工具，后续的 `when.step` 引用此前的步骤；`when.path` 是**该工具返回的正文 JSON 内部的字段**。不需要拼 `steps[0].content`、`result.output` 等外围结构。
 
 前序工具真实返回 `{"approved":true}` 时：
 
@@ -25,8 +25,8 @@
 - 返回 JSON 对象：按实际字段写 `path`，支持 `approved`、`$.file.path`、`items[0].name`；`equals` 保持真实 JSON 类型（布尔值、数值、字符串）。
 - 返回普通文本（如 `ready`）：省略 `path`，直接以 `{"step":1,"equals":"ready"}` 比较整个结果。
 - 后续参数取值：使用 `{"$step_result":1,"path":"file.path"}` 引用前序结果字段，省略 `path` 可传递整个结果。
-- 可选工具：先通过 `capability_search` 找到并加载，待模型收到包含该工具的下一轮实际工具表，再用于编排。
-- 精确指定 `select:工具A,工具B` 会替换本轮可选工具清单，避免旧步骤加载的工具持续占用模型上下文。工具仍保留在注册表中，后续需要时可重新选择；已确认的工具执行结果和审批回执不会因切换而丢失。
+- 所有工具通过固定的 `tool_call` 入口按注册名称直接执行，包括内置工具、GitHub、LSP 与 MCP，无需按轮选择、预加载或等待新工具表。
+- 未知真实工具名或参数时，先调用 `tool_search` 查询实时注册表和 Schema；已知名称可直接调用。例如 `tool_call({"name":"read","arguments":{"path":"文档.md"}})`。编排器 `code_mode_run` 也通过 `tool_call` 调用，内部每个子步骤继续独立审批。
 
 字段找不到时，回执会指出字段路径和实际 JSON 对象的可用字段；结果为普通文本时，明确提示去掉 `path`。当条件引用失败，后续步骤不会假装执行成功。
 

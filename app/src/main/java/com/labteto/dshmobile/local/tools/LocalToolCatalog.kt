@@ -54,8 +54,8 @@ object LocalToolCatalog {
             "old_text" to string("必须只出现一次的原文"),
             "new_text" to string("替换后的文字"),
         ), listOf("path", "old_text", "new_text")))
-        add(tool("apply_patch", "应用标准 unified diff 补丁到工作区；先执行 git apply --check，成功后原子式应用", properties(
-            "patch" to string("完整 unified diff 文本"),
+        add(tool("apply_patch", "通过 Git 预检及原子应用补丁；支持 unified diff 与 Codex *** Begin Patch 格式", properties(
+            "patch" to string("完整 unified diff，或 *** Begin Patch/End Patch 围住的 Codex 文件修改补丁"),
         ), listOf("patch")))
         add(tool("archive_list", "完整枚举 ZIP/TAR.GZ/TAR 等归档的内部文件；按 cursor 翻页直到 next_cursor=none，不能把预览当作全量结果", properties(
             "path" to string("工作区相对归档路径，如 .dsh/attachments/xxx.gz"),
@@ -165,8 +165,13 @@ object LocalToolCatalog {
             "url" to string("要诊断的网址或域名"),
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
-        add(tool("capability_search", "从实时注册表发现扩展。已知名称可用 select:工具名1,工具名2，按照真实任务需要指定工具名称，由实际注册状态及模型定义预算决定本轮装入范围，并聚焦当前任务的可选工具候选。结果区分已注册、已选择候选与定义预算不足；以下一模型请求最终提供的工具表为实际可用依据。进入该工具表的 MCP/GitHub 扩展可参与 code_mode_run，仍须逐步经过真实连接与权限审批。", properties(
-            "query" to string("例如 能力目录、工具与能力检测、GitHub PR、Android 界面、视觉、MCP、LSP、下载或某项具体工具名"),
+        // The model uses one stable dispatch tool for every registered capability.
+        add(tool("tool_call", "按注册名称直接调用工具，无需预加载。未知名称先用 tool_search 查询；参数由目标工具真实 Schema 校验，目标工具自行审批。", properties(
+            "name" to string("已注册工具名，例如 read、grep、github_search 或 MCP 工具名称"),
+            "arguments" to jsonSchemaObject("目标工具的完整 JSON 参数；参照 tool_search 返回的真实参数定义"),
+        ), listOf("name", "arguments")))
+        add(tool("tool_search", "只读查找实时工具注册表及准确参数定义；不选择、不加载、不改变模型工具表。", properties(
+            "query" to string("工具名称、功能描述或 能力目录"),
         ), listOf("query")))
         add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
             "items" to buildJsonObject {
@@ -250,10 +255,17 @@ object LocalToolCatalog {
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("question")))
-        add(tool("skill", "列出可由模型调用的技能（支持分页和任务关键词），或读取指定技能的 SKILL.md", properties(
-            "name" to string("可选；填写后精确读取技能规则"),
-            "query" to string("可选；按当前任务内容优先展示相关技能；分页时保持一致"),
-            "offset" to integer("可选；继续上次技能目录的 offset，默认 0"),
+
+        add(tool("skill", "三级渐进技能加载：目录只含元数据，选中后读取 SKILL.md，专项资料在引用时按行读取", properties(
+            "name" to string("可选；读取指定技能的完整核心规则"),
+            "query" to string("可选；目录查询"),
+            "offset" to integer("可选；目录续读游标"),
+            "resource" to string("可选；SKILL.md 所引用的 references/、scripts/ 或 assets/ 内相对路径"),
+            "reference_query" to string("可选；在当前技能 references/ 资料库按关键词检索，不预先加载整个知识库；与 resource 二选一"),
+            "cursor" to string("可选；专项资料搜索返回的 next_cursor，保持 reference_query 不变"),
+            "revision" to string("读取 SKILL.md 得到的 sha256 规则版本；专项资料读取时必填"),
+            "start_line" to integer("专项资料起始行，默认 1"),
+            "end_line" to integer("专项资料结束行，默认读取 200 行"),
         )))
         add(tool("skill_create", "将技能直接写入工作区、安装到真实技能目录并读取校验；不会自动证明执行效果", properties(
             "id" to string("英文技能标识"),

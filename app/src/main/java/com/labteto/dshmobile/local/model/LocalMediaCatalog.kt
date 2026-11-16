@@ -113,12 +113,13 @@ object LocalMediaCatalog {
     fun providerFor(profile: LocalModelProfile): LocalMediaProvider? {
         if (profile.authKind != LocalModelAuthKind.API_KEY) return null
         val uri = runCatching { URI(normalizeModelBaseUrl(profile.baseUrl)) }.getOrNull() ?: return null
-        if (!uri.scheme.equals("https", true) || uri.port != -1) return null
+        val miniMaxOfficial = profile.model.startsWith("MiniMax-", ignoreCase = true) &&
+            LocalMiniMaxPolicy.isOfficial(profile.baseUrl)
+        if (!uri.scheme.equals("https", true) ||
+            (uri.port != -1 && !(uri.port == 443 && miniMaxOfficial))) return null
         val host = uri.host?.lowercase() ?: return null
         return when {
-            host in setOf("api.minimaxi.com", "api.minimax.cn", "api.minimax.io") &&
-                profile.model.startsWith("MiniMax-", ignoreCase = true) ->
-                LocalMediaProvider.MINIMAX
+            miniMaxOfficial -> LocalMediaProvider.MINIMAX
             host == "api.openai.com" -> LocalMediaProvider.OPENAI
             host in setOf("dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com") ||
                 (host.endsWith(".maas.aliyuncs.com") && host.length > ".maas.aliyuncs.com".length) ->

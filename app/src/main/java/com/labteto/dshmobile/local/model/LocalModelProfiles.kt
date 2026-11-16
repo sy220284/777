@@ -123,6 +123,7 @@ object LocalModelPresets {
             provider = "DeepSeek",
             model = "deepseek-flash",
             baseUrl = "https://api.deepseek.com",
+            protocol = LocalModelProtocol.RESPONSES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
@@ -140,6 +141,7 @@ object LocalModelPresets {
             provider = "DeepSeek",
             model = "deepseek-v4-pro",
             baseUrl = "https://api.deepseek.com",
+            protocol = LocalModelProtocol.RESPONSES,
             capabilities = setOf(LocalModelCapability.TEXT),
             imageInputSupported = false,
             modelsEndpoint = "https://api.deepseek.com/models",
@@ -185,6 +187,91 @@ object LocalModelPresets {
             // Anthropic max_tokens counts both thinking and answer; 8K truncates long model tasks.
             defaultMaxOutputTokens = 65_536,
         ),
+        // K3.1 Pro is thinking-only. Plus/Moderato uses 256K; Pro/Allegretto may choose 1M.
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3.1-pro",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE, LocalModelCapability.VIDEO),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3.1-pro-highspeed",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE, LocalModelCapability.VIDEO),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 1_048_576,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            // Plus/Moderato is limited to 256K; 1M is a Pro/Allegretto entitlement.
+            contextWindowTokens = 262_144,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3-256k",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "kimi-for-coding",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 1_048_576,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "kimi-for-coding-highspeed",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
+        ),
+    )
+
+    /**
+     * Read-only metadata for previously saved API routes and ChatGPT Plan runtime contracts.
+     * Never rendered as an API preset. Keeping this metadata avoids silently degrading existing
+     * user-created routes and the independent ChatGPT subscription transport.
+     */
+    private val compatibilityMetadata = listOf(
         LocalModelPreset(
             provider = "MiniMax",
             model = "MiniMax-M2.7",
@@ -203,66 +290,7 @@ object LocalModelPresets {
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
             contextWindowTokens = 204_800,
         ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "k3",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            // Plus/Moderato is limited to 256K; 1M is a Pro/Allegretto entitlement.
-            contextWindowTokens = 262_144,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "k3-256k",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            contextWindowTokens = 262_144,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "kimi-for-coding",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            contextWindowTokens = 1_048_576,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "kimi-for-coding-highspeed",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            contextWindowTokens = 262_144,
-        ),
-    )
 
-    /**
-     * Read-only metadata for previously saved API routes and ChatGPT Plan runtime contracts.
-     * Never rendered as an API preset. Keeping this metadata avoids silently degrading existing
-     * user-created routes and the independent ChatGPT subscription transport.
-     */
-    private val compatibilityMetadata = listOf(
         LocalModelPreset(
             provider = "智谱 GLM",
             model = "glm-5.3-flash",
@@ -501,7 +529,9 @@ object LocalModelPresets {
         val normalizedBaseUrl = runCatching { normalizeModelBaseUrl(baseUrl) }.getOrNull()
             ?: return null
         if (LocalMiniMaxPolicy.isOfficial(normalizedBaseUrl)) {
-            val native = entries.firstOrNull { it.provider == "MiniMax" && it.model.equals(normalizedModel, true) }
+            val native = (entries + compatibilityMetadata).firstOrNull {
+                it.provider == "MiniMax" && it.model.equals(normalizedModel, true)
+            }
             if (native != null) {
                 val protocol = if (native.model in setOf("MiniMax-M3.1-Flash", "MiniMax-M3")) {
                     LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl)
@@ -526,14 +556,28 @@ object LocalModelPresets {
                         .takeIf { protocol == LocalModelProtocol.ANTHROPIC_MESSAGES },
                 )
             }
+            // Retired M2.7 presets still need official regional aliases for saved routes.
+            compatibilityMetadata.firstOrNull {
+                it.provider == "MiniMax" && it.model.equals(normalizedModel, ignoreCase = true)
+            }?.let { return it.copy(baseUrl = normalizedBaseUrl) }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
-                return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
+                return compatibilityMetadata.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
         }
         if (LocalKimiPolicy.isOfficial(normalizedBaseUrl)) {
             return entries.firstOrNull {
                 it.provider == "Kimi Code" && it.model.equals(normalizedModel, ignoreCase = true)
             }?.copy(baseUrl = normalizedBaseUrl)
+        }
+        if (DeepSeekChatRequestPolicy.isOfficial(normalizedModel, normalizedBaseUrl)) {
+            return entries.firstOrNull {
+                it.provider == "DeepSeek" && it.model.equals(normalizedModel, ignoreCase = true)
+            }?.copy(
+                baseUrl = normalizedBaseUrl,
+                protocol = if (normalizedBaseUrl.endsWith("/chat/completions")) {
+                    LocalModelProtocol.CHAT_COMPLETIONS
+                } else LocalModelProtocol.RESPONSES,
+            )
         }
         return (entries + compatibilityMetadata).firstOrNull { preset ->
             preset.model.equals(normalizedModel, ignoreCase = true) &&
@@ -544,11 +588,44 @@ object LocalModelPresets {
     fun capabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
         find(model, baseUrl)?.capabilities ?: setOf(LocalModelCapability.TEXT)
 
+    /** Settings consumes this Model-owned editing projection instead of provider internals. */
+    fun editorProtocolsFor(model: String, baseUrl: String): List<LocalModelProtocol> =
+        LocalModelProtocolRoutePolicy.supportedProtocols(model, baseUrl)
+
+    fun editorBaseUrlForProtocol(
+        model: String, baseUrl: String, protocol: LocalModelProtocol,
+    ): String = LocalModelProtocolRoutePolicy.baseUrlFor(model, baseUrl, protocol)
+
+    fun editorRequestEndpointFor(
+        model: String, baseUrl: String, protocol: LocalModelProtocol,
+    ): String = LocalModelProtocolRoutePolicy.requestEndpoint(model, baseUrl, protocol)
+
+    fun editorContextWindowOptionsFor(model: String, baseUrl: String): List<Int> =
+        if (LocalKimiPolicy.supportsContextChoice(model, baseUrl)) {
+            LocalKimiPolicy.selectableContextTokens.sorted()
+        } else emptyList()
+
+    /** Official aliases and alternate documented protocol roots remain editable as a preset. */
+    fun editablePresetFor(model: String, baseUrl: String): LocalModelPreset? {
+        val resolved = find(model, baseUrl) ?: return null
+        return entries.firstOrNull {
+            it.provider == resolved.provider && it.model.equals(resolved.model, ignoreCase = true)
+        }
+    }
+
     /** Capabilities actually encoded by this client's current request/response transports. */
-    fun clientCapabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
+    fun clientCapabilitiesFor(
+        model: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol = protocolFor(model, baseUrl),
+    ): Set<LocalModelCapability> =
         capabilitiesFor(model, baseUrl).filterTo(linkedSetOf()) {
             it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE ||
-                (it == LocalModelCapability.VIDEO && LocalKimiPolicy.videoInputSupported(model, baseUrl))
+                (it == LocalModelCapability.VIDEO && (
+                    (protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
+                        LocalKimiPolicy.videoInputSupported(model, baseUrl)) ||
+                    LocalMiniMaxPolicy.nativeVideoSupported(model, baseUrl, protocol)
+                ))
         }
 
     fun maxNativeImageBytesFor(model: String, baseUrl: String): Long =
@@ -651,8 +728,10 @@ object LocalModelPresets {
                 promptCachePolicy = promptCachePolicy,
             )
             LocalModelProtocol.RESPONSES -> LocalModelRuntimeCapabilities(
-                structuredOutput = true,
-                strictSchema = true,
+                structuredOutput = authKind == LocalModelAuthKind.API_KEY &&
+                    DeepSeekChatRequestPolicy.isOfficial(model, baseUrl),
+                strictSchema = authKind == LocalModelAuthKind.API_KEY &&
+                    DeepSeekChatRequestPolicy.isOfficial(model, baseUrl),
                 imageInput = image,
                 temperature = preset?.temperatureSupported != false,
                 maxImageBytes = maxImageBytes,
@@ -667,7 +746,8 @@ object LocalModelPresets {
                 structuredOutput = false,
                 strictSchema = false,
                 imageInput = image,
-                temperature = preset?.temperatureSupported != false,
+                temperature = preset?.temperatureSupported != false &&
+                    !normalizeModelBaseUrl(baseUrl).startsWith("https://api.anthropic.com/"),
                 maxImageBytes = maxImageBytes,
                 contextWindowTokens = contextWindowTokens,
                 defaultMaxOutputTokens = defaultMaxOutputTokens,
@@ -759,7 +839,9 @@ internal fun List<LocalModelProfile>.apiKeyProfileForRoute(
     val matches = filter { profile ->
         profile.authKind == LocalModelAuthKind.API_KEY &&
             profile.model == model &&
-            normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl
+            (normalizeModelBaseUrl(profile.baseUrl).trimEnd('/') == normalizedBaseUrl ||
+                (profileId != null && profile.id == profileId &&
+                    LocalModelProtocolRoutePolicy.sameCredentialOrigin(profile.baseUrl, normalizedBaseUrl)))
     }
     if (profileId != null) {
         return requireNotNull(matches.firstOrNull { it.id == profileId }) {

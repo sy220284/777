@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local.work.improvement
 
 import com.labteto.dshmobile.harness.optimization.StrategyComparison
 import com.labteto.dshmobile.harness.optimization.StrategyTrial
+import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageAnalyticsStore
 import com.labteto.dshmobile.local.TokenUsageGroupKind
@@ -26,10 +27,14 @@ import kotlinx.serialization.json.put
 internal class LocalWorkStrategyEvaluation(
     private val sessionStorage: LocalSessionStorageRuntime,
     private val usage: TokenUsageAnalyticsStore,
+    private val archive: LocalWorkImprovementArchive,
 ) {
-    fun evaluate(bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice) {
+    suspend fun evaluate(
+        bound: LocalWorkRunBinding, runId: String, advice: WorkImprovementAdvice,
+        settled: LocalHarnessState,
+    ) {
         val log = bound.eventLog
-        val goal = bound.workState.snapshot().goal ?: return
+        val goal = settled.work.goal ?: return
         log.latestMatching(setOf(
             if (advice.active) "work/improvement-applied" else "work/improvement-trial",
         )) {
@@ -38,7 +43,7 @@ internal class LocalWorkStrategyEvaluation(
                 it.value("steering_revision") == bound.steeringRevision.value.toString()
         } ?: return
         val evidence = localWorkDeliveryEvidence(log, goal, File(sessionStorage.files.workspace.path))
-        val current = bound.aggregateSnapshot()
+        val current = settled
         if (current.modelState.model != advice.model ||
             (current.modelState.modelSelection.activeProfileId ?: "") != advice.profileId ||
             current.modelState.modelSelection.activeProfile?.routeFingerprint().orEmpty() != advice.routeFingerprint ||
@@ -49,11 +54,14 @@ internal class LocalWorkStrategyEvaluation(
         if (workGoalComparisonKey(goal) != advice.goalSignature || !advice.baselineTestVerified) return
         val (_, failedTools) = workGoalToolMetrics(log, goal)
         if (goal.status == "blocked" && failedTools > 0) {
-            val lease = LocalSessionRuntimeRegistry.tryAcquire(
+            // Wait for the current user turn to release ownership. Losing this
+            // receipt because another turn was briefly active stalls the candidate.
+            val lease = LocalSessionRuntimeRegistry.acquire(
                 bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
-            ) ?: return
+            )
             try {
-                if (bound.workState.snapshot().goal != goal) return
+                // The turn's captured Goal stays valid even if its successor
+                // has already started. Its original event facts are rechecked below.
                 log.withWriterLease {
                     if (log.latestMatching(setOf("work/improvement-evaluation")) {
                             it.value("run_id") == runId && it.value("candidate_id") == advice.id
@@ -101,10 +109,10 @@ internal class LocalWorkStrategyEvaluation(
                 setOf(testKey), setOf(testKey), true,
                 failures, tools.toLong(), observedTokens),
         )
-        val lease = LocalSessionRuntimeRegistry.tryAcquire(bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE)
-            ?: return
+        val lease = LocalSessionRuntimeRegistry.acquire(
+            bound.sessionId, LocalSessionRuntimeKind.MAINTENANCE,
+        )
         try {
-            if (bound.workState.snapshot().goal != goal) return
             log.withWriterLease {
                 if (log.latestMatching(setOf("work/improvement-evaluation")) {
                         it.value("run_id") == runId && it.value("candidate_id") == advice.id
@@ -124,7 +132,10 @@ internal class LocalWorkStrategyEvaluation(
                     put("comparison", "natural_same_acceptance_observational")
                     put("source_receipt", evidence.testCallId)
                 })
-                if (!advice.active && result.canAdopt) {
+                if (!advice.active && result.canAdopt &&
+                    archive.verifiedNaturalTrialGoalIds(advice.id).any { it != goal.id }) {
+                    // Two separate user goals with objective test/usage receipts; evidence
+                    // remains observational, never a randomized independent A/B trial.
                     // Narrow acceptance only: exact Goal contract, project and model/profile.
                     // Never mutate stable System Prompt, skill files, approvals or tool policy.
                     log.append("work/improvement-adopted", buildJsonObject {
@@ -135,7 +146,7 @@ internal class LocalWorkStrategyEvaluation(
                         put("model", advice.model)
                         put("profile_id", advice.profileId)
                         put("project_id", advice.projectId)
-                        put("evaluation", "verified_narrow_scope")
+                        put("evaluation", "repeated_natural_observations")
                     })
                 } else if (shouldRetireWorkAdvice(
                         active = advice.active,

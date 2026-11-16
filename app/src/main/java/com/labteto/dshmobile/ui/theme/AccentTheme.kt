@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import com.shenyan.designsystem.foundation.syInkContrastRatio
 
 /**
  * 777 的交互色卡。流体杏为当前默认，历史传统色继续作为显式可选外观。
@@ -42,24 +43,50 @@ object AccentPalettes {
 }
 
 /**
+ * Derive one readable ink from the selected primary hue before tinting the
+ * gradient and hover. This keeps every action fill on the same contrast-safe
+ * side of the luminance range while retaining the user's chosen hue.
+ */
+internal fun readableAccentForeground(preferred: Color, fills: List<Color>): Color {
+    require(fills.isNotEmpty())
+    fun minContrast(ink: Color): Float =
+        fills.minOf { syInkContrastRatio(ink, it.copy(alpha = 1f)) }
+    val preferredSolid = preferred.copy(alpha = 1f)
+    if (minContrast(preferredSolid) >= 4.5f) return preferredSolid
+    val target = listOf(Color.Black, Color.White).maxBy(::minContrast)
+    // The palette controls the fills. If the extremes straddle both polarities,
+    // fail visibly in tests instead of inventing an unreadable foreground.
+    check(minContrast(target) >= 4.5f) { "交互色各状态没有共同的可读文字颜色" }
+    var low = 0f
+    var high = 1f
+    repeat(18) {
+        val middle = (low + high) / 2f
+        if (minContrast(lerp(preferredSolid, target, middle)) < 4.5f) low = middle
+        else high = middle
+    }
+    return lerp(preferredSolid, target, high)
+}
+
+/**
  * 把选中的色卡覆盖进语义色：accent 家族整体换血，其余语义（文字/画布/成功/警示）原样保留。
  * 换色面刻意收窄——整页只有交互色变，Functional 族与 Family 容器色不跟卡走，页面不会花。
  */
 fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
     val accent = if (dark) palette.darkAccent else palette.lightAccent
-    val on = if (dark) palette.onDark else palette.onLight
+    val preferredOn = if (dark) palette.onDark else palette.onLight
     val tertiary = if (dark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.12f)
-    val primaryHover = accent.copy(alpha = 0.85f)
+    // Foreground selection is made against the user's actual hue. Secondary
+    // action fills move slightly *toward* the contrast-safe pole rather than
+    // becoming translucent over a different luminance surface.
+    val on = readableAccentForeground(preferredOn, listOf(accent))
+    val toward = if (on.luminance() < 0.5f) Color.White else Color.Black
+    val primaryHover = lerp(accent, toward, 0.08f)
     // Only light-mode generic hover is accent-tinted; dark generic hover stays neutral.
     val interactionHover = if (dark) this.hover else accent.copy(alpha = 0.06f)
     val interactionPressed = accent.copy(alpha = if (dark) 0.24f else 0.19f)
     val interactionActive = accent.copy(alpha = if (dark) 0.14f else 0.15f)
     // Nudge the first gradient stop away from the accent while preserving foreground contrast.
-    val brandGradientStart = lerp(
-        accent,
-        if (on.luminance() < 0.5f) Color.White else Color.Black,
-        0.10f,
-    )
+    val brandGradientStart = lerp(accent, toward, 0.10f)
     val dimmedPrimary = accent.copy(alpha = 0.30f).compositeOver(bgLayer2)
     return copy(
         brandPrimary = brandGradientStart,

@@ -833,86 +833,40 @@ internal fun LocalWorkspaceFilesDialog(
                     placeholder = stringResource(R.string.fluid_files_search),
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd))
 
-                if (mode == LocalFilesMode.WORKSPACE && section == -1 &&
-                    preview == null && query.isBlank()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                    ) {
+                if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting) {
+                    LocalWorkspaceBrowseToolbar(
+                        importing = importing,
+                        enabled = !loading,
+                        onImport = if (section == -1 && query.isBlank() && importFromPhone != null) {
+                            { phoneFilePicker.launch(arrayOf("*/*")) }
+                        } else null,
+                        onProjects = if (projectActions != null) ({ projectsSheetOpen = true }) else null,
+                        onReview = if (compareLocalGit != null || compareCommitGit != null ||
+                            (remoteGitBranches != null && compareRemoteGit != null)) ({
+                            when {
+                                compareLocalGit != null -> openLocalGitComparison()
+                                remoteGitBranches != null && compareRemoteGit != null -> openGitComparison()
+                                compareCommitGit != null -> openCommitComparison()
+                            }
+                        }) else null,
+                        onDownloads = if (section == -1 && query.isBlank()) ::openDownloads else null,
+                        onSelect = if (!loading && error == null && visibleSharePaths.isNotEmpty()) {
+                            { selecting = true }
+                        } else null,
+                        modifier = Modifier.padding(horizontal = SyMetric.gapLg),
+                    )
+                    if (section == -1 && query.isBlank()) {
                         Text("完成的成果：手机存储/Download/神言神语",
-                            modifier = Modifier.weight(1f),
-                            style = DsType.small13.withReadingWeight())
-                        SyButton(
-                            text = "打开下载",
-                            onClick = ::openDownloads,
-                            size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Outline,
-                        )
-                    }
-                }
-                if (mode == LocalFilesMode.WORKSPACE && section == -1 &&
-                    preview == null && query.isBlank() && importFromPhone != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        SyButton(
-                            text = if (importing) "导入中…" else "导入手机文件",
-                            onClick = { phoneFilePicker.launch(arrayOf("*/*")) },
-                            enabled = !importing,
-                            size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Outline,
-                            modifier = Modifier.testTag("work_import_phone_file"),
-                        )
+                            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm),
+                            style = DsType.caption11.withReadingWeight(),
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                     }
                 }
                 if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
-                    Text(
-                        stringResource(R.string.local_workspace_search_scope),
+                    Text(stringResource(R.string.local_workspace_search_scope),
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
                         style = DsType.caption11.withReadingWeight(),
-                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-                    )
-                }
-
-                if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting && projectActions != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        SyButton(
-                            text = "管理项目",
-                            onClick = { projectsSheetOpen = true },
-                            enabled = !loading,
-                            size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Outline,
-                            modifier = Modifier.testTag("work_projects_open"),
-                        )
-                    }
-                }
-                if (mode == LocalFilesMode.WORKSPACE && preview == null && !selecting &&
-                    (compareLocalGit != null || compareCommitGit != null ||
-                        (remoteGitBranches != null && compareRemoteGit != null))) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        SyButton(
-                            text = "代码审查",
-                            onClick = {
-                                when {
-                                    compareLocalGit != null -> openLocalGitComparison()
-                                    remoteGitBranches != null && compareRemoteGit != null -> openGitComparison()
-                                    compareCommitGit != null -> openCommitComparison()
-                                }
-                            },
-                            enabled = !loading,
-                            size = SyButtonSize.Small,
-                            variant = SyButtonVariant.Outline,
-                            modifier = Modifier.testTag("work_git_review_entry"),
-                        )
-                    }
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                 }
                 if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
                     if (selecting) {
@@ -967,7 +921,7 @@ internal fun LocalWorkspaceFilesDialog(
                                 variant = SyButtonVariant.Outline,
                             )
                         }
-                    } else {
+                    } else if (mode != LocalFilesMode.WORKSPACE) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
                             horizontalArrangement = Arrangement.End,

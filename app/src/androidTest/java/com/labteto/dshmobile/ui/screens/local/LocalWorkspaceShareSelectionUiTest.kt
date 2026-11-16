@@ -88,6 +88,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
+        compose.onNodeWithContentDescription("更多文件操作").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
         }
@@ -137,6 +138,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
+        compose.onNodeWithContentDescription("更多文件操作").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
         }
@@ -186,6 +188,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
+        compose.onNodeWithContentDescription("更多文件操作").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
         }
@@ -351,6 +354,7 @@ class LocalWorkspaceShareSelectionUiTest {
                 )
             }
         }
+        compose.onNodeWithContentDescription("更多文件操作").performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("代码审查").fetchSemanticsNodes().isNotEmpty()
         }

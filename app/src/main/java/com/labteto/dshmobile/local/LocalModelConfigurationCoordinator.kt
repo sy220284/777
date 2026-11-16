@@ -15,6 +15,7 @@ import com.labteto.dshmobile.local.model.LocalModelConfigurationTransaction
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.model.LocalModelProfileStore
 import com.labteto.dshmobile.local.model.LocalModelProtocol
+import com.labteto.dshmobile.local.model.LocalModelProtocolRoutePolicy
 import com.labteto.dshmobile.local.model.LocalModelStartupMigrator
 import com.labteto.dshmobile.local.model.chatgpt.ChatGptModelOption
 import com.labteto.dshmobile.local.model.modelProfileId
@@ -71,7 +72,9 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
             val source = credentialSourceProfileId?.let { id ->
                 existingProfiles.firstOrNull {
                     it.id == id && it.authKind == LocalModelAuthKind.API_KEY &&
-                        normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
+                        (normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl) ||
+                            (it.model == model.trim() &&
+                                LocalModelProtocolRoutePolicy.sameCredentialOrigin(it.baseUrl, baseUrl)))
                 } ?: error("来源模型配置已变化，请重新查询模型")
             }
             val inheritedKey = if (apiKey.isBlank() && profileId == null) {
@@ -201,7 +204,9 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
             credentialSourceProfileId?.let { id ->
                 val source = saved.firstOrNull {
                     it.id == id && it.authKind == LocalModelAuthKind.API_KEY &&
-                        normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
+                        (normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl) ||
+                            (it.model == model.trim() &&
+                                LocalModelProtocolRoutePolicy.sameCredentialOrigin(it.baseUrl, baseUrl)))
                 } ?: return "连接失败：原密钥来源已失效，请重新填写密钥"
                 apiKeys.getFor(source.id)
             }
@@ -220,7 +225,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         val source = credentialSourceProfileId?.let { id ->
             profiles.read().firstOrNull {
                 it.id == id && it.authKind == LocalModelAuthKind.API_KEY &&
-                    normalizeModelBaseUrl(it.baseUrl) == normalizeModelBaseUrl(baseUrl)
+                    LocalModelProtocolRoutePolicy.sameCredentialOrigin(it.baseUrl, baseUrl)
             } ?: error("已保存的密钥来源无效，请重新输入密钥")
         }
         val key = apiKey.trim().ifBlank { source?.let { apiKeys.getFor(it.id) }.orEmpty() }

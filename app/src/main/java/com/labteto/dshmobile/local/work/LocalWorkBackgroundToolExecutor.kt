@@ -201,7 +201,6 @@ internal class LocalWorkBackgroundToolExecutor(
     private fun executeUtility(call: LocalToolCall, sessionId: String,
         memoryTools: com.labteto.dshmobile.local.memory.LocalMemoryTools,
         enabledOptionalTools: MutableSet<String>): AgentToolResult? = when (call.name) {
-        "capability_search" -> AgentToolResult(tools.execution.searchCapabilities(call.arguments.string("query"), enabledOptionalTools))
         "memory_search", "memory_list" -> AgentToolResult(memoryTools.execute(call.name, call.arguments, allowMutation = false))
         "tool_output_read" -> AgentToolResult(
             (call.arguments["query"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)?.let { query ->

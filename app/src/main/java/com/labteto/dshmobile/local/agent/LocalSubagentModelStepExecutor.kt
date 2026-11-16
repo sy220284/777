@@ -36,6 +36,7 @@ internal class LocalSubagentModelStepExecutor(
         tools: JsonArray,
         subagentId: String,
         step: Int,
+        responseFormat: JsonObject? = null,
         durableHistory: LocalModelHistoryBuffer? = null,
         allowContextOverflowRecovery: Boolean = true,
     ): LocalModelReply = modelStepRuntime.execute(
@@ -63,6 +64,7 @@ internal class LocalSubagentModelStepExecutor(
             tools = tools,
             subagentId = subagentId,
             step = step,
+            responseFormat = responseFormat,
         )
     }
 }

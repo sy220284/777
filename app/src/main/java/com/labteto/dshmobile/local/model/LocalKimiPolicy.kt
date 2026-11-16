@@ -10,7 +10,21 @@ import java.net.URI
  */
 internal object LocalKimiPolicy {
     private const val officialHost = "api.kimi.com"
-    private val controllable = setOf("k3", "k3-256k", "kimi-for-coding")
+    private val controllable = setOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "k3-256k", "kimi-for-coding")
+    const val standardContextTokens = 262_144
+    const val extendedContextTokens = 1_048_576
+    val selectableContextTokens = setOf(standardContextTokens, extendedContextTokens)
+
+    fun supportsContextChoice(model: String, baseUrl: String): Boolean =
+        isOfficial(baseUrl) && model.trim().lowercase() in setOf("k3", "k3.1-pro")
+
+    fun validateContextChoice(model: String, baseUrl: String, requested: Int?) {
+        if (supportsContextChoice(model, baseUrl) && requested != null && requested != 0) {
+            require(requested in selectableContextTokens) {
+                "Kimi K3/K3.1 Pro 上下文只支持 $standardContextTokens 或 $extendedContextTokens Token"
+            }
+        }
+    }
 
     fun isOfficial(baseUrl: String): Boolean = runCatching {
         val uri = URI(normalizeModelBaseUrl(baseUrl))
@@ -23,7 +37,7 @@ internal object LocalKimiPolicy {
     /** Kimi Code video input is supported on the subscription models except K3-256K. */
     fun videoInputSupported(model: String, baseUrl: String): Boolean =
         isOfficial(baseUrl) && model.trim().lowercase() in
-            setOf("k3", "kimi-for-coding", "kimi-for-coding-highspeed")
+            setOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "kimi-for-coding", "kimi-for-coding-highspeed")
 
     /** Only advertise client-implemented formats, not all server-side formats. */
     fun videoMediaType(name: String, mediaType: String): String? {
@@ -68,9 +82,9 @@ internal object LocalKimiPolicy {
         defaultWindow: Int?,
     ): Int? {
         val override = requested?.takeIf { it in 4_096..16_000_000 }
-        return if (model.equals("k3", true) && baseUrl != null && isOfficial(baseUrl)) {
+        return if (model != null && baseUrl != null && supportsContextChoice(model, baseUrl)) {
             // Allow an explicit context setting; never assume a Plus tier has 1M.
-            override?.takeIf { it <= 1_048_576 } ?: defaultWindow
+            override?.takeIf { it in selectableContextTokens } ?: defaultWindow
         } else when {
             // A user-configured smaller limit is meaningful for a constrained gateway.
             // Never let a manual setting enlarge a documented model window without

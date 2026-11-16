@@ -33,11 +33,11 @@ jobs:
           import json
           from pathlib import Path
           data = json.loads(Path("build/callgraph-audit/callgraph.json").read_text(encoding="utf-8"))
-          caller = "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolSchemaProjection.kt"
-          target = "app/src/main/java/com/labteto/dshmobile/local/tools/LocalToolScopeProjection.kt"
+          caller = "app/src/main/java/com/labteto/dshmobile/local/LocalToolExecutionCoordinator.kt"
+          target = "app/src/main/java/com/labteto/dshmobile/local/tools/LocalDirectToolDispatch.kt"
           files = {row["path"]: row for row in data["files"]}
           assert target in files[caller]["call_edges"], (
-              "Kotlin HarnessTool::forReadOnlyModelScope 方法引用丢失：只读权限投影被误判为无调用者"
+              "统一工具调度未实际连接直调解析器：模型工具可能无法进入真实执行链路"
           )
           # Kotlin also permits invoking suspend helper functions as
           # runSuspendResult { ... } with no parentheses.
@@ -46,7 +46,7 @@ jobs:
           assert helper in files[gallery]["call_edges"], (
               "Kotlin 尾随 lambda 调用丢失：实际使用的协程取消安全封装被误判为无调用者"
           )
-          print("KOTLIN_METHOD_REFERENCE_AND_LAMBDA_OK")
+          print("KOTLIN_DIRECT_TOOL_DISPATCH_AND_LAMBDA_OK")
           PY
       - name: 校验架构所有权及运行性能约束
         run: |

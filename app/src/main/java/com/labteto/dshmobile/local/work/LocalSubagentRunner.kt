@@ -75,6 +75,8 @@ import com.labteto.dshmobile.local.runtime.adaptiveAgentStepLimit
 import com.labteto.dshmobile.local.runtime.nextAdaptiveAgentStepLimit
 import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import com.labteto.dshmobile.local.tools.LocalModelToolStepSurface
+import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
+import com.labteto.dshmobile.local.tools.directToolTarget
 import com.labteto.dshmobile.local.tools.LocalRunToolSurface
 import com.labteto.dshmobile.observability.AppLog
 import java.util.UUID
@@ -131,7 +133,7 @@ internal class LocalSubagentRunner(
     private val requireTeamRootAuthorization: ((String) -> Unit)? = null,
     private val requireTeamWorkspaceMutation: (suspend (String, LocalToolCall) -> Unit)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
-    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
+    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, LocalModelProfile) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
     private val onUsage: (String, LocalModelReply, TokenUsageContext) -> Unit = { _, _, _ -> },
     private val onNativeImageAccepted: (String, String) -> Unit = { _, _ -> },
@@ -328,15 +330,16 @@ internal class LocalSubagentRunner(
         )
         var pendingTerminalOutput: String? = null
         val modelToolStepSurface = LocalModelToolStepSurface()
-        val toolCallPolicy = LocalSubagentToolCallPolicy(allowMutation, virtualScreenId, modelToolStepSurface)
-        // Optional tool visibility belongs to this exact Agent run. A child discovering an MCP/LSP/
-        // runtime capability must never make that capability appear in its parent or sibling run.
-        val enabledOptionalTools = admitLocalAgentScopedToolGrants(
-            capabilities, recoveredEnabledOptionalTools,
-        ).toCollection(linkedSetOf())
         val canDelegateNested = !capabilities.allowMutation && !capabilities.continuable &&
             capabilities.depth < capabilities.maxDepth && runCoordinator != null &&
             snapshot.kernel.resources.maxAgents > capabilities.depth
+        val toolCallPolicy = LocalSubagentToolCallPolicy(
+            allowMutation, virtualScreenId, modelToolStepSurface, capabilities.toolAllowlist,
+            teamManaged = capabilities.teamManaged,
+        )
+        val enabledOptionalTools = admitLocalAgentScopedToolGrants(
+            capabilities, recoveredEnabledOptionalTools,
+        ).toCollection(linkedSetOf())
         fun executionSchemas(mutation: Boolean, virtual: Boolean, enabled: MutableSet<String>): JsonArray {
             val normal = schemas(mutation, virtual, enabled)
             val team = if (capabilities.teamManaged && backgroundJobId != null)
@@ -577,8 +580,7 @@ internal class LocalSubagentRunner(
                     val preparedHistory = prepareMessages(
                         durableHistory,
                         selectedMode,
-                        snapshot.modelState.baseUrl,
-                        routeModel,
+                        runProfile,
                     )
                     // Only record a delivery as submitted when the exact normalized message survived
                     // compaction and reached the model request. Dropped history remains unconfirmed.
@@ -605,6 +607,18 @@ internal class LocalSubagentRunner(
                             },
                             subagentId = subagentId,
                             step = modelStep,
+                            responseFormat = capabilities.outputSchema
+                                ?.takeIf {
+                                    runProfile.protocol == com.labteto.dshmobile.local.model.LocalModelProtocol.RESPONSES &&
+                                        com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy.isOfficial(
+                                            runProfile.model, runProfile.baseUrl)
+                                }?.let { schema ->
+                                    buildJsonObject {
+                                        put("type", "json_schema")
+                                        put("name", "subagent_result")
+                                        put("schema", schema)
+                                    }
+                                },
                             durableHistory = history,
                         ).also {
                             // An ancestor may lose its Run while a remote model request is in flight.
@@ -670,22 +684,20 @@ internal class LocalSubagentRunner(
                         executionFence()
                         ensureTeamRootAuthorization()
                         currentCoroutineContext().ensureActive()
-                        LocalRecursiveReadOnlyToolScope.rejection(call, capabilities)
-                            ?: toolCallPolicy.rejection(call)
-                            ?: if (capabilities.teamManaged && call.name == "capability_search") {
-                                AgentToolResult(
-                                    content = "额外的 MCP、LSP、GitHub 等扩展由主代理评估并显式授权；请向主代理申请所需工具。",
-                                )
-                            } else withContext(LocalModelRunContext(runProfile)) {
+                        val targetCall = call.directToolTarget() ?: call
+                        LocalRecursiveReadOnlyToolScope.rejection(targetCall, capabilities)
+                            ?: toolCallPolicy.rejection(call, targetCall)
+                            ?: withContext(LocalModelRunContext(runProfile) +
+                                LocalSubagentExecutionScope(capabilities, virtualScreenId, canDelegateNested)) {
                             currentCoroutineContext().ensureActive()
                             if (capabilities.teamManaged) {
                                 requireNotNull(requireTeamWorkspaceMutation) {
                                     "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
-                                }(requireNotNull(backgroundJobId), call.toLocalToolCall())
+                                }(requireNotNull(backgroundJobId), targetCall.toLocalToolCall())
                             }
-                            if (canDelegateNested && call.name == "subagent") {
+                            if (canDelegateNested && targetCall.name == "subagent") {
                                 dispatchLocalNestedSubagent(
-                                    call = call,
+                                    call = targetCall,
                                     parentCapabilities = capabilities,
                                     parentProfileId = runProfile.id,
                                     parentMaxSteps = maxSteps,
@@ -718,9 +730,9 @@ internal class LocalSubagentRunner(
                                     },
                                 )
                             } else if (capabilities.teamManaged &&
-                                LocalAgentTeamContract.isTeamChildControlCall(call.name)) {
+                                LocalAgentTeamContract.isTeamChildControlCall(targetCall.name)) {
                                 requireNotNull(executeTeamTool) { "TEAM_CALLER_UNAVAILABLE" }(
-                                    requireNotNull(backgroundJobId), call.toLocalToolCall(),
+                                    requireNotNull(backgroundJobId), targetCall.toLocalToolCall(),
                                 )
                             } else {
                                 val admittedCall = call.toLocalToolCall()
@@ -737,7 +749,7 @@ internal class LocalSubagentRunner(
                                         executionFence()
                                         ensureTeamRootAuthorization()
                                         runContext?.let { runCoordinator?.ensureCurrentOwner(it) }
-                                        check(jobId, admittedCall)
+                                        check(jobId, targetCall.toLocalToolCall())
                                     }) { invoke() }
                                 } else invoke()
                             }
