@@ -13,6 +13,15 @@ internal fun subagentContinuationMessage(
     completedContinuations: Int,
 ): JsonObject? {
     val continuation = SUBAGENT_CONTINUATION_POLICY.message(error, completedContinuations) ?: return null
+    if (error.code in setOf("MODEL_STREAM_PROTOCOL", "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR")) {
+        return kotlinx.serialization.json.JsonObject(
+            continuation + ("content" to kotlinx.serialization.json.JsonPrimitive(
+                "上一模型响应的工具调用参数或协议结构有误，工具尚未执行。错误：" +
+                    com.labteto.dshmobile.observability.sanitizeDiagnosticText(error.message.orEmpty()).take(250) +
+                    "。请通过 tool_search 确认真实参数，重新生成完整有效的调用并继续；已完成操作不可重复。"
+            ))
+        )
+    }
     if (error.code == "ANTHROPIC_PROTOCOL_ERROR") {
         return kotlinx.serialization.json.JsonObject(
             continuation + ("content" to kotlinx.serialization.json.JsonPrimitive(
