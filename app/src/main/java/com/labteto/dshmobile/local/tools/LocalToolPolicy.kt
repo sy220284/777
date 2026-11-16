@@ -36,10 +36,9 @@ internal object LocalToolPolicy {
     /**
      * Model-facing exposure is an explicit policy decision, just like access and approval.
      *
-     * Keep the tools needed for ordinary coding/execution loops permanently visible. Capabilities
-     * that are only useful for a narrower user intent stay registered but are exposed on demand
-     * through task-intent pre-activation or capability_search. This removes repeated schema cost
-     * without removing the capability itself.
+     * The model sees the fixed tool_call/tool_search gateway. CORE/OPTIONAL describes
+     * registered capability metadata (and agent authorization boundaries) only, not
+     * per-turn schema admission or any preloading queue.
      */
     fun exposure(name: String): ToolExposure = when (canonical(name)) {
         "web_search", "web_fetch", "http_request", "download_file", "network_diagnose",
