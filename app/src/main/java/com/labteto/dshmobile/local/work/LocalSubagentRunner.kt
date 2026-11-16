@@ -604,6 +604,18 @@ internal class LocalSubagentRunner(
                             },
                             subagentId = subagentId,
                             step = modelStep,
+                            responseFormat = capabilities.outputSchema
+                                ?.takeIf {
+                                    runProfile.protocol == com.labteto.dshmobile.local.model.LocalModelProtocol.RESPONSES &&
+                                        com.labteto.dshmobile.local.model.DeepSeekChatRequestPolicy.isOfficial(
+                                            runProfile.model, runProfile.baseUrl)
+                                }?.let { schema ->
+                                    buildJsonObject {
+                                        put("type", "json_schema")
+                                        put("name", "subagent_result")
+                                        put("schema", schema)
+                                    }
+                                },
                             durableHistory = history,
                         ).also {
                             // An ancestor may lose its Run while a remote model request is in flight.
