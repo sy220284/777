@@ -521,7 +521,7 @@ internal class AnthropicMessagesClient @Inject constructor(
                             else -> null
                         }
                         if (expectedBlock != null && accumulator.type != expectedBlock) {
-                            if (accumulator.type == "tool_use" || expectedBlock == "tool_use") {
+                            if (accumulator.type == "tool_use") {
                                 throw malformedToolArgumentsErrorStatic(
                                     requestId ?: messageId, stopReason, streamEventsSeen,
                                     toolName = accumulator.name,
