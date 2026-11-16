@@ -496,6 +496,10 @@ class DeepSeekClient @Inject constructor(
                     )
                 }
                 requireUniqueModelToolCallIds(calls, "MODEL_STREAM_PROTOCOL", retryable = false)
+                if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED &&
+                    rawStopReason in setOf("tool_calls", "function_call") && calls.isEmpty()) {
+                    throw streamProtocolError("模型声明了工具调用结束，但没有提供完整工具调用数据")
+                }
                 val message = buildJsonObject {
                     put("role", "assistant")
                     put("content", content.toString())
@@ -616,6 +620,10 @@ class DeepSeekClient @Inject constructor(
             validatedModelToolCall(item["id"], function["name"], function["arguments"], "MODEL_RESPONSE_PROTOCOL")
         }
         requireUniqueModelToolCallIds(calls, "MODEL_RESPONSE_PROTOCOL")
+        if (completionReason == com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED &&
+            rawStopReason in setOf("tool_calls", "function_call") && calls.isEmpty()) {
+            throw responseToolProtocolError("模型声明了工具调用结束，但没有提供工具调用数据")
+        }
         val usage = parseDeepSeekOpenAiUsage(root)
         return LocalModelReply(
             completionReason = completionReason, rawStopReason = rawStopReason,
