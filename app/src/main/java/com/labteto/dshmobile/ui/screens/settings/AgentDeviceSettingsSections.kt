@@ -84,7 +84,8 @@ internal fun DeviceCapabilitiesCard(
     onOpenPermissionGuide: () -> Unit,
 ) {
     val enabledCount = listOf(state.accessibility, state.notifications,
-        state.postingNotifications == true).count { it }
+        state.postingNotifications == true,
+        state.batteryOptimizationExempt && !state.backgroundRestricted).count { it }
     val overallState = when {
         state.loading -> SyStatus.Running
         state.error != null -> SyStatus.Failed
@@ -135,6 +136,19 @@ internal fun DeviceCapabilitiesCard(
                 onAction = onRequestPostingPermission,
             )
         }
+        CapabilityRow(
+            label = stringResource(R.string.permission_setup_background_work),
+            enabled = state.batteryOptimizationExempt && !state.backgroundRestricted,
+            hint = stringResource(
+                if (state.backgroundRestricted)
+                    R.string.permission_setup_background_restricted_hint
+                else R.string.permission_setup_background_work_hint,
+            ),
+            actionLabel = stringResource(R.string.permission_setup_background_open),
+            onAction = if (state.backgroundRestricted)
+                viewModel::openBatteryOptimizationSettings
+            else viewModel::requestContinuousWorkBatteryExemption,
+        )
         CapabilityRow(
             label = stringResource(R.string.advanced_virtual_display),
             enabled = state.virtualDisplay,
