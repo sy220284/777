@@ -123,6 +123,7 @@ object LocalModelPresets {
             provider = "DeepSeek",
             model = "deepseek-flash",
             baseUrl = "https://api.deepseek.com",
+            protocol = LocalModelProtocol.RESPONSES,
             capabilities = setOf(
                 LocalModelCapability.TEXT,
                 LocalModelCapability.IMAGE,
@@ -140,6 +141,7 @@ object LocalModelPresets {
             provider = "DeepSeek",
             model = "deepseek-v4-pro",
             baseUrl = "https://api.deepseek.com",
+            protocol = LocalModelProtocol.RESPONSES,
             capabilities = setOf(LocalModelCapability.TEXT),
             imageInputSupported = false,
             modelsEndpoint = "https://api.deepseek.com/models",
@@ -185,6 +187,91 @@ object LocalModelPresets {
             // Anthropic max_tokens counts both thinking and answer; 8K truncates long model tasks.
             defaultMaxOutputTokens = 65_536,
         ),
+        // K3.1 Pro is thinking-only. Plus/Moderato uses 256K; Pro/Allegretto may choose 1M.
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3.1-pro",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3.1-pro-highspeed",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(LocalModelCapability.TEXT, LocalModelCapability.IMAGE),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 1_048_576,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            // Plus/Moderato is limited to 256K; 1M is a Pro/Allegretto entitlement.
+            contextWindowTokens = 262_144,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "k3-256k",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "kimi-for-coding",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 1_048_576,
+        ),
+        LocalModelPreset(
+            provider = "Kimi Code",
+            model = "kimi-for-coding-highspeed",
+            baseUrl = "https://api.kimi.com/coding/v1",
+            protocol = LocalModelProtocol.RESPONSES,
+            capabilities = setOf(
+                LocalModelCapability.TEXT,
+                LocalModelCapability.IMAGE,
+                LocalModelCapability.VIDEO,
+            ),
+            imageInputSupported = true,
+            temperatureSupported = false,
+            contextWindowTokens = 262_144,
+        ),
+    )
+
+    /**
+     * Read-only metadata for previously saved API routes and ChatGPT Plan runtime contracts.
+     * Never rendered as an API preset. Keeping this metadata avoids silently degrading existing
+     * user-created routes and the independent ChatGPT subscription transport.
+     */
+    private val compatibilityMetadata = listOf(
         LocalModelPreset(
             provider = "MiniMax",
             model = "MiniMax-M2.7",
@@ -203,66 +290,7 @@ object LocalModelPresets {
             modelsEndpoint = "https://api.minimaxi.com/v1/models",
             contextWindowTokens = 204_800,
         ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "k3",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            // Plus/Moderato is limited to 256K; 1M is a Pro/Allegretto entitlement.
-            contextWindowTokens = 262_144,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "k3-256k",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            contextWindowTokens = 262_144,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "kimi-for-coding",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            contextWindowTokens = 1_048_576,
-        ),
-        LocalModelPreset(
-            provider = "Kimi Code",
-            model = "kimi-for-coding-highspeed",
-            baseUrl = "https://api.kimi.com/coding/v1",
-            capabilities = setOf(
-                LocalModelCapability.TEXT,
-                LocalModelCapability.IMAGE,
-                LocalModelCapability.VIDEO,
-            ),
-            imageInputSupported = true,
-            temperatureSupported = false,
-            contextWindowTokens = 262_144,
-        ),
-    )
 
-    /**
-     * Read-only metadata for previously saved API routes and ChatGPT Plan runtime contracts.
-     * Never rendered as an API preset. Keeping this metadata avoids silently degrading existing
-     * user-created routes and the independent ChatGPT subscription transport.
-     */
-    private val compatibilityMetadata = listOf(
         LocalModelPreset(
             provider = "智谱 GLM",
             model = "glm-5.3-flash",
@@ -527,7 +555,7 @@ object LocalModelPresets {
                 )
             }
             if (normalizedModel.lowercase() in setOf("minimax-m2", "minimax-m2.1", "minimax-m2.1-highspeed", "minimax-m2.5", "minimax-m2.5-highspeed")) {
-                return entries.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
+                return compatibilityMetadata.first { it.model == "MiniMax-M2.7" }.copy(model = normalizedModel, baseUrl = normalizedBaseUrl)
             }
         }
         if (LocalKimiPolicy.isOfficial(normalizedBaseUrl)) {
