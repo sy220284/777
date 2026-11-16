@@ -74,10 +74,22 @@ metadata={'apk_sha256':digest,'package':a.package,'version':re.search(r'versionN
  'abis':adb('shell','-n','getprop','ro.product.cpu.abilist').decode().strip()}
 (out/'installed.json').write_text(json.dumps(metadata,indent=2))
 adb('shell','-n','pm','grant',a.package,'android.permission.POST_NOTIFICATIONS')
-adb('shell','-n','am','start','-W','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',a.package)
+# Launch as PackageManager.getLaunchIntentForPackage does: resolve the launcher
+# without MATCH_DEFAULT_ONLY, then use an explicit component with its matching action/category.
+user=adb('shell','-n','am','get-current-user').decode().strip()
+(out/'package-state.txt').write_text(package)
+resolved=adb('shell','-n','cmd','package','resolve-activity','--brief','--query-flags','0',
+ '--user',user,'-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',a.package).decode().strip()
+(out/'launcher-resolution.txt').write_text(resolved)
+component=resolved.splitlines()[-1]
+if not component.startswith(a.package+'/'):raise RuntimeError('Installed launcher could not be resolved: '+resolved)
+adb('shell','-n','am','start','-W','--user',user,'-n',component,
+ '-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER')
 end=time.monotonic()+45
 while True:
  t=tree()
+ if candidates(t,strings['shenyan_onboarding_skip']):
+  snapshot('first-launch');tap(strings['shenyan_onboarding_skip']);continue
  if candidates(t,strings['app_open_navigation']):break
  if time.monotonic()>end:raise RuntimeError('Conversation shell did not become ready')
  time.sleep(.5)

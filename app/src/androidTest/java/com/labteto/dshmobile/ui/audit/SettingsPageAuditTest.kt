@@ -67,7 +67,7 @@ class SettingsPageAuditTest(
         }
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.common_back))
             .assertExists()
-        captureUiAudit(compose, "settings-${destination.name}-${theme.name}-$fontScale-$width", "settings-audit-frame")
+        captureScrollableUiAudit(compose, "settings-${destination.name}-${theme.name}-$fontScale-$width", "settings-audit-frame")
     }
 
     companion object {
@@ -79,6 +79,12 @@ class SettingsPageAuditTest(
             listOf(ThemePreference.DARK, ThemePreference.MATTE_BLACK).flatMap { theme ->
                 listOf(1.3f, 2f).map { scale -> arrayOf<Any>(page, theme, scale, 320) }
             }
-        }
+        } + SettingsDestination.entries.filterNot { it in setOf(
+            SettingsDestination.ROOT, SettingsDestination.APPEARANCE,
+            SettingsDestination.PERMISSIONS, SettingsDestination.NOTIFICATIONS,
+        ) }.flatMap { page -> listOf(
+            arrayOf<Any>(page, ThemePreference.DARK, 2f, 320),
+            arrayOf<Any>(page, ThemePreference.MATTE_BLACK, 1.3f, 320),
+        ) }
     }
 }

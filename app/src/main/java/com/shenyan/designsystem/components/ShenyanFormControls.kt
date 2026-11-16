@@ -220,12 +220,14 @@ fun SySegmentedControl(
         with(density) { measurer.measure(option.label, style = labelStyle, softWrap = false).size.width.toDp() }
     }
     val scroll = rememberScrollState()
-    BoxWithConstraints(modifier.selectableGroup()) {
+    BoxWithConstraints(modifier.selectableGroup().clip(shape)
+        .background(syMaterialColor(SyMaterialTier.L2_BAR))
+        .border(1.dp, p.border, shape).padding(2.dp)) {
         // Equal tracks are useful only when every complete label fits. Otherwise retain
         // the natural reading direction and let the single choice track scroll.
         val equalTracks = stretch &&
             ((widths.maxOrNull() ?: 0.dp) + 14.dp) * segments.size +
-                2.dp * (segments.size - 1).coerceAtLeast(0) + 4.dp <= maxWidth
+                2.dp * (segments.size - 1).coerceAtLeast(0) <= maxWidth
         val naturalWidths = widths.map { (it + 28.dp).coerceAtLeast(SyMetric.touch) }
         val selectedIndex = segments.indexOfFirst { it.id == selectedId }
         LaunchedEffect(selectedId, maxWidth, density.fontScale, equalTracks, naturalWidths) {
@@ -236,9 +238,7 @@ fun SySegmentedControl(
             }
         }
         Row(
-            modifier = Modifier.then(if (equalTracks) Modifier.fillMaxWidth() else Modifier.horizontalScroll(scroll))
-                .clip(shape).background(syMaterialColor(SyMaterialTier.L2_BAR))
-                .border(1.dp, p.border, shape).padding(2.dp),
+            modifier = Modifier.then(if (equalTracks) Modifier.fillMaxWidth() else Modifier.horizontalScroll(scroll)),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             segments.forEachIndexed { index, option ->

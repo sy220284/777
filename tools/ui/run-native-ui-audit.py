@@ -11,6 +11,7 @@ CLASSES=[
  'com.labteto.dshmobile.ui.screens.local.LocalWorkspaceShareSelectionUiTest',
  'com.labteto.dshmobile.ui.audit.SettingsPageAuditTest',
  'com.labteto.dshmobile.ui.audit.MainPagesAuditTourTest',
+ 'com.labteto.dshmobile.ui.audit.ContentPagesAuditTest',
  'com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest',
@@ -41,7 +42,7 @@ for apk in [debug,test]:checked(['adb','install','--no-streaming','-r',str(apk)]
 for name in CLASSES:
  def run_class(name=name):
   p=subprocess.run(['adb','shell','-n','am','instrument','-w','-r','-e','class',name,
-    'com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner'],cwd=ROOT,text=True,capture_output=True,timeout=600)
+    'com.sy220284.dshmobile.debug.test/androidx.test.runner.AndroidJUnitRunner'],cwd=ROOT,text=True,capture_output=True,timeout=1800 if name.endswith('SettingsPageAuditTest') else 1200 if name.endswith('ContentPagesAuditTest') else 600)
   text=p.stdout+'\n'+p.stderr
   (OUT/(name.rsplit('.',1)[1]+'.txt')).write_text(text)
   match=re.search(r'OK \((\d+) tests?\)',text)

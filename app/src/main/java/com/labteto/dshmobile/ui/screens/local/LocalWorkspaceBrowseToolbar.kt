@@ -1,12 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.shenyan.designsystem.foundation.LocalSyColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,9 +55,13 @@ internal fun LocalWorkspaceBrowseToolbar(
                     contentDescription = "更多文件操作", onClick = { expanded = true },
                     modifier = Modifier.testTag("work_files_more"))
                 SyPopupMenu(expanded = expanded, onDismiss = { expanded = false }) {
-                    @Composable fun Entry(label: String, tag: String, action: (() -> Unit)?, available: Boolean = true) {
+                    @Composable fun Entry(label: String, tag: String, action: (() -> Unit)?, available: Boolean = true, hint: String? = null) {
                         if (action != null) DropdownMenuItem(
-                            text = { Text(label) }, enabled = available,
+                            text = { Column {
+                                Text(label)
+                                if (hint != null) Text(hint, style = MaterialTheme.typography.bodySmall,
+                                    color = LocalSyColors.current.textSecondary)
+                            } }, enabled = available,
                             modifier = Modifier.testTag(tag),
                             onClick = { expanded = false; action() },
                         )
@@ -62,7 +69,7 @@ internal fun LocalWorkspaceBrowseToolbar(
                     Entry("选择文件", "work_files_select", onSelect)
                     Entry("管理项目", "work_projects_open", onProjects, enabled)
                     Entry("代码审查", "work_git_review_entry", onReview, enabled)
-                    Entry("打开下载", "work_downloads_open", onDownloads)
+                    Entry("打开下载", "work_downloads_open", onDownloads, hint = "完成的成果：手机存储/Download/神言神语")
                 }
             }
         }

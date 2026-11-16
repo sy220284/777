@@ -855,12 +855,6 @@ internal fun LocalWorkspaceFilesDialog(
                         } else null,
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg),
                     )
-                    if (section == -1 && query.isBlank()) {
-                        Text("完成的成果：手机存储/Download/神言神语",
-                            modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
-                    }
                 }
                 if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
                     Text(stringResource(R.string.local_workspace_search_scope),

@@ -7,11 +7,19 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.test.espresso.Espresso
+import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.MainActivity
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.shenyan.SY_COMPOSER_FIELD_TAG
+import org.junit.After
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.printToString
+import java.io.File
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -29,13 +37,26 @@ class MainPagesAuditTourTest {
         }
     }
     @get:Rule val rules: RuleChain = RuleChain.outerRule(permission).around(compose)
+    @After fun keepLastNativeScreenAndSemantics() {
+        captureUiAudit(compose, "main-tour-last-screen")
+        val directory = File(compose.activity.getExternalFilesDir(null), "ui-audit")
+        val roots = compose.onAllNodes(isRoot(), useUnmergedTree = true)
+        File(directory, "main-tour-last-semantics.txt").writeText(
+            roots.fetchSemanticsNodes().indices.joinToString("\n") { roots[it].printToString() },
+        )
+    }
+
     private fun text(resource: Int) = compose.activity.getString(resource)
     private fun drawerVisible(): Boolean = listOf(R.string.local_usage_chat, R.string.local_usage_work)
-        .all { resource -> compose.onAllNodesWithText(text(resource)).fetchSemanticsNodes()
+        .all { resource -> compose.onAllNodesWithText(text(resource), useUnmergedTree = true).fetchSemanticsNodes()
             .any { it.boundsInRoot.left >= 0 && it.boundsInRoot.right > 0 } }
-    private fun back() = compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+    private fun back() {
+        Espresso.pressBack()
+        compose.waitForIdle()
+    }
     private fun openDrawer() {
         compose.onNodeWithContentDescription(text(R.string.app_open_navigation)).performClick()
+        captureUiAudit(compose, "main-drawer-open-attempt")
         compose.waitUntil(10_000) { drawerVisible() }
     }
     private fun selectMode(resource: Int) {
@@ -64,6 +85,10 @@ class MainPagesAuditTourTest {
             compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
+        if (compose.onAllNodesWithText(text(R.string.shenyan_onboarding_skip)).fetchSemanticsNodes().isNotEmpty()) {
+            captureUiAudit(compose, "main-first-launch")
+            compose.onNodeWithText(text(R.string.shenyan_onboarding_skip)).performClick()
+        }
         selectMode(R.string.local_usage_work)
         captureUiAudit(compose, "main-work")
         openDrawer(); captureUiAudit(compose, "main-sidebar-work"); back()
@@ -72,6 +97,10 @@ class MainPagesAuditTourTest {
             compose.onNodeWithContentDescription(text(R.string.tasks_new)).performClick()
             compose.onNodeWithText(text(R.string.tasks_create_manual)).performClick()
             captureUiAudit(compose, "main-task-editor")
+            compose.onAllNodes(hasSetTextAction())[0].performClick().performTextInput("整理本周的阅读笔记和后续研究问题")
+            captureUiAudit(compose, "main-task-editor-keyboard")
+            Espresso.pressBack()
+            captureUiAudit(compose, "main-task-editor-keyboard-dismissed")
             back()
         }
         page(R.string.tools_title, "main-tools") {
@@ -80,13 +109,29 @@ class MainPagesAuditTourTest {
             compose.onNodeWithText("连接器").performClick()
             captureUiAudit(compose, "main-connectors")
         }
-        page(R.string.settings_title, "main-settings")
+        page(R.string.settings_title, "main-settings") {
+            compose.onNodeWithText(text(R.string.settings_page_models)).performScrollTo().performClick()
+            compose.onNodeWithText(text(R.string.local_api_model_add)).performClick()
+            captureUiAudit(compose, "main-model-connection-form")
+            back()
+            back()
+        }
         selectMode(R.string.local_usage_chat)
         captureUiAudit(compose, "main-chat")
         openDrawer(); captureUiAudit(compose, "main-sidebar-chat"); back()
         page(R.string.persona_gallery_title, "main-personas") {
             compose.onNodeWithText(text(R.string.persona_gallery_add)).performClick()
             captureUiAudit(compose, "main-persona-presets")
+            compose.onAllNodesWithText(text(R.string.persona_gallery_preset_add))[0].performClick()
+            compose.waitUntil(30_000) {
+                compose.onAllNodesWithText(text(R.string.persona_gallery_preset_taken)).fetchSemanticsNodes().isNotEmpty()
+            }
+            back()
+            compose.onNodeWithText(PersonaPresetCatalog.presets.first().persona.name).performClick()
+            captureUiAudit(compose, "main-persona-detail")
+            compose.onNodeWithText(text(R.string.persona_gallery_view_profile)).performScrollTo().performClick()
+            captureUiAudit(compose, "main-persona-profile")
+            back()
             back()
         }
         page(R.string.chat_diary_title, "main-diary")
