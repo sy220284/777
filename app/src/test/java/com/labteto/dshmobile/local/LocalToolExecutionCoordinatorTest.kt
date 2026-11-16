@@ -123,27 +123,15 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(listOf("script-1/step-2:bash"), approvals) // no redundant wrapper prompt
     }
 
-    @Test fun planModeAdvertisesReadOnlyCodeModeInsteadOfHidingIt() = runBlocking {
+    @Test fun planModeAdvertisesStableDirectCallGateway() {
         val registry = ToolRegistry()
-        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
-            ToolResult("preview")
-        })
-        CodeModePlugin(registry).install(HarnessContext(registry))
+        registerGateways(registry)
+        registry.register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("preview") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-        val selected = projection.modelSelection(
-            policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = true,
-            history = emptyList(),
-        )
-        assertTrue("code_mode_run" in projection.names(selected.schemas))
-        val codeMode = selected.schemas
-            .mapNotNull { it as? JsonObject }
-            .first { it.getValue("function").jsonObject.getValue("name").jsonPrimitive.content == "code_mode_run" }
-        val description = codeMode.getValue("function").jsonObject
-            .getValue("description").jsonPrimitive.content
-        assertTrue(description.contains("规划模式只允许"))
-        assertTrue(description.contains("写文件"))
+        val selected = projection.modelSelection(localAgentRunPolicy(LocalUsageMode.WORK),
+            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList())
+        assertEquals(listOf("tool_search", "tool_call"), projection.names(selected.schemas))
+        assertFalse("read" in projection.names(selected.schemas))
     }
 
     @Test fun planModeRunsReadOnlyCodeModeWithoutExtraPromptsAndRejectsMixedScript() = runBlocking {
@@ -1087,7 +1075,7 @@ class LocalToolExecutionCoordinatorTest {
 
         assertTrue(result.isError)
         assertEquals("UNKNOWN_TOOL", result.errorCode)
-        assertTrue(result.recoveryHint.orEmpty().contains("capability_search"))
+        assertTrue(result.recoveryHint.orEmpty().contains("tool_search"))
     }
 
     @Test
@@ -1935,109 +1923,39 @@ class LocalToolExecutionCoordinatorTest {
         )
     }
 
-    @Test
-    fun subagentSchemaProjectionPreservesReadOnlyAndVirtualScreenBoundaries() {
-        val registry = ToolRegistry().apply {
-            register(
-                tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") },
-            )
-            register(
-                tool("download_file", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) {
-                    ToolResult("ok")
-                },
-            )
-            register(
-                tool("workflow", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") },
-            )
-            register(
-                tool(
-                    "android_vscreen_status",
-                    ToolAccess.READ_ONLY,
-                    ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "Android",
-                    keywords = setOf("android", "virtual screen"),
-                ) { ToolResult("ok") },
-            )
-        }
+    @Test fun subagentSurfaceStaysStableAcrossCapabilityModes() {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        registry.register(tool("download_file", ToolAccess.WORKSPACE_WRITE,
+            ToolApprovalPolicy.ALWAYS, ToolExposure.OPTIONAL) { ToolResult("ok") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-
-        val readOnly = projection.names(
-            projection.subagentSchemas(
-                allowMutation = false,
-                allowVirtualScreen = false,
-                enabledOptional = emptySet(),
-            ),
-        )
-        assertEquals(listOf("read"), readOnly)
-
-        val withVirtualScreen = projection.names(
-            projection.subagentSchemas(
-                allowMutation = false,
-                allowVirtualScreen = true,
-                enabledOptional = setOf("android_vscreen_status"),
-            ),
-        )
-        assertEquals(listOf("read", "android_vscreen_status"), withVirtualScreen)
+        for (mutation in listOf(false, true)) for (virtual in listOf(false, true)) {
+            assertEquals(listOf("tool_search", "tool_call"), projection.names(
+                projection.subagentSchemas(mutation, virtual, setOf("download_file"))))
+        }
     }
 
-    @Test
-    fun readonlyAndPlanToolSchemasHideBackgroundWebFetchOption() {
-        val registry = ToolRegistry().apply { register(webFetchTool { ToolResult("ok") }) }
+    @Test fun readonlyAndPlanDoNotAdvertiseInnerWebFetchSchema() {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        registry.register(webFetchTool { ToolResult("ok") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-
-        val readonly = projection.subagentSchemas(
-            allowMutation = false,
-            allowVirtualScreen = false,
-            enabledOptional = emptySet(),
-        ).single().jsonObject
-        val planning = projection.modelSchemas(
-            policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = true,
-            history = emptyList(),
-        ).single().jsonObject
-        val writable = projection.subagentSchemas(
-            allowMutation = true,
-            allowVirtualScreen = false,
-            enabledOptional = emptySet(),
-        ).single().jsonObject
-
-        fun properties(schema: JsonObject): JsonObject =
-            schema["function"]!!.jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
-
-        assertFalse("run_in_background" in properties(readonly))
-        assertFalse("run_in_background" in properties(planning))
-        assertTrue("run_in_background" in properties(writable))
-        assertTrue(readonly["function"]!!.jsonObject["description"]!!.jsonPrimitive.content.contains("不写入工作区"))
+        val work = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK),
+            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList())
+        val child = projection.subagentSchemas(false, false, emptySet())
+        assertEquals(work, child)
+        assertEquals(listOf("tool_search", "tool_call"), projection.names(work))
+        assertFalse("web_fetch" in projection.names(work))
     }
 
-    @Test
-    fun planModeSchemaProjectionOmitsToolsThatExecutionWouldReject() {
-        val registry = ToolRegistry().apply {
-            register(tool("read", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) { ToolResult("ok") })
-            register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) { ToolResult("ok") })
-            register(
-                tool(
-                    name = "remote_lookup",
-                    access = ToolAccess.NETWORK,
-                    approval = ToolApprovalPolicy.NEVER,
-                    exposure = ToolExposure.OPTIONAL,
-                    family = "网络",
-                    keywords = setOf("联网"),
-                ) { ToolResult("ok") },
-            )
-        }
+    @Test fun planModeStillUsesConstantGatewayWithoutExposingWrites() {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        registry.register(tool("write", ToolAccess.WORKSPACE_WRITE, ToolApprovalPolicy.ALWAYS) { ToolResult("ok") })
         val projection = LocalToolSchemaProjection(registry, coordinator(registry))
-        val schemas = projection.modelSchemas(
-            policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = true,
-            history = emptyList(),
-            enabledOptional = setOf("remote_lookup"),
-        )
-
-        assertEquals(listOf("read", "remote_lookup"), projection.names(schemas))
+        val surface = projection.modelSchemas(localAgentRunPolicy(LocalUsageMode.WORK),
+            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList(), setOf("write"))
+        assertEquals(listOf("tool_search", "tool_call"), projection.names(surface))
     }
 
     @Test fun unsupportedRemoteFileAndShellToolsCannotFallBackToPhoneEffects() = runBlocking {
@@ -2121,40 +2039,26 @@ class LocalToolExecutionCoordinatorTest {
         assertEquals(1, observations)
     }
 
-    @Test
-    fun modelSelectionDiagnosesAbsentOrPolicyExcludedToolsWithoutExposingSchemas() {
-        val registry = ToolRegistry().apply {
-            register(tool(name = "web_search", access = ToolAccess.NETWORK,
-                approval = ToolApprovalPolicy.NEVER, exposure = ToolExposure.OPTIONAL,
-                family = "网络", keywords = setOf("联网")) { ToolResult("ok") })
-            register(tool(name = "workspace_write", access = ToolAccess.WORKSPACE_WRITE,
-                approval = ToolApprovalPolicy.MUTATION, exposure = ToolExposure.OPTIONAL,
-                family = "文件", keywords = setOf("写入")) { ToolResult("ok") })
-        }
-        val execution = coordinator(registry, networkSearchEnabled = { false })
-        val projection = LocalToolSchemaProjection(registry, execution)
-        val selection = projection.modelSelection(
-            policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = true,
-            history = emptyList(),
-            enabledOptional = linkedSetOf("web_search", "workspace_write", "uninstalled_extension"),
-        )
-        assertFalse("web_search" in projection.names(selection.schemas))
-        assertFalse("workspace_write" in projection.names(selection.schemas))
-        assertFalse("uninstalled_extension" in projection.names(selection.schemas))
-        assertTrue(selection.omittedReasons["web_search"].orEmpty().contains("关闭"))
-        assertTrue(selection.omittedReasons["workspace_write"].orEmpty().contains("规划模式"))
-        assertTrue(selection.omittedReasons["uninstalled_extension"].orEmpty().contains("未注册"))
+    @Test fun modelSelectionIsIndependentOfOptionalBudgetAndNetworkState() {
+        val registry = ToolRegistry()
+        registerGateways(registry)
+        registry.register(tool("web_search", ToolAccess.NETWORK, ToolApprovalPolicy.NEVER,
+            ToolExposure.OPTIONAL) { ToolResult("ok") })
+        val projection = LocalToolSchemaProjection(registry, coordinator(registry,
+            networkSearchEnabled = { false }))
+        val actual = projection.modelSelection(localAgentRunPolicy(LocalUsageMode.WORK),
+            com.labteto.dshmobile.local.model.LocalModelState(), true, emptyList(),
+            setOf("web_search", "missing_extension"))
+        assertEquals(listOf("tool_search", "tool_call"), projection.names(actual.schemas))
+        assertTrue(actual.omittedReasons.isEmpty())
+    }
 
-        // The public model-facing API must not drift from the diagnostic selection.
-        assertEquals(selection.schemas, projection.modelSchemas(
-            policy = localAgentRunPolicy(LocalUsageMode.WORK),
-            modelState = com.labteto.dshmobile.local.model.LocalModelState(),
-            planModeEnabled = true,
-            history = emptyList(),
-            enabledOptional = linkedSetOf("web_search", "workspace_write", "uninstalled_extension"),
-        ))
+    private fun registerGateways(registry: ToolRegistry) {
+        for (name in listOf("tool_search", "tool_call")) {
+            registry.register(tool(name, ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                ToolResult("gateway")
+            })
+        }
     }
 
     private fun coordinator(
