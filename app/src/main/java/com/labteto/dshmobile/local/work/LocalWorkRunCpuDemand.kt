@@ -12,8 +12,10 @@ internal fun workRunCpuDemand(binding: LocalWorkRunBinding) = combine(
     binding.executingToolCallIds,
     binding.waitingForTransport,
 ) { waiting, executing, transportWaiting ->
-    !transportWaiting && workRunNeedsCpu(waiting, executing)
+    workRunNeedsCpu(waiting, executing, transportWaiting)
 }.distinctUntilChanged()
 
-internal fun workRunNeedsCpu(waitingCallIds: Set<String>, executingCallIds: Set<String>): Boolean =
-    waitingCallIds.isEmpty() || executingCallIds.any { it !in waitingCallIds }
+internal fun workRunNeedsCpu(
+    waitingCallIds: Set<String>, executingCallIds: Set<String>, transportWaiting: Boolean = false,
+): Boolean = !transportWaiting &&
+    (waitingCallIds.isEmpty() || executingCallIds.any { it !in waitingCallIds })
