@@ -442,11 +442,6 @@ internal class LocalToolExecutionCoordinator(
                 readOnly = false, executionStarted = false,
             )
             val binding = currentCoroutineContext()[ToolBindingSnapshot]
-            if (binding != null && binding.directChild(child.name) !== handler) {
-                return localToolFailure("TOOL_REGISTRATION_CHANGED",
-                    "工具在当前模型请求之后新增、更新或卸载；请在下一次模型响应中重新调用：" + child.name,
-                    readOnly = false, executionStarted = false)
-            }
             val delegated = child.copy(id = call.id + "/direct")
             val invoke: suspend () -> AgentToolResult = {
                 executeScoped(
