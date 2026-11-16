@@ -529,7 +529,9 @@ object LocalModelPresets {
         val normalizedBaseUrl = runCatching { normalizeModelBaseUrl(baseUrl) }.getOrNull()
             ?: return null
         if (LocalMiniMaxPolicy.isOfficial(normalizedBaseUrl)) {
-            val native = entries.firstOrNull { it.provider == "MiniMax" && it.model.equals(normalizedModel, true) }
+            val native = (entries + compatibilityMetadata).firstOrNull {
+                it.provider == "MiniMax" && it.model.equals(normalizedModel, true)
+            }
             if (native != null) {
                 val protocol = if (native.model in setOf("MiniMax-M3.1-Flash", "MiniMax-M3")) {
                     LocalMiniMaxPolicy.protocolForEndpoint(normalizedBaseUrl)
