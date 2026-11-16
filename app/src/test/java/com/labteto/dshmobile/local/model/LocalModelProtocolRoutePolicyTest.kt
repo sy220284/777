@@ -124,6 +124,35 @@ class LocalModelProtocolRoutePolicyTest {
         assertEquals(listOf("$miniMax/v1/chat/completions"), seen)
     }
 
+    @Test fun oldDeepSeekFullChatEndpointSwitchesToNativeResponsesWithoutChangingTheSavedAccount() = runBlocking {
+        val oldUrl = "https://api.deepseek.com/v1/chat/completions"
+        val saved = LocalModelProfile("old-deepseek", "deepseek-flash", oldUrl,
+            protocol = LocalModelProtocol.CHAT_COMPLETIONS)
+        assertEquals(LocalModelProtocol.CHAT_COMPLETIONS,
+            LocalModelPresets.find(saved.model, oldUrl)?.protocol)
+        assertEquals("deepseek-flash",
+            LocalModelPresets.editablePresetFor(saved.model, oldUrl)?.model)
+        assertEquals(listOf(LocalModelProtocol.RESPONSES, LocalModelProtocol.CHAT_COMPLETIONS),
+            LocalModelPresets.editorProtocolsFor(saved.model, oldUrl))
+        val newUrl = LocalModelPresets.editorBaseUrlForProtocol(
+            saved.model, oldUrl, LocalModelProtocol.RESPONSES)
+        assertEquals("https://api.deepseek.com", newUrl)
+        assertEquals("https://api.deepseek.com/responses",
+            LocalModelPresets.editorRequestEndpointFor(saved.model, newUrl, LocalModelProtocol.RESPONSES))
+        assertTrue(LocalModelProtocolRoutePolicy.sameCredentialOrigin(oldUrl, newUrl))
+        val draft = resolveLocalModelApiKeyDraft("", saved.model, newUrl,
+            LocalModelProtocol.RESPONSES, listOf(saved),
+            { id -> if (id == saved.id) "old-key" else error("wrong credential") },
+            profileId = saved.id)
+        assertEquals(saved.id, draft.profile.id)
+        assertEquals("old-key", draft.key)
+        assertEquals(LocalModelProtocol.RESPONSES, draft.profile.protocol)
+        assertEquals(newUrl, draft.profile.baseUrl)
+        assertNotEquals(saved.routeFingerprint(), draft.profile.routeFingerprint())
+        assertFalse(LocalModelProtocolRoutePolicy.sameCredentialOrigin(oldUrl,
+            "https://api.deepseek.com.evil.example/v1"))
+    }
+
     @Test fun structuredOutputCapabilityAndGatewayAdmissionMatchTheSameDeepSeekRoute() {
         val r = LocalModelProtocol.RESPONSES
         val deepSeek = LocalModelPresets.runtimeCapabilitiesFor(
