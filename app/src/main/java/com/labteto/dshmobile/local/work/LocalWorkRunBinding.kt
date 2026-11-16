@@ -9,7 +9,6 @@ import com.labteto.dshmobile.local.interaction.LocalInteractionCoordinator
 import com.labteto.dshmobile.local.interaction.LocalInteractionStatePort
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.jobs.LocalJobInfo
-import com.labteto.dshmobile.local.tools.LocalRunToolSelection
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalAgentRunHandle
 import com.labteto.dshmobile.local.runtime.projectExecutionJobs
@@ -49,7 +48,7 @@ internal class LocalWorkRunBinding(
     /** Exact live tool bodies, including question waits; settled by the shared execution boundary. */
     val executingToolCallIds = MutableStateFlow<Set<String>>(emptySet())
     val workState: LocalWorkStatePort = localWorkRunStatePort(state)
-    val enabledOptionalTools = LocalRunToolSelection()
+    val enabledOptionalTools = linkedSetOf<String>()
     /** Per-run MCP registrations discovered after a model step, not a global permission grant. */
     internal val mcpDiscovery = LocalWorkRunMcpDiscovery()
     internal val workflowAdmission = kotlinx.coroutines.sync.Mutex()
