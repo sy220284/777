@@ -11,6 +11,13 @@ class LocalWorkRunCpuDemandTest {
         assertTrue(workRunNeedsCpu(emptySet(), emptySet()))
     }
 
+    @Test fun waitingForNetworkReleasesWakeLockWithoutCancellingWork() {
+        assertFalse(workRunNeedsCpu(emptySet(), emptySet(), transportWaiting = true))
+        assertFalse(workRunNeedsCpu(setOf("approval"), setOf("read"), transportWaiting = true))
+        assertTrue(workRunNeedsCpu(emptySet(), emptySet(), transportWaiting = false))
+        assertTrue(workRunNeedsCpu(setOf("approval"), setOf("read"), transportWaiting = false))
+    }
+
     @Test fun approvalAndQueuedOrSettledToolsDoNotNeedCpu() {
         // The completed read's durable batch receipt can still be pending; it is not a live body.
         assertFalse(workRunNeedsCpu(setOf("approve"), emptySet()))
