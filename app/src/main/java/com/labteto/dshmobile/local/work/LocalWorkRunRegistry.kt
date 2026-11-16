@@ -212,7 +212,10 @@ class LocalWorkRunRegistry internal constructor(
         onIdle: () -> Unit = {},
         startNext: (QueuedAgentInput, LocalWorkRunBinding) -> Job,
     ): Job? = synchronized(runtimeStateStore.foregroundRunHandle.lock) {
-        if (binding.runHandle.job !== completedJob) return@synchronized null
+        // A previous binding may settle after a session was reopened with the same id.
+        // Only the registry's current binding can write a checkpoint or claim inbox work.
+        if (bindings[binding.sessionId] !== binding ||
+            binding.runHandle.job !== completedJob) return@synchronized null
 
         var successor: Job? = null
         try {
@@ -310,7 +313,8 @@ class LocalWorkRunRegistry internal constructor(
     /** Also covers cancellation before a lazy turn starts and failures during turn setup. */
     internal fun releaseCompletedTurn(binding: LocalWorkRunBinding, completedJob: Job) {
         synchronized(runtimeStateStore.foregroundRunHandle.lock) {
-            if (binding.runHandle.job === completedJob) releaseFinishedBinding(binding)
+            if (bindings[binding.sessionId] === binding &&
+                binding.runHandle.job === completedJob) releaseFinishedBinding(binding)
         }
     }
 
@@ -330,11 +334,12 @@ class LocalWorkRunRegistry internal constructor(
 
     private fun releaseFinishedBinding(binding: LocalWorkRunBinding) {
         binding.runHandle.job = null
-        detach(binding)
+        val wasCurrentOwner = detach(binding)
         binding.runHandle.projectionJob?.cancel()
         binding.runHandle.projectionJob = null
         binding.state.update { current -> current.copy(kernel = current.kernel.copy(running = false)) }
         if (
+            wasCurrentOwner &&
             runtimeStateStore.currentSessionId == binding.sessionId &&
             runtimeStateStore.state.value.sessionId == binding.sessionId
         ) {
