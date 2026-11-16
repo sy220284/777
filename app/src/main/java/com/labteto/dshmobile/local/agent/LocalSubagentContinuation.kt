@@ -13,6 +13,13 @@ internal fun subagentContinuationMessage(
     completedContinuations: Int,
 ): JsonObject? {
     val continuation = SUBAGENT_CONTINUATION_POLICY.message(error, completedContinuations) ?: return null
+    if (error.code == "MODEL_EMPTY_RESPONSE") {
+        return kotlinx.serialization.json.JsonObject(
+            continuation + ("content" to kotlinx.serialization.json.JsonPrimitive(
+                "上一轮模型给出了空白完成结果。请核对已有工具回执和当前子任务目标，生成实际结果或使用正确工具继续；已执行的操作不可重复。"
+            ))
+        )
+    }
     if (error.code in setOf("MODEL_STREAM_PROTOCOL", "MODEL_RESPONSE_PROTOCOL", "RESPONSES_PROTOCOL_ERROR")) {
         return kotlinx.serialization.json.JsonObject(
             continuation + ("content" to kotlinx.serialization.json.JsonPrimitive(
