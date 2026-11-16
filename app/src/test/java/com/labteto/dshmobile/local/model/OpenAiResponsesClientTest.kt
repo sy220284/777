@@ -181,6 +181,27 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun malformedResponsesSseFrameEntersInStepProtocolCorrection() = runBlocking {
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body("data: {\"type\":\"response.completed\",\"response\":\n\n"
+                    .toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val failure = runCatching {
+            OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+                accessToken = "mock-token", baseUrl = "https://api.openai.com/v1", model = "gpt-test",
+                messages = chatPostTurnModelMessages("检查协议"), tools = JsonArray(emptyList()),
+            )
+        }.exceptionOrNull() as? LocalModelException
+        assertEquals("RESPONSES_PROTOCOL_ERROR", failure?.code)
+        assertEquals(LocalModelAdmissionState.ADMITTED, failure?.admissionState)
+        assertTrue(failure?.continuationEligible == true)
+        assertFalse(failure?.retryable ?: true)
+        assertFalse(failure?.cause?.message.orEmpty().contains("response.completed"))
+    }
+
+    @Test
     fun duplicateResponsesToolIdsAreRejectedBeforeDispatch() {
         val duplicateCall = """{"type":"function_call","call_id":"same-id","name":"tool_call","arguments":"{}"}"""
         val response = Json.parseToJsonElement(
