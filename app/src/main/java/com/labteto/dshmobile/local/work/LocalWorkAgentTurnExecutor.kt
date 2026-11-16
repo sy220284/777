@@ -537,11 +537,29 @@ internal class LocalWorkAgentTurnExecutor(
                     )
                     val nativeImagesSent = hasMaterializedImageUrls(requestMessages)
                     agentRunCoordinator.ensureCurrentOwner(runContext)
+                    val eagerToolContext = currentCoroutineContext()
+                        [com.labteto.dshmobile.harness.agent.AgentEagerToolContext]
                     val sampling = try {
-                        sampleUntilWorkSteered(binding.steeringRevision, observedSteer) {
+                        sampleWithToolArgumentsRepair(
+                            revisions = binding.steeringRevision,
+                            observedRevision = observedSteer,
+                            originalMessages = requestMessages,
+                            canRepair = {
+                                !binding.runHandle.cancellationRequested &&
+                                    eagerToolContext?.hasOffered?.invoke() != true
+                            },
+                            onRepair = { attempt ->
+                                runEventLog.append("work/model-tool-arguments-repair", buildJsonObject {
+                                    put("run_id", runContext.runId)
+                                    put("step", modelStep + 1)
+                                    put("attempt", attempt)
+                                    put("reason", "invalid_tool_json")
+                                })
+                            },
+                        ) { correctedMessages ->
                         modelRequests.complete(
                             snapshot = snapshot,
-                            messages = requestMessages,
+                            messages = correctedMessages,
                             step = modelStep + 1,
                             options = com.labteto.dshmobile.local.LocalModelRequestOptions(
                                 toolsOverride = tools,
