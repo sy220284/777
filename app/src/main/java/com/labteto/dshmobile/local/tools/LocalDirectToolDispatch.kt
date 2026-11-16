@@ -60,6 +60,7 @@ internal class LocalSubagentExecutionScope(
         }
         if (capabilities.toolAllowlist != null && name !in capabilities.toolAllowlist) return false
         if (capabilities.teamManaged && tool.exposure == ToolExposure.OPTIONAL &&
+            name !in LocalAgentTeamContract.MEMBER_TOOL_NAMES &&
             name !in capabilities.initialOptionalTools) return false
         return LocalRecursiveReadOnlyToolScope.permits(name, capabilities)
     }
