@@ -116,6 +116,7 @@ class WorkBackgroundReplyAndroidTest {
         assertNotNull("用户发起任务后，前台服务必须成功取得执行许可", lease)
         try {
             assertTrue("前台服务应接收任务进度", runBlocking { lease!!.updateStep(1) })
+            runBlocking { lease!!.setCpuActive(true) }
             assertTrue("系统必须切换到桌面",
                 instrumentation.uiAutomation.performGlobalAction(
                     AccessibilityService.GLOBAL_ACTION_HOME))
