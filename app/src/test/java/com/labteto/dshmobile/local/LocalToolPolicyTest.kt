@@ -37,7 +37,7 @@ class LocalToolPolicyTest {
     @Test fun ordinaryExecutionToolsStayCoreWhileNarrowCapabilitiesAreDeferred() {
         for (name in listOf(
             "read", "tool_output_read", "write", "edit", "apply_patch", "file_inspect",
-            "list_files", "glob", "grep", "bash", "capability_search", "update_plan",
+            "list_files", "glob", "grep", "bash", "tool_call", "tool_search", "update_plan",
             "exit_plan_mode", "ask_user_question", "subagent", "list_subagent_models", "session_event_search",
         )) {
             assertEquals(name, ToolExposure.CORE, LocalToolPolicy.exposure(name))
