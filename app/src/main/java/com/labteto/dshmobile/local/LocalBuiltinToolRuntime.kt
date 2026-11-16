@@ -23,6 +23,7 @@ import com.labteto.dshmobile.local.tools.LocalExtensionWorkshop
 import com.labteto.dshmobile.local.tools.LocalShellTool
 import com.labteto.dshmobile.local.tools.LocalSubagentExecutionScope
 import com.labteto.dshmobile.local.tools.LocalToolRouter
+import com.labteto.dshmobile.local.tools.LocalToolPolicy
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import kotlinx.coroutines.currentCoroutineContext
 import com.labteto.dshmobile.harness.resource.HarnessResourceKind
