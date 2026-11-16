@@ -147,6 +147,10 @@ internal class LocalWorkRunBinding(
     @Volatile
     var continuationParentRunId: String? = null
 
+    /** Restored Inbox carries the transport reason even when the UI request has no live ref. */
+    @Volatile
+    var continuationFailureCode: String? = null
+
     val transcriptRuntime = LocalTranscriptRuntime(
         state = transcriptStatePort,
         // Work tool results are bounded by LocalWorkToolResultRuntime before transcript projection.
