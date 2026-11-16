@@ -38,7 +38,7 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
                 it.matches(Regex("[A-Za-z][A-Za-z0-9_/-]{0,127}"))
             }
             val instruction = buildString {
-                append("上一轮模型响应解析失败，该模型回复中没有执行任何工具。错误码=")
+                append("上一轮模型响应解析失败，工具尚未执行。错误码=")
                 append(error.code)
                 append("；具体原因=")
                 if (error.code in setOf(
@@ -63,7 +63,7 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
                 } else {
                     append("如果不确定名称或参数，先用 tool_search 查询 Schema。")
                 }
-                append("继续原任务；历史中已有成功回执的操作不得重复执行。")
+                append("继续原任务；历史中已有成功回执的操作不要重复执行。")
             }
             messages = originalMessages + buildJsonObject {
                 put("role", "user")
