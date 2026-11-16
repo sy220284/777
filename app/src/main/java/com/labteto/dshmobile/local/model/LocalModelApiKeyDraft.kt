@@ -29,8 +29,12 @@ internal suspend fun resolveLocalModelApiKeyDraft(
     newProfileId: () -> String = { "api-${UUID.randomUUID()}" },
 ): LocalModelApiKeyDraft {
     require(model.isNotBlank()) { "请选择模型" }
-    val url = normalizeModelBaseUrl(baseUrl)
-    val name = migrateOfficialClaudeModel(model.trim(), url)
+    val normalizedInputUrl = normalizeModelBaseUrl(baseUrl)
+    val name = migrateOfficialClaudeModel(model.trim(), normalizedInputUrl)
+    val selectedProtocol = protocol ?: profiles.firstOrNull {
+        profileId != null && it.id == profileId && it.model == name
+    }?.protocol ?: LocalModelPresets.protocolFor(name, normalizedInputUrl)
+    val url = LocalModelProtocolRoutePolicy.baseUrlFor(name, normalizedInputUrl, selectedProtocol)
     val explicitKey = apiKey.trim().takeIf(String::isNotEmpty)
     val existing = when {
         profileId != null -> profiles.apiKeyProfileForRoute(name, url, profileId)
@@ -61,7 +65,7 @@ internal suspend fun resolveLocalModelApiKeyDraft(
         model = name,
         baseUrl = url,
         provider = preset?.provider ?: existing?.provider.orEmpty(),
-        protocol = protocol ?: existing?.protocol ?: preset?.protocol ?: LocalModelProtocol.CHAT_COMPLETIONS,
+        protocol = selectedProtocol,
         contextWindowTokensOverride = contextOverride,
     )
     return LocalModelApiKeyDraft(profile, key)
