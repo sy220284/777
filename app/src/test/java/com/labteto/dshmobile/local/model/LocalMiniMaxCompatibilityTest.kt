@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.model
 
 import com.labteto.dshmobile.local.DeepSeekClient
+import com.labteto.dshmobile.local.LocalModelException
 import kotlinx.coroutines.runBlocking
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import java.io.File
