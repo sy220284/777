@@ -131,7 +131,7 @@ internal class LocalSubagentRunner(
     private val requireTeamRootAuthorization: ((String) -> Unit)? = null,
     private val requireTeamWorkspaceMutation: (suspend (String, LocalToolCall) -> Unit)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
-    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, String, String) -> List<JsonObject>,
+    private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, LocalModelProfile) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
     private val onUsage: (String, LocalModelReply, TokenUsageContext) -> Unit = { _, _, _ -> },
     private val onNativeImageAccepted: (String, String) -> Unit = { _, _ -> },
@@ -577,8 +577,7 @@ internal class LocalSubagentRunner(
                     val preparedHistory = prepareMessages(
                         durableHistory,
                         selectedMode,
-                        snapshot.modelState.baseUrl,
-                        routeModel,
+                        runProfile,
                     )
                     // Only record a delivery as submitted when the exact normalized message survived
                     // compaction and reached the model request. Dropped history remains unconfirmed.
