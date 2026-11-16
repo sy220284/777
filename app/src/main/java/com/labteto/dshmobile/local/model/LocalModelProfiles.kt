@@ -573,10 +573,16 @@ object LocalModelPresets {
         find(model, baseUrl)?.capabilities ?: setOf(LocalModelCapability.TEXT)
 
     /** Capabilities actually encoded by this client's current request/response transports. */
-    fun clientCapabilitiesFor(model: String, baseUrl: String): Set<LocalModelCapability> =
+    fun clientCapabilitiesFor(
+        model: String,
+        baseUrl: String,
+        protocol: LocalModelProtocol = protocolFor(model, baseUrl),
+    ): Set<LocalModelCapability> =
         capabilitiesFor(model, baseUrl).filterTo(linkedSetOf()) {
             it == LocalModelCapability.TEXT || it == LocalModelCapability.IMAGE ||
-                (it == LocalModelCapability.VIDEO && LocalKimiPolicy.videoInputSupported(model, baseUrl))
+                (it == LocalModelCapability.VIDEO &&
+                    protocol == LocalModelProtocol.CHAT_COMPLETIONS &&
+                    LocalKimiPolicy.videoInputSupported(model, baseUrl))
         }
 
     fun maxNativeImageBytesFor(model: String, baseUrl: String): Long =
