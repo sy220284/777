@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.espresso.Espresso
 import com.labteto.dshmobile.local.chat.PersonaPresetCatalog
@@ -105,12 +106,12 @@ class MainPagesAuditTourTest {
             // A Back press while editing can first dismiss the IME. Ensure the
             // editor's own Back action is exercised before leaving the task page.
             val taskRootAction = text(R.string.tasks_new)
-            if (compose.onAllNodesWithContentDescription(taskRootAction)
+            if (compose.onAllNodes(hasContentDescription(taskRootAction))
                     .fetchSemanticsNodes().isEmpty()) {
                 compose.onNodeWithContentDescription(text(R.string.common_back)).performClick()
             }
             compose.waitUntil(10_000) {
-                compose.onAllNodesWithContentDescription(taskRootAction)
+                compose.onAllNodes(hasContentDescription(taskRootAction))
                     .fetchSemanticsNodes().isNotEmpty()
             }
             captureUiAudit(compose, "main-task-editor-closed")
