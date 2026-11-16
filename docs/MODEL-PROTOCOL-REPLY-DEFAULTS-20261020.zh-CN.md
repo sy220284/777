@@ -15,7 +15,7 @@
 | Claude 官方历史元数据 | Anthropic Messages | `https://api.anthropic.com/v1` | 保持 x-api-key 与历史模型路线 |
 | GLM、Gemini、Qwen 历史元数据 | Chat Completions | 历史各自兼容接口 | 保留已保存配置 |
 
-**协议与多模态关联：** Kimi Code 官方 Responses 当前支持文字与图片，视频输入需原生 Chat Completions。777 的能力投影按真实 `profile.protocol` 确定是否显示视频支持；预置默认 Responses，用户可通过预置编辑器明确改用 Chat Completions 处理视频。旧配置不自动改写协议，以免覆盖原来的用户选择和历史请求回放身份。Kimi K3.1 Pro 与 K3 的 1M 上下文需要拥有对应档位；默认 256K，高速旗舰的默认上下文为 1M。
+**协议与多模态关联：** Kimi Code 官方 Responses 当前支持文字与图片，视频输入需原生 Chat Completions；K3.1 Pro 两款型号的原生 Chat 路由也支持视频。777 的能力投影按真实 `profile.protocol` 确定是否显示视频支持；预置默认 Responses，用户可通过预置编辑器明确改用 Chat Completions 处理视频。旧配置不自动改写协议，以免覆盖原来的用户选择和历史请求回放身份。Kimi K3.1 Pro 与 K3 的 1M 上下文需要拥有对应档位；默认 256K，高速旗舰的默认上下文为 1M。
 
 ## 协议执行与缓存
 
