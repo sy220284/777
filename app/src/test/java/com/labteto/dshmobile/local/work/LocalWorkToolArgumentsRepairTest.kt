@@ -84,6 +84,35 @@ class LocalWorkToolArgumentsRepairTest {
         assertEquals(original, seen.last().dropLast(1))
     }
 
+    @Test fun malformedSseFrameAlsoContinuesInSameStepWithPreciseRecoveryCause() = runTest {
+        val failure = LocalModelException(
+            code = "ANTHROPIC_PROTOCOL_ERROR",
+            message = "Anthropic SSE 包含无法解析的数据帧",
+            retryable = false,
+            admissionState = LocalModelAdmissionState.ADMITTED,
+            continuationEligible = true,
+        )
+        var calls = 0
+        var instruction = ""
+        val outcome = sampleWithToolArgumentsRepair(
+            revisions = MutableStateFlow(0L),
+            observedRevision = 0L,
+            originalMessages = original,
+            canRepair = { true },
+            onRepair = {},
+        ) { messages ->
+            calls++
+            if (calls == 1) throw failure
+            instruction = messages.last().getValue("content").jsonPrimitive.content
+            "恢复完成"
+        }
+        assertEquals(LocalWorkSamplingOutcome.Completed("恢复完成"), outcome)
+        assertEquals(2, calls)
+        assertTrue(instruction.contains("ANTHROPIC_PROTOCOL_ERROR"))
+        assertTrue(instruction.contains("SSE"))
+        assertTrue(instruction.contains("tool_search"))
+    }
+
     @Test fun boundedRepairDoesNotRepeatIndefinitely() = runTest {
         val attempts = mutableListOf<Int>()
         var requests = 0
