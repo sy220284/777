@@ -22,6 +22,28 @@ class ModelStreamLineReaderTest {
         assertNull(events.readData())
     }
 
+    @Test fun adjacentJsonEventsWithoutBlankSeparatorsRemainSeparate() {
+        val source = "data: {\"type\":\"response.created\"}\n" +
+            "data: {\"type\":\"response.completed\"}\n" +
+            "data: [DONE]\n"
+        val frames = ModelSseDataReader(stream(source, 300, 1_000))
+        assertEquals("""{"type":"response.created"}""", frames.readData())
+        assertEquals("""{"type":"response.completed"}""", frames.readData())
+        assertEquals("[DONE]", frames.readData())
+        assertNull(frames.readData())
+    }
+
+    @Test fun nonSseJsonBodyIsAvailableToChatCompletionsFallback() {
+        val original = """{"choices":[{"message":{"content":"OK"}}]}"""
+        val forwarded = StringBuilder()
+        val frames = ModelSseDataReader(
+            stream(original, 300, 500),
+            onNonEventLine = { forwarded.append(it) },
+        )
+        assertNull(frames.readData())
+        assertEquals(original, forwarded.toString())
+    }
+
     @Test fun crLfAndEofPreserveProviderFraming() {
         val reader = stream("data: one\r\ndata: two", 100, 100)
         assertEquals("data: one", reader.readLine())
