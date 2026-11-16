@@ -10,7 +10,7 @@ import java.net.URI
  */
 internal object LocalKimiPolicy {
     private const val officialHost = "api.kimi.com"
-    private val controllable = setOf("k3", "k3-256k", "kimi-for-coding")
+    private val controllable = setOf("k3.1-pro", "k3.1-pro-highspeed", "k3", "k3-256k", "kimi-for-coding")
 
     fun isOfficial(baseUrl: String): Boolean = runCatching {
         val uri = URI(normalizeModelBaseUrl(baseUrl))
@@ -68,7 +68,7 @@ internal object LocalKimiPolicy {
         defaultWindow: Int?,
     ): Int? {
         val override = requested?.takeIf { it in 4_096..16_000_000 }
-        return if (model.equals("k3", true) && baseUrl != null && isOfficial(baseUrl)) {
+        return if (model?.lowercase() in setOf("k3", "k3.1-pro") && baseUrl != null && isOfficial(baseUrl)) {
             // Allow an explicit context setting; never assume a Plus tier has 1M.
             override?.takeIf { it <= 1_048_576 } ?: defaultWindow
         } else when {
