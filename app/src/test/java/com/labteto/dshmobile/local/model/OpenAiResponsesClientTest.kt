@@ -162,6 +162,25 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
+    fun responsesReassemblesMultilineCompletedFrame() = runBlocking {
+        val response = "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-multiline\",\"output\":[\n" +
+            "data: {\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"跨行完成\"}]}],\"usage\":{\"input_tokens\":2,\"output_tokens\":3}}}\n\n"
+        val transport = OkHttpClient.Builder().addInterceptor { chain ->
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                .code(200).message("OK")
+                .body(response.toResponseBody("text/event-stream".toMediaType())).build()
+        }.build()
+        val reply = OpenAiResponsesClient(transport, Json { ignoreUnknownKeys = true }).completeStreaming(
+            accessToken = "mock-token",
+            baseUrl = "https://api.openai.com/v1",
+            model = "gpt-test",
+            messages = chatPostTurnModelMessages("验证跨行"),
+            tools = JsonArray(emptyList()),
+        )
+        assertEquals("跨行完成", reply.content)
+    }
+
+    @Test
     fun exactReportedCancelWithoutSpaceIsRetryable() {
         val error = client.networkFailure(IOException("stream was reset:CANCEL"))
         assertEquals("MODEL_NETWORK", error.code)
