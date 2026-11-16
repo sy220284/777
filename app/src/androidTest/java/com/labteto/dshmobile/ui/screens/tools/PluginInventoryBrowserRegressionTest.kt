@@ -221,6 +221,33 @@ class PluginInventoryBrowserRegressionTest {
 
 
     @Test
+    fun compactCatalogKeepsActualCardsReadableAtNormalAndLargeTextScales() {
+        val scale = mutableStateOf(1.0f)
+        compose.setContent {
+            DshTheme(textScale = scale.value) {
+                Box(Modifier.width(320.dp)) {
+                    PluginInventoryBrowser(
+                        localIds = listOf("android-runtime"),
+                        onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                    )
+                }
+            }
+        }
+        for (textScale in listOf(1.0f, 1.5f, 2.0f)) {
+            compose.runOnIdle { scale.value = textScale }
+            val card = compose.onNodeWithTag("plugin-inventory-card-local:android-runtime")
+                .assertIsDisplayed().getUnclippedBoundsInRoot()
+            val title = compose.onNodeWithTag(
+                "plugin-inventory-title-local:android-runtime", useUnmergedTree = true,
+            ).assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue("At $textScale x text, the title must fit its card",
+                title.left >= card.left && title.right <= card.right)
+            assertTrue("At $textScale x text, the card must fit a 320dp viewport",
+                card.right - card.left <= 320.dp)
+        }
+    }
+
+    @Test
     fun extensionListRemainsReadableAcrossFourWidthsAndThreeThemes() {
         val width = mutableIntStateOf(320)
         val appearance = mutableStateOf(ThemePreference.LIGHT)

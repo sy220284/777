@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -825,6 +826,17 @@ internal fun LocalWorkspaceFilesDialog(
                     onAction = { scope.launch { reload() } },
                 )
 
+                if (mode == LocalFilesMode.WORKSPACE && section >= 0 &&
+                    preview == null && query.isBlank()) {
+                    LocalWorkspacePathBreadcrumb(directory = directory, section = section) { destination ->
+                        if (directory != destination) {
+                            directory = destination
+                            loading = true
+                            scope.launch { reload() }
+                        }
+                    }
+                }
+
                 if (preview == null) SySearchField(query, {
                     invalidatePreview()
                     previewPath = null
@@ -1495,6 +1507,84 @@ private fun LocalWorkspaceRootList(onOpen: (Int) -> Unit) {
     }
 }
 
+/** A directory is stored as a real workspace path; display names are localized only. */
+internal data class WorkspaceBreadcrumb(val name: String, val directory: String)
+
+internal fun workspaceBreadcrumbs(
+    directory: String,
+    categoryRoot: String,
+    categoryLabel: String,
+): List<WorkspaceBreadcrumb> {
+    val relative = when {
+        directory == categoryRoot -> ""
+        categoryRoot.isEmpty() -> directory
+        directory.startsWith("$categoryRoot/") -> directory.removePrefix("$categoryRoot/")
+        else -> error("工作区目录不属于当前分类：$directory")
+    }
+    return buildList {
+        add(WorkspaceBreadcrumb(categoryLabel, categoryRoot))
+        var path = categoryRoot
+        relative.split('/').filter(String::isNotBlank).forEach { part ->
+            path = if (path.isEmpty()) part else "$path/$part"
+            add(WorkspaceBreadcrumb(part, path))
+        }
+    }
+}
+
+/** Every level is reachable without repeated Back presses; long paths remain scrollable. */
+@Composable
+internal fun LocalWorkspacePathBreadcrumb(
+    directory: String,
+    section: Int,
+    onNavigate: (String) -> Unit,
+) {
+    val categoryRoot = when (section) {
+        0 -> "任务"
+        1 -> "交付成果"
+        else -> ""
+    }
+    val categoryLabel = stringResource(when (section) {
+        0 -> R.string.local_workspace_tasks
+        1 -> R.string.local_workspace_deliverables
+        else -> R.string.local_workspace_other_files
+    })
+    val segments = remember(directory, categoryRoot, categoryLabel) {
+        workspaceBreadcrumbs(directory, categoryRoot, categoryLabel)
+    }
+    val scroll = rememberScrollState()
+    LaunchedEffect(directory, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .horizontalScroll(scroll)
+            .testTag("workspace_path_breadcrumb")
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        segments.forEachIndexed { index, part ->
+            if (index > 0) {
+                Text("›", color = colors.textTertiary, style = DsType.small13)
+            }
+            if (index == segments.lastIndex) {
+                SelectionContainer {
+                    Text(part.name, color = colors.text,
+                        style = DsType.std14Strong.withReadingWeight(),
+                        modifier = Modifier.testTag("workspace_breadcrumb_$index"))
+                }
+            } else {
+                SyButton(
+                    text = part.name,
+                    onClick = { onNavigate(part.directory) },
+                    size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.testTag("workspace_breadcrumb_$index"),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun LocalWorkspaceDirectoryList(
     directoryKey: String,
@@ -1775,7 +1865,7 @@ private fun LocalDirectoryRow(
                     name,
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.text,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
@@ -1843,7 +1933,7 @@ private fun LocalFileRow(
                     fileName,
                     style = DsType.std14Strong.withReadingWeight(),
                     color = colors.text,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
@@ -1884,11 +1974,14 @@ private fun LocalFilePreviewBody(
         Modifier.fillMaxSize().padding(horizontal = SyMetric.gapLg),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
-        Text(
-            "${preview.file.path} · ${formatBytes(preview.file.bytes)}",
-            style = DsType.caption11.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-        )
+        SelectionContainer {
+            Text(
+                "${preview.file.path} · ${formatBytes(preview.file.bytes)}",
+                style = DsType.caption11.withReadingWeight(),
+                color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+                modifier = Modifier.testTag("workspace_preview_full_path"),
+            )
+        }
         if (preview.text == null) {
             Text(
                 stringResource(R.string.local_files_binary_hint),

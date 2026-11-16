@@ -193,6 +193,7 @@ internal fun PluginInventoryBrowser(
     var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
     var transportFilter by rememberSaveable { mutableStateOf(PluginTransportFilter.ALL) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
+    var figmaCollectionExpanded by rememberSaveable { mutableStateOf(false) }
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
     var sharePackageSkillName by remember { mutableStateOf<String?>(null) }
@@ -296,7 +297,7 @@ internal fun PluginInventoryBrowser(
         val copy = extensionPresentation(id, id, "", ExtensionKind.SKILL)
         InventoryRow(
             id = "curated-skill:" + id, name = copy.title,
-            detail = "官方精选技能 · 安装前校验完整内容",
+            detail = copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
             group = copy.group, documentIcon = copy.documentIcon,
             available = false, installableCurated = true,
@@ -401,6 +402,13 @@ internal fun PluginInventoryBrowser(
     }.sortedWith(compareByDescending<Pair<InventoryRow, Int>> { it.second }
         .thenBy { it.first.name }).map { it.first }.toList()
 
+    val figmaSkills = list.filter { it.id.startsWith("curated-skill:figma-") }
+    val groupFigmaSkills = query.isBlank() && selectedCategory == 0 && figmaSkills.size >= 3
+    val visibleList = if (!groupFigmaSkills) list else {
+        val other = list.filterNot { it.id.startsWith("curated-skill:figma-") }
+        if (figmaCollectionExpanded) figmaSkills + other else other
+    }
+
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
             if (!embedded) SyTopBar(
@@ -409,12 +417,35 @@ internal fun PluginInventoryBrowser(
                 backContentDescription = stringResource(R.string.common_back),
             )
             Row(
-                modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
+                modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                LazyRow(
+                    modifier = Modifier.weight(1f).testTag("plugin-category-list"),
+                    contentPadding = PaddingValues(start = SyMetric.gapSection, end = SyMetric.gapSm),
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                ) {
+                    items(5) { category ->
+                        SyFilterChip(
+                            text = if (skillsOnly) when (category) {
+                                1 -> "已安装"
+                                2 -> "办公效率"
+                                3 -> "开发研究"
+                                4 -> "创意设计"
+                                else -> "发现"
+                            } else when (category) {
+                                1 -> "已连接"
+                                2 -> "已安装"
+                                3 -> "设备与自动化"
+                                4 -> "创意设计"
+                                else -> "发现"
+                            },
+                            selected = selectedCategory == category,
+                            onClick = { selectedCategory = category },
+                        )
+                    }
+                }
                 IconButton(
                     onClick = {
                         showSearch = !showSearch
@@ -442,31 +473,6 @@ internal fun PluginInventoryBrowser(
                     placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search
                         else R.string.tools_catalog_search),
                 )
-            }
-            LazyRow(
-                modifier = Modifier.testTag("plugin-category-list"),
-                contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-            ) {
-                items(5) { category ->
-                    SyFilterChip(
-                        text = if (skillsOnly) when (category) {
-                            1 -> "已安装"
-                            2 -> "办公效率"
-                            3 -> "开发研究"
-                            4 -> "创意设计"
-                            else -> "发现"
-                        } else when (category) {
-                            1 -> "已连接"
-                            2 -> "已安装"
-                            3 -> "设备与自动化"
-                            4 -> "创意设计"
-                            else -> "发现"
-                        },
-                        selected = selectedCategory == category,
-                        onClick = { selectedCategory = category },
-                    )
-                }
             }
             if (loading && list.isNotEmpty()) {
                 Text(
@@ -528,7 +534,34 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 } else {
-                    items(list, key = { it.id }) { item ->
+                    if (groupFigmaSkills) item(key = "figma-skill-collection") {
+                        Surface(
+                            onClick = { figmaCollectionExpanded = !figmaCollectionExpanded },
+                            modifier = Modifier.fillMaxWidth().testTag("figma-skill-collection"),
+                            color = colors.materialL4,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Icon(FeatherIcons.BookOpen, contentDescription = null,
+                                    tint = colors.text, modifier = Modifier.size(24.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("Figma 设计技能", style = DsType.std14Strong.withReadingWeight(),
+                                        color = colors.text)
+                                    Text("${figmaSkills.size} 项精选技能 · 按需要展开安装",
+                                        style = DsType.small13.withReadingWeight(),
+                                        color = colors.textSecondary)
+                                }
+                                Text(if (figmaCollectionExpanded) "收起" else "展开",
+                                    style = DsType.small13Strong.withReadingWeight(),
+                                    color = colors.linkInk)
+                            }
+                        }
+                    }
+                    items(visibleList, key = { it.id }) { item ->
                         val codexId = item.id.takeIf { it.startsWith("codex-plugin:") }
                             ?.removePrefix("codex-plugin:")
                         val logoBytes = codexId?.let(codexLogos::get)
@@ -546,7 +579,7 @@ internal fun PluginInventoryBrowser(
                             accent = item.accent,
                             documentIcon = item.documentIcon,
                             brandLogo = brandLogo,
-                            statusLabel = item.marketState.label,
+                            marketState = item.marketState,
                             onOpen = {
                                 selectedRow = item
                                 if (item.id.startsWith("codex-plugin:")) {

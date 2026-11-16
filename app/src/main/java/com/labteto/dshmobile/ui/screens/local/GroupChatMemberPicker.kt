@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,7 @@ internal fun GroupChatMemberPickerSheet(
     currentIds: List<String>,
     enabled: Boolean,
     onSave: (List<String>) -> Boolean,
+    onCreatePersona: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val selected = remember { mutableStateListOf<String>() }
@@ -123,7 +125,24 @@ internal fun GroupChatMemberPickerSheet(
                 style = DsType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
+            if (onCreatePersona != null) {
+                SyButton(
+                    text = "去创建人物",
+                    onClick = onCreatePersona,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth().testTag("group-chat-create-persona"),
+                )
+            }
         } else {
+            if (entries.size < MIN_GROUP_CHAT_MEMBERS && onCreatePersona != null) {
+                SyButton(
+                    text = "再创建一位人物",
+                    onClick = onCreatePersona,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth().testTag("group-chat-create-persona"),
+                    variant = SyButtonVariant.Ghost,
+                )
+            }
             SyTextField(
                 value = query,
                 onValueChange = { query = it },

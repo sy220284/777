@@ -275,6 +275,7 @@ fun LocalHarnessScreen(
     var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
     var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
     var showGroupSetup by rememberSaveable { mutableStateOf(false) }
+    var returnToGroupAfterPersona by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
     var showNewPersona by rememberSaveable { mutableStateOf(false) }
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
@@ -1260,7 +1261,13 @@ fun LocalHarnessScreen(
             profile = remember { PersonaProfile(name = "") },
             onSave = { profile -> viewModel.createGalleryPersona(profile).map { Unit } },
             onAutoFill = viewModel::autoFillNewPersona,
-            onDismiss = { showNewPersona = false },
+            onDismiss = {
+                showNewPersona = false
+                if (returnToGroupAfterPersona) {
+                    returnToGroupAfterPersona = false
+                    showGroupSetup = true
+                }
+            },
             creatingNew = true,
         )
     }
@@ -1270,6 +1277,11 @@ fun LocalHarnessScreen(
             entries = gallery,
             currentIds = emptyList(),
             enabled = !shell.loading && !shell.running,
+            onCreatePersona = {
+                showGroupSetup = false
+                returnToGroupAfterPersona = true
+                showNewPersona = true
+            },
             onSave = { ids ->
                 val created = viewModel.createGroupChatSession(ids)
                 if (created) {
