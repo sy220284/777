@@ -3,8 +3,6 @@ package com.labteto.dshmobile.interop.mcp
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.tools.HarnessTool
-import com.labteto.dshmobile.harness.tools.ToolParameterSchemas
-import com.labteto.dshmobile.harness.tools.ToolParameterDialect
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
@@ -749,11 +747,7 @@ class McpToolBridgePlugin(
             val prepared = definitions.mapNotNull { definition ->
                 try {
                     val schema = normalizeRemoteParameterSchema(definition.inputSchema)
-                    val problem = ToolParameterSchemas.problem(schema, ToolParameterDialect.JSON_SCHEMA)
-                    if (problem != null) {
-                        unavailable[definition.name] = problem
-                        null
-                    } else definition to schema
+                    definition to schema
                 } catch (error: IllegalArgumentException) {
                     unavailable[definition.name] = error.message ?: "参数 schema 无效"
                     null
@@ -773,24 +767,11 @@ class McpToolBridgePlugin(
                 clientFactory = clientFactory,
                 beforeCall = beforeCall,
                 client = client,
-                toolNames = names,
+                toolNames = registered,
                 definitionBytes = definitionBytes,
                 remoteToolCount = remoteDefinitions.size,
-                unavailableTools = unavailable.toMap(),
+                unavailableTools = unavailable,
             )
-            val connectedMessage = buildString {
-                append("已连接 MCP 服务：").append(serverId)
-                append("\n传输：").append(transport)
-                append("\n目标：").append(displayTarget)
-                append("\n注册工具数：").append(names.size)
-                if (unavailable.isNotEmpty()) {
-                    append("\n未注册工具（当前 schema 不支持或无效）：")
-                    unavailable.forEach { (name, reason) -> append("\n").append(name).append(": ").append(reason) }
-                }
-                if (names.isNotEmpty()) {
-                    append("\n工具：").append(names.joinToString(", "))
-                }
-            }
 
             mutex.withLock {
                 require(acceptingConnections) { "MCP 插件正在卸载，连接已取消" }
@@ -807,8 +788,7 @@ class McpToolBridgePlugin(
                 }
                 prepared.zip(names).forEach { (preparedTool, localName) ->
                     val (definition, parameterSchema) = preparedTool
-                    context.tools.register(
-                        HarnessTool(
+                    val localTool = HarnessTool(
                             name = localName,
                             schema = functionToolSchema(
                                 name = localName,
@@ -822,7 +802,6 @@ class McpToolBridgePlugin(
                                 parameterSchema = parameterSchema,
                             ),
                             access = ToolAccess.PRIVILEGED,
-                            parameterDialect = ToolParameterDialect.JSON_SCHEMA,
                             approvalPolicy = ToolApprovalPolicy.ALWAYS,
                             exposure = ToolExposure.OPTIONAL,
                             metadata = ToolMetadata(
@@ -907,9 +886,14 @@ class McpToolBridgePlugin(
                                     }
                                 }
                             },
-                        ),
-                    )
-                    registered += localName
+                        )
+                    try {
+                        context.tools.register(localTool)
+                        registered += localName
+                    } catch (error: IllegalArgumentException) {
+                        // One invalid remote schema must not hide independent valid tools.
+                        unavailable[definition.name] = error.message ?: "参数 schema 无效"
+                    }
                 }
                 servers[serverId] = binding
                 releaseConnectionReservationLocked(serverId)
@@ -936,6 +920,20 @@ class McpToolBridgePlugin(
                     }
                 }
             }
+            val connectedMessage = buildString {
+                append("已连接 MCP 服务：").append(serverId)
+                append("\n传输：").append(transport)
+                append("\n目标：").append(displayTarget)
+                append("\n注册工具数：").append(registered.size)
+                if (unavailable.isNotEmpty()) {
+                    append("\n未注册工具（当前 schema 不支持或无效）：")
+                    unavailable.forEach { (name, reason) -> append("\n").append(name).append(": ").append(reason) }
+                }
+                if (names.isNotEmpty()) {
+                    append("\n工具：").append(registered.joinToString(", "))
+                }
+            }
+
             return connectedMessage
         } catch (error: Exception) {
             withContext(NonCancellable) {
