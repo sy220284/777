@@ -85,6 +85,7 @@ internal fun localChatFeatureUiContribution(
                 workspacePath = surface.workspacePath,
                 canSave = !surface.loading && !surface.running,
                 onSaveCurrent = actions.saveCurrentToGallery,
+                onReload = actions.reloadGallery,
                 onHistory = actions.galleryHistory,
                 onEditStoryDetails = actions.editGalleryStoryDetails,
                 onRenameStory = actions.renameGalleryStory,

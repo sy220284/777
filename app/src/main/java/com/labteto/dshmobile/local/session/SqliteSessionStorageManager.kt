@@ -79,7 +79,7 @@ internal class SqliteSessionStorageManager(
             "设备可用 ${core.freeBytes / mib} MiB${warning}"
     }
 
-    suspend fun compactAll(): LocalSessionStorageStatus {
+    suspend fun compactAll() {
         val maintenance = SqliteSessionConsistencyGate.acquireExclusive()
         try {
         listOf(snapshots.writableDatabase, events.writableDatabase).forEach { db ->
@@ -93,7 +93,6 @@ internal class SqliteSessionStorageManager(
         // The V6 legacy rewrite already committed atomically. Only mark its physical
         // reclaim complete after BOTH databases have passed checkpoint and VACUUM.
         if (events.needsRequestVacuum()) events.finishRequestVacuum()
-        return status()
         } finally { maintenance.unlock() }
     }
 

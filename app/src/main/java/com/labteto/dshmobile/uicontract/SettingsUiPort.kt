@@ -83,7 +83,7 @@ interface SettingsUiPort {
     fun clearChatStyleGuardHits()
     suspend fun diagnoseNetwork(target: String): String
     suspend fun sessionStorageStatus(): LocalSessionStorageStatus
-    suspend fun compactSessionStorage(): LocalSessionStorageStatus
+    suspend fun compactSessionStorage()
     suspend fun exportSessionStorage(output: OutputStream): Long
     /** Session SQLite, managed attachments and Media Studio DB plus verified originals. */
     suspend fun exportCompleteSessionStorage(output: OutputStream): Long

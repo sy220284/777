@@ -63,6 +63,25 @@ class LocalAgentTeamRuntimeTest {
     }
 
     @Test
+    fun teamToolAdmissionChecksLiveOwnershipWithoutInventingPathPermissions() = runBlocking {
+        val session = "tool-ownership"
+        val f = fixture(session)
+        appendActiveMember(f.log, session)
+        f.runtime.requireMemberTaskOwnership(session, "job-team-1")
+        // Scope declarations remain claim-conflict facts. Shared tool execution still decides
+        // whether native writes, Shell, network and extensions are allowed and need approval.
+        f.log.append(LocalAgentTeamContract.TEAM_TASK_EVENT,
+            task(session, "task-1", 1, emptyList(), status = "in_progress",
+                ownerId = "member-1", writeScopes = listOf("src")))
+        f.runtime.requireMemberTaskOwnership(session, "job-team-1")
+        f.log.append(LocalAgentTeamContract.TEAM_MEMBER_EVENT,
+            member(session, "member-1", "worker", "failed"))
+        assertTrue(runCatching {
+            f.runtime.requireMemberTaskOwnership(session, "job-team-1")
+        }.isFailure)
+    }
+
+    @Test
     fun leadAndHistoricalLeadMemberHaveStableAddressesAcrossReplay() = runBlocking {
         val lead = mutableListOf<QueuedAgentInput>()
         val peer = mutableListOf<Pair<String, QueuedAgentInput>>()

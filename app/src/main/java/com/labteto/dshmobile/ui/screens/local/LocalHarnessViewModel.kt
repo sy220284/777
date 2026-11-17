@@ -187,12 +187,13 @@ class LocalHarnessViewModel @Inject constructor(
             else workProjectUi.assign(setOf(sessionId), projectId)
         },
     )
+    suspend fun reloadGallery(): Result<Unit> = personaGalleryController.reloadGallery()
     suspend fun saveCurrentToGallery(
         notes: String,
         existingId: String? = null,
         existingStoryId: String? = null,
         forceNewStory: Boolean = false,
-    ): Result<PersonaGalleryEntry> =
+    ): Result<com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Saved> =
         personaGalleryController.saveCurrentToGallery(notes, existingId, existingStoryId, forceNewStory)
     fun hasUnsavedCurrentPersona(): Boolean = personaGalleryController.hasUnsavedCurrentPersona()
     fun currentGalleryNeedsUpdate(): Boolean = personaGalleryController.currentGalleryNeedsUpdate()

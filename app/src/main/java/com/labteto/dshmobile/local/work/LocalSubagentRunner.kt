@@ -130,7 +130,7 @@ internal class LocalSubagentRunner(
     private val newNestedRunner: (() -> LocalSubagentRunner)? = null,
     private val executeTeamTool: (suspend (String, LocalToolCall) -> AgentToolResult)? = null,
     private val requireTeamRootAuthorization: ((String) -> Unit)? = null,
-    private val requireTeamWorkspaceMutation: (suspend (String, LocalToolCall) -> Unit)? = null,
+    private val requireTeamTaskOwnership: ((String) -> Unit)? = null,
     private val spillToolOutput: (String, String) -> Boolean = { _, _ -> false },
     private val prepareMessages: suspend (List<JsonObject>, LocalImageInputMode, LocalModelProfile) -> List<JsonObject>,
     private val resolveImageMode: (LocalImageInputMode, String, String) -> LocalImageInputMode,
@@ -687,9 +687,9 @@ internal class LocalSubagentRunner(
                                 LocalSubagentExecutionScope(capabilities, virtualScreenId, canDelegateNested)) {
                             currentCoroutineContext().ensureActive()
                             if (capabilities.teamManaged) {
-                                requireNotNull(requireTeamWorkspaceMutation) {
-                                    "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
-                                }(requireNotNull(backgroundJobId), targetCall.toLocalToolCall())
+                                requireNotNull(requireTeamTaskOwnership) {
+                                    "TEAM_TASK_OWNERSHIP_GATE_REQUIRED"
+                                }(requireNotNull(backgroundJobId))
                             }
                             if (canDelegateNested && targetCall.name == "subagent") {
                                 dispatchLocalNestedSubagent(
@@ -738,14 +738,14 @@ internal class LocalSubagentRunner(
                                 }
                                 if (capabilities.teamManaged) {
                                     val jobId = requireNotNull(backgroundJobId)
-                                    val check = requireNotNull(requireTeamWorkspaceMutation) {
-                                        "TEAM_WORKSPACE_WRITE_GATE_REQUIRED"
+                                    val check = requireNotNull(requireTeamTaskOwnership) {
+                                        "TEAM_TASK_OWNERSHIP_GATE_REQUIRED"
                                     }
                                     withContext(LocalTeamToolExecutionAdmission {
                                         executionFence()
                                         ensureTeamRootAuthorization()
                                         runContext?.let { runCoordinator?.ensureCurrentOwner(it) }
-                                        check(jobId, targetCall.toLocalToolCall())
+                                        check(jobId)
                                     }) { invoke() }
                                 } else invoke()
                             }

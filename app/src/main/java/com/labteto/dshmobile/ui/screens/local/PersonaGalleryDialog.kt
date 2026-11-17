@@ -98,7 +98,7 @@ internal fun PersonaGallerySavePromptDialog(
     persona: PersonaProfile,
     isUpdate: Boolean,
     canSave: Boolean,
-    onSaveCurrent: suspend () -> Result<PersonaGalleryEntry>,
+    onSaveCurrent: suspend () -> Result<com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Saved>,
     onContinue: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -184,7 +184,8 @@ internal fun PersonaGalleryScreen(
     currentSessionId: String,
     workspacePath: String = "",
     canSave: Boolean,
-    onSaveCurrent: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
+    onSaveCurrent: suspend (String, String?, String?, Boolean) -> Result<com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Saved>,
+    onReload: suspend () -> Result<Unit>,
     onHistory: suspend (String, String, String?) -> com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt,
     onEditStoryDetails: suspend (String, String, String, String) -> Result<Unit>,
     onRenameStory: suspend (String, String, String) -> Result<Unit>,
@@ -269,6 +270,9 @@ internal fun PersonaGalleryScreen(
 
     var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        onReload().onFailure { error = it.message ?: "读取图集失败，请重新读取" }
+    }
     var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
     var showMoreActions by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryOpenVersion, selectedId, selectedStoryId)
@@ -623,7 +627,7 @@ internal fun PersonaGalleryScreen(
                         scope.launch {
                             onSaveCurrent("", selected.id, null, true)
                                 .onSuccess {
-                                    selectedStoryId = it.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
+                                    selectedStoryId = it.storyId
                                     notice = mergeDoneText
                                     showMoreActions = false
                                 }
@@ -882,8 +886,8 @@ internal fun PersonaGalleryScreen(
                         scope.launch {
                             onSaveCurrent("", currentGalleryId, currentGalleryStoryId, false)
                                 .onSuccess {
-                                    selectedId = it.id
-                                    selectedStoryId = it.stories.maxByOrNull(PersonaGalleryStory::updatedAt)?.id
+                                    selectedId = it.galleryId
+                                    selectedStoryId = it.storyId
                                     notice = mergedNoticeText
                                 }
                                 .onFailure { error = it.message ?: saveFailedText }
@@ -1164,6 +1168,20 @@ internal fun PersonaGalleryScreen(
                     }
 
                 }
+                SyButton(
+                    text = "重新读取图集",
+                    variant = SyButtonVariant.Ghost,
+                    enabled = !busy && !inspecting,
+                    onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                onReload().onSuccess { error = null }
+                                    .onFailure { error = it.message ?: "读取图集失败，请重试" }
+                            } finally { busy = false }
+                        }
+                    },
+                )
                 error?.let {
                     Text(
                         it,

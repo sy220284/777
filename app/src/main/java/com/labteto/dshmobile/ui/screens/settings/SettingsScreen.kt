@@ -338,8 +338,9 @@ fun SettingsScreen(
         if (uri != null) viewModel.storageOperations.launch {
             try {
                 viewModel.exportLocalSessionStorage(uri)
-                localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                viewModel.storageOperations.notice.value = (storageExported)
+                viewModel.storageOperations.refreshAfterCommit(
+                    storageExported, viewModel::localSessionStorageStatus,
+                ) { AppLog.failure("Settings", "refresh_storage_after_commit", it) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -355,8 +356,9 @@ fun SettingsScreen(
         if (uri != null) viewModel.storageOperations.launch {
             try {
                 viewModel.exportCompleteLocalSessionStorage(uri)
-                localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                viewModel.storageOperations.notice.value = ("完整备份已导出：包含会话、附件和媒体工作室创作原件")
+                viewModel.storageOperations.refreshAfterCommit(
+                    "完整备份已导出：包含会话、附件和媒体工作室创作原件", viewModel::localSessionStorageStatus,
+                ) { AppLog.failure("Settings", "refresh_storage_after_commit", it) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -372,8 +374,9 @@ fun SettingsScreen(
         if (uri != null) viewModel.storageOperations.launch {
             try {
                 val sessions = viewModel.importLocalSessionStorage(uri)
-                localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                viewModel.storageOperations.notice.value = ("备份已验证并安排恢复 $sessions 个会话；如包含媒体工作室成果，将一并于重启后恢复")
+                viewModel.storageOperations.refreshAfterCommit(
+                    "备份已验证并安排恢复 $sessions 个会话；如包含媒体工作室成果，将一并于重启后恢复", viewModel::localSessionStorageStatus,
+                ) { AppLog.failure("Settings", "refresh_storage_after_commit", it) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -389,8 +392,9 @@ fun SettingsScreen(
         if (uri != null) viewModel.storageOperations.launch {
             try {
                 val sessions = viewModel.importLegacySessionStorage(uri)
-                localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                viewModel.storageOperations.notice.value = ("旧版 ZIP 已转换为 SQLite 恢复计划：$sessions 个会话。旧归档不含完整媒体原件，请自行保留素材备份；重启后生效")
+                viewModel.storageOperations.refreshAfterCommit(
+                    "旧版 ZIP 已转换为 SQLite 恢复计划：$sessions 个会话。旧归档不含完整媒体原件，请自行保留素材备份；重启后生效", viewModel::localSessionStorageStatus,
+                ) { AppLog.failure("Settings", "refresh_storage_after_commit", it) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -428,7 +432,14 @@ fun SettingsScreen(
             )
         }
         if (page == SettingsDestination.SESSION_STORAGE) {
-            localSessionStorageStatus = runCatching { viewModel.localSessionStorageStatus() }.getOrNull()
+            try {
+                localSessionStorageStatus = viewModel.localSessionStorageStatus()
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (error: Exception) {
+                AppLog.failure("Settings", "read_storage", error)
+                localSessionStorageStatus = null
+                viewModel.storageOperations.notice.value = "读取存储信息失败，请重新读取"
+            }
         }
     }
     LaunchedEffect(showEnvironment) {
@@ -1172,11 +1183,25 @@ fun SettingsScreen(
                         LocalSessionStorageCard(
                             status = localSessionStorageStatus,
                             busy = localSessionStorageBusy,
+                            onRefresh = {
+                                viewModel.storageOperations.launch {
+                                    try {
+                                        localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                                    } catch (cancelled: CancellationException) { throw cancelled
+                                    } catch (error: Exception) {
+                                        AppLog.failure("Settings", "refresh_storage", error)
+                                        localSessionStorageStatus = null
+                                        viewModel.storageOperations.notice.value = "读取存储信息失败，请重试"
+                                    }
+                                }
+                            },
                             onCompact = {
                                 viewModel.storageOperations.launch {
                                     try {
-                                        localSessionStorageStatus = viewModel.compactLocalSessionStorage()
-                                        viewModel.storageOperations.notice.value = (storageCompacted)
+                                        viewModel.compactLocalSessionStorage()
+                                        viewModel.storageOperations.refreshAfterCommit(
+                                            storageCompacted, viewModel::localSessionStorageStatus,
+                                        ) { AppLog.failure("Settings", "refresh_storage_after_commit", it) }
                                     } catch (cancelled: CancellationException) { throw cancelled
                                     } catch (error: Exception) {
                                         AppLog.failure("Settings", "compact_session_archive", error)
@@ -1194,8 +1219,9 @@ fun SettingsScreen(
                                 viewModel.storageOperations.launch {
                                     try {
                                         if (viewModel.cancelStagedSessionRestore()) {
-                                            viewModel.storageOperations.notice.value = ("已取消未开始的备份恢复")
-                                            localSessionStorageStatus = viewModel.localSessionStorageStatus()
+                                            viewModel.storageOperations.refreshAfterCommit(
+                                                "已取消未开始的备份恢复", viewModel::localSessionStorageStatus,
+                                            ) { AppLog.failure("Settings", "refresh_storage_after_commit", it) }
                                         }
                                     } catch (cancelled: CancellationException) { throw cancelled
                                     } catch (error: Exception) {

@@ -25,6 +25,7 @@ import com.labteto.dshmobile.ui.theme.withReadingWeight
 internal fun LocalSessionStorageCard(
     status: LocalSessionStorageStatus?,
     busy: Boolean,
+    onRefresh: () -> Unit,
     onCompact: () -> Unit,
     onExport: () -> Unit,
     onExportFull: () -> Unit,
@@ -37,9 +38,15 @@ internal fun LocalSessionStorageCard(
     SettingsCard(
         title = stringResource(R.string.settings_local_session_storage),
     ) {
+        SyButton(
+            text = "重新读取存储信息",
+            onClick = onRefresh,
+            enabled = !busy,
+            variant = SyButtonVariant.Ghost,
+        )
         if (status == null) {
             Text(
-                text = stringResource(R.string.common_loading),
+                text = "尚未取得存储信息，请重新读取",
                 style = DsType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
@@ -135,14 +142,14 @@ internal fun LocalSessionStorageCard(
         SyButton(
             text = "导入会话备份（重启后生效）",
             onClick = onRestore,
-            enabled = !busy && status?.pendingRestore != true,
+            enabled = !busy && status?.pendingRestore == false,
             variant = SyButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
         SyButton(
             text = "转换旧版会话 ZIP（不包含原媒体文件）",
             onClick = onLegacyRestore,
-            enabled = !busy && status?.pendingRestore != true,
+            enabled = !busy && status?.pendingRestore == false,
             variant = SyButtonVariant.Outline,
             modifier = Modifier.fillMaxWidth(),
         )
