@@ -191,8 +191,12 @@ class McpClientTest {
     @Test
     fun headerEncodingPreservesAsciiAndProtectsUnicode() {
         assertEquals("plain", encodeHeaderValue("plain"))
-        val encoded = encodeHeaderValue("中文")
-        assertTrue(encoded.startsWith("base64:"))
+        assertEquals("Hello\tthere", encodeHeaderValue("Hello\tthere"))
+        assertEquals("=?base64?5Lit5paH?=", encodeHeaderValue("中文"))
+        assertEquals("=?base64?IHBhZGRlZCA=?=", encodeHeaderValue(" padded "))
+        assertEquals("=?base64?bGluZTEKbGluZTI=?=", encodeHeaderValue("line1\nline2"))
+        assertEquals("=?base64?PT9iYXNlNjQ/bGl0ZXJhbD89?=",
+            encodeHeaderValue("=?base64?literal?="))
     }
 
     @Test
