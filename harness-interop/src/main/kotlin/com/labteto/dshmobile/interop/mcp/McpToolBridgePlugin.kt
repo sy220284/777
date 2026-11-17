@@ -3,7 +3,8 @@ package com.labteto.dshmobile.interop.mcp
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.tools.HarnessTool
-import com.labteto.dshmobile.harness.tools.JsonSchemaValidator
+import com.labteto.dshmobile.harness.tools.ToolParameterSchemas
+import com.labteto.dshmobile.harness.tools.ToolParameterDialect
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
@@ -745,7 +746,7 @@ class McpToolBridgePlugin(
             val prepared = definitions.mapNotNull { definition ->
                 try {
                     val schema = normalizeRemoteParameterSchema(definition.inputSchema)
-                    val problem = JsonSchemaValidator.validateSchema(schema, requireObjectRoot = true)
+                    val problem = ToolParameterSchemas.problem(schema, ToolParameterDialect.JSON_SCHEMA)
                     if (problem != null) {
                         unavailable[definition.name] = problem
                         null
@@ -818,6 +819,7 @@ class McpToolBridgePlugin(
                                 parameterSchema = parameterSchema,
                             ),
                             access = ToolAccess.PRIVILEGED,
+                            parameterDialect = ToolParameterDialect.JSON_SCHEMA,
                             approvalPolicy = ToolApprovalPolicy.ALWAYS,
                             exposure = ToolExposure.OPTIONAL,
                             metadata = ToolMetadata(

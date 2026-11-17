@@ -104,7 +104,14 @@ data class HarnessTool(
     val metadata: ToolMetadata,
     val timeoutMillis: Long? = null,
     val executor: HarnessToolExecutor,
-)
+    /** Native schemas and external JSON Schema have different declared contracts. */
+    val parameterDialect: ToolParameterDialect = ToolParameterDialect.NATIVE,
+) {
+    internal val parameterValidation: CompiledToolParameters by lazy {
+        val parameters = (schema["function"] as JsonObject)["parameters"] as JsonObject
+        CompiledToolParameters.compile(parameters, parameterDialect)
+    }
+}
 
 class ToolRegistry private constructor(
     private val tools: RegistryEntries<HarnessTool>,
@@ -113,8 +120,8 @@ class ToolRegistry private constructor(
 ) {
     constructor() : this(RegistryEntries(), ToolLifecycleAdmission(), ToolHookRegistry())
     fun register(tool: HarnessTool, replace: Boolean = false) {
-        validateToolRegistration(tool)
         val normalized = tool.withContractDescription()
+        validateToolRegistration(normalized)
         tools.register(normalized.name, normalized, replace)
     }
     fun unregister(name: String): HarnessTool? = tools.remove(name)
@@ -130,9 +137,7 @@ class ToolRegistry private constructor(
         input: JsonObject,
         isDeferred: (JsonElement) -> Boolean,
     ): String? {
-        val parameters = (tool.schema["function"] as? JsonObject)
-            ?.get("parameters") as? JsonObject ?: return null
-        return JsonSchemaValidator.validateTrustedDeferred(input, parameters, isDeferred)
+        return tool.parameterValidation.validateDeferred(input, isDeferred)
     }
 
     fun names(): List<String> = tools.snapshot().keys.toList()
@@ -510,21 +515,15 @@ class ToolRegistry private constructor(
         require(parameterType == "object") {
             "工具 parameters 根类型必须是 object：${tool.name}"
         }
-        JsonSchemaValidator.validateSchema(
-            schema = parameters,
-            requireObjectRoot = true,
-        )?.let { problem ->
-            throw IllegalArgumentException(
-                "工具 parameters schema 非法：${tool.name}：$problem"
-            )
+        try {
+            tool.parameterValidation
+        } catch (error: IllegalArgumentException) {
+            throw IllegalArgumentException("工具 parameters schema 非法：${tool.name}：${error.message}", error)
         }
     }
 
-    private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? {
-        val function = tool.schema["function"] as? JsonObject ?: return null
-        val parameters = function["parameters"] as? JsonObject ?: return null
-        return JsonSchemaValidator.validateTrusted(input, parameters)
-    }
+    private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? =
+        tool.parameterValidation.validate(input)
 
 
 
