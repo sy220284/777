@@ -40,7 +40,7 @@ data class SyColors(
     val primaryPressed: Color = Color(0xFF244337),
     val onPrimary: Color = Color(0xFFFFFFFF),
     val mint: Color = Color(0xFF75A58C),
-    val lilac: Color = Color(0xFF9B6C63),
+    val lilac: Color = Color(0xFF865950),
     val warning: Color = Color(0xFFBD8A36),
     val danger: Color = Color(0xFFB8473D),
     val selected: Color,
@@ -51,8 +51,8 @@ data class SyColors(
     // Keep decorative accent fills independent from readable text colours.
     val actionFill: Color get() = primary
     val actionInk: Color get() = onPrimary
-    val linkInk: Color get() = syReadableInk(primary, selected)
-    val personaInk: Color get() = syReadableInk(lilac, selected)
+    val linkInk: Color get() = syReadableInk(primary, materialL2)
+    val personaInk: Color get() = syReadableInk(lilac, materialL2)
     val successInk: Color get() = if (text.luminance() < .5f) Color(0xFF2E6755) else mint
     val warningInk: Color get() = if (text.luminance() < .5f) Color(0xFF80511F) else warning
     val dangerInk: Color get() = if (text.luminance() < .5f) Color(0xFF963B30) else Color(0xFFE89B8F)
@@ -93,7 +93,7 @@ private val Light = SyColors(
     border = Color(0xFFD8DFD6), text = Color(0xFF202923),
     textSecondary = Color(0xFF58665C), textTertiary = Color(0xFF5F6A61),
     primary = Color(0xFF315447), primaryPressed = Color(0xFF244337), onPrimary = Color(0xFFFFFFFF),
-    mint = Color(0xFF75A58C), lilac = Color(0xFF9B6C63),
+    mint = Color(0xFF75A58C), lilac = Color(0xFF865950),
     warning = Color(0xFFBD8A36), danger = Color(0xFFB8473D),
     selected = Color(0xFFE7EEDC), overlay = Color(0x66101B18),
     wallpaperTintEnabled = true,
