@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.local.tools
 
-import com.labteto.dshmobile.harness.tools.JsonSchemaValidator
 import com.labteto.dshmobile.harness.tools.ToolExposure
 import com.labteto.dshmobile.harness.tools.ToolRegistry
 import com.labteto.dshmobile.uicontract.UiToolDraftValidation
@@ -30,6 +29,6 @@ internal fun validateCapabilityDraftAgainstRegistry(
         return reject("工具参数不是合法 JSON")
     }
     val arguments = value as? JsonObject ?: return reject("工具参数必须是 JSON 对象")
-    val invalid = JsonSchemaValidator.validate(arguments, current)
+    val invalid = registry.validateArguments(tool, arguments)
     return if (invalid == null) UiToolDraftValidation.Valid else reject(invalid)
 }
