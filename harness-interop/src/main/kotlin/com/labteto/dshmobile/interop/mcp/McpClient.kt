@@ -87,6 +87,16 @@ data class McpToolDefinition(
     val raw: JsonObject,
 )
 
+internal data class McpToolDiscovery(
+    val tools: List<McpToolDefinition>,
+    val rejectedTools: Map<String, String>,
+)
+
+/** Modern HTTP alone interprets request-header annotations. Legacy transports ignore them. */
+internal interface McpHttpToolAdmission {
+    fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery
+}
+
 interface McpTransport : Closeable {
     suspend fun request(method: String, params: JsonObject = JsonObject(emptyMap())): JsonObject
 }
@@ -139,7 +149,11 @@ class McpClient(
         (transport as? McpTerminationSource)?.terminalEvents
     suspend fun supportedResourceMethods(): Set<String> =
         (transport as? McpResourceDiscovery)?.supportedResourceMethods() ?: emptySet()
-    suspend fun listTools(allowUnsupported: Boolean = false): List<McpToolDefinition> {
+    suspend fun listTools(allowUnsupported: Boolean = false): List<McpToolDefinition> =
+        discoverTools(allowUnsupported).tools
+
+    /** Also returns individually rejected HTTP-header annotations for Owner/UI visibility. */
+    internal suspend fun discoverTools(allowUnsupported: Boolean = false): McpToolDiscovery {
         val tools = mutableListOf<McpToolDefinition>()
         val names = mutableSetOf<String>()
         val cursors = mutableSetOf<String>()
@@ -152,7 +166,8 @@ class McpClient(
                 }).requireResult()
             } catch (error: McpRpcException) {
                 // Only first-page JSON-RPC method-not-found proves an absent tool capability.
-                if (allowUnsupported && cursor == null && error.code == -32601) return emptyList()
+                if (allowUnsupported && cursor == null && error.code == -32601)
+                    return McpToolDiscovery(emptyList(), emptyMap())
                 throw error
             }
             result["tools"]?.jsonArray.orEmpty().forEach { element ->
@@ -170,7 +185,7 @@ class McpClient(
                     raw = tool,
                 )
             }
-            val next = result["nextCursor"]?.takeUnless { it == JsonNull } ?: return tools
+            val next = result["nextCursor"]?.takeUnless { it == JsonNull } ?: return admitToolHeaders(tools)
             val value = next.jsonPrimitive
             require(value.isString && value.content.length in 1..MAX_CURSOR_CHARS && cursors.add(value.content)) {
                 "MCP 分页游标无效或重复"
@@ -180,6 +195,10 @@ class McpClient(
         error("MCP 工具分页超过 $MAX_TOOL_PAGES 页上限")
     }
 
+
+    private fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery =
+        (transport as? McpHttpToolAdmission)?.admitToolHeaders(definitions)
+            ?: McpToolDiscovery(definitions, emptyMap())
 
     suspend fun callTool(name: String, arguments: JsonObject): JsonObject =
         transport.request(
@@ -260,8 +279,27 @@ class McpStreamableHttpTransport(
     private val clientName: String = "777-android",
     private val clientVersion: String = "1",
     private val clientCapabilities: JsonObject = JsonObject(emptyMap()),
-) : McpTransport {
+) : McpTransport, McpHttpToolAdmission {
     private val ids = AtomicLong(1L)
+    @Volatile private var headerRules: Map<String, List<McpHttpParameterHeader>> = emptyMap()
+
+    override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery {
+        val valid = mutableListOf<McpToolDefinition>()
+        val rejected = linkedMapOf<String, String>()
+        val nextRules = linkedMapOf<String, List<McpHttpParameterHeader>>()
+        definitions.forEach { definition ->
+            try {
+                val compiled = McpHttpToolHeaders.compile(definition.inputSchema)
+                valid += definition
+                nextRules[definition.name] = compiled
+            } catch (error: IllegalArgumentException) {
+                rejected[definition.name] = error.message ?: "x-mcp-header 注解无效"
+            }
+        }
+        headerRules = nextRules.toMap()
+        return McpToolDiscovery(valid, rejected)
+    }
+
     // MCP calls may mutate remote state; do not replay after connection failure or redirect.
     private val nonReplayHttp = http.newBuilder().retryOnConnectionFailure(false)
         .followRedirects(false).followSslRedirects(false).build()
@@ -292,11 +330,21 @@ class McpStreamableHttpTransport(
                 .header("MCP-Protocol-Version", protocolVersion)
                 .header("Mcp-Method", method)
 
-            enriched["name"]?.jsonPrimitive?.content?.let {
+            val name = when (method) {
+                "tools/call", "prompts/get" -> enriched["name"] as? JsonPrimitive
+                "resources/read" -> enriched["uri"] as? JsonPrimitive
+                else -> null
+            }
+            name?.takeIf { it.isString }?.content?.let {
                 builder.header("Mcp-Name", encodeHeaderValue(it))
             }
-            enriched["uri"]?.jsonPrimitive?.content?.let {
-                builder.header("Mcp-Name", encodeHeaderValue(it))
+            if (method == "tools/call") {
+                val toolName = name?.content ?: error("MCP tools/call 缺少工具名称")
+                val rules = headerRules[toolName]
+                    ?: error("MCP 工具未完成 HTTP 参数头发现或已被拒绝：$toolName")
+                val arguments = enriched["arguments"] as? JsonObject
+                    ?: error("MCP tools/call arguments 必须为 object")
+                McpHttpToolHeaders.apply(builder, rules, arguments)
             }
 
             nonReplayHttp.newCall(builder.build()).executeCancellable { response ->
@@ -564,5 +612,8 @@ internal fun parseJsonRpcResponse(body: String, id: Long, json: Json): JsonObjec
 }
 
 internal fun encodeHeaderValue(value: String): String =
-    if (value.all { it.code in 0x20..0x7E }) value
-    else "base64:" + Base64.getEncoder().encodeToString(value.toByteArray())
+    if (value.all { it.code in 0x20..0x7E || it.code == 0x09 } &&
+        (value.isEmpty() || (!value.first().isWhitespace() && !value.last().isWhitespace())) &&
+        !(value.startsWith("=?base64?") && value.endsWith("?="))
+    ) value
+    else "=?base64?" + Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8)) + "?="
