@@ -55,10 +55,12 @@ def run():
             page.goto(url + '#work')
             page.get_by_role('button', name='查看待确认事项').click()
             assert page.get_by_role('dialog', name='发布前，再确认两件事').is_visible()
+            page.wait_for_timeout(250)  # Capture the settled 240ms sheet, not a translucent animation frame.
             page.locator('#device').screenshot(path=str(OUT / 'approval-sheet.png'))
             page.keyboard.press('Escape')
             assert page.locator('#overlay').evaluate('(e)=>e.childElementCount===0')
             page.get_by_role('button', name='打开导航').click()
+            page.wait_for_timeout(250)  # Settle the specified 220ms drawer entrance.
             page.locator('#device').screenshot(path=str(OUT / 'navigation-drawer.png'))
             page.get_by_role('button', name='工作区文件', exact=True).click()
             assert page.url.endswith('#files')

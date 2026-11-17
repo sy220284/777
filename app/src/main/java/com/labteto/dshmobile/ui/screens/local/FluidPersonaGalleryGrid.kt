@@ -41,7 +41,8 @@ internal fun FluidPersonaGalleryGrid(
     val motion = com.shenyan.designsystem.foundation.SyMotion
     val enterOffset = with(LocalDensity.current) { 12.dp.toPx() }
     val columns = if (LocalDensity.current.fontScale >= 1.3f ||
-        LocalConfiguration.current.screenWidthDp < 360) 1 else 2
+        LocalConfiguration.current.screenWidthDp < 360 ||
+        LocalConfiguration.current.screenHeightDp < 700) 1 else 2
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         modifier = modifier,

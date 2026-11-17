@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -53,14 +56,14 @@ internal fun StudioPersonaTile(
             decodePersonaPortraitBitmap(entry.portraitPath, maxEdgePx = 640)
         }
     }
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-            .testTag("personaGalleryEntry_${entry.id}")
-            .combinedClickable(role = Role.Button, onClick = onClick,
-                onLongClickLabel = stringResource(R.string.persona_gallery_manage), onLongClick = onLongClick),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(.78f).clip(RoundedCornerShape(20.dp))
+    val compact = LocalConfiguration.current.screenHeightDp < 700 || LocalDensity.current.fontScale >= 1.3f
+    val target = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+        .testTag("personaGalleryEntry_${entry.id}")
+        .combinedClickable(role = Role.Button, onClick = onClick,
+            onLongClickLabel = stringResource(R.string.persona_gallery_manage), onLongClick = onLongClick)
+
+    @Composable fun Cover(modifier: Modifier) {
+        Box(modifier.aspectRatio(.78f).clip(RoundedCornerShape(20.dp))
             .background(colors.materialL2), contentAlignment = Alignment.Center) {
             val image = portrait
             if (image != null) {
@@ -72,19 +75,35 @@ internal fun StudioPersonaTile(
                     style = DsType.largeTitle28.withReadingWeight())
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(entry.persona.name, modifier = Modifier.weight(1f),
-                style = DsType.base16Strong.withReadingWeight(), color = colors.text,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (pinned) Icon(FeatherIcons.Pin, contentDescription = stringResource(R.string.persona_gallery_pinned),
-                tint = colors.linkInk, modifier = Modifier.size(16.dp))
+    }
+    @Composable fun Details(modifier: Modifier) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(entry.persona.name, modifier = Modifier.weight(1f),
+                    style = DsType.base16Strong.withReadingWeight(), color = colors.text,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (pinned) Icon(FeatherIcons.Pin, contentDescription = stringResource(R.string.persona_gallery_pinned),
+                    tint = colors.linkInk, modifier = Modifier.size(16.dp))
+            }
+            Text(entry.persona.coreIdentity.ifBlank {
+                stringResource(R.string.persona_gallery_compact_meta, entry.stories.size, entry.totalDialogueCount())
+            }, modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+                style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
+                maxLines = if (compact) 3 else 2, overflow = TextOverflow.Ellipsis)
         }
-        Text(entry.persona.coreIdentity.ifBlank {
-            stringResource(R.string.persona_gallery_compact_meta, entry.stories.size, entry.totalDialogueCount())
-        }, modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
-            style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
-            maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+    if (compact) {
+        Row(target.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Cover(Modifier.width(92.dp))
+            Details(Modifier.weight(1f))
+        }
+    } else {
+        Column(target, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Cover(Modifier.fillMaxWidth())
+            Details(Modifier.fillMaxWidth())
+        }
     }
 }
