@@ -499,9 +499,9 @@ class McpToolBridgePlugin(
                                 put("server_id", server.id); put("transport", server.transport)
                                 put("state", server.lifecycle.name)
                                 put("unavailable_tools", buildJsonObject {
-                            binding.unavailableTools.forEach { (name, reason) -> put(name, reason) }
-                        })
-                        put("tools", buildJsonArray { server.tools.forEach { add(JsonPrimitive(it)) } })
+                                    server.unavailableTools.forEach { (name, reason) -> put(name, reason) }
+                                })
+                                put("tools", buildJsonArray { server.tools.forEach { add(JsonPrimitive(it)) } })
                             }) }
                         })
                     }.toString())
@@ -1020,6 +1020,9 @@ class McpToolBridgePlugin(
                         put("server_id", binding.id)
                         put("transport", binding.transport)
                         put("target", binding.displayTarget)
+                        put("unavailable_tools", buildJsonObject {
+                            binding.unavailableTools.forEach { (name, reason) -> put(name, reason) }
+                        })
                         put("tools", buildJsonArray {
                             binding.toolNames.forEach { add(JsonPrimitive(it)) }
                         })
