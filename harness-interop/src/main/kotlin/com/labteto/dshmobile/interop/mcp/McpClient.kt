@@ -290,7 +290,7 @@ class McpStreamableHttpTransport(
     private val ids = AtomicLong(1L)
     @Volatile private var headerRules: Map<String, List<McpHttpParameterHeader>> = emptyMap()
 
-    override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery {
+    internal override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery {
         val (admitted, rules) = McpHttpToolHeaders.admit(definitions)
         headerRules = rules
         return admitted
