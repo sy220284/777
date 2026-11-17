@@ -729,7 +729,7 @@ class McpToolBridgePlugin(
         }
         val registered = mutableListOf<String>()
         try {
-            val discovery = client.discoverTools(allowUnsupported = true)
+            val discovery = client.discoverTools(allowUnsupported = true, enforceHttpHeaders = transport == "http")
             val remoteDefinitions = discovery.tools
             val resourceDefinitions = resourceToolDefinitions(
                 serverId, remoteDefinitions, client.supportedResourceMethods(),
