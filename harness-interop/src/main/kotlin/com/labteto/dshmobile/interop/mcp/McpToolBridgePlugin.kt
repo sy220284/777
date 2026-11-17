@@ -1109,11 +1109,9 @@ class McpToolBridgePlugin(
                 put("additionalProperties", true)
             }
         }
-        val type = schema["type"]?.jsonPrimitive?.contentOrNull
-        require(type == null || type == "object") {
-            "MCP 工具参数根 schema 必须是 object"
-        }
-        return if (type == null) {
+        // Keep MCP's omitted root type compatible; the shared registry checks
+        // invalid or non-object roots once when it compiles the standard schema.
+        return if (schema["type"] == null) {
             JsonObject(schema + ("type" to JsonPrimitive("object")))
         } else {
             schema
