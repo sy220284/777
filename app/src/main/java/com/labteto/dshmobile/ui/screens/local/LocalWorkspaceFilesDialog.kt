@@ -180,8 +180,6 @@ internal fun LocalWorkspaceFilesDialog(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
     val selectionScope = listOf(mode.name, sessionId, workspacePath, section.toString(), directory, entryRequest.toString())
     val selection = rememberSaveable(selectionScope, saver = workspaceSelectionSaver(selectionScope)) {
         WorkspaceSelectionState()
@@ -463,9 +461,6 @@ internal fun LocalWorkspaceFilesDialog(
             gitError = "请粘贴要审查的 Git 提交哈希"
             return
         }
-        // Submitting a commit closes the editor: results and review history need the viewport.
-        focusManager.clearFocus(force = true)
-        keyboardController?.hide()
         gitJob?.cancel()
         gitJob = scope.launch {
             gitLoading = true
@@ -1243,6 +1238,9 @@ internal fun LocalWorkspaceFilesDialog(
             onDismiss = { gitJob?.cancel(); gitSheetOpen = false },
             scrollable = true,
         ) {
+            // ModalBottomSheet/Dialog owns a separate focus tree from the workspace.
+            val sheetFocusManager = LocalFocusManager.current
+            val sheetKeyboardController = LocalSoftwareKeyboardController.current
             Text("审查范围", style = DsType.small13Strong, color = colors.text)
             androidx.compose.foundation.layout.FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -1283,7 +1281,12 @@ internal fun LocalWorkspaceFilesDialog(
                 )
                 SyButton(
                     text = if (gitLoading) "正在读取…" else "读取提交差异",
-                    onClick = ::loadCommitComparison,
+                    onClick = {
+                        // Release the editor in this sheet's actual focus owner before showing results.
+                        sheetFocusManager.clearFocus(force = true)
+                        sheetKeyboardController?.hide()
+                        loadCommitComparison()
+                    },
                     enabled = !gitLoading && gitCommitInput.trim().length >= 7,
                     modifier = Modifier.fillMaxWidth().testTag("work_git_commit_load"),
                 )
