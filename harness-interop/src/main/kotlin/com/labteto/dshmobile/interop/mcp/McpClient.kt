@@ -87,7 +87,7 @@ data class McpToolDefinition(
     val raw: JsonObject,
 )
 
-internal data class McpToolDiscovery(
+data class McpToolDiscovery(
     val tools: List<McpToolDefinition>,
     val rejectedTools: Map<String, String>,
 )
@@ -290,7 +290,7 @@ class McpStreamableHttpTransport(
     private val ids = AtomicLong(1L)
     @Volatile private var headerRules: Map<String, List<McpHttpParameterHeader>> = emptyMap()
 
-    internal override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery {
+    override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery {
         val (admitted, rules) = McpHttpToolHeaders.admit(definitions)
         headerRules = rules
         return admitted
