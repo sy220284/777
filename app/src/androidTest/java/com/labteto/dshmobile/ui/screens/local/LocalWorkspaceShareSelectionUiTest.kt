@@ -241,6 +241,10 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.onNodeWithText("指定提交").performClick()
         compose.onNodeWithTag("work_git_commit_input").performTextInput("abcdef1234567")
         compose.onNodeWithTag("work_git_commit_load").performClick()
+        compose.waitUntil(5_000) {
+            compose.onNodeWithTag("work_git_commit_input").fetchSemanticsNode().config
+                .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Focused) == false
+        }
         compose.onNodeWithTag("work_git_commit_input").assertIsNotFocused()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("独立代码历史仍可查看").fetchSemanticsNodes().isNotEmpty() &&

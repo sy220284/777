@@ -464,7 +464,7 @@ internal fun LocalWorkspaceFilesDialog(
             return
         }
         // Submitting a commit closes the editor: results and review history need the viewport.
-        focusManager.clearFocus()
+        focusManager.clearFocus(force = true)
         keyboardController?.hide()
         gitJob?.cancel()
         gitJob = scope.launch {

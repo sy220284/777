@@ -17,8 +17,20 @@ def adb(*args,timeout=60):
  return p.stdout
 
 def tree():
- adb('shell','-n','uiautomator','dump','/sdcard/ui-audit.xml')
- return ET.fromstring(adb('exec-out','cat','/sdcard/ui-audit.xml'))
+ # UIAutomator may return an empty or transiently incomplete dump while the
+ # application is attaching its first window. Require a real hierarchy.
+ last_error=None
+ for attempt in range(10):
+  try:
+   adb('shell','-n','uiautomator','dump','/sdcard/ui-audit.xml')
+   xml=adb('exec-out','cat','/sdcard/ui-audit.xml')
+   root=ET.fromstring(xml)
+   if root.tag!='hierarchy':raise RuntimeError('Unexpected UI hierarchy root: '+root.tag)
+   return root
+  except (ET.ParseError,RuntimeError) as failure:
+   last_error=failure
+   time.sleep(.4)
+ raise RuntimeError(f'UIAutomator did not produce a valid hierarchy after 10 reads: {last_error}')
 
 def candidates(t,label):
  found={}
@@ -29,17 +41,22 @@ def candidates(t,label):
  return list(found)
 
 def tap(label):
- for attempt in range(7):
+ deadline=time.monotonic()+15
+ swipes=0
+ while time.monotonic()<deadline:
   t=tree();matches=candidates(t,label)
   if len(matches)==1:
    x1,y1,x2,y2=matches[0];adb('shell','-n','input','tap',str((x1+x2)//2),str((y1+y2)//2));return
   if len(matches)>1:raise RuntimeError(f'Ambiguous navigation label: {label}')
   scrollers=[n for n in t.iter('node') if n.get('scrollable')=='true']
-  if not scrollers:break
-  bounds=max((list(map(int,re.findall(r'\d+',n.get('bounds','')))) for n in scrollers),key=lambda b:(b[2]-b[0])*(b[3]-b[1]))
-  x1,y1,x2,y2=bounds;x=(x1+x2)//2
-  adb('shell','-n','input','swipe',str(x),str(y2-24),str(x),str(y1+24),'350')
- raise RuntimeError(f'Navigation target missing: {label}')
+  if scrollers and swipes<6:
+   bounds=max((list(map(int,re.findall(r'\d+',n.get('bounds','')))) for n in scrollers),key=lambda b:(b[2]-b[0])*(b[3]-b[1]))
+   x1,y1,x2,y2=bounds;x=(x1+x2)//2
+   adb('shell','-n','input','swipe',str(x),str(y2-24),str(x),str(y1+24),'350')
+   swipes+=1
+  else:
+   time.sleep(.35)
+ raise RuntimeError(f'Navigation target missing after waiting for UI: {label}')
 
 def snapshot(name):
  t=tree();ET.ElementTree(t).write(out/(name+'.xml'),encoding='utf-8')
@@ -51,10 +68,18 @@ def drawer_visible(t):
  return all(candidates(t,strings[key]) for key in ['local_usage_chat','local_usage_work','settings_title'])
 
 def drawer():
- t=tree()
- if drawer_visible(t):return
- if candidates(t,strings['app_open_navigation']):tap(strings['app_open_navigation'])
- else:raise RuntimeError('Not on home or drawer')
+ # A successful input tap is asynchronous; verify the drawer is visible
+ # before attempting to interact with its destinations.
+ deadline=time.monotonic()+15
+ opened=False
+ while time.monotonic()<deadline:
+  t=tree()
+  if drawer_visible(t):return
+  if candidates(t,strings['app_open_navigation']) and not opened:
+   tap(strings['app_open_navigation'])
+   opened=True
+  time.sleep(.3)
+ raise RuntimeError('Sidebar did not open after tapping the navigation control')
 
 def home():
  for _ in range(4):
