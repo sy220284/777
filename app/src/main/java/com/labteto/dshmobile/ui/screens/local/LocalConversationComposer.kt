@@ -4,6 +4,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,6 +15,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -22,6 +27,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -48,6 +57,9 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.presentation.LocalReasoningControls
+import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.local.presentation.LocalReasoningUiMode
 import com.labteto.dshmobile.local.presentation.LocalConversationSurfaceState
 import com.labteto.dshmobile.local.send.LocalSendResult
@@ -147,6 +159,21 @@ internal fun LocalConversationComposer(
     // Opening the input reveals the two capabilities; idle chats retain their compact row.
     val expanded = state.usageMode == LocalUsageMode.WORK || focused || input.contains('\n') || attachments.isNotEmpty() ||
         teamDispatchSelected || capabilityPanel != null
+    val composerTransition = updateTransition(expanded, label = "composerExpansion")
+    val density = LocalDensity.current
+    val windowHeight = LocalWindowInfo.current.containerSize.height
+    val availableHeight = with(density) {
+        (windowHeight - WindowInsets.ime.getBottom(this) - WindowInsets.statusBars.getTop(this) -
+            WindowInsets.navigationBars.getBottom(this)).toDp().value
+    }
+    val lineHeight = with(density) { MaterialTheme.typography.bodyMedium.lineHeight.toDp().value }
+    val editorMaxLines = localComposerMaxLines(availableHeight, lineHeight)
+    val modelLimits by LocalModelPerformanceControls.state.collectAsStateWithLifecycle()
+    val modes = LocalReasoningControls.availableModes(activeModelProfile, state.usageMode, modelLimits.reasoningCeiling)
+    val reasoningLabel = stringResource(composerReasoningLabel(reasoningMode, modes,
+        LocalReasoningControls.requiresBasicReasoning(activeModelProfile, state.usageMode)))
+    val modelLabel = activeModelProfile?.let { it.displayName?.takeIf(String::isNotBlank) ?: it.model }
+        ?: stringResource(R.string.models_title)
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     // A chat temperature change is committed asynchronously. Do not submit the next
     // turn with the old sampling value while the new persona setting is still saving.
@@ -241,14 +268,22 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun ModelControl() {
-        SyComposerAction(
-            icon = com.labteto.dshmobile.ui.components.SyEntryIcons.Models,
-            contentDescription = stringResource(R.string.models_title),
+        Surface(
             onClick = onOpenModelPicker,
             enabled = !state.loading,
-            tint = colors.textSecondary,
-            containerColor = Color.Transparent,
-        )
+            color = colors.primary.copy(alpha = .08f),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(SyMetric.radiusControl),
+            modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
+                .testTag("composer-model-selection"),
+        ) {
+            Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.Center) {
+                Text(modelLabel, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                Text(reasoningLabel, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+            }
+        }
     }
 
     @Composable
@@ -305,9 +340,12 @@ internal fun LocalConversationComposer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
+                Text(stringResource(R.string.local_team_selected_hint),
+                    modifier = Modifier.weight(1f), style = DsType.small13.withReadingWeight(),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, color = colors.textSecondary)
                 Icon(
                     painter = painterResource(R.drawable.ic_ui_create_subagent),
-                    contentDescription = stringResource(R.string.local_team_selected_hint),
+                    contentDescription = null,
                     tint = colors.primary,
                     modifier = Modifier.size(20.dp),
                 )
@@ -319,6 +357,11 @@ internal fun LocalConversationComposer(
                     tint = colors.textSecondary,
                 )
             }
+        }
+        if (state.usageMode == LocalUsageMode.WORK && state.planMode) {
+            Text(stringResource(R.string.composer_plan_active),
+                modifier = Modifier.testTag("composer-plan-state"),
+                style = DsType.caption11.withReadingWeight(), color = colors.primaryPressed)
         }
         if (state.usageMode == LocalUsageMode.WORK && state.running &&
             (input.isNotBlank() || attachments.isNotEmpty())) {
@@ -397,8 +440,8 @@ internal fun LocalConversationComposer(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
         ) {
-            AnimatedVisibility(
-                visible = !expanded,
+            composerTransition.AnimatedVisibility(
+                visible = { !it },
                 enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
                 exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
             ) {
@@ -428,14 +471,14 @@ internal fun LocalConversationComposer(
                         stringResource(R.string.local_chat_composer_persona_hint, state.chatPersona.name)
                 },
                 modifier = Modifier.weight(1f),
-                maxLines = 5,
+                maxLines = editorMaxLines,
                 onFocusedChange = {
                     focused = it
                     onFocusChanged(it)
                 },
             )
-            AnimatedVisibility(
-                visible = !expanded,
+            composerTransition.AnimatedVisibility(
+                visible = { !it },
                 enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
                 exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
             ) {
@@ -444,7 +487,7 @@ internal fun LocalConversationComposer(
         }
 
         LocalConversationComposerExpandedRow(
-            visible = expanded,
+            expansion = composerTransition,
             menuControl = { AttachmentControl() },
             modelControl = { ModelControl() },
             replySuggestionsControl = { ReplySuggestionsControl() },

@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -175,7 +176,10 @@ internal fun WorkSurfaceHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
-            modifier = Modifier.weight(1f).padding(horizontal = SyMetric.gapMd),
+            modifier = Modifier.weight(1f).heightIn(min = SyMetric.touch)
+                .testTag("work-status-summary")
+                .then(if (onOpenWorkEvidence != null) Modifier.clickable(role = Role.Button, onClick = onOpenWorkEvidence) else Modifier)
+                .padding(horizontal = SyMetric.gapMd),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(

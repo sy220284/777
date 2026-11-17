@@ -26,6 +26,7 @@ class DeviceVideoRecorder:
         self._started = threading.Event()
         self._thread = None
         self._process = None
+        self._process_lock = threading.Lock()
         self._clips = []
         self._remotes = []
         self._errors = []
@@ -62,17 +63,23 @@ class DeviceVideoRecorder:
             remote = f"/data/local/tmp/ui-audit-{self._token}-{index:03d}.mp4"
             began = _utc_now()
             start = time.monotonic()
+            process = None
             try:
-                self._process = subprocess.Popen(
-                    [self.adb, "shell", "-n", "screenrecord", "--time-limit", str(self.seconds),
-                     "--bit-rate", str(self.bit_rate), remote],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                    text=True,
-                )
+                # Atomic with stop(): do not launch a new segment after shutdown begins.
+                with self._process_lock:
+                    if not self._stop.is_set():
+                        process = subprocess.Popen(
+                            [self.adb, "shell", "-n", "screenrecord", "--time-limit", str(self.seconds),
+                             "--bit-rate", str(self.bit_rate), remote],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                        )
+                        self._process = process
+                if process is None:
+                    break
                 self._started.set()
-                stdout, stderr = self._process.communicate(timeout=self.seconds + 35)
-                if self._process.returncode:
-                    raise RuntimeError(f"screenrecord 退出 {self._process.returncode}: {(stderr or stdout)[-800:]}")
+                stdout, stderr = process.communicate(timeout=self.seconds + 35)
+                if process.returncode:
+                    raise RuntimeError(f"screenrecord 退出 {process.returncode}: {(stderr or stdout)[-800:]}")
                 self._remotes.append({"remote": remote, "file": f"part-{index:03d}.mp4",
                                       "started_at": began, "ended_at": _utc_now(),
                                       "elapsed_seconds": round(time.monotonic()-start, 2)})
@@ -80,24 +87,33 @@ class DeviceVideoRecorder:
                 self._errors.append(f"{remote}: {error}")
                 break
             finally:
-                self._process = None
+                with self._process_lock:
+                    if self._process is process:
+                        self._process = None
         self._started.set()
 
     def stop(self):
-        self._stop.set()
+        with self._process_lock:
+            self._stop.set()
+            process = self._process
         if self._thread:
-            if self._thread.is_alive():
-                # SIGINT asks Android's screenrecord to finalize its MP4, unlike killing adb.
-                pids = subprocess.run([self.adb, "shell", "-n", "pidof", "screenrecord"],
-                                      capture_output=True, text=True, timeout=10)
-                if pids.returncode == 0:
-                    for pid in pids.stdout.split():
-                        if pid.isdigit():
+            if self._thread.is_alive() and process is not None:
+                # During rollover the host adb child can exist before remote screenrecord
+                # installs its signal handler. Wait for the actual recorder PID before SIGINT.
+                deadline = time.monotonic() + 6
+                while process.poll() is None and time.monotonic() < deadline:
+                    pids = subprocess.run([self.adb, "shell", "-n", "pidof", "screenrecord"],
+                                          capture_output=True, text=True, timeout=10)
+                    active = [pid for pid in pids.stdout.split() if pid.isdigit()] if pids.returncode == 0 else []
+                    if active:
+                        for pid in active:
                             signal_result = subprocess.run(
                                 [self.adb, "shell", "-n", "kill", "-2", pid],
                                 capture_output=True, text=True, timeout=15)
-                            if signal_result.returncode and self._process and self._process.poll() is None:
+                            if signal_result.returncode and process.poll() is None:
                                 self._errors.append("无法结束录像进程：" + signal_result.stderr[-600:])
+                        break
+                    time.sleep(.08)
             self._thread.join(timeout=45)
             if self._thread.is_alive():
                 self._errors.append("录屏进程未能正常结束并回收")

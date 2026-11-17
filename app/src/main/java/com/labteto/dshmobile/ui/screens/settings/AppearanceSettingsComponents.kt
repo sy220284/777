@@ -89,6 +89,7 @@ internal fun ReadingPreferencesRow(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Text(
         stringResource(R.string.settings_text_size),
+        modifier = Modifier.settingsSearchAnchor(stringResource(R.string.settings_text_size)),
         style = DsType.std14Strong.withReadingWeight(),
         color = colors.text,
     )
@@ -166,6 +167,7 @@ internal fun AppearanceAdvancedControls(
 
     Spacer(Modifier.height(SyMetric.gapSm))
     Text(stringResource(R.string.settings_advanced_motion),
+        modifier = Modifier.settingsSearchAnchor(stringResource(R.string.settings_advanced_motion)),
         style = DsType.std14Strong.withReadingWeight(), color = colors.text)
     AppearanceAdvancedSlider(
         stringResource(R.string.settings_advanced_motion_tempo),

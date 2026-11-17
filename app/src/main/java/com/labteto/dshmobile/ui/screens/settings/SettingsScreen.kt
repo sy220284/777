@@ -43,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -112,6 +113,7 @@ import kotlinx.coroutines.withContext
  */
 enum class SettingsDestination {
     ROOT,
+    SEARCH,
     SESSION,
     APPEARANCE,
     CHAT,
@@ -296,7 +298,11 @@ fun SettingsScreen(
         listOf(initialDestination), entryRequest,
     )
     val page = pageStack.last()
+    var settingsQuery by rememberSaveable { mutableStateOf("") }
+    var settingsSearchTargetId by rememberSaveable { mutableStateOf<String?>(null) }
+    val settingsSearchTarget = settingsSearchEntries.firstOrNull { it.id == settingsSearchTargetId }
     fun openPage(destination: SettingsDestination) {
+        settingsSearchTargetId = null
         pageStack = settingsNavigationPush(pageStack, destination)
     }
     var showAllMemories by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(
@@ -449,29 +455,10 @@ fun SettingsScreen(
 
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
-        SettingsDestination.SESSION -> stringResource(R.string.settings_page_session)
-        SettingsDestination.APPEARANCE -> stringResource(R.string.settings_page_appearance)
-        SettingsDestination.CHAT -> stringResource(R.string.settings_page_chat)
-        SettingsDestination.ACCOUNT -> stringResource(R.string.chatgpt_account_title)
-        SettingsDestination.MODELS -> stringResource(R.string.settings_page_models)
-        SettingsDestination.MODEL_PERFORMANCE -> stringResource(R.string.settings_model_performance_title)
-        SettingsDestination.MODEL_USAGE -> stringResource(R.string.settings_page_model_usage)
-        SettingsDestination.MINIMAX_QUOTA -> stringResource(R.string.minimax_quota_title)
-        SettingsDestination.PRICING -> stringResource(R.string.settings_page_pricing)
-        SettingsDestination.USAGE -> stringResource(R.string.usage_calculation_title)
-        SettingsDestination.USAGE_LOG -> stringResource(R.string.usage_log_title)
-        SettingsDestination.USAGE_DETAIL -> when (usageDetailSelection) {
-            is UsageDetailSelection.Request -> stringResource(R.string.usage_request_detail)
-            else -> stringResource(R.string.usage_group_detail)
-        }
-        SettingsDestination.MEMORY -> stringResource(R.string.settings_page_memory)
-        SettingsDestination.MEMORY_SETTINGS -> stringResource(R.string.advanced_memory_settings)
-        SettingsDestination.MEMORY_MANAGEMENT -> stringResource(R.string.advanced_manage_memory)
-        SettingsDestination.PERMISSIONS -> stringResource(R.string.settings_page_permissions)
-        SettingsDestination.NOTIFICATIONS -> stringResource(R.string.settings_page_notifications)
-        SettingsDestination.ADVANCED -> stringResource(R.string.settings_page_advanced)
-        SettingsDestination.SESSION_STORAGE -> stringResource(R.string.settings_local_session_storage)
-        SettingsDestination.DIAGNOSTICS -> stringResource(R.string.settings_runtime_diagnostics)
+        SettingsDestination.SEARCH -> stringResource(R.string.settings_search_title)
+        SettingsDestination.USAGE_DETAIL -> stringResource(if (usageDetailSelection is UsageDetailSelection.Request)
+            R.string.usage_request_detail else R.string.usage_group_detail)
+        else -> stringResource(requireNotNull(settingsPageEntry(page)).titleRes)
     }
 
     if (showPermissionSetup) {
@@ -498,13 +485,17 @@ fun SettingsScreen(
                     largeTitle = page == SettingsDestination.ROOT,
                     plainBackButton = page == SettingsDestination.ROOT,
                     modifier = Modifier.fillMaxWidth(),
-                    actionIcon = FeatherIcons.Clock.takeIf { page == SettingsDestination.USAGE },
-                    actionContentDescription = stringResource(R.string.usage_log_open)
-                        .takeIf { page == SettingsDestination.USAGE },
-                    onAction = if (page == SettingsDestination.USAGE) {
-                        { openPage(SettingsDestination.USAGE_LOG) }
-                    } else {
-                        null
+                    actionIcon = when (page) {
+                        SettingsDestination.SEARCH -> null
+                        SettingsDestination.USAGE -> FeatherIcons.Clock
+                        else -> FeatherIcons.Search
+                    },
+                    actionContentDescription = stringResource(if (page == SettingsDestination.USAGE)
+                        R.string.usage_log_open else R.string.settings_search_title),
+                    onAction = when (page) {
+                        SettingsDestination.SEARCH -> null
+                        SettingsDestination.USAGE -> { { openPage(SettingsDestination.USAGE_LOG) } }
+                        else -> { { openPage(SettingsDestination.SEARCH) } }
                     },
                 )
 
@@ -515,23 +506,37 @@ fun SettingsScreen(
                     modifier = Modifier.weight(1f),
                 ) { shownStack ->
                 val shownPage = shownStack.last()
+                val searchFocus = settingsSearchTarget?.takeIf { it.destination == shownPage }
+                    ?.anchorTitleRes?.let { SettingsSearchFocus(stringResource(it), settingsSearchTargetId.orEmpty()) }
+                CompositionLocalProvider(LocalSettingsSearchFocus provides searchFocus) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        .then(if (shownPage == SettingsDestination.SEARCH) Modifier
+                            else Modifier.verticalScroll(rememberScrollState()))
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapMd),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
                 when (shownPage) {
+                    SettingsDestination.SEARCH -> SettingsSearchResults(settingsQuery,
+                        onQueryChange = { settingsQuery = it },
+                        onSelect = { entry ->
+                            settingsSearchTargetId = entry.id
+                            pageStack = settingsNavigationPush(pageStack, entry.destination)
+                        })
                     SettingsDestination.ROOT -> {
+                        AppSettingsRow(icon = FeatherIcons.Search,
+                            title = stringResource(R.string.settings_search_title),
+                            subtitle = stringResource(R.string.settings_search_hint),
+                            onClick = { openPage(SettingsDestination.SEARCH) }, compact = true)
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_appearance_experience)) {
                             AppSettingsRow(icon = SyEntryIcons.Appearance,
-                                title = stringResource(R.string.settings_page_appearance),
+                                title = stringResource(settingsPageEntry(SettingsDestination.APPEARANCE)!!.titleRes),
                                 onClick = { openPage(SettingsDestination.APPEARANCE) }, compact = true)
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = SyEntryIcons.Notifications,
-                                title = stringResource(R.string.settings_page_notifications),
+                                title = stringResource(settingsPageEntry(SettingsDestination.NOTIFICATIONS)!!.titleRes),
                                 onClick = { openPage(SettingsDestination.NOTIFICATIONS) },
                                 compact = true,
                             )
@@ -539,21 +544,21 @@ fun SettingsScreen(
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_models_account)) {
                             AppSettingsRow(
                                 icon = SyEntryIcons.Models,
-                                title = stringResource(R.string.settings_page_models),
+                                title = stringResource(settingsPageEntry(SettingsDestination.MODELS)!!.titleRes),
                                 onClick = { openPage(SettingsDestination.MODELS) },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = SyEntryIcons.Account,
-                                title = stringResource(R.string.chatgpt_account_title),
+                                title = stringResource(settingsPageEntry(SettingsDestination.ACCOUNT)!!.titleRes),
                                 onClick = { openPage(SettingsDestination.ACCOUNT) },
                                 compact = true,
                             )
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = SyEntryIcons.Performance,
-                                title = stringResource(R.string.settings_model_performance_title),
+                                title = stringResource(settingsPageEntry(SettingsDestination.MODEL_PERFORMANCE)!!.titleRes),
                                 reservedEntryHeight = 72.dp,
                                 onClick = { openPage(SettingsDestination.MODEL_PERFORMANCE) },
                                 compact = true,
@@ -561,7 +566,7 @@ fun SettingsScreen(
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_memory_data)) {
                             AppSettingsRow(icon = SyEntryIcons.Memory,
-                                title = stringResource(R.string.settings_page_memory),
+                                title = stringResource(settingsPageEntry(SettingsDestination.MEMORY)!!.titleRes),
                                 onClick = { openPage(SettingsDestination.MEMORY) }, compact = true)
                             AppSettingsDivider()
                             AppSettingsRow(icon = SyEntryIcons.SessionStorage,
@@ -571,7 +576,7 @@ fun SettingsScreen(
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_system_maintenance)) {
                             AppSettingsRow(
                                 icon = SyEntryIcons.Permissions,
-                                title = stringResource(R.string.settings_page_permissions),
+                                title = stringResource(settingsPageEntry(SettingsDestination.PERMISSIONS)!!.titleRes),
                                 value = when {
                                     deviceCapabilities.loading -> stringResource(R.string.common_loading)
                                     deviceCapabilities.error != null -> stringResource(R.string.settings_permissions_check_failed)
@@ -590,7 +595,7 @@ fun SettingsScreen(
                             AppSettingsDivider()
                             AppSettingsRow(
                                 icon = SyEntryIcons.Advanced,
-                                title = stringResource(R.string.settings_page_advanced),
+                                title = stringResource(settingsPageEntry(SettingsDestination.ADVANCED)!!.titleRes),
                                 onClick = { openPage(SettingsDestination.ADVANCED) },
                                 compact = true,
                             )
@@ -665,6 +670,9 @@ fun SettingsScreen(
                             )
                         }
                         var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+                        LaunchedEffect(settingsSearchTargetId) {
+                            if (settingsSearchTarget?.expandAppearance == true) advancedExpanded = true
+                        }
                         SettingsSeamlessGroup(stringResource(R.string.settings_advanced_appearance)) {
                             ToggleRow(
                                 stringResource(R.string.settings_advanced_expand),
@@ -1163,7 +1171,7 @@ fun SettingsScreen(
                     SettingsDestination.SESSION_STORAGE -> {
                         AppSettingsSection {
                             AppSettingsRow(icon = SyEntryIcons.ChatStyle,
-                                title = stringResource(R.string.settings_page_session),
+                                title = stringResource(settingsPageEntry(SettingsDestination.SESSION)!!.titleRes),
                                 onClick = { openPage(SettingsDestination.SESSION) })
                         }
                         LocalSessionStorageCard(
@@ -1235,6 +1243,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(SyMetric.gapPage))
                 }
+                } // settings search focus
                 }
             }
             SyToastHost(toast, modifier = Modifier.fillMaxWidth())

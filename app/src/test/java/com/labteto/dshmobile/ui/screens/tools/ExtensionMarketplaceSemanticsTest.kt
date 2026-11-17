@@ -57,13 +57,24 @@ class ExtensionMarketplaceSemanticsTest {
     }
 
     @Test fun discoveryShowsBothInstalledAndInstallable() {
-        assertTrue(marketplaceTabAllows(0, true, false, true, false, false, ExtensionGroup.OFFICE))
-        assertTrue(marketplaceTabAllows(0, true, true, false, false, false, ExtensionGroup.OFFICE))
-        assertTrue(marketplaceTabAllows(0, false, false, false, true, false, ExtensionGroup.GENERAL))
+        assertTrue(marketplaceTabAllows(false, true, false, true, false, false, ExtensionGroup.OFFICE))
+        assertTrue(marketplaceTabAllows(false, true, true, false, false, false, ExtensionGroup.OFFICE))
+        assertTrue(marketplaceTabAllows(false, false, false, false, true, false, ExtensionGroup.GENERAL))
     }
 
     @Test fun installedViewOnlyShowsInstalledItems() {
-        assertTrue(!marketplaceTabAllows(1, true, false, true, false, false, ExtensionGroup.OFFICE))
-        assertTrue(marketplaceTabAllows(1, true, true, false, false, false, ExtensionGroup.OFFICE))
+        assertTrue(!marketplaceTabAllows(true, true, false, true, false, false, ExtensionGroup.OFFICE))
+        assertTrue(marketplaceTabAllows(true, true, true, false, false, false, ExtensionGroup.OFFICE))
     }
+    @Test fun addedViewRetainsConnectedServicesButExcludesUninstalledOffers() {
+        assertTrue(marketplaceTabAllows(true, false, false, false, true, false, ExtensionGroup.GENERAL))
+        assertTrue(!marketplaceTabAllows(true, false, false, true, false, false, ExtensionGroup.OFFICE))
+    }
+    @Test fun categoryAndOwnershipAreIndependentFilters() {
+        assertTrue(marketplaceTabAllows(false, false, false, true, false, false,
+            ExtensionGroup.DEVELOPMENT, ExtensionGroup.DEVELOPMENT))
+        assertTrue(!marketplaceTabAllows(false, false, true, false, false, false,
+            ExtensionGroup.OFFICE, ExtensionGroup.DEVELOPMENT))
+    }
+
 }

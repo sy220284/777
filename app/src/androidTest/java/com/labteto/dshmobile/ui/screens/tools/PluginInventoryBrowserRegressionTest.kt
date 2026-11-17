@@ -46,7 +46,7 @@ class PluginInventoryBrowserRegressionTest {
         compose.runOnIdle { assertEquals(1, returned) }
     }
     @Test
-    fun serviceConnectionsCategoryUsesLocalMcpInventory() {
+    fun addedViewShowsConfiguredLocalMcpServices() {
         var openedConnections = 0
         compose.setContent {
             DshTheme {
@@ -62,8 +62,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithTag("plugin-category-list").performScrollToIndex(1)
-        compose.onNodeWithText("已连接").performClick()
+        compose.onNodeWithText("已添加").performClick()
         compose.onNodeWithText("MCP 本地服务").assertIsDisplayed().performClick()
         compose.onNodeWithTag("plugin-detail-primary-action").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, openedConnections) }
@@ -98,7 +97,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithTag("plugin-category-list").performScrollToIndex(4)
+        compose.onNodeWithTag("plugin-category-list").performScrollToIndex(3)
         compose.onNodeWithText("创意设计").performClick()
         compose.onNodeWithText("视觉理解").assertIsDisplayed()
         compose.onNodeWithText("终端与运行环境").assertDoesNotExist()
@@ -374,7 +373,6 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithTag("skill-import-file").assertDoesNotExist()
-        compose.onNodeWithTag("plugin-inventory-search-trigger").performClick()
         compose.onNodeWithTag("plugin-inventory-search").performTextInput("research")
         compose.onNodeWithTag("skill-import-file").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
@@ -390,7 +388,6 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithTag("plugin-inventory-search-trigger").performClick()
         compose.onNodeWithTag("plugin-inventory-search").performTextInput("自动执行")
         compose.onNodeWithTag("plugin-inventory-card-local:android-automation").assertIsDisplayed()
         compose.onNodeWithTag("plugin-inventory-search").performTextInput("不存在的插件名称")
@@ -427,8 +424,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
-        compose.onNodeWithTag("plugin-inventory-search-trigger").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
         compose.onNodeWithText("插件").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
     }

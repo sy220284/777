@@ -44,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -178,8 +180,12 @@ internal fun LocalWorkspaceFilesDialog(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
-    val selected = remember(mode, sessionId, section, directory) { mutableStateListOf<String>() }
+    val selectionScope = listOf(mode.name, sessionId, workspacePath, section.toString(), directory, entryRequest.toString())
+    val selection = rememberSaveable(selectionScope, saver = workspaceSelectionSaver(selectionScope)) {
+        WorkspaceSelectionState()
+    }
+    var selecting by selection.active
+    val selected = selection.paths
     var sharing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var savedLocation by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
@@ -232,10 +238,6 @@ internal fun LocalWorkspaceFilesDialog(
     }
     val visibleSharePaths = remember(shareableFiles) {
         shareableFiles.map { it.path }.distinct()
-    }
-
-    LaunchedEffect(visibleSharePaths) {
-        selected.retainAll(visibleSharePaths.toSet())
     }
 
     fun toggle(path: String) {
@@ -558,8 +560,8 @@ internal fun LocalWorkspaceFilesDialog(
         fun stillCurrent(): Boolean =
             loadEpoch == epoch && directory == pageDirectory && section == currentSection &&
                 query.trim() == currentQuery
-        selected.clear()
-        selecting = false
+        // Refresh retains the current selection. Only a complete Owner snapshot can
+        // remove missing files; partial directory/search pages must keep offscreen items.
         loading = true
         loadingNextPage = false
         loadingNextSearchPage = false
@@ -592,6 +594,21 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
             if (stillCurrent()) {
+                val complete = when (mode) {
+                    LocalFilesMode.WORKSPACE -> currentQuery.isBlank() && nextDirectoryOffset == null
+                    LocalFilesMode.CONVERSATION -> true
+                }
+                val available = when (mode) {
+                    LocalFilesMode.WORKSPACE -> entries.filterNot { it.isDirectory }.map { it.path }
+                    LocalFilesMode.CONVERSATION -> (conversation.artifacts + conversation.involved).map { it.path }
+                }.toSet()
+                val retained = reconcileWorkspaceSelection(selected.toList(), available, complete)
+                val removed = selected.size - retained.size
+                if (removed > 0) {
+                    selected.clear()
+                    selected.addAll(retained)
+                    shareError = "已移除 $removed 个不再可用的已选文件，其余选择已保留"
+                }
                 lastLoadedSearch = currentQuery
                 previewPath?.let { path -> openPreview(path) }
             }
@@ -903,9 +920,10 @@ internal fun LocalWorkspaceFilesDialog(
                             SyButton(
                                 text = stringResource(R.string.local_files_select_all),
                                 onClick = {
-                                    selected.clear()
-                                    selected.addAll(visibleSharePaths.take(MAX_LOCAL_SHARE_FILES))
-                                    shareError = if (visibleSharePaths.size > MAX_LOCAL_SHARE_FILES) limitText else null
+                                    val additions = visibleSharePaths.filterNot { it in selected }
+                                    val remaining = (MAX_LOCAL_SHARE_FILES - selected.size).coerceAtLeast(0)
+                                    selected.addAll(additions.take(remaining))
+                                    shareError = if (additions.size > remaining) limitText else null
                                 },
                                 modifier = Modifier.weight(1f),
                                 size = SyButtonSize.Small,
@@ -1220,6 +1238,9 @@ internal fun LocalWorkspaceFilesDialog(
             onDismiss = { gitJob?.cancel(); gitSheetOpen = false },
             scrollable = true,
         ) {
+            // ModalBottomSheet/Dialog owns a separate focus tree from the workspace.
+            val sheetFocusManager = LocalFocusManager.current
+            val sheetKeyboardController = LocalSoftwareKeyboardController.current
             Text("审查范围", style = DsType.small13Strong, color = colors.text)
             androidx.compose.foundation.layout.FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -1260,7 +1281,12 @@ internal fun LocalWorkspaceFilesDialog(
                 )
                 SyButton(
                     text = if (gitLoading) "正在读取…" else "读取提交差异",
-                    onClick = ::loadCommitComparison,
+                    onClick = {
+                        // Release the editor in this sheet's actual focus owner before showing results.
+                        sheetFocusManager.clearFocus(force = true)
+                        sheetKeyboardController?.hide()
+                        loadCommitComparison()
+                    },
                     enabled = !gitLoading && gitCommitInput.trim().length >= 7,
                     modifier = Modifier.fillMaxWidth().testTag("work_git_commit_load"),
                 )

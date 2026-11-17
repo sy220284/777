@@ -14,6 +14,8 @@ CLASSES=[
  'com.labteto.dshmobile.ui.screens.local.UiPolishInteractionRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalWorkspaceShareSelectionUiTest',
  'com.labteto.dshmobile.ui.audit.SettingsPageAuditTest',
+ 'com.labteto.dshmobile.ui.screens.settings.SettingsSearchUiTest',
+ 'com.labteto.dshmobile.ui.screens.settings.SettingsNavigationStateRestorationTest',
  'com.labteto.dshmobile.ui.audit.MainPagesAuditTourTest',
  'com.labteto.dshmobile.ui.audit.ContentPagesAuditTest',
  'com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest',

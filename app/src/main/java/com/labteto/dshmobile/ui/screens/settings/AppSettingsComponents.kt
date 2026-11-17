@@ -60,7 +60,7 @@ internal fun AppSettingsMenuGroup(title: String, content: @Composable ColumnScop
 @Composable
 internal fun SettingsGroupTitle(text: String) {
     com.shenyan.designsystem.components.SySectionHeader(text,
-        modifier = Modifier.padding(start = SyMetric.gapMd, top = SyMetric.gapLg, bottom = SyMetric.gapSm))
+        modifier = Modifier.settingsSearchAnchor(text).padding(start = SyMetric.gapMd, top = SyMetric.gapLg, bottom = SyMetric.gapSm))
 }
 
 @Composable
@@ -92,6 +92,7 @@ internal fun AppSettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .settingsSearchAnchor(title)
             .heightIn(min = reservedEntryHeight ?: if (compact) 56.dp else 64.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = SyMetric.gapSection, vertical = if (compact) SyMetric.gapMd else SyMetric.gapLg),

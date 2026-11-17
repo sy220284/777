@@ -34,8 +34,15 @@ if args[0]=='screenrecord':
   global quitting
   quitting=True
  signal.signal(signal.SIGINT,stop)
+ sequence=store/'sequence'
+ index=int(sequence.read_text())+1 if sequence.exists() else 1
+ sequence.write_text(str(index))
+ slow=os.environ.get('FAKE_ADB_DELAY_CLIP')==str(index)
+ if slow:
+  (store/'delayed-clip-started').write_text(str(index))
+  time.sleep(.45)
  (store/'pid').write_text(str(os.getpid()))
- end=time.monotonic()+float(args[2])*.01
+ end=time.monotonic()+(4 if slow else float(args[2])*.01)
  while not quitting and time.monotonic()<end:time.sleep(.025)
  dest.write_bytes(b'\0\0\0\x18ftypisom'+b'0'*1024)
  (store/'pid').unlink(missing_ok=True)
@@ -78,6 +85,26 @@ class VideoTest(unittest.TestCase):
             self.assertTrue(all((root/'videos'/x['file']).exists() for x in receipt['clips']))
             self.assertEqual(json.loads((root/'videos'/'manifest.json').read_text())['name'],'main-tour')
 
+
+    def test_stopping_during_rollover_waits_for_remote_recorder(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            rec = self.setup_recorder(root, seconds=30)
+            os.environ['FAKE_ADB_DELAY_CLIP'] = '2'
+            try:
+                rec.start()
+                deadline = time.monotonic() + 5
+                marker = root / 'remote' / 'delayed-clip-started'
+                while not marker.exists() and time.monotonic() < deadline:
+                    time.sleep(.025)
+                self.assertTrue(marker.exists(), 'Second clip must have begun launching')
+                started = time.monotonic()
+                receipt = rec.stop()
+                self.assertLess(time.monotonic() - started, 2)
+                self.assertGreaterEqual(len(receipt['clips']), 2)
+                self.assertEqual(receipt['errors'], [])
+            finally:
+                os.environ.pop('FAKE_ADB_DELAY_CLIP', None)
 
     def test_failed_transfer_never_deletes_only_recording(self):
         with tempfile.TemporaryDirectory() as d:

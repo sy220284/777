@@ -197,6 +197,7 @@ private fun CapabilityRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .settingsSearchAnchor(label)
             .padding(vertical = SyMetric.gapSm),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {

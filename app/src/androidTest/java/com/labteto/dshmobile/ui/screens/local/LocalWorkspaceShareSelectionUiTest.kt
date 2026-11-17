@@ -1,10 +1,12 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToIndex
@@ -239,6 +241,11 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.onNodeWithText("指定提交").performClick()
         compose.onNodeWithTag("work_git_commit_input").performTextInput("abcdef1234567")
         compose.onNodeWithTag("work_git_commit_load").performClick()
+        compose.waitUntil(5_000) {
+            compose.onNodeWithTag("work_git_commit_input").fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.Focused] == false
+        }
+        compose.onNodeWithTag("work_git_commit_input").assertIsNotFocused()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("独立代码历史仍可查看").fetchSemanticsNodes().isNotEmpty() &&
                 compose.onAllNodesWithText("安全历史记录读取失败").fetchSemanticsNodes().isNotEmpty()
@@ -592,4 +599,71 @@ class LocalWorkspaceShareSelectionUiTest {
         }
         compose.onNodeWithText("查看下载").assertExists()
     }
+    @Test
+    fun changingSearchKeepsOffscreenSelectionAndSelectAllAddsVisibleResults() {
+        val files = listOf(LocalWorkspaceFile("成果/第一份.md", 5L, 1L),
+            LocalWorkspaceFile("成果/第二份.md", 10L, 2L))
+        val saved = java.util.Collections.synchronizedList(mutableListOf<String>())
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.CONVERSATION, sessionId = "offscreen-selection",
+                    workspacePath = context.filesDir.absolutePath,
+                    loadWorkspace = { emptyList() },
+                    loadConversation = { LocalConversationFiles(artifacts = files) },
+                    loadPreview = { path -> LocalWorkspaceFilePreview(files.first { it.path == path }) },
+                    saveToDownloads = { path ->
+                        saved += path
+                        "Download/神言神语/${path.substringAfterLast('/')}"
+                    },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("第一份.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_files_select)).performClick()
+        compose.onNodeWithText("第一份.md").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("第二份")
+        compose.onNodeWithText(context.getString(R.string.local_files_selected_count, 1)).assertExists()
+        compose.onNodeWithText("第一份.md").assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_files_select_all)).performClick()
+        compose.onNodeWithText(context.getString(R.string.local_files_selected_count, 2)).assertExists()
+        compose.onNodeWithText("保存到下载").performClick()
+        compose.waitUntil(5_000) { saved.size == 2 }
+        compose.runOnIdle {
+            assertEquals(listOf("成果/第一份.md", "成果/第二份.md"), saved)
+        }
+    }
+
+    @Test
+    fun rebuildingFileBrowserRetainsSelectedArtifacts() {
+        val files = listOf(LocalWorkspaceFile("成果/第一份.md", 5L, 1L),
+            LocalWorkspaceFile("成果/第二份.md", 10L, 2L))
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(mode = LocalFilesMode.CONVERSATION,
+                    sessionId = "selection-restore", workspacePath = context.filesDir.absolutePath,
+                    loadWorkspace = { emptyList() },
+                    loadConversation = { LocalConversationFiles(artifacts = files) },
+                    loadPreview = { path -> LocalWorkspaceFilePreview(files.first { it.path == path }) },
+                    onDismiss = {})
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("第一份.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_files_select)).performClick()
+        compose.onNodeWithText("第一份.md").performClick()
+        compose.onNodeWithText("第二份.md").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText(context.getString(R.string.local_files_selected_count, 2))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_files_selected_count, 2)).assertExists()
+    }
+
 }
