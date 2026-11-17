@@ -4,6 +4,7 @@
 > **审计范围：** `com.shenyan.designsystem`（唯一视觉库）、`ui/theme`（主题 / 壁纸 / 强调色）、`ui/shenyan`（迁移代理层）。
 > **审计日期：** 2026-11-16　**对应实现基线：** 与 [V6 当前实现](../v6/V6-CURRENT-IMPLEMENTATION.zh-CN.md) 同源（main `73d86a8d` + PR #926）。
 > **本文不改动任何生产代码**，只作为 V7 重设计的取值依据。与 [V7 视觉语言](V7-VISUAL-LANGUAGE.zh-CN.md) 的差异请以代码为准。
+> **与当前设计方向的关系：** 本文全部数值仍是「当前生产实现」的真实值。V7 / V8 两轮视觉方向已按用户要求整体清理；现行唯一有效的设计方向是 [V9](../v9/V9-DESIGN.zh-CN.md)，其令牌在 `docs/design/v9/tokens.json`（64 项校验通过），Android 实现尚未开始——本文与 V9 目标的差距即 V9 路线图的施工量。
 
 ---
 
