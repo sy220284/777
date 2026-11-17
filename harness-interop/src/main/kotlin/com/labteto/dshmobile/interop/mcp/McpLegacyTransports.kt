@@ -366,7 +366,7 @@ class McpNegotiatingHttpTransport(
     json: Json,
     modernClientCapabilities: JsonObject = JsonObject(emptyMap()),
 ) : McpTransport, McpTerminationSource, McpResourceDiscovery, McpHttpToolAdmission {
-    override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery =
+    internal override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery =
         if (selected === modern) modern.admitToolHeaders(definitions)
         else McpToolDiscovery(definitions, emptyMap())
 
