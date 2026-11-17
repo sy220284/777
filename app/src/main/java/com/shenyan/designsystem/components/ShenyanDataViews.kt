@@ -119,18 +119,9 @@ fun SyValueRow(label: String, value: String?, modifier: Modifier = Modifier, hin
     }
 }
 
-/** One shared icon palette for the expanded list and the collapsed rail. */
-internal fun syEntryTileTone(name: String): Color? {
-    if (!name.startsWith("SyEntry.")) return null
-    return when (name.removePrefix("SyEntry.")) {
-"Persona", "Search", "Account", "Gallery" -> Color(0xFFE2E7E9)
-        "NewSession", "WorkspaceFiles", "Quota", "Tools" -> Color(0xFFEEE4D8)
-        "Tasks", "Permissions", "Memory", "Connections" -> Color(0xFFDFE6DA)
-        "Settings", "Models", "Diary", "Plugins" -> Color(0xFFE8E2E9)
-        "GroupChat", "Appearance", "Notifications", "Skills" -> Color(0xFFF1DFD3)
-        else -> Color(0xFFE4E8E9)
-    }
-}
+/** Entry glyphs use one quiet plate; business categories are identified by their icon and label. */
+internal fun syEntryTileTone(name: String): Color? =
+    if (name.startsWith("SyEntry.")) Color(0xFFECF0E8) else null
 
 /**
  * 现行入口采用参考稿的低饱和色块和墨线；动作图标不添加色块。
@@ -150,12 +141,12 @@ fun SyIconBox(icon: ImageVector? = null, iconPainter: Painter? = null, modifier:
 
     Box(
         modifier.size(if (tile != null) 32.dp else 30.dp).then(
-            if (tile != null) Modifier.background(tile, RoundedCornerShape(9.dp)) else Modifier
+            if (tile != null) Modifier.background(tile, RoundedCornerShape(12.dp)) else Modifier
         ),
         contentAlignment = Alignment.Center,
     ) {
         val glyph = Modifier.size(20.dp).graphicsLayer { this.alpha = alpha }
-        val ink = if (tile != null) p.text else p.textSecondary
+        val ink = if (tile != null) p.linkInk else p.textSecondary
         if (iconPainter != null) Icon(iconPainter, contentDescription, glyph, tint = ink)
         else if (icon != null) Icon(icon, contentDescription, glyph, tint = ink)
     }

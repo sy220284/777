@@ -50,7 +50,7 @@ import androidx.compose.ui.window.DialogProperties
 /**
  * V5: mobile bottom sheet, tablet/desktop right-side panel.
  * Controlled callbacks only: approvals stay caller-owned, no implicit acceptance on dismiss.
- * Ordinary sheets share the aligned scene by default; risk/destructive confirmations opt into an explicit L4 overlay.
+ * V7 sheets use a dedicated reading surface; callers may explicitly retain an aligned scene.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +66,7 @@ fun SyResponsiveSheet(
     showDragHandle: Boolean = true,
     floating: Boolean = false,
     surfaceTier: SyMaterialTier = SyMaterialTier.L4_OVERLAY,
-    seamlessBackground: Boolean = true,
+    seamlessBackground: Boolean = false,
     dimScrimWhenSeamless: Boolean = true,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -85,12 +85,12 @@ fun SyResponsiveSheet(
     @Composable fun SheetBody() {
         Column(
             Modifier.fillMaxWidth().imePadding()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (!wide && showDragHandle) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Spacer(Modifier.width(44.dp).height(4.dp)
+                    Spacer(Modifier.width(32.dp).height(4.dp)
                         .clip(RoundedCornerShape(3.dp)).background(p.border))
                 }
             }

@@ -91,7 +91,7 @@ private val Light = SyColors(
     materialL5 = Color(0xFFFFFFFF), materialSheen = Color.Transparent,
     surface = Color(0xFFFFFFFF), surfaceRaised = Color(0xFFECF0E8), surfaceSolid = Color(0xFFFFFFFF),
     border = Color(0xFFD8DFD6), text = Color(0xFF202923),
-    textSecondary = Color(0xFF58665C), textTertiary = Color(0xFF626E64),
+    textSecondary = Color(0xFF58665C), textTertiary = Color(0xFF5F6A61),
     primary = Color(0xFF315447), primaryPressed = Color(0xFF244337), onPrimary = Color(0xFFFFFFFF),
     mint = Color(0xFF75A58C), lilac = Color(0xFF9B6C63),
     warning = Color(0xFFBD8A36), danger = Color(0xFFB8473D),

@@ -103,7 +103,7 @@ fun SyIconButton(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(
                 modifier = if (tile != null) Modifier.requiredSize(32.dp)
-                    .background(tile, RoundedCornerShape(9.dp)) else Modifier,
+                    .background(tile, RoundedCornerShape(12.dp)) else Modifier,
                 contentAlignment = Alignment.Center,
             ) {
                 val glyphModifier = Modifier.requiredSize(iconSize).scale(scale)
