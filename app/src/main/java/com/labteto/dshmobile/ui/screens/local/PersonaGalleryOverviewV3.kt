@@ -282,6 +282,12 @@ internal fun PersonaGalleryOverviewV3(
         modifier = modifier.fillMaxSize().padding(horizontal = SyMetric.gapLg),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
+        if (!managing) {
+            com.shenyan.designsystem.components.SySceneHeading(
+                title = stringResource(R.string.studio_people_heading),
+                subtitle = stringResource(R.string.studio_people_description),
+            )
+        }
         if (currentGalleryId == null || currentHasUnsavedChanges) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(

@@ -21,7 +21,7 @@ enum class ShenyanMode { LIGHT, DARK, MATTE }
 data class SyColors(
     val canvas: Color,
     val topBar: Color,
-    // Five semantic material tiers. L1-L3 are translucent; L4 prioritises readability; L5 solid.
+    // V7: paper, inset, raised, overlay and reading surfaces; wallpaper tint is opt-in by scene.
     val materialL1: Color,
     val materialL2: Color,
     val materialL3: Color,
@@ -36,23 +36,23 @@ data class SyColors(
     val text: Color,
     val textSecondary: Color,
     val textTertiary: Color,
-    val primary: Color = Color(0xFFE8A87C),
-    val primaryPressed: Color = Color(0xFFD9926B),
-    val onPrimary: Color = Color(0xFF3A342D),
-    val mint: Color = Color(0xFF7FBFA8),
-    val lilac: Color = Color(0xFFB9A0D4),
-    val warning: Color = Color(0xFFE0A458),
-    val danger: Color = Color(0xFFD9705F),
+    val primary: Color = Color(0xFF315447),
+    val primaryPressed: Color = Color(0xFF244337),
+    val onPrimary: Color = Color(0xFFFFFFFF),
+    val mint: Color = Color(0xFF75A58C),
+    val lilac: Color = Color(0xFF9B6C63),
+    val warning: Color = Color(0xFFBD8A36),
+    val danger: Color = Color(0xFFB8473D),
     val selected: Color,
     val overlay: Color,
+    val wallpaperTintEnabled: Boolean = true,
 ) {
     // Decoration and small status text have different contrast requirements.
     // Keep decorative accent fills independent from readable text colours.
     val actionFill: Color get() = primary
     val actionInk: Color get() = onPrimary
-    val linkInk: Color get() = syReadableInk(
-        if (primary == Color(0xFFE8A87C)) Color(0xFF44618C) else primary, materialL5)
-    val personaInk: Color get() = syReadableInk(lilac, materialL5)
+    val linkInk: Color get() = syReadableInk(primary, selected)
+    val personaInk: Color get() = syReadableInk(lilac, selected)
     val successInk: Color get() = if (text.luminance() < .5f) Color(0xFF2E6755) else mint
     val warningInk: Color get() = if (text.luminance() < .5f) Color(0xFF80511F) else warning
     val dangerInk: Color get() = if (text.luminance() < .5f) Color(0xFF963B30) else Color(0xFFE89B8F)
@@ -85,38 +85,48 @@ fun syReadableInk(accent: Color, background: Color, minimumRatio: Float = 4.5f):
 }
 
 private val Light = SyColors(
-    canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
-    // All material tiers share the warm canvas hue; increasing opacity, not whiteness, adds depth.
-    materialL1 = Color(0x4DEDE6DA), materialL2 = Color(0x75F1E8DC),
-    materialL3 = Color(0xA3F1E8DC), materialL4 = Color(0xE0F1E8DC),
-    materialL5 = Color(0xFFF1E8DC), materialSheen = Color(0x66F6F0E6),
-    surface = Color(0xA3F1E8DC), surfaceRaised = Color(0x75F1E8DC), surfaceSolid = Color(0xFFF1E8DC),
-    border = Color(0x66D3C5B5), text = Color(0xFF3A342D),
-    textSecondary = Color(0xFF6A6156), textTertiary = Color(0xFF70665A),
-    selected = Color(0xFFF2C7A8), overlay = Color(0x335A4837)
+    canvas = Color(0xFFF5F7F3), topBar = Color(0xFFECF0E8),
+    materialL1 = Color(0xFFF5F7F3), materialL2 = Color(0xFFECF0E8),
+    materialL3 = Color(0xFFFFFFFF), materialL4 = Color(0xFFFFFFFF),
+    materialL5 = Color(0xFFFFFFFF), materialSheen = Color.Transparent,
+    surface = Color(0xFFFFFFFF), surfaceRaised = Color(0xFFECF0E8), surfaceSolid = Color(0xFFFFFFFF),
+    border = Color(0xFFD8DFD6), text = Color(0xFF202923),
+    textSecondary = Color(0xFF58665C), textTertiary = Color(0xFF626E64),
+    primary = Color(0xFF315447), primaryPressed = Color(0xFF244337), onPrimary = Color(0xFFFFFFFF),
+    mint = Color(0xFF75A58C), lilac = Color(0xFF9B6C63),
+    warning = Color(0xFFBD8A36), danger = Color(0xFFB8473D),
+    selected = Color(0xFFE7EEDC), overlay = Color(0x66101B18),
+    wallpaperTintEnabled = true,
 )
 private val Dark = SyColors(
-    canvas = Color(0xFF24211E), topBar = Color(0xFF292521),
-    materialL1 = Color(0x1A302B27), materialL2 = Color(0x29302B27),
-    materialL3 = Color(0x4035302B), materialL4 = Color(0xE0312B26),
-    materialL5 = Color(0xFF35312D), materialSheen = Color(0x29FFF1DE),
-    surface = Color(0x4035302B), surfaceRaised = Color(0x29302B27), surfaceSolid = Color(0xFF35312D),
-    border = Color(0x21FFFFFF), text = Color(0xFFF5F0E8),
-    textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
-    selected = Color(0xFF60422F), overlay = Color(0x5C000000)
+    canvas = Color(0xFF141C18), topBar = Color(0xFF26332A),
+    materialL1 = Color(0xFF19231D), materialL2 = Color(0xFF26332A),
+    materialL3 = Color(0xFF1E2922), materialL4 = Color(0xFF1E2922),
+    materialL5 = Color(0xFF1E2922), materialSheen = Color.Transparent,
+    surface = Color(0xFF1E2922), surfaceRaised = Color(0xFF26332A), surfaceSolid = Color(0xFF1E2922),
+    border = Color(0xFF3B4B40), text = Color(0xFFEDF2E9),
+    textSecondary = Color(0xFFC0CDC1), textTertiary = Color(0xFFB1BFB3),
+    primary = Color(0xFFB1D3BC), primaryPressed = Color(0xFF9CC6A9), onPrimary = Color(0xFF173225),
+    mint = Color(0xFF9BC6AF), lilac = Color(0xFFDAB4A9),
+    warning = Color(0xFFE2BC78), danger = Color(0xFFF2B1A4),
+    selected = Color(0xFF344735), overlay = Color(0x99101813),
+    wallpaperTintEnabled = true,
 )
 private val Matte = SyColors(
-    canvas = Color(0xFF0F0F10), topBar = Color(0xFF18181A),
-    materialL1 = Color(0xFF181819), materialL2 = Color(0xFF1E1E20),
-    materialL3 = Color(0xFF232324), materialL4 = Color(0xFF29292B),
-    materialL5 = Color(0xFF29292B), materialSheen = Color(0x0EFFFFFF),
-    surface = Color(0xFF232324), surfaceRaised = Color(0xFF1E1E20), surfaceSolid = Color(0xFF29292B),
-    border = Color(0x1AFFFFFF), text = Color(0xFFF5F0E8),
-    textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
-    selected = Color(0xFF573F30), overlay = Color(0x99000000)
+    canvas = Color(0xFF000000), topBar = Color(0xFF141916),
+    materialL1 = Color(0xFF090D0B), materialL2 = Color(0xFF141916),
+    materialL3 = Color(0xFF191F1A), materialL4 = Color(0xFF191F1A),
+    materialL5 = Color(0xFF191F1A), materialSheen = Color.Transparent,
+    surface = Color(0xFF191F1A), surfaceRaised = Color(0xFF141916), surfaceSolid = Color(0xFF191F1A),
+    border = Color(0xFF37453C), text = Color(0xFFEDF2E9),
+    textSecondary = Color(0xFFC0CDC1), textTertiary = Color(0xFFB1BFB3),
+    primary = Color(0xFFB1D3BC), primaryPressed = Color(0xFF9CC6A9), onPrimary = Color(0xFF173225),
+    mint = Color(0xFF9BC6AF), lilac = Color(0xFFDAB4A9),
+    warning = Color(0xFFE2BC78), danger = Color(0xFFF2B1A4),
+    selected = Color(0xFF2D3B2E), overlay = Color(0xB3000000),
+    wallpaperTintEnabled = false,
 )
 
-/** Published read-only palettes; one source for Figma, native and migration adapters. */
 object ShenyanPalettes {
     val light: SyColors get() = Light
     val dark: SyColors get() = Dark
@@ -155,19 +165,19 @@ val LocalSySceneBackdrop = staticCompositionLocalOf<SySceneBackdrop?> { null }
 object SyMetric {
     val touch = 48.dp
     // Navigation geometry is V6 pack-owned, shared by feature stack and peer swaps.
-    val navigationPushOffset = 20.dp
-    val navigationPeerOffset = 6.dp
-    val gapXs = 2.dp
-    val gapSm = 6.dp
-    val gapMd = 10.dp
-    val gapLg = 14.dp
-    val gapSection = 22.dp
-    val gapPage = 34.dp
-    val gapHero = 54.dp
-    val radiusSm = 9.dp
-    val radiusControl = 13.dp
-    val radiusCard = 18.dp
-    val radiusSheet = 24.dp
+    val navigationPushOffset = 12.dp
+    val navigationPeerOffset = 4.dp
+    val gapXs = 4.dp
+    val gapSm = 8.dp
+    val gapMd = 12.dp
+    val gapLg = 16.dp
+    val gapSection = 24.dp
+    val gapPage = 32.dp
+    val gapHero = 48.dp
+    val radiusSm = 8.dp
+    val radiusControl = 16.dp
+    val radiusCard = 20.dp
+    val radiusSheet = 28.dp
 }
 /** Opacity response shared by V6 glass and retained legacy surface adapters. */
 object SyMaterialPolicy {
@@ -186,16 +196,16 @@ object SyMotion {
         if (reducedMotion) reducedMotionMs
         else (ms * tempo.coerceIn(.7f, 1.3f)).roundToInt()
     // Responsive V6 motion: input first, geometry second; all lengths in milliseconds.
-    const val pressMs = 70
-    const val selectMs = 150
+    const val pressMs = 90
+    const val selectMs = 140
     const val dialogMs = 220
-    const val sheetMs = 280
-    const val pushMs = 260
-    const val morphMs = 260
+    const val sheetMs = 240
+    const val pushMs = 220
+    const val morphMs = 220
     const val toolExpandMs = 170
     const val toolDetailDelayMs = 55
     const val toastMs = 170
-    const val sidebarMs = 180
+    const val sidebarMs = 220
     const val sidebarContentDelayMs = 0
     const val progressMs = 280
     const val composerRevealMs = 155
@@ -203,7 +213,7 @@ object SyMotion {
     const val chevronMs = 130
     const val interactionColorMs = 120
     const val fadeMs = 130
-    const val pagePopMs = 220
+    const val pagePopMs = 180
     const val pagePeerMs = 140
     const val pageEnterFadeMs = 130
     const val pageExitFadeMs = 95

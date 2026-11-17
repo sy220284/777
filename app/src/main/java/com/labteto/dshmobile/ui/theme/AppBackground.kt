@@ -281,7 +281,8 @@ fun AppBackgroundHost(
         image = loaded?.image,
         veil = adaptiveGlobalVeil(state, surfaceBase),
         glowColors = if (loaded == null && fluidGlass) listOf(
-            ambientPalette.primary, ambientPalette.mint, ambientPalette.lilac.copy(alpha = .18f),
+            ambientPalette.primary.copy(alpha = .20f), ambientPalette.mint.copy(alpha = .12f),
+            ambientPalette.lilac.copy(alpha = .08f),
         ) else emptyList(),
         dark = darkTheme,
         regionColors = visibleAnalysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),

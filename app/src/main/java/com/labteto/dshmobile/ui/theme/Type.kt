@@ -47,8 +47,8 @@ object DsType {
     val mdH2 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Bold, fontSize = 21.sp, lineHeight = 30.sp)
     val mdH3 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 28.sp)
     val mdH4 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 26.sp)
-    val mdBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
-    val workBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 25.sp)
+    val mdBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 27.sp)
+    val workBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 27.sp)
     val mdSmall = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val mdCode = TextStyle(fontFamily = codeFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 22.sp)
 
@@ -61,8 +61,8 @@ object DsType {
     val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 34.sp)
     val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
     val titleSerif20 = TextStyle(fontFamily = titleFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
-    val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.5.sp, lineHeight = 27.sp)
-    val base16Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 15.5.sp, lineHeight = 27.sp)
+    val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 27.sp)
+    val base16Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 27.sp)
     val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val std14Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 23.sp)
     val small13 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 21.sp)
@@ -72,19 +72,19 @@ object DsType {
     val caption11Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 11.5.sp, lineHeight = 19.sp)
 
     // Navigation and settings use larger, stronger roles for comfortable viewing distance.
-    val navigationItem = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 23.sp)
+    val navigationItem = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 23.sp)
     val navigationSupporting = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 21.sp)
     val navigationSection = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 21.sp)
     // Uploaded fluid-glass hierarchy: actionable rows read stronger; history reads like body copy.
     val drawerItem = navigationItem.copy(fontWeight = FontWeight.Medium)
     val drawerSession = navigationItem.copy(fontFamily = contentFont, fontSize = 14.sp, lineHeight = 23.sp, fontWeight = FontWeight.Normal)
     val drawerSection = caption11.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium)
-    val settingsItem = navigationItem.copy(fontSize = 14.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
+    val settingsItem = navigationItem.copy(fontSize = 16.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
 
     // Composer / rows / chat
     // User and assistant body text deliberately share the exact same metrics. Role distinction comes
     // from container, alignment and colour rather than an accidental font-size mismatch.
-    val chatBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 26.sp)
+    val chatBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 27.sp)
     val bubbleText = chatBody
     val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val tabText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)

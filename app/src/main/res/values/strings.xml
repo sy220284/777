@@ -2440,4 +2440,14 @@
     <string name="permission_setup_notification_not_granted">尚未允许发送通知</string>
     <string name="permission_setup_open_notifications">打开应用通知设置</string>
     <string name="permission_setup_enabled_count">已开启 %1$d 项 · 其余可按需开启</string>
+    <string name="studio_people_heading">每次相遇，都有回响。</string>
+    <string name="studio_people_description">你的故事，从一个熟悉的名字开始。</string>
+    <string name="studio_tasks_heading">把日常，交给时间。</string>
+    <string name="studio_tasks_description">安排下一次执行，回来查看结果。</string>
+    <string name="studio_tools_heading">为想法，多添一种可能。</string>
+    <string name="studio_tools_description">按需连接工具，清楚了解每次授权。</string>
+    <string name="studio_files_heading">让成果，井然有序。</string>
+    <string name="studio_files_description">浏览项目、任务与已经保存的文件。</string>
+    <string name="studio_settings_heading">用你习惯的方式。</string>
+    <string name="studio_settings_description">调整体验、模型与数据。</string>
 </resources>

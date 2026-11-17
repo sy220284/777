@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,11 +23,12 @@ fun SyUserBubble(text: String, modifier: Modifier = Modifier,
     border: Color = LocalSyColors.current.border,
     textStyle: TextStyle = MaterialTheme.typography.bodyLarge) {
     val p = LocalSyColors.current
-    val shape = RoundedCornerShape(SyMetric.radiusCard)
+    val shape = RoundedCornerShape(topStart = SyMetric.radiusCard, topEnd = 6.dp,
+        bottomEnd = SyMetric.radiusCard, bottomStart = SyMetric.radiusCard)
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        SyMaterialSurface(modifier = Modifier.widthIn(max = minOf(460.dp, maxWidth * .86f)),
-            shape = shape, tier = SyMaterialTier.L3_CARD, tint = background,
-            border = androidx.compose.foundation.BorderStroke(1.dp, border), shadowElevation = 0.dp) {
+        Surface(modifier = Modifier.widthIn(max = minOf(460.dp, maxWidth * .86f)),
+            shape = shape, color = background,
+            border = androidx.compose.foundation.BorderStroke(1.dp, border.copy(alpha = .35f)), shadowElevation = 0.dp) {
             Text(text, style = textStyle, color = p.text, modifier = Modifier.padding(horizontal = 15.dp, vertical = 11.dp))
         }
     }

@@ -61,17 +61,17 @@ fun SyTopBar(
             Column(
                 Modifier.weight(1f).padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.Start,
             ) {
                 Text(
                     title,
                     modifier = Modifier.fillMaxWidth().alpha(titleAlpha)
                         .then(if (titleAlpha < .5f) Modifier.clearAndSetSemantics { } else Modifier),
-                    style = if (largeTitle) MaterialTheme.typography.titleLarge
+                    style = if (largeTitle) MaterialTheme.typography.headlineMedium
                         else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = tokens.text,
-                    textAlign = TextAlign.Center,
+                    textAlign = TextAlign.Start,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -92,9 +92,9 @@ fun SyTopBar(
             }
         }
         if (!subtitle.isNullOrBlank()) {
-            Text(subtitle, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
+            Text(subtitle, modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
                 color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                textAlign = TextAlign.Start, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
     }
 }

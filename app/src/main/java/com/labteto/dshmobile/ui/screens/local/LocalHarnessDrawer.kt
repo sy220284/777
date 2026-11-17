@@ -158,7 +158,7 @@ internal fun LocalModeDrawer(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val sy = LocalSyPalette.current
     val hasWallpaper = LocalSySceneBackdrop.current?.image != null
-    val drawerMaterial = if (hasWallpaper) syMaterialColor(SyMaterialTier.L2_BAR) else Color.Transparent
+    val drawerMaterial = if (hasWallpaper) syMaterialColor(SyMaterialTier.L2_BAR) else colors.materialL3
     // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
     // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
     val expandLabel = stringResource(R.string.sy_v5_nav_expand)
@@ -355,7 +355,7 @@ internal fun LocalModeDrawer(
     }
 
     ModalDrawerSheet(
-        drawerShape = androidx.compose.ui.graphics.RectangleShape,
+        drawerShape = androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp),
         drawerContainerColor = androidx.compose.ui.graphics.Color.Transparent,
         windowInsets = WindowInsets(0, 0, 0, 0), // Edge-to-edge backdrop, inset content only.
         modifier = Modifier.fillMaxHeight().width(
@@ -370,7 +370,7 @@ internal fun LocalModeDrawer(
         ) {
         Column(
             Modifier.fillMaxHeight()
-                .background(drawerMaterial.copy(alpha = if (hasWallpaper) drawerMaterial.alpha.coerceAtLeast(.48f) else 0f))
+                .background(drawerMaterial)
                 .safeDrawingPadding()
         ) {
             Column(

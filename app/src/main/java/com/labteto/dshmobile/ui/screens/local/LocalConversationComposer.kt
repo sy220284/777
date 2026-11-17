@@ -90,7 +90,7 @@ import kotlinx.coroutines.withContext
  * Wallpaper mode reuses the existing bottom-region contrast analysis. Matte is always solid.
  */
 internal fun v6ConversationComposerSurface(background: AppBackgroundState, palette: SyColors): Color =
-    if (!background.hasImage || palette.materialL2.alpha == 1f) {
+    if (!background.hasImage || !palette.wallpaperTintEnabled) {
         palette.materialL2
     } else {
         background.wallpaperSurface(

@@ -95,7 +95,7 @@ fun SyDialog(
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val scale by animateFloatAsState(
-        if (shown) 1f else .92f,
+        if (shown || reduced) 1f else .97f,
         tween(SyMotion.duration(SyMotion.dialogMs, reduced, LocalSyMotionTempo.current)), label = "syDialogScale",
     )
     Dialog(
@@ -118,7 +118,7 @@ fun SyDialog(
                 shape = RoundedCornerShape(SyMetric.radiusSheet),
                 tier = SyMaterialTier.L4_OVERLAY,
                 border = BorderStroke(1.dp, p.border),
-                shadowElevation = 16.dp,
+                shadowElevation = 8.dp,
             ) {
                 Column(
                     Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 20.dp),

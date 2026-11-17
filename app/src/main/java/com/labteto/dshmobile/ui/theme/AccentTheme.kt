@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.luminance
 import com.shenyan.designsystem.foundation.syInkContrastRatio
 
 /**
- * 777 的交互色卡。流体杏为当前默认，历史传统色继续作为显式可选外观。
+ * 777 的交互色卡。苔绿为当前默认，历史传统色继续作为显式可选外观。
  *
  * 每张卡提供亮 / 暗两档主色，只覆盖交互 accent 家族，不改变成功、警告、错误等语义色。
  */
@@ -22,8 +22,9 @@ data class AccentPalette(
 
 object AccentPalettes {
 
-    /** 流体杏为默认交互色；旧版默认 "celadon" 在 [of] 中跟随当前默认。 */
+    /** 苔绿为默认交互色；旧版默认 "celadon" 在 [of] 中跟随当前默认。 */
     val ALL = listOf(
+        AccentPalette("studio_moss", "苔绿", Color(0xFF315447), Color(0xFFB1D3BC), onDark = Color(0xFF173225)),
         AccentPalette("fluid_apricot", "流体杏", Color(0xFFD9926B), Color(0xFFE8A87C), onLight = Color(0xFF3A342D), onDark = Color(0xFF3A342D)),
         AccentPalette("default_blue", "默认蓝", Color(0xFF1783FF), Color(0xFF5A9BFF), onDark = Color(0xFF07111F)),
         AccentPalette("celadon_explicit", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),

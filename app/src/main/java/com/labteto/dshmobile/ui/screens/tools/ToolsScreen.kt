@@ -1366,6 +1366,12 @@ fun ToolsScreen(
                         actionEnabled = !state.loading,
                         onAction = viewModel::refresh,
                     )
+                    if (!showGitHubBrowser && !showGitHubConfig && !showConnectorSettings) {
+                        com.shenyan.designsystem.components.SySceneHeading(
+                            title = stringResource(R.string.studio_tools_heading),
+                            subtitle = stringResource(R.string.studio_tools_description),
+                        )
+                    }
                     CapabilityCenterTabs(selectedTab) { next ->
                         // The ViewModel loads on entry and observes skill-file changes.
                         // Switching tabs must not fetch every plugin, server and skill again.

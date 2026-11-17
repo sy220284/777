@@ -7,7 +7,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 /**
  * 统一 semantic radius scale:
- * Uploaded components: 9 chip / 13 control / 18 card / 24 floating surface.
+ * V7: 8 chip / 16 control / 20 reading surface / 28 overlay.
  * User bubbles retain a 6dp trailing corner; tags retain the full capsule.
  *
  * Screens consume semantic names so page code does not invent local radii.
@@ -18,11 +18,11 @@ object DsShapes {
     val buttonSmall = RoundedCornerShape(12.dp)
     val bubble = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 6.dp)
     val characterBubble = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 18.dp)
-    val composer = RoundedCornerShape(20.dp)
+    val composer = RoundedCornerShape(24.dp)
     val approvalCard = RoundedCornerShape(SyMetric.radiusCard)
     val dialog = RoundedCornerShape(SyMetric.radiusSheet)
     val floatingSheet = RoundedCornerShape(SyMetric.radiusSheet)
-    val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    val sheet = RoundedCornerShape(topStart = SyMetric.radiusSheet, topEnd = SyMetric.radiusSheet)
     val menu = RoundedCornerShape(SyMetric.radiusSheet)
     val toast = RoundedCornerShape(12.dp)
     val block = RoundedCornerShape(SyMetric.radiusCard)

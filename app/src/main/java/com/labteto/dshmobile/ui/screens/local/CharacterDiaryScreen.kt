@@ -637,7 +637,7 @@ private fun CharacterDiaryDayCard(
             // A personal journal: date and voice lead; source tools are quiet.
             Text(
                 text = dateText,
-                style = DsType.titleSerif20.withReadingWeight(),
+                style = DsType.hero26.withReadingWeight().copy(fontFamily = DsType.titleFont),
                 color = colors.text,
                 modifier = Modifier.fillMaxWidth().testTag("diary_day_" + day.key),
             )
@@ -654,7 +654,7 @@ private fun CharacterDiaryDayCard(
                 text = characterDiaryDayNarrative(day.entries),
                 style = DsType.chatBody.withReadingWeight().copy(
                     fontFamily = DsType.titleFont,
-                    lineHeight = 29.sp,
+                    lineHeight = 32.sp,
                 ),
                 color = colors.text,
                 textAlign = TextAlign.Start,
@@ -662,7 +662,7 @@ private fun CharacterDiaryDayCard(
                     .testTag("diary_paper_event_" + day.entries.first().id),
             )
             androidx.compose.material3.HorizontalDivider(
-                color = colors.textTertiary.copy(alpha = 0.18f),
+                color = colors.border,
             )
             SyButton(
                 text = stringResource(

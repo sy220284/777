@@ -843,6 +843,13 @@ internal fun LocalWorkspaceFilesDialog(
                     onAction = { scope.launch { reload() } },
                 )
 
+                if (preview == null && previewPath == null && directory.isEmpty() && section == -1) {
+                    com.shenyan.designsystem.components.SySceneHeading(
+                        title = stringResource(R.string.studio_files_heading),
+                        subtitle = stringResource(R.string.studio_files_description),
+                    )
+                }
+
                 if (mode == LocalFilesMode.WORKSPACE && section >= 0 &&
                     preview == null && query.isBlank()) {
                     LocalWorkspacePathBreadcrumb(directory = directory, section = section) { destination ->
@@ -1870,7 +1877,7 @@ private fun LocalDirectoryRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 62.dp)
+                .heightIn(min = 76.dp)
                 .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
@@ -1889,14 +1896,14 @@ private fun LocalDirectoryRow(
             ) {
                 Text(
                     name,
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = DsType.base16Strong.withReadingWeight(),
                     color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     subtitle ?: stringResource(R.string.panel_folder),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.textTertiary,
                     maxLines = 1,
                 )
@@ -1935,13 +1942,13 @@ private fun LocalFileRow(
                 onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
             ),
         shape = DsShapes.row,
-        color = if (selected) colors.selected.copy(alpha = .20f)
+        color = if (selected) colors.selected
             else androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 70.dp)
+                .heightIn(min = 80.dp)
                 .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
@@ -1957,7 +1964,7 @@ private fun LocalFileRow(
             ) {
                 Text(
                     fileName,
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = DsType.base16Strong.withReadingWeight(),
                     color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1965,7 +1972,7 @@ private fun LocalFileRow(
                 Text(
                     if (showPath) "${file.path} · ${formatBytes(file.bytes)}"
                     else formatBytes(file.bytes),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = DsType.small13.withReadingWeight(),
                     color = colors.textTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

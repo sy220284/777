@@ -221,8 +221,8 @@ fun SySegmentedControl(
     }
     val scroll = rememberScrollState()
     BoxWithConstraints(modifier.selectableGroup().clip(shape)
-        .background(syMaterialColor(SyMaterialTier.L2_BAR))
-        .border(1.dp, p.border, shape).padding(2.dp)) {
+        .background(if (role == Role.Tab) Color.Transparent else syMaterialColor(SyMaterialTier.L2_BAR))
+        .then(if (role == Role.Tab) Modifier else Modifier.border(1.dp, p.border, shape)).padding(2.dp)) {
         // Equal tracks are useful only when every complete label fits. Otherwise retain
         // the natural reading direction and let the single choice track scroll.
         val equalTracks = stretch &&
@@ -244,8 +244,8 @@ fun SySegmentedControl(
             segments.forEachIndexed { index, option ->
                 val selected = option.id == selectedId
                 val background by animateColorAsState(
-                    if (selected) p.selected else Color.Transparent,
-                    animationSpec = tween(if (reduceMotion) 0 else SyMotion.selectMs),
+                    if (selected && role != Role.Tab) p.materialL3 else Color.Transparent,
+                    animationSpec = tween(SyMotion.duration(SyMotion.selectMs, reduceMotion, com.shenyan.designsystem.foundation.LocalSyMotionTempo.current)),
                     label = "sySegment",
                 )
                 val itemModifier = if (equalTracks) Modifier.weight(1f) else Modifier.width(naturalWidths[index])
@@ -266,7 +266,7 @@ fun SySegmentedControl(
                         option.label,
                         color = when {
                             !enabled || !option.enabled -> p.textTertiary
-                            selected -> p.text
+                            selected -> p.linkInk
                             else -> p.textSecondary
                         },
                         style = labelStyle,

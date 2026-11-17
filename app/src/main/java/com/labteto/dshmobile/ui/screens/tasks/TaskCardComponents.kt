@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import com.shenyan.designsystem.foundation.SyMetric
@@ -430,28 +432,27 @@ private fun taskTiming(task: AutomationTask): String {
 @Composable
 internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Column(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(SyMetric.gapSection),
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button,
+            onClick = onClick).padding(vertical = SyMetric.gapLg),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+        Box(Modifier.size(40.dp).background(colors.materialL2,
+            androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center) {
             androidx.compose.material3.Icon(
                 if (task.mode == AutomationMode.CHAT) FeatherIcons.MessageCircle else FeatherIcons.Clock,
-                contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(18.dp))
+                contentDescription = null, tint = colors.linkInk, modifier = Modifier.size(20.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SyStatusPill(state = taskStatus(task.status), label = taskStatusLabel(task.status))
+            Text(task.prompt.lineSequence().firstOrNull().orEmpty(),
+                style = DsType.base16Strong.withReadingWeight(), color = colors.text, maxLines = 3)
+            Text(taskTiming(task), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+            Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(1.dp).background(colors.border))
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.text, maxLines = 2)
-                Text(taskTiming(task),
-                    style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
-            }
-            androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = colors.textTertiary)
-        }
+        androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null,
+            tint = colors.textSecondary, modifier = Modifier.padding(top = 8.dp).size(20.dp))
     }
 }

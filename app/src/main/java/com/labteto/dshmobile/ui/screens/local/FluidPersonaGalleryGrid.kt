@@ -5,8 +5,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,7 +25,7 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 import com.shenyan.designsystem.foundation.SyMetric
 import kotlinx.coroutines.delay
 
-/** Historic function name retained for callers; V6 now uses one full-width compact row per persona. */
+/** V7 image covers. Large font or narrow phones use one column; management remains a list. */
 @Composable
 internal fun FluidPersonaGalleryGrid(
     entries: List<PersonaGalleryEntry>,
@@ -38,9 +40,13 @@ internal fun FluidPersonaGalleryGrid(
     val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
     val motion = com.shenyan.designsystem.foundation.SyMotion
     val enterOffset = with(LocalDensity.current) { 12.dp.toPx() }
-    LazyColumn(
+    val columns = if (LocalDensity.current.fontScale >= 1.3f ||
+        LocalConfiguration.current.screenWidthDp < 360) 1 else 2
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSection),
     ) {
         itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
             var appeared by rememberSaveable(entry.id, animateEntrance) {
@@ -62,16 +68,11 @@ internal fun FluidPersonaGalleryGrid(
                 alpha = reveal
                 translationY = (1f - reveal) * enterOffset
             }) {
-                CompactPersonaRow(
+                StudioPersonaTile(
                     entry = entry,
                     pinned = entry.id in pinnedIds,
-                    managing = false,
-                    selected = false,
-                    dragEnabled = false,
                     onClick = { onSelect(entry.id) },
                     onLongClick = { onLongClick(entry.id) },
-                    onTogglePin = {},
-                    onMove = { false },
                 )
             }
         }

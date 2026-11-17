@@ -88,7 +88,7 @@ fun SyButton(
     }
     val foreground = if (!enabled) c.textTertiary else when (style) {
         SyButtonStyle.PRIMARY -> c.onPrimary
-        SyButtonStyle.DANGER -> Color(0xFF241613)
+        SyButtonStyle.DANGER -> syReadableInk(Color.White, c.danger)
         else -> c.text
     }
     Surface(

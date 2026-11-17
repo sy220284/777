@@ -531,6 +531,10 @@ fun SettingsScreen(
                             pageStack = settingsNavigationPush(pageStack, entry.destination)
                         })
                     SettingsDestination.ROOT -> {
+                        com.shenyan.designsystem.components.SySceneHeading(
+                            title = stringResource(R.string.studio_settings_heading),
+                            subtitle = stringResource(R.string.studio_settings_description),
+                        )
                         AppSettingsRow(icon = FeatherIcons.Search,
                             title = stringResource(R.string.settings_search_title),
                             subtitle = stringResource(R.string.settings_search_hint),

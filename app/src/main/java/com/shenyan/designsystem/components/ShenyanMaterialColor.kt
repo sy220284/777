@@ -37,7 +37,7 @@ internal fun syResolveMaterialFill(
         SyMaterialTier.L5_SOLID -> colors.materialL5
     }
     // Matte is intentionally solid; detached previews fall back to the same canvas-based tokens.
-    if (colors.materialL3.alpha == 1f || scene == null) return token
+    if (scene?.image == null || !colors.wallpaperTintEnabled) return token
 
     val index = when {
         regionY < .30f -> 0
@@ -94,7 +94,14 @@ internal fun syResolveMaterialFill(
     // A vivid wallpaper should be allowed to colour the glass. The contrast-safe solid tint
     // above is the starting point, not a mandate to paint an almost-white opaque slab.
     tinted = lerp(tinted, sample.copy(alpha = 1f), .12f * transparency)
-    val desiredAlpha = (token.alpha +
+    val wallpaperAlpha = when (tier) {
+        SyMaterialTier.L1_SECTION -> .60f
+        SyMaterialTier.L2_BAR -> .82f
+        SyMaterialTier.L3_CARD -> .90f
+        SyMaterialTier.L4_OVERLAY -> .97f
+        SyMaterialTier.L5_SOLID -> 1f
+    }
+    val desiredAlpha = (wallpaperAlpha +
         com.shenyan.designsystem.foundation.SyMaterialPolicy.adjustment(transparency)).coerceIn(.08f, 1f)
     if (!scene.adaptiveContrast) return tinted.copy(alpha = desiredAlpha)
 

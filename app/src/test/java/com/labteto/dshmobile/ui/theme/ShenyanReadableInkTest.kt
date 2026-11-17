@@ -11,8 +11,18 @@ import org.junit.Test
 class ShenyanReadableInkTest {
     @Test fun allThemeReadingInksMeetNormalTextContrast() {
         listOf(ShenyanPalettes.light, ShenyanPalettes.dark, ShenyanPalettes.matte).forEach { palette ->
-            assertTrue("link ink", syInkContrastRatio(palette.linkInk, palette.materialL5) >= 4.5f)
-            assertTrue("persona ink", syInkContrastRatio(palette.personaInk, palette.materialL5) >= 4.5f)
+            val surfaces = listOf(palette.canvas, palette.materialL2, palette.materialL3, palette.selected)
+            val inks = listOf(palette.text, palette.textSecondary, palette.textTertiary,
+                palette.linkInk, palette.personaInk, palette.successInk, palette.warningInk, palette.dangerInk)
+            surfaces.forEachIndexed { surfaceIndex, surface ->
+                inks.forEachIndexed { inkIndex, ink ->
+                    assertTrue("reading ink $inkIndex on surface $surfaceIndex",
+                        syInkContrastRatio(ink, surface) >= 4.5f)
+                }
+            }
+            assertTrue("primary action", syInkContrastRatio(palette.onPrimary, palette.primary) >= 4.5f)
+            assertTrue("pressed primary action", syInkContrastRatio(palette.onPrimary, palette.primaryPressed) >= 4.5f)
+            assertTrue("danger action", syInkContrastRatio(syReadableInk(Color.White, palette.danger), palette.danger) >= 4.5f)
         }
     }
 

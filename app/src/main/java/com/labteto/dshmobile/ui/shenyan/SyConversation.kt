@@ -130,11 +130,11 @@ fun SyConversationComposer(
 ) {
     val p = LocalSyColors.current
     val reduceMotion = LocalSyReduceMotion.current
-    val shape = RoundedCornerShape(SyMetric.radiusCard)
+    val shape = RoundedCornerShape(24.dp)
     SyMaterialSurface(
-        tier = SyMaterialTier.L2_BAR,
+        tier = SyMaterialTier.L3_CARD,
         modifier = modifier.testTag("ds-conversation-composer")
-            .fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
+            .fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             .then(if (animateSize)
                 Modifier.animateContentSize(tween(SyMotion.duration(
                     SyMotion.toolExpandMs, reduceMotion, LocalSyMotionTempo.current
@@ -145,7 +145,7 @@ fun SyConversationComposer(
         border = BorderStroke(1.dp, p.border),
         shadowElevation = shadowElevation,
     ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
             content = content,
         )
     }

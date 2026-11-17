@@ -71,7 +71,7 @@ internal fun ChatSurfaceHeader(
         ) {
             Row(
                 modifier = Modifier
-                    .widthIn(max = 188.dp)
+                    .widthIn(max = 224.dp)
                     .heightIn(min = SyMetric.touch)
                     .clip(DsShapes.row)
                     .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
@@ -86,7 +86,7 @@ internal fun ChatSurfaceHeader(
                 Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
-                        style = DsType.base16Strong.withReadingWeight(),
+                        style = DsType.headline17.withReadingWeight(),
                         color = colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -106,7 +106,7 @@ internal fun ChatSurfaceHeader(
                                 activeSpeakerName?.let { speaker ->
                                     stringResource(R.string.local_group_chat_active_speaker, speaker)
                                 } ?: stringResource(R.string.local_group_chat_member_count, groupMembers.size),
-                                style = DsType.caption11.withReadingWeight(),
+                                style = DsType.small13.withReadingWeight(),
                                 color = colors.textSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -116,7 +116,7 @@ internal fun ChatSurfaceHeader(
                     } else if (secondary.isNotBlank()) {
                         Text(
                             secondary,
-                            style = DsType.caption11.withReadingWeight(),
+                            style = DsType.small13.withReadingWeight(),
                             color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -184,14 +184,14 @@ internal fun WorkSurfaceHeader(
         ) {
             Text(
                 sessionTitle.ifBlank { "工作会话" },
-                style = DsType.base16Strong.withReadingWeight(),
+                style = DsType.headline17.withReadingWeight(),
                 color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 statusText,
-                style = DsType.caption11.withReadingWeight(),
+                style = DsType.small13.withReadingWeight(),
                 color = if (statusText.startsWith("执行异常") ||
                     statusText.startsWith("执行状态读取异常") ||
                     statusText.startsWith("任务步骤失败")) colors.dangerInk else colors.textSecondary,

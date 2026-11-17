@@ -96,7 +96,7 @@ fun SyMaterialSurface(
     var materialSize by remember { mutableStateOf(IntSize.Zero) }
     val nested = LocalSyGlassDepth.current
     // Matte already has opaque tiers: reduced transparency must not erase their hierarchy.
-    val needsSolidFallback = LocalSyReduceTransparency.current && c.materialL3.alpha < 1f
+    val needsSolidFallback = LocalSyReduceTransparency.current && scene?.image != null
     val resolved = if ((nested >= 3 || needsSolidFallback) && tier != SyMaterialTier.L5_SOLID) SyMaterialTier.L5_SOLID else tier
     val regionY = if (scene == null || scene.viewportSize.height == 0) .5f else
         (materialOrigin.y - scene.viewportOrigin.y + materialSize.height / 2f) / scene.viewportSize.height
@@ -123,9 +123,9 @@ fun SyMaterialSurface(
     }
     val elevation = when (resolved) {
         SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 0.dp
-        SyMaterialTier.L2_BAR -> 2.dp
-        SyMaterialTier.L3_CARD -> 1.dp
-        SyMaterialTier.L4_OVERLAY -> 16.dp
+        SyMaterialTier.L2_BAR -> 0.dp
+        SyMaterialTier.L3_CARD -> 0.dp
+        SyMaterialTier.L4_OVERLAY -> 8.dp
     }
     val rim = if (materialFill.alpha < 1f && resolved in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY)) BorderStroke(1.dp, Brush.linearGradient(
         listOf(c.materialSheen, c.border.copy(alpha = c.border.alpha * .45f), c.materialSheen.copy(alpha = .12f)),

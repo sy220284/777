@@ -261,6 +261,13 @@ private fun WorkTasksScreen(
                     }
                 }
 
+                if (!showCreate && selectedTask == null) {
+                    com.shenyan.designsystem.components.SySceneHeading(
+                        title = stringResource(R.string.studio_tasks_heading),
+                        subtitle = stringResource(R.string.studio_tasks_description),
+                    )
+                }
+
                 Column(
                     modifier = Modifier.weight(1f)
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
