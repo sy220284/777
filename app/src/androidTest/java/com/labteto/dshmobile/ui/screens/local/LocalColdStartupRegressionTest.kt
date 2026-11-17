@@ -5,6 +5,9 @@ import android.Manifest
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
@@ -42,11 +45,20 @@ class LocalColdStartupRegressionTest {
             }
         }
         try {
+            val onboardingSkip = compose.activity.getString(com.labteto.dshmobile.R.string.shenyan_onboarding_skip)
             compose.waitUntil(timeoutMillis = 30_000L) {
                 runCatching {
-                    compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
-                        .fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodesWithText(onboardingSkip).fetchSemanticsNodes().isNotEmpty() ||
+                        compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
+                            .fetchSemanticsNodes().isNotEmpty()
                 }.getOrDefault(false)
+            }
+            if (compose.onAllNodesWithText(onboardingSkip).fetchSemanticsNodes().isNotEmpty()) {
+                compose.onNodeWithText(onboardingSkip).performClick()
+            }
+            compose.waitUntil(timeoutMillis = 30_000L) {
+                compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNodes().isNotEmpty()
             }
         } catch (failure: Throwable) {
             // A timeout is a real regression: include the crash buffer for diagnosis rather
