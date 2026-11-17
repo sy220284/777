@@ -729,7 +729,8 @@ class McpToolBridgePlugin(
         }
         val registered = mutableListOf<String>()
         try {
-            val remoteDefinitions = client.listTools(allowUnsupported = true)
+            val discovery = client.discoverTools(allowUnsupported = true)
+            val remoteDefinitions = discovery.tools
             val resourceDefinitions = resourceToolDefinitions(
                 serverId, remoteDefinitions, client.supportedResourceMethods(),
             )
@@ -742,7 +743,9 @@ class McpToolBridgePlugin(
             }
             // A server's declarations are independent capabilities. An unsupported schema
             // must remain unavailable, without discarding unrelated valid tools/resources.
-            val unavailable = linkedMapOf<String, String>()
+            val unavailable = linkedMapOf<String, String>().apply {
+                putAll(discovery.rejectedTools)
+            }
             val prepared = definitions.mapNotNull { definition ->
                 try {
                     val schema = normalizeRemoteParameterSchema(definition.inputSchema)
