@@ -54,6 +54,19 @@ class StandardToolParametersTest {
         )) assertNotNull(bad, rules.validate(json(bad)))
     }
 
+    @Test fun numericAssertionsKeepMathematicalIntegersAndExactDecimalPrecision() {
+        val even = compile("""{"type":"object","properties":{"n":{"type":"integer","multipleOf":2}},"required":["n"]}""")
+        assertNull(even.validate(json("""{"n":2.0}""")))
+        assertNull(even.validate(json("""{"n":9007199254740992}""")))
+        assertNotNull(even.validate(json("""{"n":9007199254740993}""")))
+        assertNotNull(even.validate(json("""{"n":100000000000000000000000000000000000000001}""")))
+        val tiny = compile("""{"type":"object","properties":{"n":{"type":"number","multipleOf":1e-400}}}""")
+        assertNull(tiny.validate(json("""{"n":2e-400}""")))
+        assertNotNull(tiny.validate(json("""{"n":1e-401}""")))
+        val bound = compile("""{"type":"object","properties":{"n":{"type":"integer","maximum":9007199254740992}}}""")
+        assertNotNull(bound.validate(json("""{"n":9007199254740993}""")))
+    }
+
     @Test fun oneOfRequiresExactlyOneMatchAndRecursiveInstancesResolveLocally() {
         val choice = compile("""{"type":"object","properties":{"x":{"oneOf":[{"type":"integer"},{"type":"number"}]}}}""")
         assertNull(choice.validate(json("""{"x":1.5}""")))

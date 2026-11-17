@@ -10,8 +10,8 @@ composeBom = "2026.09.00"
 navigationCompose = "2.8.5"
 hiltNavigationCompose = "1.2.0"
 coroutines = "1.9.0"
-serializationJson = "1.11.0"
-jsonSchemaValidator = "0.5.5"
+serializationJson = "1.7.3"
+jsonSchemaValidator = "2.0.8"
 okhttp = "4.12.0"
 zxingEmbedded = "4.3.0"
 datastore = "1.1.1"
@@ -26,7 +26,7 @@ kotlinxCoroutinesTest = "1.9.0"
 androidxTestRunner = "1.7.0"
 
 [libraries]
-json-schema-validator = { group = "io.github.optimumcode", name = "json-schema-validator", version.ref = "jsonSchemaValidator" }
+json-schema-validator = { group = "com.networknt", name = "json-schema-validator", version.ref = "jsonSchemaValidator" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }

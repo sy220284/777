@@ -1,15 +1,24 @@
 package com.labteto.dshmobile.harness.tools
 
-import com.eygraber.uri.Uri
-import io.github.optimumcode.json.schema.JsonSchema
-import io.github.optimumcode.json.schema.JsonSchemaLoader
-import io.github.optimumcode.json.schema.SchemaType
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.json.JsonMapper
+import com.networknt.schema.Schema
+import com.networknt.schema.SchemaException
+import com.networknt.schema.SchemaContext
+import com.networknt.schema.SchemaLocation
+import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SchemaRegistryConfig
+import com.networknt.schema.dialect.Dialect
+import com.networknt.schema.dialect.Dialects
+import com.networknt.schema.keyword.Keyword
+import com.networknt.schema.keyword.KeywordValidator
+import com.networknt.schema.keyword.MultipleOfValidator
+import java.math.BigDecimal
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** Native authoring contracts stay strict; external tools declare standard JSON Schema. */
 enum class ToolParameterDialect { NATIVE, JSON_SCHEMA }
@@ -38,7 +47,11 @@ internal abstract class CompiledToolParameters {
                     }
                     NativeParameters(schema)
                 }
-                ToolParameterDialect.JSON_SCHEMA -> StandardParameters(schema)
+                ToolParameterDialect.JSON_SCHEMA -> try {
+                    StandardParameters(schema)
+                } catch (error: SchemaException) {
+                    throw IllegalArgumentException(error.message ?: "JSON Schema 编译失败", error)
+                }
             }
         }
     }
@@ -51,33 +64,46 @@ private class NativeParameters(private val schema: JsonObject) : CompiledToolPar
 }
 
 private class StandardParameters(private val definition: JsonObject) : CompiledToolParameters() {
-    // Each registration has an isolated reference namespace. The loader has no network resolver;
-    // unresolved external references fail registration instead of initiating an unapproved fetch.
-    private val rootUri = Uri.parse("urn:777:tool-parameters")
-    private val loader = JsonSchemaLoader.create().register(definition, rootUri)
-    private val validators = mutableMapOf<String, JsonSchema>()
-    private val shapes = mutableMapOf<String, JsonSchema>()
-    private val root = at("")
+    // The mapper retains exact decimal/integer values. No Double coercion is used for
+    // assertions such as multipleOf or bounds, including values beyond the Long range.
+    private val mapper = JsonMapper.builder().enable(
+        DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS,
+        DeserializationFeature.USE_BIG_INTEGER_FOR_INTS,
+    ).build()
+    // Isolated resources per registration. Remote retrieval is explicitly disabled;
+    // the built-in meta-schemas and resources embedded in this definition remain available.
+    private val registry = SchemaRegistry.withDialects(listOf(
+        Dialects.getDraft202012(), Dialects.getDraft201909(), Dialects.getDraft7(),
+        Dialects.getDraft6(), Dialects.getDraft4(),
+    ).map { Dialect.builder(it).keyword(ExactMultipleOf).build() }) { builder ->
+        builder.nodeReader { it.jsonMapper(mapper) }
+            .schemaLoader { it.fetchRemoteResources(false) }
+            .schemaRegistryConfig(SchemaRegistryConfig.builder().preloadSchema(true).losslessNarrowing(true).build())
+    }
+    private val validators = mutableMapOf<String, Schema>()
+    private val shapes = mutableMapOf<String, Schema>()
+    private val root = registry.getSchema(SchemaLocation.of("urn:777:tool-parameters"), mapper.readTree(definition.toString()))
+        .also { compiled ->
+            val meta = registry.getSchema(SchemaLocation.of(compiled.schemaContext.dialect.id))
+            val errors = meta.validate(compiled.schemaNode)
+            require(errors.isEmpty()) { errors.first().message }
+            compiled.initializeValidators()
+        }
 
     override fun validate(value: JsonElement): String? = validateWith(root, value, "$")
 
     override fun validateDeferred(value: JsonElement, deferred: (JsonElement) -> Boolean): String? =
         preview(value, definition, "", "$", deferred)
 
-    private fun at(pointer: String): JsonSchema = synchronized(loader) {
-        validators.getOrPut(pointer) {
-            loader.fromJsonElement(buildJsonObject { put("\$ref", "$rootUri#$pointer") })
+    private fun at(pointer: String): Schema = synchronized(registry) {
+        if (pointer.isEmpty()) root else validators.getOrPut(pointer) {
+            root.getSubSchema(SchemaLocation.Fragment.of(pointer)).also { it.initializeValidators() }
         }
     }
 
-    private fun validateWith(validator: JsonSchema, value: JsonElement, path: String): String? = synchronized(loader) {
-        // The library lazily initializes reference assertions on first validation. Keep that
-        // initialization and selector compilation on the same registration-local monitor.
-        var first: String? = null
-        val valid = validator.validate(value) { error ->
-            if (first == null) first = "$path${error.objectPath}: ${error.message}"
-        }
-        if (valid) null else first ?: "$path 参数不符合 JSON Schema"
+    private fun validateWith(validator: Schema, value: JsonElement, path: String): String? {
+        val errors = validator.validate(mapper.readTree(value.toString()))
+        return errors.firstOrNull()?.let { "$path${it.instanceLocation}: ${it.message}" }
     }
 
     private fun preview(
@@ -91,7 +117,7 @@ private class StandardParameters(private val definition: JsonObject) : CompiledT
 
         // These assertions depend on container structure, not on unresolved result values.
         // Use the same standard engine, including nullable/union type semantics.
-        val shape = synchronized(loader) {
+        val shape = synchronized(registry) {
             shapes.getOrPut(pointer) {
                 val fields = node.filterKeys { it in STRUCTURAL_KEYS }.toMutableMap()
                 if (node["additionalProperties"] == JsonPrimitive(false)) {
@@ -101,7 +127,7 @@ private class StandardParameters(private val definition: JsonObject) : CompiledT
                         .mapValues { JsonPrimitive(true) })
                     fields["additionalProperties"] = JsonPrimitive(false)
                 }
-                JsonSchema.fromJsonElement(JsonObject(fields), SchemaType.DRAFT_2020_12)
+                registry.getSchema(mapper.readTree(JsonObject(fields).toString()))
             }
         }
         validateWith(shape, value, path)?.let { return it }
@@ -158,5 +184,21 @@ private class StandardParameters(private val definition: JsonObject) : CompiledT
 
     private companion object {
         val STRUCTURAL_KEYS = setOf("type", "required", "minProperties", "maxProperties", "minItems", "maxItems")
+    }
+}
+
+/** Keep the engine's branch/reference semantics, using exact JSON numbers at its keyword boundary. */
+private object ExactMultipleOf : Keyword {
+    override fun getValue() = "multipleOf"
+    override fun newValidator(
+        location: SchemaLocation, schemaNode: JsonNode, parent: Schema, context: SchemaContext,
+    ): KeywordValidator = object : MultipleOfValidator(location, schemaNode, parent, context) {
+        override fun getDivisor(node: JsonNode): BigDecimal? =
+            if (node.isNumber) node.decimalValue().also {
+                require(it.signum() > 0) { "multipleOf 必须为正数" }
+            } else null
+
+        override fun getDividend(node: JsonNode): BigDecimal? =
+            if (node.isNumber) node.decimalValue() else null
     }
 }

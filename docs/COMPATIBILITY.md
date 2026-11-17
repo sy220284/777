@@ -93,6 +93,6 @@ Android 本机模式目标是语义等价，不要求复制桌面宿主的物理
 
 ## MCP Schema 兼容
 
-外部工具参数采用 JSON Schema Draft 2020-12 默认方言，并识别标准引擎支持的显式 Draft 4/6/7/2019-09。参数 Schema 由 `io.github.optimumcode:json-schema-validator:0.5.5` 编译，JSON 序列化运行库对应升级为 1.11.0。输入仍由共享 Tool Registry 执行校验与审批，不存在未校验的兼容旁路。
+外部工具参数采用 JSON Schema Draft 2020-12 默认方言，并识别标准引擎支持的显式 Draft 4/6/7/2019-09。参数 Schema 由 `com.networknt:json-schema-validator:2.0.8` 编译，共享 kotlinx.serialization 运行库保持现有 1.7.3。输入仍由共享 Tool Registry 执行校验与审批，不存在未校验的兼容旁路。
 
 跨网络引用资源不隐式下载；服务应把工具依赖的定义放在自己的 `inputSchema` 内。无法解析的引用或不支持的方言会给出具体未注册原因，服务中其他有效工具可继续使用。`format` 按所选 JSON Schema 方言的 assertion/annotation 语义处理；它不替代实际网络工具的目标与权限验证。
