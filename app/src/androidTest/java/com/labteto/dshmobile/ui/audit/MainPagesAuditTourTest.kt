@@ -85,13 +85,21 @@ class MainPagesAuditTourTest {
     }
 
     @Test fun allMainRoutesKeepTheirRealNavigationAndNativeAppearance() {
+        // The first-launch gate shows either onboarding or the conversation,
+        // never a clickable conversation hidden behind a late overlay.
+        val onboardingSkip = text(R.string.shenyan_onboarding_skip)
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithText(onboardingSkip).fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNodes().isNotEmpty()
+        }
+        if (compose.onAllNodesWithText(onboardingSkip).fetchSemanticsNodes().isNotEmpty()) {
+            captureUiAudit(compose, "main-first-launch")
+            compose.onNodeWithText(onboardingSkip).performClick()
+        }
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()
-        }
-        if (compose.onAllNodesWithText(text(R.string.shenyan_onboarding_skip)).fetchSemanticsNodes().isNotEmpty()) {
-            captureUiAudit(compose, "main-first-launch")
-            compose.onNodeWithText(text(R.string.shenyan_onboarding_skip)).performClick()
         }
         selectMode(R.string.local_usage_work)
         captureUiAudit(compose, "main-work")
