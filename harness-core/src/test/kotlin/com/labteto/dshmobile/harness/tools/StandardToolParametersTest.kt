@@ -127,6 +127,16 @@ class StandardToolParametersTest {
         assertNotNull(rules.validate(json("""{"known":1,"later":"special"}""")))
     }
 
+    @Test fun draft7ReferenceSiblingsStayIgnoredWhenPreviewingDeferredArguments() {
+        val rules = compile("""{"type":"object","${key}schema":"http://json-schema.org/draft-07/schema#",
+          "definitions":{"base":{"type":"object","properties":{"known":{"type":"integer"}},"required":["known"]}},
+          "${key}ref":"#/definitions/base","required":["ignored"],"properties":{"known":{"const":"ignored"}}
+        }""")
+        assertNull(rules.validateDeferred(json("""{"known":1,"later":{"${key}step_result":1}}"""), ::isDeferred))
+        assertNull(rules.validate(json("""{"known":1,"later":"ok"}""")))
+        assertNotNull(rules.validate(json("""{"known":"bad","later":"ok"}""")))
+    }
+
     @Test fun codeModeFullyValidatesResolvedStandardArgumentsBeforeApprovalOrRemoteExecution() = runTest {
         val registry = ToolRegistry()
         var remoteExecutions = 0

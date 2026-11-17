@@ -9,6 +9,7 @@ import com.networknt.schema.SchemaContext
 import com.networknt.schema.SchemaLocation
 import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.SchemaRegistryConfig
+import com.networknt.schema.SpecificationVersion
 import com.networknt.schema.dialect.Dialect
 import com.networknt.schema.dialect.Dialects
 import com.networknt.schema.keyword.Keyword
@@ -114,6 +115,12 @@ private class StandardParameters(private val definition: JsonObject) : CompiledT
         if (!hasDeferred(value, deferred)) return validateWith(at(pointer), value, path)
         if (schema == JsonPrimitive(false)) return "$path 不允许此参数"
         val node = schema as? JsonObject ?: return null
+        if ("\$ref" in node &&
+            at(pointer).schemaContext.dialect.specificationVersion.order < SpecificationVersion.DRAFT_2019_09.order) {
+            // Older drafts ignore $ref siblings. Applying their properties/required during
+            // preview would reject calls that the original schema explicitly permits.
+            return null
+        }
 
         // These assertions depend on container structure, not on unresolved result values.
         // Use the same standard engine, including nullable/union type semantics.
