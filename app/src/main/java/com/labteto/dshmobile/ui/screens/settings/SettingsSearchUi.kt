@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
@@ -64,7 +65,8 @@ internal fun SettingsSearchResults(
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val colors = LocalSyColors.current
-    val results = remember(query, context.resources.configuration) {
+    val configuration = LocalConfiguration.current
+    val results = remember(query, configuration) {
         searchSettingsEntries(query, title = { context.getString(it) })
     }
     Column(Modifier.fillMaxSize()) {
