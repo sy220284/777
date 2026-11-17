@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
  */
 /** A removed, replaced or re-keyed account must not be used to poll an old task. */
 fun LocalMediaVideoTask.belongsTo(offer: LocalMediaOffer): Boolean =
-        offerId == offer.id && routeFingerprint == offer.profile.routeFingerprint() &&
+        offerId == offer.id && mediaRouteIdentityMatches(routeFingerprint, credentialSignature, offer.profile) &&
             provider == offer.provider.name && model == offer.model
 
 @Serializable
@@ -39,6 +39,13 @@ internal object LocalMediaVideoTransitions {
             lastError = null,
         )
     }
+
+    fun submissionFailed(previous: LocalMediaVideoTask, failure: Exception, requestStarted: Boolean, now: Long): LocalMediaVideoTask =
+        if (previous.phase != LocalMediaVideoPhase.SUBMITTING) previous else previous.copy(
+            phase = if (!requestStarted || failure is LocalMediaRequestRejected)
+                LocalMediaVideoPhase.FAILED else LocalMediaVideoPhase.OUTCOME_UNKNOWN,
+            lastError = failure.message?.take(300), updatedAtMillis = now,
+        )
 
     fun polled(
         previous: LocalMediaVideoTask,

@@ -26,6 +26,7 @@ internal fun notificationGrantAction(apiLevel: Int, attempted: Boolean): Notific
 internal enum class PermissionSetupStatus {
     READY,
     AUTHORIZED_WAITING,
+    CHANNEL_BLOCKED,
     VISITED_NOT_GRANTED,
     NOT_GRANTED,
 }
@@ -35,15 +36,17 @@ internal fun permissionSetupStatus(
     state: DeviceCapabilitiesState,
     visited: Boolean = false,
 ): PermissionSetupStatus {
+    if (feature == PermissionSetupFeature.TASK_ALERTS && state.postingNotifications == true &&
+        state.taskAlertsEnabled != true) return PermissionSetupStatus.CHANNEL_BLOCKED
     val granted = when (feature) {
         PermissionSetupFeature.SCREEN_CONTROL -> state.accessibilityGranted
         PermissionSetupFeature.NOTIFICATION_READ -> state.notificationAccessGranted
-        PermissionSetupFeature.TASK_ALERTS -> state.postingNotifications == true
+        PermissionSetupFeature.TASK_ALERTS -> state.postingNotifications == true && state.taskAlertsEnabled == true
     }
     val connected = when (feature) {
         PermissionSetupFeature.SCREEN_CONTROL -> state.accessibility
         PermissionSetupFeature.NOTIFICATION_READ -> state.notifications
-        PermissionSetupFeature.TASK_ALERTS -> state.postingNotifications == true
+        PermissionSetupFeature.TASK_ALERTS -> state.postingNotifications == true && state.taskAlertsEnabled == true
     }
     return when {
         granted && connected -> PermissionSetupStatus.READY

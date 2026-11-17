@@ -55,11 +55,12 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
     override suspend fun prepareSession(
         text: String,
         preferredSessionId: String?,
+        recoverInterrupted: Boolean,
     ): String {
         val prompt = text.trim()
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
         awaitReady()
-        return resolveSession(preferredSessionId, prompt).id
+        return resolveSession(preferredSessionId, prompt, recoverInterrupted).id
     }
 
     override suspend fun run(
@@ -72,7 +73,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
         require(prompt.isNotEmpty()) { "后台任务提示词不能为空" }
         awaitReady()
 
-        val sessionId = resolveSession(preferredSessionId, prompt).id
+        val sessionId = resolveSession(preferredSessionId, prompt, recoverInterrupted).id
         val budget = LocalWorkAutomationTimeoutBudget(timeoutMillis, 15 * 60_000L)
         val sessionLease = budget.acquireSession(sessionId, LocalSessionRuntimeKind.AUTOMATION_WORK)
         return try {
@@ -258,32 +259,13 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
         require(runtimeStateStore.state.value.modelState.configured) { "本机 Harness 尚未配置模型" }
     }
 
-    private fun resolveSession(
-        preferredSessionId: String?,
-        prompt: String,
-    ): LocalHarnessSession {
-        preferredSessionId
-            ?.takeIf(String::isNotBlank)
-            ?.let(sessionCoordinator::read)
-            ?.takeIf { it.usageMode == LocalUsageMode.WORK }
-            ?.let { return it }
-
-        val now = System.currentTimeMillis()
-        val id = UUID.randomUUID().toString()
-        val session = LocalHarnessSession(
-            id = id,
-            title = prompt.lineSequence().firstOrNull()?.trim()?.take(36)
-                ?.takeIf(String::isNotBlank)
-                ?: "自动化任务",
-            updatedAt = now,
-            usageMode = LocalUsageMode.WORK,
-            conversationMode = LocalConversationMode.INDEPENDENT,
-            lineageId = id,
-            projectId = null,
-        )
-        sessionStorage.coordinator.enqueue(session)
-        return session
-    }
+    private suspend fun resolveSession(
+        preferredSessionId: String?, prompt: String, recoverInterrupted: Boolean = false,
+    ): LocalHarnessSession = resolveLocalWorkAutomationSession(
+        preferredSessionId, prompt, sessionCoordinator,
+        hasEvents = { sessionStorage.eventLogs.get(it).latestSequence() >= 0 },
+        recoverInterrupted = recoverInterrupted,
+    )
 
     private fun boundState(session: LocalHarnessSession): LocalHarnessState {
         val runtime = runtimeStateStore.state.value

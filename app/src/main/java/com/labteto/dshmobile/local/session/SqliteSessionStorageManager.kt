@@ -418,12 +418,18 @@ internal class SqliteSessionStorageManager(
         // that may reference them. Retrying after process death is idempotent.
         mediaBackup.installStaged(pendingRoot)
         sources.forEach { (src, dst) ->
-            if (dst.exists() && sameBytes(src, dst)) return@forEach
+            if (dst.exists() && sameBytes(src, dst)) {
+                DurableFileCommit.syncFile(dst)
+                DurableFileCommit.syncDirectory(requireNotNull(dst.parentFile))
+                return@forEach
+            }
             dst.parentFile?.mkdirs()
             val tmp = File(dst.parentFile, dst.name + ".restore-tmp")
             if (tmp.exists()) check(tmp.delete())
             src.copyTo(tmp, overwrite = false)
+            DurableFileCommit.syncFile(tmp)
             check(tmp.renameTo(dst)) { "SQLite 备份恢复无法完成：${dst.name}" }
+            DurableFileCommit.syncDirectory(requireNotNull(dst.parentFile))
         }
         val count = countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
         check(!Files.exists(committedRoot.toPath(), LinkOption.NOFOLLOW_LINKS)) {

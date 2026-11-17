@@ -9,6 +9,20 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LocalModelProfileStoreRecoveryTest {
+    @Test fun credentialBindingSurvivesProfileStorageAndSeparatesRekeyedRecoveryRoutes() {
+        val fixture = fakePreferences()
+        val store = LocalModelProfileStore(fixture.preferences, Json { ignoreUnknownKeys = true })
+        fun read(binding: String): LocalModelProfile {
+            fixture.values[LocalModelConfigContract.KEY_PROFILES_V3] =
+                """[{"id":"same-profile","model":"model","baseUrl":"https://api.example/v1","credentialBinding":"$binding"}]"""
+            return store.read().single()
+        }
+        val first = read("binding-a")
+        val second = read("binding-b")
+        org.junit.Assert.assertNotEquals("同id更换凭据必须隔离私有重放与恢复", first.routeFingerprint(), second.routeFingerprint())
+        org.junit.Assert.assertTrue(store.encode(listOf(first)).contains("binding-a"))
+    }
+
     @Test
     fun firstWriteAlreadyHasRecoverableBackup() {
         val fixture = fakePreferences()

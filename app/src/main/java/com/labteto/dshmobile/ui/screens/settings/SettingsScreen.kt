@@ -218,7 +218,7 @@ fun SettingsScreen(
     val storageCompacted = stringResource(R.string.settings_local_session_storage_compacted)
     val storageCompactFailed = stringResource(R.string.settings_local_session_storage_compact_failed)
     // The reviewed immutable bytes are the same bytes given to SAF or the native share sheet.
-    var diagnosticDraft by remember { mutableStateOf<String?>(null) }
+    var diagnosticDraft by viewModel.diagnosticDraft
     var diagnosticBusy by remember { mutableStateOf(false) }
     val reviewDiagnostics: () -> Unit = {
         if (!diagnosticBusy) {
@@ -239,6 +239,9 @@ fun SettingsScreen(
     }
     val diagnosticExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         val report = diagnosticDraft
+        if (uri != null && report == null) {
+            toast.second("诊断报告预览已失效，请重新检查后导出")
+        }
         if (uri != null && report != null) scope.launch {
             try {
                 withContext(Dispatchers.IO) {
@@ -323,24 +326,25 @@ fun SettingsScreen(
     var environmentInfo by remember { mutableStateOf<String?>(null) }
     var customChatFilterDraft by rememberSaveable { mutableStateOf("") }
     var showChatPreferenceDiagnostics by rememberSaveable { mutableStateOf(false) }
-    var localSessionStorageStatus by remember { mutableStateOf<LocalSessionStorageStatus?>(null) }
-    var localSessionStorageBusy by rememberSaveable { mutableStateOf(false) }
+    var localSessionStorageStatus by viewModel.storageOperations.status
+    val localSessionStorageBusy by viewModel.storageOperations.busy
+    val storageNotice by viewModel.storageOperations.notice
+    LaunchedEffect(storageNotice) {
+        storageNotice?.let { toast.second(it); viewModel.storageOperations.notice.value = null }
+    }
     val sessionStorageExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
-        if (uri != null) scope.launch {
-            localSessionStorageBusy = true
+        if (uri != null) viewModel.storageOperations.launch {
             try {
                 viewModel.exportLocalSessionStorage(uri)
                 localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                toast.second(storageExported)
+                viewModel.storageOperations.notice.value = (storageExported)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "export_session_archive", error)
-                toast.second(storageExportFailed)
-            } finally {
-                localSessionStorageBusy = false
+                viewModel.storageOperations.notice.value = (storageExportFailed)
             }
         }
     }
@@ -348,19 +352,16 @@ fun SettingsScreen(
     val fullStorageExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
-        if (uri != null) scope.launch {
-            localSessionStorageBusy = true
+        if (uri != null) viewModel.storageOperations.launch {
             try {
                 viewModel.exportCompleteLocalSessionStorage(uri)
                 localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                toast.second("完整备份已导出：包含会话、附件和媒体工作室创作原件")
+                viewModel.storageOperations.notice.value = ("完整备份已导出：包含会话、附件和媒体工作室创作原件")
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "export_complete_archive", error)
-                toast.second(error.message ?: "完整备份导出失败")
-            } finally {
-                localSessionStorageBusy = false
+                viewModel.storageOperations.notice.value = (error.message ?: "完整备份导出失败")
             }
         }
     }
@@ -368,19 +369,16 @@ fun SettingsScreen(
     val sessionStorageImporter = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) scope.launch {
-            localSessionStorageBusy = true
+        if (uri != null) viewModel.storageOperations.launch {
             try {
                 val sessions = viewModel.importLocalSessionStorage(uri)
                 localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                toast.second("备份已验证并安排恢复 $sessions 个会话；如包含媒体工作室成果，将一并于重启后恢复")
+                viewModel.storageOperations.notice.value = ("备份已验证并安排恢复 $sessions 个会话；如包含媒体工作室成果，将一并于重启后恢复")
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "stage_session_archive_restore", error)
-                toast.second(error.message ?: "会话备份导入失败")
-            } finally {
-                localSessionStorageBusy = false
+                viewModel.storageOperations.notice.value = (error.message ?: "会话备份导入失败")
             }
         }
     }
@@ -388,19 +386,16 @@ fun SettingsScreen(
     val legacyStorageImporter = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) scope.launch {
-            localSessionStorageBusy = true
+        if (uri != null) viewModel.storageOperations.launch {
             try {
                 val sessions = viewModel.importLegacySessionStorage(uri)
                 localSessionStorageStatus = viewModel.localSessionStorageStatus()
-                toast.second("旧版 ZIP 已转换为 SQLite 恢复计划：$sessions 个会话。旧归档不含完整媒体原件，请自行保留素材备份；重启后生效")
+                viewModel.storageOperations.notice.value = ("旧版 ZIP 已转换为 SQLite 恢复计划：$sessions 个会话。旧归档不含完整媒体原件，请自行保留素材备份；重启后生效")
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 AppLog.failure("Settings", "stage_legacy_session_restore", error)
-                toast.second(error.message ?: "旧版 ZIP 转换失败")
-            } finally {
-                localSessionStorageBusy = false
+                viewModel.storageOperations.notice.value = (error.message ?: "旧版 ZIP 转换失败")
             }
         }
     }
@@ -1178,16 +1173,14 @@ fun SettingsScreen(
                             status = localSessionStorageStatus,
                             busy = localSessionStorageBusy,
                             onCompact = {
-                                scope.launch {
-                                    localSessionStorageBusy = true
+                                viewModel.storageOperations.launch {
                                     try {
                                         localSessionStorageStatus = viewModel.compactLocalSessionStorage()
-                                        toast.second(storageCompacted)
+                                        viewModel.storageOperations.notice.value = (storageCompacted)
+                                    } catch (cancelled: CancellationException) { throw cancelled
                                     } catch (error: Exception) {
                                         AppLog.failure("Settings", "compact_session_archive", error)
-                                        toast.second(storageCompactFailed)
-                                    } finally {
-                                        localSessionStorageBusy = false
+                                        viewModel.storageOperations.notice.value = (storageCompactFailed)
                                     }
                                 }
                             },
@@ -1198,17 +1191,15 @@ fun SettingsScreen(
                                 legacyStorageImporter.launch(arrayOf("application/zip", "application/octet-stream"))
                             },
                             onCancelRestore = {
-                                scope.launch {
-                                    localSessionStorageBusy = true
+                                viewModel.storageOperations.launch {
                                     try {
                                         if (viewModel.cancelStagedSessionRestore()) {
-                                            toast.second("已取消未开始的备份恢复")
+                                            viewModel.storageOperations.notice.value = ("已取消未开始的备份恢复")
                                             localSessionStorageStatus = viewModel.localSessionStorageStatus()
                                         }
+                                    } catch (cancelled: CancellationException) { throw cancelled
                                     } catch (error: Exception) {
-                                        toast.second(error.message ?: "无法取消已开始的恢复")
-                                    } finally {
-                                        localSessionStorageBusy = false
+                                        viewModel.storageOperations.notice.value = (error.message ?: "无法取消已开始的恢复")
                                     }
                                 }
                             },

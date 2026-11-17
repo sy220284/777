@@ -22,13 +22,13 @@ internal object PromptTokenEstimateCache {
         val persona: Boolean,
     )
 
-    private val messageCache = object : LinkedHashMap<JsonObject, MessageEstimate>(
+    private val messageCache = object : LinkedHashMap<JsonObject, Int>(
         256,
         0.75f,
         true,
     ) {
         override fun removeEldestEntry(
-            eldest: MutableMap.MutableEntry<JsonObject, MessageEstimate>?,
+            eldest: MutableMap.MutableEntry<JsonObject, Int>?,
         ): Boolean = size > MAX_MESSAGE_ESTIMATES
     }
 
@@ -87,14 +87,14 @@ internal object PromptTokenEstimateCache {
                 persona = personaClassifier(content),
             )
         }
-        messageCache[value]?.let { return it }
-        val encoded = value.toString()
+        val tokens = messageCache[value] ?: estimateRequestTokens(value.toString())
+            .also { messageCache[value] = it }
         val content = value["content"]?.toString().orEmpty()
         return MessageEstimate(
-            tokens = estimateRequestTokens(encoded),
+            tokens = tokens,
             memory = memoryClassifier(content),
             persona = personaClassifier(content),
-        ).also { messageCache[value] = it }
+        )
     }
 
     @Synchronized

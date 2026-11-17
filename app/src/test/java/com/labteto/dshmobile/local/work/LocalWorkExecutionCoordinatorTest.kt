@@ -13,6 +13,8 @@ import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -22,6 +24,70 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalWorkExecutionCoordinatorTest {
+    @Test fun interruptedIdentityAdmissionReportsBlockedWithoutStartingAnotherRun() = runTest {
+        var executed = false
+        val coordinator = coordinator(RecordingTurnPort(),
+            prepareDetachedSession = { _, id, recovering ->
+                assertTrue(recovering)
+                throw com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException("旧会话记录缺失", id)
+            },
+            runDetached = { _, _, _, _ -> executed = true; error("不得执行") })
+        val result = coordinator.execute(LocalWorkExecutionRequest("任务", "old-run", recoverInterrupted = true))
+        assertEquals(LocalWorkExecutionStatus.BLOCKED, result.status)
+        assertEquals("old-run", result.sessionId)
+        assertFalse(executed)
+    }
+
+    @Test fun callerCancellationWaitsUntilDetachedExecutionHasReleasedItsResources() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val cleanupStarted = CompletableDeferred<Unit>()
+        val releaseCleanup = CompletableDeferred<Unit>()
+        val cleaned = CompletableDeferred<Unit>()
+        val coordinator = coordinator(RecordingTurnPort(),
+            runDetached = { _, _, _, _ ->
+                started.complete(Unit)
+                try { kotlinx.coroutines.awaitCancellation() }
+                finally { kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    cleanupStarted.complete(Unit)
+                    releaseCleanup.await()
+                    cleaned.complete(Unit)
+                } }
+            })
+        val caller = async { coordinator.execute(LocalWorkExecutionRequest("任务", "cancel-owner")) }
+        try {
+            started.await()
+            caller.cancel()
+            cleanupStarted.await()
+            runCurrent()
+            assertFalse("执行入口不能在真实执行清理前返回并移除Owner", caller.isCompleted)
+        } finally {
+            releaseCleanup.complete(Unit)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { caller.join(); cleaned.await() }
+        }
+    }
+
+    @Test fun callerTimeoutCancelsOwnedExecutionAndPropagatesInsteadOfReturningFailure() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val cleaned = CompletableDeferred<Unit>()
+        val coordinator = coordinator(RecordingTurnPort(), runDetached = { _, _, _, _ ->
+            started.complete(Unit)
+            try { kotlinx.coroutines.awaitCancellation() } finally { cleaned.complete(Unit) }
+        })
+        val caller = async {
+            kotlinx.coroutines.withTimeout(100) {
+                coordinator.execute(LocalWorkExecutionRequest("任务", "timeout-owner"))
+            }
+        }
+        try {
+            started.await()
+            advanceTimeBy(100)
+            runCurrent()
+            try { caller.await(); org.junit.Assert.fail("调用方超时必须传播取消") }
+            catch (_: kotlinx.coroutines.TimeoutCancellationException) { }
+            assertTrue("外层超时返回前必须完成真实执行清理", cleaned.isCompleted)
+        } finally { coordinator.cancelAndJoin("timeout-owner") }
+    }
+
     @Test
     fun emptyInputIsRejectedInsideWorkFeatureWithoutCallingTurnBridge() {
         val fake = RecordingTurnPort()
@@ -66,7 +132,10 @@ class LocalWorkExecutionCoordinatorTest {
         val fake = RecordingTurnPort()
         val coordinator = coordinator(
             turn = fake,
-            prepareDetachedSession = { _, preferred -> preferred ?: "created-session" },
+            prepareDetachedSession = { _, preferred, recover ->
+                assertTrue("恢复标记必须在准备会话前传入", recover)
+                preferred ?: "created-session"
+            },
             runDetached = { text, target, timeout, recover ->
                 assertEquals("后台任务", text)
                 assertEquals("session-b", target)
@@ -97,7 +166,7 @@ class LocalWorkExecutionCoordinatorTest {
         val never = CompletableDeferred<Unit>()
         val coordinator = coordinator(
             turn = fake,
-            prepareDetachedSession = { _, preferred -> requireNotNull(preferred) },
+            prepareDetachedSession = { _, preferred, _ -> requireNotNull(preferred) },
             runDetached = { _, target, _, _ ->
                 started.complete(Unit)
                 never.await()
@@ -190,7 +259,7 @@ class LocalWorkExecutionCoordinatorTest {
     private fun coordinator(
         turn: RecordingTurnPort,
         runtime: LocalRuntimeStateStore = defaultRuntime(),
-        prepareDetachedSession: suspend (String, String?) -> String = { _, preferred ->
+        prepareDetachedSession: suspend (String, String?, Boolean) -> String = { _, preferred, _ ->
             preferred ?: "detached-test"
         },
         runDetached: suspend (String, String?, Long, Boolean) -> LocalWorkAutomationResult =

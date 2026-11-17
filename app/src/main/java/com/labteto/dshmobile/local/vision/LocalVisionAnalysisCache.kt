@@ -8,7 +8,7 @@ import java.util.UUID
 /**
  * App-private cache for completed workspace-image vision analyses.
  *
- * Keys bind image content, vision endpoint, model and the exact bounded task prompt. The cache
+ * Keys bind image content, vision endpoint, model and the exact task prompt. The cache
  * never invents a generic summary and never skips explicit tool approval; it only avoids paying
  * for the same already-approved analysis twice.
  */
@@ -72,7 +72,7 @@ internal class LocalVisionAnalysisCache(
             append(route.baseUrl.trim().trimEnd('/')).append('\u0000')
             append(route.model.trim()).append('\u0000')
             append(route.profile?.id.orEmpty()).append('\u0000')
-            append(prompt.trim().take(4_000))
+            append(prompt)
         }
         return File(root, sha256(keyMaterial.toByteArray(Charsets.UTF_8)) + ".txt")
     }
@@ -116,7 +116,7 @@ internal class LocalVisionAnalysisCache(
             .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
     private companion object {
-        const val CACHE_VERSION = "vision-cache-v1"
+        const val CACHE_VERSION = "vision-cache-v2-full-prompt"
         const val DEFAULT_TTL_MILLIS = 7L * 24L * 60L * 60L * 1000L
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         const val DEFAULT_MAX_ENTRIES = 256

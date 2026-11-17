@@ -75,6 +75,7 @@ internal class LocalModelProfileStore(
                         }
                 },
                 credentialRef = credentialRef,
+                credentialBinding = obj["credentialBinding"]?.jsonPrimitive?.contentOrNull,
                 displayName = obj["displayName"]?.jsonPrimitive?.contentOrNull,
                 contextWindowTokensOverride = obj["contextWindowTokensOverride"]?.jsonPrimitive?.intOrNull,
             )
@@ -197,6 +198,7 @@ internal class LocalModelProfileStore(
                 put("authKind", profile.authKind.name)
                 put("protocol", profile.protocol.name)
                 profile.credentialRef?.let { put("credentialRef", it) }
+                profile.credentialBinding?.let { put("credentialBinding", it) }
                 profile.displayName?.let { put("displayName", it) }
                 profile.contextWindowTokensOverride?.let { put("contextWindowTokensOverride", it) }
             })

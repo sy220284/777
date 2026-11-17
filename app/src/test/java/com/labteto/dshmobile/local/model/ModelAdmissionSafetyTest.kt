@@ -18,6 +18,32 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ModelAdmissionSafetyTest {
+    @Test fun partiallyWrittenBodyCannotBeReplayedAfterTransportFailure() {
+        val tracker = LocalModelAdmissionTracker()
+        val body = object : okhttp3.RequestBody() {
+            override fun contentType() = "application/json".toMediaType()
+            override fun writeTo(sink: okio.BufferedSink) {
+                sink.write(ByteArray(32 * 1024))
+                sink.flush()
+                throw IOException("connection lost after partial upload")
+            }
+        }.withModelAdmissionTracking(tracker)
+        org.junit.Assert.assertThrows(IOException::class.java) { body.writeTo(Buffer()) }
+        val failure = modelTransportFailure("MODEL_NETWORK", "upload interrupted", tracker, "partial", IOException())
+        assertEquals(LocalModelAdmissionState.MAYBE_ADMITTED, tracker.snapshot())
+        assertFalse(failure.retryable)
+    }
+
+    @Test fun bodyValidationFailureBeforeAnyBytesStillAllowsSafeRetry() {
+        val tracker = LocalModelAdmissionTracker()
+        val body = object : okhttp3.RequestBody() {
+            override fun contentType() = "application/json".toMediaType()
+            override fun writeTo(sink: okio.BufferedSink) { throw IOException("no bytes written") }
+        }.withModelAdmissionTracking(tracker)
+        org.junit.Assert.assertThrows(IOException::class.java) { body.writeTo(Buffer()) }
+        assertEquals(LocalModelAdmissionState.NOT_SENT, tracker.snapshot())
+    }
+
     @Test
     fun completeRequestBodyMovesAttemptIntoMaybeAdmittedState() {
         val tracker = LocalModelAdmissionTracker()

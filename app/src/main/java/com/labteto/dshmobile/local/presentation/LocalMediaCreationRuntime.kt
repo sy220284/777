@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.presentation
 
 import android.net.Uri
+import com.labteto.dshmobile.local.model.LocalMediaCredentialBinding
 import com.labteto.dshmobile.local.model.LocalMediaApiClient
 import com.labteto.dshmobile.local.model.LocalModelCredentialResolver
 import com.labteto.dshmobile.local.model.LocalMediaRevisionDraft
@@ -305,12 +306,13 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         }
     }
     private suspend fun submit(offer: LocalMediaOffer, sessionId: String, prompt: String?, sourceMessageId: String?, revisionOf: String? = null, execute: suspend (String) -> Unit): LocalMediaCreationJob {
-        val signature = credentialResolver.mediaCredentialSignature(offer.profile)
-            ?: error("当前创作账户 API Key 不可用，请重新选择账户")
+        val binding = LocalMediaCredentialBinding(offer.profile,
+            credentialResolver.resolve(offer.profile.model, offer.profile.baseUrl, offer.profile))
+        val signature = binding.signature
         val job = withContext(Dispatchers.IO) {
             store.beginCreation(offer, sessionId, prompt, sourceMessageId, revisionOf, signature)
         }
-        scope.launch(LocalMediaRequestAdmission({ store.requestStarted(job.id) }, { store.providerSucceeded(job.id) })) {
+        scope.launch(binding + LocalMediaRequestAdmission({ store.requestStarted(job.id) }, { store.providerSucceeded(job.id) })) {
             try { execute(job.id) }
             catch (cancelled: CancellationException) { store.creationFailure(job.id, cancelled); throw cancelled }
             catch (failure: Exception) { store.creationFailure(job.id, failure) }
@@ -319,10 +321,12 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     }
     suspend fun createVideo(offer: LocalMediaOffer, prompt: String, sessionId: String? = null, sourceMessageId: String? = null, revisionOf: String? = null): LocalMediaVideoTask {
         validate(offer, LocalMediaKind.VIDEO); require(prompt.isNotBlank())
+        val binding = LocalMediaCredentialBinding(offer.profile,
+            credentialResolver.resolve(offer.profile.model, offer.profile.baseUrl, offer.profile))
         val task = withContext(Dispatchers.IO) { store.beginVideo(offer, sessionId, prompt, sourceMessageId, revisionOf,
-            credentialResolver.mediaCredentialSignature(offer.profile)
-                ?: error("当前创作账户 API Key 不可用，请重新选择账户")) }
-        scope.launch {
+            binding.signature) }
+        var requestStarted = false
+        scope.launch(binding + LocalMediaRequestAdmission({ requestStarted = true }, {})) {
             try {
                 val external = when (offer.provider) {
                     LocalMediaProvider.MINIMAX -> miniMax.startVideo(offer.profile, prompt)
@@ -331,14 +335,13 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 }
                 store.updateVideo(task.id) { LocalMediaVideoTransitions.accepted(it, external, System.currentTimeMillis()) }
             } catch (cancelled: CancellationException) {
-                videoSubmissionFailure(task.id, cancelled); throw cancelled
-            } catch (failure: Exception) { videoSubmissionFailure(task.id, failure) }
+                videoSubmissionFailure(task.id, cancelled, requestStarted); throw cancelled
+            } catch (failure: Exception) { videoSubmissionFailure(task.id, failure, requestStarted) }
         }
         return task
     }
-    private fun videoSubmissionFailure(id: String, failure: Exception) = store.updateVideo(id) {
-        if (it.phase != LocalMediaVideoPhase.SUBMITTING) it else it.copy(
-            phase = LocalMediaVideoPhase.OUTCOME_UNKNOWN, lastError = failure.message?.take(300))
+    private fun videoSubmissionFailure(id: String, failure: Exception, requestStarted: Boolean) = store.updateVideo(id) {
+        LocalMediaVideoTransitions.submissionFailed(it, failure, requestStarted, now = System.currentTimeMillis())
     }
     suspend fun refreshVideo(offer: LocalMediaOffer, taskId: String) = withContext(Dispatchers.IO) {
         validate(offer, LocalMediaKind.VIDEO)

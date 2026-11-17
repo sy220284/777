@@ -169,6 +169,7 @@ class HarnessAutomationWorker(
                 runtime.prepareWorkSession(
                     text = task.prompt,
                     preferredSessionId = task.workSessionId,
+                    recoverInterrupted = recovering,
                 ).also { sessionId ->
                     task = store.updateIf(
                         id,
@@ -264,7 +265,15 @@ class HarnessAutomationWorker(
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (error: Throwable) {
+        } catch (blocked: com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException) {
+            settlement.settleBlocked(
+                id = id, requestedGeneration = requestedGeneration, task = task,
+                manualRun = manualRun, started = started, manualExecutionId = manualExecutionId,
+                sessionId = blocked.sessionId ?: task.workSessionId ?: task.targetSessionId,
+                detail = blocked.message ?: "原工作会话需要核实后才能恢复",
+            )
+            Result.success()
+        } catch (error: Exception) {
             settlement.settleFailure(
                 id = id,
                 requestedGeneration = requestedGeneration,

@@ -15,6 +15,38 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalPromptPressureTest {
+    @Test fun pressurePreflightCannotPoisonMemoryAndPersonaClassification() {
+        val message = buildJsonObject { put("role", "system"); put("content", "人物记忆：只属于本测试的事实") }
+        LocalPromptPressureMeter.measure(listOf(message), JsonArray(emptyList()), 128_000)
+        val usage = com.labteto.dshmobile.local.usage.PromptTokenEstimateCache.message(
+            message, { it.contains("记忆") }, { it.contains("人物") })
+        assertTrue("token缓存不得缓存其他调用方的分类结果", usage.memory)
+        assertTrue(usage.persona)
+    }
+
+    @Test fun inlineMediaUsesTheSharedModalityEstimateInsteadOfBase64TextTokens() {
+        val payload = "A".repeat(1024 * 1024)
+        for (type in listOf("image_url", "video_url", "input_file")) {
+            val part = buildJsonObject {
+                put("type", type)
+                if (type == "input_file") put("file_data", "data:application/pdf;base64,$payload")
+                else put(type, buildJsonObject { put("url", "data:image/png;base64,$payload") })
+            }
+            val message = buildJsonObject {
+                put("role", "user")
+                put("content", JsonArray(listOf(part)))
+            }
+            val expected = com.labteto.dshmobile.local.usage.PromptTokenEstimateCache.message(message, { false }, { false }).tokens
+            val actual = LocalPromptPressureMeter.measure(listOf(message), JsonArray(emptyList()), 128_000)
+            assertEquals("压力准入必须与共享模态估算一致：$type", expected, actual.estimatedInputTokens)
+            assertTrue(actual.estimatedInputTokens < 32_000)
+        }
+    }
+    @Test fun literalBase64InUserTextStillConsumesTheTextBudget() {
+        val message = buildJsonObject { put("role", "user"); put("content", "A".repeat(100_000)) }
+        assertTrue(LocalPromptPressureMeter.measure(listOf(message), JsonArray(emptyList()), 4096).estimatedInputTokens > 4096)
+    }
+
     @Test
     fun bucketsAreMutuallyExclusiveAndSumToEstimatedInput() {
         val messages = listOf(

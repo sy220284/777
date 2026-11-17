@@ -51,8 +51,8 @@ class LocalAutomationRuntime @Inject internal constructor(
         runtimeStateStore.withModelRequestResource(block)
 
 
-    internal suspend fun prepareWorkSession(text: String, preferredSessionId: String? = null): String =
-        workExecution.prepareSession(text, preferredSessionId)
+    internal suspend fun prepareWorkSession(text: String, preferredSessionId: String? = null, recoverInterrupted: Boolean = false): String =
+        workExecution.prepareSession(text, preferredSessionId, recoverInterrupted)
     internal suspend fun runWork(
         text: String,
         preferredSessionId: String? = null,

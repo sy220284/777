@@ -158,6 +158,7 @@ internal fun LocalMessageRow(
     onConvertToWork: ((LocalHarnessMessage) -> Unit)? = null,
     onCreateDocument: ((LocalHarnessMessage) -> Unit)? = null,
     onFeedback: ((String) -> Unit)? = null,
+    onMessageLongClick: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val pulse = rememberHapticPulse()
@@ -207,7 +208,7 @@ internal fun LocalMessageRow(
                     Box(
                         modifier = Modifier.combinedClickable(
                             onClick = { actionsOpen = false },
-                            onLongClick = { pulse(); actionsOpen = true },
+                            onLongClick = onMessageLongClick ?: { pulse(); actionsOpen = true },
                         ),
                     ) {
                         LocalUserMessageContent(
@@ -348,7 +349,7 @@ internal fun LocalMessageRow(
                 Column(
                     readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(
                         onClick = { actionsExpanded = !actionsExpanded },
-                        onLongClick = if (secondaryActions.isNotEmpty()) {
+                        onLongClick = onMessageLongClick ?: if (secondaryActions.isNotEmpty()) {
                             {
                                 pulse()
                                 actionsExpanded = true

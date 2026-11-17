@@ -8,6 +8,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalMediaPersistenceRulesTest {
+    @Test fun explicitVideoRejectionIsFailedButLostResponseRemainsUnknown() {
+        val pending = job(LocalMediaVideoPhase.SUBMITTING)
+        assertEquals(LocalMediaVideoPhase.FAILED, LocalMediaVideoTransitions.submissionFailed(
+            pending, LocalMediaRequestRejected("HTTP 401"), requestStarted = true, now = 200).phase)
+        assertEquals(LocalMediaVideoPhase.FAILED, LocalMediaVideoTransitions.submissionFailed(
+            pending, java.io.IOException("not sent"), requestStarted = false, now = 200).phase)
+        assertEquals(LocalMediaVideoPhase.OUTCOME_UNKNOWN, LocalMediaVideoTransitions.submissionFailed(
+            pending, java.io.IOException("response lost"), requestStarted = true, now = 200).phase)
+        val accepted = job(LocalMediaVideoPhase.QUEUED, "remote-1")
+        assertEquals(accepted, LocalMediaVideoTransitions.submissionFailed(
+            accepted, java.io.IOException(), requestStarted = true, now = 300))
+    }
+
     @Test fun pendingCreationReceiptSurvivesRestartWithoutRepeatingPaidRequest() {
         val job = LocalMediaCreationJob(
             id = "operation", sessionId = "chat-one", kind = "SPEECH",

@@ -10,6 +10,9 @@ import java.net.UnknownHostException
 import javax.net.ssl.SSLException
 import okhttp3.RequestBody
 import okio.BufferedSink
+import okio.Buffer
+import okio.ForwardingSink
+import okio.buffer
 
 internal class LocalModelAdmissionTracker {
     @Volatile
@@ -41,8 +44,16 @@ internal fun RequestBody.withModelAdmissionTracking(
         override fun isOneShot() = true
 
         override fun writeTo(sink: BufferedSink) {
-            delegate.writeTo(sink)
-            // writeTo completed: the full JSON body has been handed to OkHttp's transport.
+            // A write may transmit a prefix and then throw. Mark at the actual sink
+            // boundary, before that write, rather than only after the whole JSON body.
+            val tracked = object : ForwardingSink(sink) {
+                override fun write(source: Buffer, byteCount: Long) {
+                    if (byteCount > 0) tracker.markRequestBodySent()
+                    super.write(source, byteCount)
+                }
+            }.buffer()
+            delegate.writeTo(tracked)
+            tracked.emit()
             tracker.markRequestBodySent()
         }
     }

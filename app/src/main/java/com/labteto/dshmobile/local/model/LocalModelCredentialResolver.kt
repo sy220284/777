@@ -11,6 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 data class LocalResolvedCredential(
     val bearerToken: String,
     val authKind: LocalModelAuthKind,
-)
+) { override fun toString() = "LocalResolvedCredential(<redacted>, authKind=$authKind)" }
 
 data class LocalCredentialDiagnostic(
     val credentialRefTail: String? = null,
@@ -116,10 +117,15 @@ class LocalModelCredentialResolver @Inject constructor(
             selected.model == model &&
                 selected.baseUrl.trimEnd('/') == baseUrl.trimEnd('/'),
         ) { "当前模型来源与请求不一致，请重新选择模型" }
+        currentCoroutineContext()[LocalMediaCredentialBinding]?.let { return it.resolveFor(selected) }
         return when (selected.authKind) {
             LocalModelAuthKind.API_KEY -> {
                 val key = apiKeys.getFor(selected.id)
                     ?: error("当前模型 API Key 不可用")
+                require(selected.credentialBinding == null ||
+                    selected.credentialBinding == localMediaCredentialSignature(selected.id, key)) {
+                    "模型凭据与冻结账户身份不一致，请重新选择模型"
+                }
                 LocalResolvedCredential(key, LocalModelAuthKind.API_KEY)
             }
             LocalModelAuthKind.CHATGPT_PLAN -> {

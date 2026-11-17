@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.chat
 
+import com.labteto.dshmobile.local.runtime.owningLocalRun
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -98,7 +99,7 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
         }
         deferred.start()
         return try {
-            val result = deferred.await()
+            val result = owningLocalRun(deferred) { deferred.await() }
             LocalChatExecutionResult(
                 sessionId = result.sessionId,
                 output = result.output,
@@ -108,6 +109,7 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
                 waitingForUserReply = result.waitingForUserReply,
             )
         } catch (timeout: TimeoutCancellationException) {
+            if (!currentCoroutineContext().isActive) throw timeout
             LocalChatExecutionResult(
                 sessionId = sessionId,
                 output = "Chat 后台执行超时",
@@ -126,7 +128,7 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
                 status = LocalChatExecutionStatus.CANCELLED,
                 detail = detail,
             )
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
             val detail = error.message ?: error::class.java.simpleName
             LocalChatExecutionResult(
                 sessionId = sessionId,

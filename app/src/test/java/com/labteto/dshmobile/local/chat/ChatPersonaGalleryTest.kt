@@ -15,6 +15,39 @@ class ChatPersonaGalleryTest {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Test
+    fun historyCursorReachesColdArchiveInChronologicalOrder() = kotlinx.coroutines.runBlocking {
+        val gallery = ChatPersonaGalleryStore(File(temporary.newFolder("cursor-history"), "gallery.json"), json)
+        val messages = (1..90).map { LocalHarnessMessage("m$it", "assistant", "line $it", createdAt = it.toLong()) }
+        val saved = gallery.save(PersonaProfile(name = "阿青"), "session", messages, ChatCharacterState(), "")
+        var cursor: String? = null
+        var all = emptyList<com.labteto.dshmobile.uicontract.UiMessageSnapshot>()
+        do {
+            val receipt = gallery.history(saved.entry.id, requireNotNull(saved.storyId), cursor)
+                as com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt.Available
+            all = receipt.page.messages + all
+            cursor = receipt.page.olderCursor
+        } while (cursor != null)
+        assertEquals(messages.map { it.id }, all.map { it.id })
+    }
+
+    @Test
+    fun historyPagePreservesMediaAndSpeaker() = kotlinx.coroutines.runBlocking {
+        val gallery = ChatPersonaGalleryStore(File(temporary.newFolder("media-page"), "gallery.json"), json)
+        val message = LocalHarnessMessage("media", "assistant", "", createdAt = 1L,
+            speakerId = "person", speakerName = "阿青",
+            blocks = listOf(com.labteto.dshmobile.local.session.LocalMessageBlock.Image(
+                "images/a.png", "image/png", "a.png", 10)))
+        val saved = gallery.save(PersonaProfile(name = "阿青"), "session", listOf(message),
+            ChatCharacterState(), "")
+        val page = gallery.history(saved.entry.id, requireNotNull(saved.storyId), null)
+            as com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt.Available
+        val projected = page.page.messages.single()
+        assertEquals("person", projected.speakerId)
+        assertEquals("阿青", projected.speakerName)
+        assertTrue(projected.blocks.single() is com.labteto.dshmobile.uicontract.UiMessageContentBlock.Image)
+    }
+
+    @Test
     fun archivesFullHistoryButOnlyRecentDialogueEntersNewChat() {
         val story = PersonaGalleryStory(
             id = "story-1",

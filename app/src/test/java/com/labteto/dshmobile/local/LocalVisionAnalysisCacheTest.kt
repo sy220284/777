@@ -9,6 +9,36 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LocalVisionAnalysisCacheTest {
+    @Test fun oldTruncatedPromptEntryCannotBeReusedByTheNewExactPromptCache() {
+        val root = kotlin.io.path.createTempDirectory("vision-cache-version-").toFile()
+        try {
+            fun hash(bytes: ByteArray) = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
+            val image = File(root, "image.png").apply { writeBytes(validPngBytes()) }
+            val dir = File(root, "cache").apply { mkdirs() }
+            val route = LocalVisionRoute("https://vision.example/v1", "vision-a")
+            val prefix = "x".repeat(4000)
+            val oldKey = listOf("vision-cache-v1", hash(image.readBytes()), route.baseUrl, route.model, "", prefix)
+                .joinToString("\u0000")
+            File(dir, hash(oldKey.toByteArray()) + ".txt").writeText("旧版本为另一个后缀问题生成的结果")
+            assertNull(LocalVisionAnalysisCache(dir).get(image, route, prefix))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun promptsWithSameLongPrefixDoNotShareAnAnalysis() {
+        val root = kotlin.io.path.createTempDirectory("vision-full-prompt-").toFile()
+        try {
+            val image = File(root, "image.png").apply { writeBytes(validPngBytes()) }
+            val cache = LocalVisionAnalysisCache(File(root, "cache"))
+            val route = LocalVisionRoute("https://vision.example/v1", "vision-a")
+            val prefix = "共同上下文".repeat(1000)
+            cache.put(image, route, prefix + "只分析按钮", "按钮结果")
+            assertEquals("按钮结果", cache.get(image, route, prefix + "只分析按钮"))
+            assertNull(cache.get(image, route, prefix + "只分析文字"))
+            assertNull(cache.get(image, route, " " + prefix + "只分析按钮"))
+        } finally { root.deleteRecursively() }
+    }
+
     @Test
     fun cacheKeyBindsImageRouteModelAndPrompt() {
         val root = kotlin.io.path.createTempDirectory("vision-analysis-cache-").toFile()

@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
+import com.labteto.dshmobile.local.model.boundProfile
 import com.labteto.dshmobile.local.model.LocalApiKeyStore
 import com.labteto.dshmobile.local.model.LocalDeepSeekSearchCredentialResolver
 import com.labteto.dshmobile.local.model.LocalModelAuthKind
@@ -83,7 +84,8 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
             val suppliedKey = apiKey.ifBlank { inheritedKey.orEmpty() }
             val draft = resolveLocalModelApiKeyDraft(suppliedKey, model.trim(), baseUrl, protocol,
                 existingProfiles, apiKeys::getFor, profileId, contextWindowTokensOverride)
-            val profile = draft.profile
+            val previousProfile = existingProfiles.firstOrNull { it.id == draft.profile.id }
+            val profile = draft.boundProfile(previousProfile, previousProfile?.let { apiKeys.getFor(it.id) })
             gateway.requireExecutionPolicy(profile)
             val all = existingProfiles.filterNot { it.id == profile.id } + profile
             val result = LocalModelConfigurationResult(true, profile.model, profile.baseUrl, all, profile.id)

@@ -27,6 +27,7 @@ class LocalChatUiFacade @Inject constructor(
     private val inspection: PersonaInspectionService,
 ) {
     internal fun galleryEntries(): List<PersonaGalleryEntry> = gallery.list()
+    internal suspend fun galleryHistory(id: String, storyId: String, cursor: String?) = gallery.history(id, storyId, cursor)
 
     internal fun saveGallery(
         persona: PersonaProfile,

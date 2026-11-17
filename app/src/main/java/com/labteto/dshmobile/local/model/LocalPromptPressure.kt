@@ -31,7 +31,8 @@ internal object LocalPromptPressureMeter {
         var chars = 0
         messages.forEachIndexed { index, message ->
             val encoded = message.toString()
-            val tokens = estimateModelTokens(encoded)
+            val tokens = com.labteto.dshmobile.local.usage.PromptTokenEstimateCache
+                .message(message, { false }, { false }).tokens
             chars += encoded.length
             when {
                 message["role"]?.jsonPrimitive?.contentOrNull == "system" -> system += tokens

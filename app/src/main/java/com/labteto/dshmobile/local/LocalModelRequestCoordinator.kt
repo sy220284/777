@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -167,6 +168,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
         val credentialDiagnostic = frozen.credentialDiagnostic
         val runtimeCapabilities = runSurface.capabilities
         val routeFingerprint = runSurface.routeFingerprint
+        val cacheAccountRoute = modelGateway.runtimeAccountRouteKey(frozenProfile, routeFingerprint)
         val cachePolicy = runSurface.promptCachePolicy
         // Foreground Chat and background state consolidation have distinct prompt series.
         // This changes diagnostics only; actual provider caching and message content stay untouched.
@@ -176,12 +178,12 @@ internal class LocalModelRequestCoordinator @Inject constructor(
             else -> "work"
         }
         val cacheComparisonResponseId = if (runtimeCapabilities.promptCacheDiagnostics) {
-            promptCacheBaselines.get(snapshot.sessionId, routeFingerprint, cacheDiagnosticSurface)
+            promptCacheBaselines.get(snapshot.sessionId, cacheAccountRoute, cacheDiagnosticSurface)
         } else {
             null
         }
         val promptCacheKey = if (cachePolicy.supportsStableCacheKey) {
-            stablePromptCacheKey(snapshot.sessionId, routeFingerprint)
+            stablePromptCacheKey(snapshot.sessionId, cacheAccountRoute)
         } else {
             null
         }
@@ -999,7 +1001,7 @@ internal class LocalModelRequestCoordinator @Inject constructor(
                                 }
                             })
                             if (runtimeCapabilities.promptCacheDiagnostics && reply.requestId.isNotBlank()) {
-                                promptCacheBaselines.put(snapshot.sessionId, routeFingerprint, cacheDiagnosticSurface, reply.requestId)
+                                promptCacheBaselines.put(snapshot.sessionId, cacheAccountRoute, cacheDiagnosticSurface, reply.requestId)
                                 reply.promptCacheDiagnostic?.let { diagnostic ->
                                     log.append("request/cache-diagnostic", buildJsonObject {
                                         put("request_uid", requestUid)
