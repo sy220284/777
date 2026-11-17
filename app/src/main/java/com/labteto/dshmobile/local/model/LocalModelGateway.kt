@@ -64,6 +64,10 @@ class LocalModelGateway @Inject constructor(
     internal suspend fun selectedCredentialAccountId(): String? = credentials.selectedAccountId()
     internal suspend fun restoreCredentialAccountSelection(id: String?) = credentials.restoreAccountSelection(id)
 
+    /** Only transient cache/health state uses this key; durable replay IDs retain their wire format. */
+    internal suspend fun runtimeAccountRouteKey(profile: LocalModelProfile, route: String): String =
+        profile.runtimeAccountRouteKey(route, credentials.mediaCredentialSignature(profile))
+
     suspend fun credentialDiagnostic(profile: LocalModelProfile): LocalCredentialDiagnostic =
         credentials.diagnostic(profile)
 

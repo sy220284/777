@@ -5,7 +5,7 @@ internal typealias LocalWorkAutomationStatus = LocalExecutionStatus
 
 /** WorkFeature-owned Automation entrypoint. Automation receives only a bounded execution result. */
 internal interface LocalWorkAutomationExecutionPort {
-    suspend fun prepareSession(text: String, preferredSessionId: String? = null): String
+    suspend fun prepareSession(text: String, preferredSessionId: String? = null, recoverInterrupted: Boolean = false): String
 
     suspend fun run(
         text: String,

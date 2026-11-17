@@ -545,6 +545,7 @@ fun LocalHarnessScreen(
         hasUnsavedCurrentPersona = viewModel::hasUnsavedCurrentPersona,
         currentGalleryHasUnsavedChanges = viewModel::currentGalleryHasUnsavedChanges,
         saveCurrentToGallery = viewModel::saveCurrentToGallery,
+        galleryHistory = viewModel::galleryHistory,
         editGalleryStoryDetails = viewModel::editGalleryStoryDetails,
         renameGalleryStory = viewModel::renameGalleryStory,
         inspectGalleryPersona = viewModel::inspectGalleryPersona,

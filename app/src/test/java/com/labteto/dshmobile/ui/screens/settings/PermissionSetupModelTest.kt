@@ -5,6 +5,16 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PermissionSetupModelTest {
+    @Test fun appNotificationGrantDoesNotOverrideABlockedTaskChannel() {
+        val blocked = DeviceCapabilitiesState(postingNotifications = true, taskAlertsEnabled = false)
+        org.junit.Assert.assertNotEquals(PermissionSetupStatus.READY,
+            permissionSetupStatus(PermissionSetupFeature.TASK_ALERTS, blocked))
+        assertEquals(PermissionSetupStatus.CHANNEL_BLOCKED,
+            permissionSetupStatus(PermissionSetupFeature.TASK_ALERTS, blocked.copy(taskAlertsEnabled = null)))
+        assertEquals(PermissionSetupStatus.READY,
+            permissionSetupStatus(PermissionSetupFeature.TASK_ALERTS, blocked.copy(taskAlertsEnabled = true)))
+    }
+
     @Test fun notificationRequestFallsBackToSettingsAfterFirstAttempt() {
         assertEquals(NotificationGrantAction.REQUEST_RUNTIME, notificationGrantAction(33, false))
         assertEquals(NotificationGrantAction.OPEN_APP_SETTINGS, notificationGrantAction(33, true))
@@ -35,7 +45,7 @@ class PermissionSetupModelTest {
         val state = DeviceCapabilitiesState(
             accessibility = true, accessibilityGranted = true,
             notifications = true, notificationAccessGranted = true,
-            postingNotifications = true,
+            postingNotifications = true, taskAlertsEnabled = true,
         )
         PermissionSetupFeature.entries.forEach { feature ->
             assertEquals(PermissionSetupStatus.READY, permissionSetupStatus(feature, state))

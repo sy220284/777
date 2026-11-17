@@ -121,7 +121,7 @@ class LocalConversationUiPortTest {
             return true
         }
         override fun regenerateReply(messageId: String) = false
-        override suspend fun prepareSession(text: String, preferredSessionId: String?): String = error("unused")
+        override suspend fun prepareSession(text: String, preferredSessionId: String?, recoverInterrupted: Boolean): String = error("unused")
         override suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult = error("unused")
         override fun cancel(sessionId: String) = false
         override suspend fun cancelAndJoin(sessionId: String) = false

@@ -11,6 +11,7 @@ class LocalWorkAutomationExecutionAdapterTest {
     @Test
     fun forwardsCompleteExecutionRequestAndTerminalResult() = runTest {
         var captured: LocalWorkExecutionRequest? = null
+        var recoveryPrepared = false
         val execution = object : LocalWorkExecutionPort {
             override fun send(
                 text: String,
@@ -31,7 +32,11 @@ class LocalWorkAutomationExecutionAdapterTest {
             override suspend fun prepareSession(
                 text: String,
                 preferredSessionId: String?,
-            ): String = preferredSessionId ?: "prepared"
+                recoverInterrupted: Boolean,
+            ): String {
+                recoveryPrepared = recoverInterrupted
+                return preferredSessionId ?: "prepared"
+            }
 
             override suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult {
                 captured = request
@@ -51,8 +56,9 @@ class LocalWorkAutomationExecutionAdapterTest {
 
         assertEquals(
             "prepared-id",
-            adapter.prepareSession("准备任务", "prepared-id"),
+            adapter.prepareSession("准备任务", "prepared-id", recoverInterrupted = true),
         )
+        assertTrue(recoveryPrepared)
         val result = adapter.run(
             text = "执行任务",
             preferredSessionId = "target-id",

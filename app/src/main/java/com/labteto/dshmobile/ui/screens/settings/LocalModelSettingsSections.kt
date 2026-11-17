@@ -106,16 +106,16 @@ internal fun LocalModelSettingsCard(
     val kimiK3ContextInvalid = stringResource(R.string.local_model_kimi_k3_context_invalid)
     val scope = rememberCoroutineScope()
     val apiProfiles = local.modelProfiles.apiModelSettingsProfiles()
-    var showEditor by remember { mutableStateOf(false) }
-    var model by remember { mutableStateOf(LocalModelPresets.entries.first().model) }
-    var baseUrl by remember { mutableStateOf(LocalModelPresets.entries.first().baseUrl) }
-    var protocol by remember { mutableStateOf(LocalModelProtocol.CHAT_COMPLETIONS) }
-    var custom by remember { mutableStateOf(false) }
-    var editingProfileId by remember { mutableStateOf<String?>(null) }
-    var editorGeneration by remember { mutableStateOf(0L) }
-    var apiKey by remember { mutableStateOf("") }
-    var credentialSourceProfileId by remember { mutableStateOf<String?>(null) }
-    var contextWindowTokens by remember { mutableStateOf("") }
+    var showEditor by viewModel.apiModelEditor.showEditor
+    var model by viewModel.apiModelEditor.model
+    var baseUrl by viewModel.apiModelEditor.baseUrl
+    var protocol by viewModel.apiModelEditor.protocol
+    var custom by viewModel.apiModelEditor.custom
+    var editingProfileId by viewModel.apiModelEditor.editingProfileId
+    var editorGeneration by viewModel.apiModelEditor.editorGeneration
+    var apiKey by viewModel.apiModelEditor.apiKey
+    var credentialSourceProfileId by viewModel.apiModelEditor.credentialSourceProfileId
+    var contextWindowTokens by viewModel.apiModelEditor.contextWindowTokens
     var testStatus by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var discoveredModels by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -361,7 +361,7 @@ internal fun LocalModelSettingsCard(
         SyResponsiveSheet(
             title = stringResource(if (editingProfileId == null) R.string.local_model_add else R.string.local_model_edit),
             subtitle = stringResource(R.string.local_model_preset_hint),
-            onDismiss = { showEditor = false; editorGeneration++ },
+            onDismiss = { viewModel.apiModelEditor.close() },
             dismissEnabled = !saving,
             scrollable = true,
             footer = {

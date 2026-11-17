@@ -213,6 +213,7 @@ class LocalHarnessViewModel @Inject constructor(
         personaGalleryController.setGalleryPortrait(id, uri)
     suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> =
         personaGalleryController.removeGalleryPortrait(id)
+    internal suspend fun galleryHistory(id: String, storyId: String, cursor: String?) = personaGalleryController.galleryHistory(id, storyId, cursor)
     suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, storyStage: String): Result<Unit> =
         personaGalleryController.editGalleryStoryDetails(id, storyId, notes, storyStage)
     suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> =

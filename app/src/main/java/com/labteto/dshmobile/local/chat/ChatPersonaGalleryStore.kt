@@ -95,7 +95,15 @@ class ChatPersonaGalleryStore internal constructor(
                     "assistant" -> UiMessageRole.ASSISTANT
                     "tool" -> UiMessageRole.TOOL
                     else -> UiMessageRole.SYSTEM
-                }, message.content, message.createdAt) }, page.totalCount, next))
+                }, message.content, message.createdAt, speakerId = message.speakerId, speakerName = message.speakerName,
+                blocks = message.blocks.map { block ->
+                    when (block) {
+                        is com.labteto.dshmobile.local.session.LocalMessageBlock.Text -> com.labteto.dshmobile.uicontract.UiMessageContentBlock.Text(block.text)
+                        is com.labteto.dshmobile.local.session.LocalMessageBlock.Image -> com.labteto.dshmobile.uicontract.UiMessageContentBlock.Image(block.relativePath, block.mediaType, block.name, block.bytes, block.attachmentId, block.width, block.height, com.labteto.dshmobile.uicontract.UiMessageMediaSource.valueOf(block.source.name))
+                        is com.labteto.dshmobile.local.session.LocalMessageBlock.File -> com.labteto.dshmobile.uicontract.UiMessageContentBlock.File(block.relativePath, block.mediaType, block.name, block.bytes, block.attachmentId, com.labteto.dshmobile.uicontract.UiMessageMediaSource.valueOf(block.source.name))
+                        is com.labteto.dshmobile.local.session.LocalMessageBlock.Unknown -> com.labteto.dshmobile.uicontract.UiMessageContentBlock.Unknown(block.kind, block.payload)
+                    }
+                }) }, page.totalCount, next))
     }
 
     override suspend fun submit(command: PersonaGalleryUiCommand): UiCommandReceipt = withContext(Dispatchers.IO) {

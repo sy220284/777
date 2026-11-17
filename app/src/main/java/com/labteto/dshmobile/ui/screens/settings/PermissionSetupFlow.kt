@@ -85,7 +85,9 @@ internal fun PermissionSetupFlow(
                 PermissionSetupFeature.SCREEN_CONTROL -> controller.openAccessibilitySettings()
                 PermissionSetupFeature.NOTIFICATION_READ -> controller.repairNotificationAccess()
                 PermissionSetupFeature.TASK_ALERTS -> {
-                    if (!forceAppSettings && notificationGrantAction(Build.VERSION.SDK_INT, feature in visited) ==
+                    if (state.postingNotifications == true && state.taskAlertsEnabled != true) {
+                        controller.openTaskNotificationSettings()
+                    } else if (!forceAppSettings && notificationGrantAction(Build.VERSION.SDK_INT, feature in visited) ==
                         NotificationGrantAction.REQUEST_RUNTIME) {
                         notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     } else controller.openAppNotificationSettings()
@@ -321,6 +323,7 @@ private fun PermissionSetupFeature.reasonRes(): Int = when (this) {
 }
 
 private fun PermissionSetupStatus.labelRes(feature: PermissionSetupFeature): Int = when {
+    this == PermissionSetupStatus.CHANNEL_BLOCKED -> R.string.permission_setup_task_channel_blocked
     feature == PermissionSetupFeature.TASK_ALERTS && this == PermissionSetupStatus.READY ->
         R.string.permission_setup_notification_allowed
     feature == PermissionSetupFeature.TASK_ALERTS && this == PermissionSetupStatus.VISITED_NOT_GRANTED ->

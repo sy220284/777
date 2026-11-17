@@ -10,6 +10,10 @@ import java.nio.file.StandardOpenOption
 
 /** A commit succeeds only after file contents and the containing directory entry are durable. */
 internal object DurableFileCommit {
+    fun syncFile(file: File) {
+        FileChannel.open(file.toPath(), StandardOpenOption.WRITE).use { it.force(true) }
+    }
+
     fun replace(target: File, bytes: ByteArray) {
         val root = requireNotNull(target.parentFile)
         check(root.isDirectory || root.mkdirs()) { "无法创建持久数据目录：${root.path}" }

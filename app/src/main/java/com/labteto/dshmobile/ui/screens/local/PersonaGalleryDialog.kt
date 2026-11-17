@@ -182,8 +182,10 @@ internal fun PersonaGalleryScreen(
     currentGalleryStoryId: String?,
     currentHasUnsavedChanges: Boolean,
     currentSessionId: String,
+    workspacePath: String = "",
     canSave: Boolean,
     onSaveCurrent: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
+    onHistory: suspend (String, String, String?) -> com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt,
     onEditStoryDetails: suspend (String, String, String, String) -> Result<Unit>,
     onRenameStory: suspend (String, String, String) -> Result<Unit>,
     onInspect: suspend (String, String?) -> Result<PersonaInspectionResult>,
@@ -231,10 +233,41 @@ internal fun PersonaGalleryScreen(
     var deletingStory by remember(selectedStoryId) { mutableStateOf(false) }
     var pendingEntryDeleteId by remember { mutableStateOf<String?>(null) }
     var pendingPresetDeleteId by remember { mutableStateOf<String?>(null) }
-    var visibleHistory by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(8, entryOpenVersion, selectedId, selectedStoryId)
     var showHistory by com.labteto.dshmobile.ui.components.rememberNavigationEntryState(false, entryOpenVersion, selectedId, selectedStoryId)
-    var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var historyMessages by remember(selectedId, selectedStoryId) { mutableStateOf(emptyList<com.labteto.dshmobile.uicontract.UiMessageSnapshot>()) }
+    var historyCursor by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
+    var historyLoaded by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    var historyLoading by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
+    suspend fun loadHistory(cursor: String?) {
+        val id = selectedId ?: return
+        val storyId = selectedStoryId ?: return
+        if (historyLoading) return
+        historyLoading = true
+        try {
+            val first = onHistory(id, storyId, cursor)
+            val result = if (first == com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt.Stale) onHistory(id, storyId, null) else first
+            when (result) {
+                is com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt.Available -> {
+                    historyMessages = if (cursor == null || first == com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt.Stale) result.page.messages else result.page.messages + historyMessages
+                    historyCursor = result.page.olderCursor
+                    historyLoaded = true
+                }
+                com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt.Stale -> {
+                    historyMessages = emptyList(); historyCursor = null; historyLoaded = false
+                }
+                else -> { historyLoaded = false; error = "加载故事历史失败，请关闭后重试" }
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: "加载故事历史失败，请重试"
+        } finally { historyLoading = false }
+    }
+    LaunchedEffect(showHistory, selectedId, selectedStoryId, historyLoaded) {
+        if (showHistory && !historyLoaded && !historyLoading) loadHistory(null)
+    }
+
+    var pendingHistoryDeleteKey by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var notice by remember(selectedId, selectedStoryId) { mutableStateOf<String?>(null) }
     var inspection by remember(selectedId, selectedStoryId) { mutableStateOf<PersonaInspectionResult?>(null) }
     var inspecting by remember(selectedId, selectedStoryId) { mutableStateOf(false) }
@@ -1002,8 +1035,10 @@ internal fun PersonaGalleryScreen(
                             onNotesChange = { notes = it },
                             showHistory = showHistory,
                             onToggleHistory = { showHistory = !showHistory },
-                            visibleHistory = visibleHistory,
-                            onMoreHistory = { visibleHistory += 12 },
+                            history = historyMessages,
+                            workspacePath = workspacePath,
+                            hasOlderHistory = historyCursor != null,
+                            onMoreHistory = { historyCursor?.let { cursor -> scope.launch { loadHistory(cursor) } } },
                             pendingHistoryDeleteKey = pendingHistoryDeleteKey,
                             onPendingHistoryDelete = { pendingHistoryDeleteKey = it },
                             busy = busy || inspecting,
@@ -1014,6 +1049,7 @@ internal fun PersonaGalleryScreen(
                                     onDeleteHistoryMessage(selected.id, story.id, messageKey)
                                         .onSuccess {
                                             pendingHistoryDeleteKey = null
+                                            historyLoaded = false
                                             notice = archiveDeletedText
                                         }
                                         .onFailure { error = deleteFailedText }

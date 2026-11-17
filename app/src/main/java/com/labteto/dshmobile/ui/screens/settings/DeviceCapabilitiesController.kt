@@ -23,6 +23,8 @@ data class DeviceCapabilitiesState(
     val notificationAccessGranted: Boolean = false,
     /** System permission for this app to POST notifications; independent from listener access. */
     val postingNotifications: Boolean? = null,
+    /** Actual local-jobs channel; null means not yet probed. */
+    val taskAlertsEnabled: Boolean? = null,
     val virtualDisplay: Boolean = true,
     val error: String? = null,
 )
@@ -50,6 +52,9 @@ internal class DeviceCapabilitiesController(
             notificationAccessGranted = appContext.getSystemService(NotificationManager::class.java)
                 .isNotificationListenerAccessGranted(listenerComponent),
             postingNotifications = NotificationManagerCompat.from(appContext).areNotificationsEnabled(),
+            taskAlertsEnabled = appContext.getSystemService(NotificationManager::class.java)
+                .getNotificationChannel(com.labteto.dshmobile.notify.DshNotifications.CHANNEL_LOCAL_JOBS)
+                ?.importance?.let { it != NotificationManager.IMPORTANCE_NONE } ?: false,
         )
     }
 
@@ -65,6 +70,13 @@ internal class DeviceCapabilitiesController(
         appContext.startActivity(
             Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+    }
+
+    fun openTaskNotificationSettings() {
+        appContext.startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, com.labteto.dshmobile.notify.DshNotifications.CHANNEL_LOCAL_JOBS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     fun openAppNotificationSettings() {

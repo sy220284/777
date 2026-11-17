@@ -8,6 +8,6 @@ internal suspend inline fun <T> runSuspendResult(block: suspend () -> T): Result
         Result.success(block())
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (error: Throwable) {
+    } catch (error: Exception) {
         Result.failure(error)
     }

@@ -54,12 +54,13 @@ data class WebhookRunResult(
 )
 
 @Singleton
-class WebhookResultStore @Inject constructor(
-    @ApplicationContext context: Context,
+class WebhookResultStore internal constructor(
+    private val preferences: android.content.SharedPreferences,
     private val json: Json,
 ) {
-    private val preferences =
-        context.getSharedPreferences("local_harness_webhook_results", Context.MODE_PRIVATE)
+    @Inject constructor(@ApplicationContext context: Context, json: Json) : this(
+        context.getSharedPreferences("local_harness_webhook_results", Context.MODE_PRIVATE), json,
+    )
 
     @Synchronized
     fun get(id: String): WebhookRunResult? =
@@ -156,6 +157,10 @@ class WebhookResultStore @Inject constructor(
                 AppLog.warn("WebhookResults", "failure=true operation=scan_webhook_result " +
                     "request_id=${key.take(80)} cause_type=${error.javaClass.simpleName}")
             }.getOrNull() ?: return@mapNotNull null
+            // Active requests still own this receipt; completed traffic must not erase
+            // their cancellation and cold-recovery identity.
+            if (parsed.status == WebhookRunStatus.QUEUED || parsed.status == WebhookRunStatus.RUNNING)
+                return@mapNotNull null
             Triple(key, parsed.updatedAt, parsed.status)
         }
         if (entries.size <= MAX_RESULTS) return

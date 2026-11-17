@@ -81,6 +81,7 @@ internal data class LocalChatFeatureUiActions(
     val hasUnsavedCurrentPersona: () -> Boolean,
     val currentGalleryHasUnsavedChanges: () -> Boolean,
     val saveCurrentToGallery: suspend (String, String?, String?, Boolean) -> Result<PersonaGalleryEntry>,
+    val galleryHistory: suspend (String, String, String?) -> com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt,
     val editGalleryStoryDetails: suspend (String, String, String, String) -> Result<Unit>,
     val renameGalleryStory: suspend (String, String, String) -> Result<Unit>,
     val inspectGalleryPersona: suspend (String, String?) -> Result<PersonaInspectionResult>,

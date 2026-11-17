@@ -128,7 +128,7 @@ internal class LocalAgentModelRequestRuntime(
             // Wait on the provider's previous 429 before occupying a scarce model-request slot.
             // The route fingerprint includes the frozen credential identity, so an exhausted
             // account does not stall other model providers or accounts.
-            sharedLocalProviderCooldown.invoke(surface.routeFingerprint) {
+            sharedLocalProviderCooldown.invoke(modelGateway.runtimeAccountRouteKey(surface.profile, surface.routeFingerprint)) {
                 val scheduler = resourceScheduler
                 if (scheduler != null) {
                     val run = currentCoroutineContext()[AgentRunExecutionContext]

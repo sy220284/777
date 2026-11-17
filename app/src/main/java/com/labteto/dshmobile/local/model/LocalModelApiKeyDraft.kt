@@ -4,6 +4,13 @@ import java.util.UUID
 
 internal data class LocalModelApiKeyDraft(val profile: LocalModelProfile, val key: String)
 
+/** Credential binding is committed with the existing model configuration transaction. */
+internal fun LocalModelApiKeyDraft.boundProfile(previous: LocalModelProfile?, previousKey: String?): LocalModelProfile =
+    profile.copy(credentialBinding =
+        if (previous?.id == profile.id && previousKey == key) previous.credentialBinding
+        else localMediaCredentialSignature(profile.id, key))
+
+
 private fun allocateApiKeyProfileId(
     profiles: List<LocalModelProfile>,
     factory: () -> String,

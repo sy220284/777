@@ -41,6 +41,58 @@ import org.junit.Test
 
 class LocalToolExecutionCoordinatorTest {
 
+    @Test fun structuredResultSurvivesSuccessfulAndFailedExecutionReceipts() = runBlocking {
+        val typed = buildJsonObject { put("path", "src/checked.kt") }
+        for (failed in listOf(false, true)) {
+            val registry = ToolRegistry()
+            registry.register(tool("inspect", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+                ToolResult("HTTP: 200\n\n结果供人阅读", isError = failed, structuredResult = typed)
+            })
+            val result = coordinator(registry).executeScoped(
+                LocalToolCall("typed", "inspect", buildJsonObject {}, "{}"),
+                "typed-session", true, false, approval = { _, _, _ -> true },
+            )
+            assertEquals(failed, result.isError)
+            assertEquals(typed, result.structuredResult)
+        }
+    }
+
+    @Test fun codeModeResolvesTypedResultThroughProductionExecutionBoundary() = runBlocking {
+        val registry = ToolRegistry()
+        var received: String? = null
+        registry.register(tool("inspect", ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER) {
+            ToolResult("HTTP: 200\n\n人工阅读内容", structuredResult = buildJsonObject {
+                put("approved", true)
+                put("file", buildJsonObject { put("path", "src/checked.kt") })
+            })
+        })
+        registry.register(HarnessTool("consume", functionToolSchema("consume", "consume",
+            parameterSchema = buildJsonObject { put("type", "object"); put("additionalProperties", true) }),
+            ToolAccess.READ_ONLY, ToolApprovalPolicy.NEVER, ToolExposure.CORE, ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, args, _ ->
+                received = args["path"]?.jsonPrimitive?.content
+                ToolResult("ok")
+            }))
+        CodeModePlugin(registry).install(HarnessContext(registry))
+        val plan = buildJsonObject { put("steps", buildJsonArray {
+            add(buildJsonObject { put("tool", "inspect"); put("args", buildJsonObject {}) })
+            add(buildJsonObject {
+                put("tool", "consume")
+                put("args", buildJsonObject { put("path", buildJsonObject {
+                    put("\$step_result", 1); put("path", "file.path")
+                }) })
+                put("when", buildJsonObject { put("step", 1); put("path", "approved"); put("equals", true) })
+            })
+        }) }
+        val result = coordinator(registry).executeScoped(
+            LocalToolCall("typed-plan", "code_mode_run", plan, plan.toString()),
+            "typed-session", true, false, approval = { _, _, _ -> true },
+        )
+        assertFalse(result.content, result.isError)
+        assertEquals("src/checked.kt", received)
+        assertEquals(result.content, result.structuredResult.toString())
+    }
+
     @Test fun failedGoalAcceptanceDoesNotPoisonSubsequentSettlement() = runBlocking {
         val registry = ToolRegistry()
         registry.register(tool("update_goal", ToolAccess.SESSION_WRITE,

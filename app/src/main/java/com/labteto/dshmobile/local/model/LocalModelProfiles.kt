@@ -14,18 +14,9 @@ internal fun LocalModelProfile.usesResponsesTransport(): Boolean =
     authKind == LocalModelAuthKind.CHATGPT_PLAN || protocol == LocalModelProtocol.RESPONSES
 
 /**
- * Stable physical-route identity for provider-side cache and route-health state.
- *
- * UI profile ids are deliberately excluded: two profiles pointing at the same physical route should
- * share health, while changing account/credential, protocol, provider, endpoint or model must create
- * a new identity. No credential secret is included.
- */
-/**
- * Stable physical-route identity for provider-side cache and route-health state.
- *
- * UI profile ids are deliberately excluded: two profiles pointing at the same physical route should
- * share health, while changing account/credential, protocol, provider, endpoint or model must create
- * a new identity. No credential secret is included.
+ * Durable protocol/replay identity. New API saves bind the exact credential without storing it;
+ * legacy profiles retain their old fingerprint until an explicit save. Transient health/cache
+ * state additionally partitions logical accounts through runtimeAccountRouteKey.
  */
 internal fun LocalModelProfile.routeFingerprint(): String {
     val effectiveProtocol = if (authKind == LocalModelAuthKind.CHATGPT_PLAN) {
@@ -40,7 +31,11 @@ internal fun LocalModelProfile.routeFingerprint(): String {
         authKind.name,
         effectiveProtocol.name,
         credentialRef.orEmpty().trim(),
-    ).joinToString("\u0000")
+    ).let { fields ->
+        // Missing binding retains the legacy fingerprint; an explicit re-key fences old replay.
+        if (authKind == LocalModelAuthKind.API_KEY && credentialBinding != null)
+            fields + credentialBinding else fields
+    }.joinToString("\u0000")
     return MessageDigest.getInstance("SHA-256").digest(route.toByteArray())
         .joinToString("") { "%02x".format(it) }
 }

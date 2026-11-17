@@ -225,7 +225,9 @@ internal fun StoryDetailSection(
     onNotesChange: (String) -> Unit,
     showHistory: Boolean,
     onToggleHistory: () -> Unit,
-    visibleHistory: Int,
+    history: List<com.labteto.dshmobile.uicontract.UiMessageSnapshot>,
+    workspacePath: String,
+    hasOlderHistory: Boolean,
     onMoreHistory: () -> Unit,
     pendingHistoryDeleteKey: String?,
     onPendingHistoryDelete: (String?) -> Unit,
@@ -316,17 +318,11 @@ internal fun StoryDetailSection(
                 style = DsType.caption11.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
-            val history = story.history.filter { it.role == "user" || it.role == "assistant" }
-            history.takeLast(visibleHistory).forEach { line ->
-                val lineKey = galleryMessageArchiveKey(line)
-                ArchivedDialogueRow(
-                    text = "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else entry.persona.name}：${line.content}",
-                    onLongClick = { onPendingHistoryDelete(lineKey) },
-                )
+            val dialogue = history.filter { it.role == com.labteto.dshmobile.uicontract.UiMessageRole.USER || it.role == com.labteto.dshmobile.uicontract.UiMessageRole.ASSISTANT }
+            dialogue.forEach { line ->
+                ArchivedDialogueRow(line, entry.persona.name, workspacePath) { onPendingHistoryDelete(line.id) }
             }
-            val pendingHistory = pendingHistoryDeleteKey?.let { key ->
-                history.firstOrNull { galleryMessageArchiveKey(it) == key }
-            }
+            val pendingHistory = pendingHistoryDeleteKey?.let { key -> dialogue.firstOrNull { it.id == key } }
             pendingHistory?.let { line ->
                 SyGlassCard {
                     Text(
@@ -335,7 +331,7 @@ internal fun StoryDetailSection(
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                     )
                     Text(
-                        "${if (line.role == "user") stringResource(R.string.persona_gallery_user) else entry.persona.name}：${line.content}",
+                        "${if (line.role == com.labteto.dshmobile.uicontract.UiMessageRole.USER) stringResource(R.string.persona_gallery_user) else (line.speakerName ?: entry.persona.name)}：${line.text}",
                         style = DsType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                         maxLines = 3,
@@ -356,7 +352,7 @@ internal fun StoryDetailSection(
                         )
                         SyButton(
                             text = stringResource(R.string.persona_gallery_confirm_delete),
-                            onClick = { onDeleteHistoryMessage(galleryMessageArchiveKey(line)) },
+                            onClick = { onDeleteHistoryMessage(line.id) },
                             variant = SyButtonVariant.Danger,
                             modifier = Modifier.weight(1f),
                             enabled = !busy,
@@ -364,7 +360,7 @@ internal fun StoryDetailSection(
                     }
                 }
             }
-            if (history.size > visibleHistory) {
+            if (hasOlderHistory) {
                 SyButton(
                     text = stringResource(R.string.persona_gallery_older_dialogue),
                     onClick = onMoreHistory,
@@ -478,17 +474,25 @@ internal fun GalleryStoryCard(
 }
 
 @Composable
-private fun ArchivedDialogueRow(text: String, onLongClick: () -> Unit) {
-    Text(
-        text,
-        style = DsType.std14.withReadingWeight(),
-        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(DsShapes.row)
-            .combinedClickable(onClick = onLongClick, onLongClick = onLongClick)
-            .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
-    )
+private fun ArchivedDialogueRow(message: com.labteto.dshmobile.uicontract.UiMessageSnapshot, personaName: String, workspacePath: String, onLongClick: () -> Unit) {
+    val blocks = message.blocks.map { block ->
+        when (block) {
+            is com.labteto.dshmobile.uicontract.UiMessageContentBlock.Text -> com.labteto.dshmobile.local.session.LocalMessageBlock.Text(block.text)
+            is com.labteto.dshmobile.uicontract.UiMessageContentBlock.Image -> com.labteto.dshmobile.local.session.LocalMessageBlock.Image(block.relativePath, block.mediaType, block.name, block.bytes, block.attachmentId, block.width, block.height, com.labteto.dshmobile.local.session.LocalMessageMediaSource.valueOf(block.source.name))
+            is com.labteto.dshmobile.uicontract.UiMessageContentBlock.File -> com.labteto.dshmobile.local.session.LocalMessageBlock.File(block.relativePath, block.mediaType, block.name, block.bytes, block.attachmentId, com.labteto.dshmobile.local.session.LocalMessageMediaSource.valueOf(block.source.name))
+            is com.labteto.dshmobile.uicontract.UiMessageContentBlock.Unknown -> com.labteto.dshmobile.local.session.LocalMessageBlock.Unknown(block.kind, block.payload)
+        }
+    }
+    val line = com.labteto.dshmobile.local.session.LocalHarnessMessage(message.id,
+        if (message.role == com.labteto.dshmobile.uicontract.UiMessageRole.USER) "user" else "assistant",
+        message.text, createdAt = message.createdAt, speakerId = message.speakerId,
+        speakerName = message.speakerName ?: personaName, blocks = blocks)
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
+        LocalMessageRow(message = line, chatMode = true, workspacePath = workspacePath, groupMode = false, canEdit = false,
+            canRegenerate = false, canSelectVariant = false, branchInfo = null,
+            onEdit = {}, onSelectVariant = { _, _ -> false }, onRegenerate = { false },
+            onMessageLongClick = onLongClick)
+    }
 }
 
 @Composable

@@ -61,6 +61,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope, localHarness::memoryContext, appServer.memory::memoryPage, appServer.memory::submit,
     )
     internal val personalizationRulesEditor = PersonalizationRulesEditor()
+    internal val apiModelEditor = ApiModelEditorState()
+    internal val diagnosticDraft = androidx.compose.runtime.mutableStateOf<String?>(null)
+    internal val storageOperations = SettingsStorageOperations(viewModelScope)
     private var desiredUserRules: String? = null
     private var desiredAutoRecall: Boolean? = null
     private var desiredAutoMemory: Boolean? = null
@@ -466,5 +469,11 @@ class SettingsViewModel @Inject constructor(
     fun repairNotificationAccess() = deviceCapabilitiesController.repairNotificationAccess()
 
     fun openAppNotificationSettings() = deviceCapabilitiesController.openAppNotificationSettings()
+
+    override fun onCleared() {
+        apiModelEditor.close()
+        diagnosticDraft.value = null
+        super.onCleared()
+    }
 
 }

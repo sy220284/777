@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.automation
 
+import com.labteto.dshmobile.local.runtime.owningLocalRun
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -25,7 +26,7 @@ class AutomationRunTest {
                 withContext(NonCancellable) { delay(100); cleaned.complete(Unit) }
             }
         }
-        val caller = launch { owningAutomationRun(engineJob) { engineJob.join() } }
+        val caller = launch { owningLocalRun(engineJob) { engineJob.join() } }
         runCurrent()
         caller.cancelAndJoin()
         assertTrue(engineJob.isCompleted)

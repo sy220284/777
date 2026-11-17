@@ -204,6 +204,7 @@ internal class SqliteSessionMediaArchive(
                 try {
                     file.copyTo(tmp, overwrite = false)
                     check(sameBytes(file, tmp)) { "媒体恢复临时文件校验失败" }
+                    com.labteto.dshmobile.local.persistence.DurableFileCommit.syncFile(tmp)
                     try {
                         Files.move(tmp.toPath(), dest.toPath())
                     } catch (ex: java.nio.file.FileAlreadyExistsException) {
@@ -211,7 +212,12 @@ internal class SqliteSessionMediaArchive(
                     }
                 } finally { tmp.delete() }
             }
+            // Also sync a byte-identical file left by an interrupted prior install.
+            com.labteto.dshmobile.local.persistence.DurableFileCommit.syncFile(dest)
         }
+        com.labteto.dshmobile.local.persistence.DurableFileCommit.syncDirectory(target)
+        com.labteto.dshmobile.local.persistence.DurableFileCommit.syncDirectory(requireNotNull(target.parentFile))
+        com.labteto.dshmobile.local.persistence.DurableFileCommit.syncDirectory(workspace)
     }
 
     companion object {

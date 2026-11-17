@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.work
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
+import com.labteto.dshmobile.local.runtime.owningLocalRun
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
@@ -79,7 +80,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
     private val startPreparedTurn: (LocalPreparedSend, com.labteto.dshmobile.local.runtime.LocalSessionRuntimeLease) -> Job,
     private val startRegeneration: (String) -> Job,
     private val prepareEditedTurn: (String, String) -> LocalWorkMessageEditPreparation,
-    private val prepareDetachedSession: suspend (String, String?) -> String = { _, _ ->
+    private val prepareDetachedSession: suspend (String, String?, Boolean) -> String = { _, _, _ ->
         error("Work 后台执行入口尚未装配")
     },
     private val runDetached: suspend (String, String?, Long, Boolean) -> LocalWorkAutomationResult =
@@ -113,7 +114,8 @@ internal class LocalWorkExecutionCoordinator internal constructor(
     override suspend fun prepareSession(
         text: String,
         preferredSessionId: String?,
-    ): String = prepareDetachedSession(text, preferredSessionId)
+        recoverInterrupted: Boolean,
+    ): String = prepareDetachedSession(text, preferredSessionId, recoverInterrupted)
 
     override suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult {
         val prompt = request.text.trim()
@@ -126,8 +128,9 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             )
         }
         val sessionId = try {
-            prepareDetachedSession(prompt, request.targetSessionId)
+            prepareDetachedSession(prompt, request.targetSessionId, request.recoverInterrupted)
         } catch (timeout: TimeoutCancellationException) {
+            if (!currentCoroutineContext().isActive) throw timeout
             return LocalWorkExecutionResult(
                 sessionId = request.targetSessionId,
                 output = "Work 执行会话准备超时",
@@ -136,7 +139,13 @@ internal class LocalWorkExecutionCoordinator internal constructor(
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (error: Throwable) {
+        } catch (blocked: com.labteto.dshmobile.local.runtime.LocalHarnessBlockedException) {
+            val detail = blocked.message ?: "原工作会话需要核实后才能恢复"
+            return LocalWorkExecutionResult(
+                sessionId = blocked.sessionId ?: request.targetSessionId,
+                output = detail, status = LocalWorkExecutionStatus.BLOCKED, detail = detail,
+            )
+        } catch (error: Exception) {
             val detail = error.message ?: error::class.java.simpleName
             return LocalWorkExecutionResult(
                 sessionId = request.targetSessionId,
@@ -169,7 +178,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
         }
         deferred.start()
         return try {
-            val result = deferred.await()
+            val result = owningLocalRun(deferred) { deferred.await() }
             LocalWorkExecutionResult(
                 sessionId = result.sessionId,
                 output = result.output,
@@ -177,6 +186,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                 detail = result.detail,
             )
         } catch (timeout: TimeoutCancellationException) {
+            if (!currentCoroutineContext().isActive) throw timeout
             LocalWorkExecutionResult(
                 sessionId = sessionId,
                 output = "Work 后台执行超时",
@@ -195,7 +205,7 @@ internal class LocalWorkExecutionCoordinator internal constructor(
                 status = LocalWorkExecutionStatus.CANCELLED,
                 detail = detail,
             )
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
             val detail = error.message ?: error::class.java.simpleName
             LocalWorkExecutionResult(
                 sessionId = sessionId,

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="permission_setup_task_channel_blocked">应用通知已授权，但任务通知通道未启用，请在系统设置中开启。</string>
+</resources>

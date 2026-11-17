@@ -22,6 +22,8 @@ data class LocalModelProfile(
     val credentialRef: String? = null,
     val displayName: String? = null,
     val contextWindowTokensOverride: Int? = null,
+    /** Non-secret credential identity written atomically by the Model configuration owner. */
+    val credentialBinding: String? = null,
 )
 
 enum class LocalModelCapability {

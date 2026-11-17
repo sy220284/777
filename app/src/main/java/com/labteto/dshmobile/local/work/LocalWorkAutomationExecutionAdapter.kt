@@ -11,7 +11,8 @@ internal class LocalWorkAutomationExecutionAdapter @Inject constructor(
     override suspend fun prepareSession(
         text: String,
         preferredSessionId: String?,
-    ): String = execution.prepareSession(text, preferredSessionId)
+        recoverInterrupted: Boolean,
+    ): String = execution.prepareSession(text, preferredSessionId, recoverInterrupted)
 
     override suspend fun run(
         text: String,

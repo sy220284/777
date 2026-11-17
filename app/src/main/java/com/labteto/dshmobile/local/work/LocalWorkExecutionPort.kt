@@ -51,6 +51,7 @@ internal interface LocalWorkExecutionPort {
     suspend fun prepareSession(
         text: String,
         preferredSessionId: String? = null,
+        recoverInterrupted: Boolean = false,
     ): String
 
     suspend fun execute(request: LocalWorkExecutionRequest): LocalWorkExecutionResult

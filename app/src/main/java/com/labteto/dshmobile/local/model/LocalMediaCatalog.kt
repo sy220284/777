@@ -2,6 +2,12 @@ package com.labteto.dshmobile.local.model
 
 import java.net.URI
 
+/** Legacy media-only compatibility; never a global relaxation of run/replay identity. */
+internal fun mediaRouteIdentityMatches(recordedRoute: String, recordedCredential: String?, profile: LocalModelProfile): Boolean =
+    recordedRoute == profile.routeFingerprint() ||
+        (recordedCredential != null && recordedCredential == profile.credentialBinding &&
+            recordedRoute == profile.copy(credentialBinding = null).routeFingerprint())
+
 /** Generation is a provider API product, NOT an input modality of the selected chat model. */
 /** Revision reopens the existing creator. Opening a draft never submits a paid request. */
 data class LocalMediaRevisionDraft(
@@ -26,7 +32,7 @@ data class LocalMediaRevisionDraft(
     fun originalOffer(offers: List<LocalMediaOffer>): LocalMediaOffer? =
         offers.firstOrNull {
             it.kind == kind && it.id == offerId && routeFingerprint != null &&
-                it.profile.routeFingerprint() == routeFingerprint
+                mediaRouteIdentityMatches(routeFingerprint, credentialSignature, it.profile)
         }
 
     companion object {

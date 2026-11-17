@@ -1,0 +1,15 @@
+package com.labteto.dshmobile.local.runtime
+
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withContext
+
+/** A background caller owns its run even when the scheduler launches it in another scope. */
+internal suspend fun <T> owningLocalRun(job: Job, awaitResult: suspend () -> T): T = try {
+    awaitResult()
+} catch (cancelled: CancellationException) {
+    withContext(NonCancellable) { job.cancelAndJoin() }
+    throw cancelled
+}

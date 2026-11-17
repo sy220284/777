@@ -282,6 +282,7 @@ internal class LocalToolExecutionCoordinator(
                         processExitCode = childResult.processExitCode,
                         fileVersions = childResult.fileVersions,
                         richContent = childResult.richContent,
+                        structuredResult = childResult.structuredResult,
                     ) to (childResult.executionId != null)
                 }
             } else null
@@ -454,6 +455,7 @@ internal class LocalToolExecutionCoordinator(
                 processExitCode = result.processExitCode,
                 fileVersions = result.fileVersions,
                 richContent = result.richContent,
+                structuredResult = result.structuredResult,
                 executionId = executionIdentity.executionId.takeIf { executionStarted },
                 sideEffect = if (executionStarted && !readLike) AgentToolSideEffect.POSSIBLE else AgentToolSideEffect.NONE,
             )
@@ -501,6 +503,7 @@ internal class LocalToolExecutionCoordinator(
             processExitCode = result.processExitCode,
             fileVersions = result.fileVersions,
             richContent = result.richContent,
+                structuredResult = result.structuredResult,
             executionId = executionIdentity.executionId.takeIf { executionStarted },
         )
     }
