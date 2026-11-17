@@ -5,20 +5,10 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenUsageAction
 import com.labteto.dshmobile.local.TokenUsageContext
 import com.labteto.dshmobile.local.model.DeepSeekUsageTracker
-import com.labteto.dshmobile.local.model.LocalModelAuthKind
 import com.labteto.dshmobile.local.model.LocalModelGateway
 import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.local.model.LocalModelProfile
-import com.labteto.dshmobile.local.model.LocalModelProtocol
-import com.labteto.dshmobile.local.model.LocalModelRouteIdentity
-import com.labteto.dshmobile.local.model.normalizeModelBaseUrl
-import com.labteto.dshmobile.local.model.parseDeepSeekOpenAiUsage
-import com.labteto.dshmobile.local.model.withCancellableModelResponse
 import com.labteto.dshmobile.local.record
-import java.io.ByteArrayOutputStream
-import java.net.SocketTimeoutException
-import java.util.UUID
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -34,11 +24,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 
 /**
  * OpenAI-compatible multimodal transport for explicit image-analysis tools.
@@ -48,27 +33,15 @@ import okhttp3.Response
  */
 @Singleton
 class VisionClient @Inject constructor(
-    private val http: OkHttpClient,
     private val json: Json,
     private val usageTracker: javax.inject.Provider<DeepSeekUsageTracker>,
     private val modelGateway: javax.inject.Provider<LocalModelGateway>,
 ) : LocalVisionAnalyzer {
-    internal constructor(
-        http: OkHttpClient,
-        json: Json,
-    ) : this(
-        http,
+    internal constructor(json: Json) : this(
         json,
         javax.inject.Provider { error("测试构造器没有用量追踪器") },
         javax.inject.Provider { error("测试构造器没有模型网关") },
     )
-    private val client = http.newBuilder()
-        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        // Total duration is not a safe proxy for a stalled vision inference.
-        .callTimeout(0, TimeUnit.SECONDS)
-        .build()
 
     override suspend fun analyze(
         apiKey: String,
@@ -105,104 +78,46 @@ class VisionClient @Inject constructor(
             "图片超过当前模型的上传大小限制，请压缩后重试"
         }
 
-        val gateway = runCatching { modelGateway.get() }.getOrNull()
-        if (gateway != null && profile == null) {
-            error("视觉模型请求缺少冻结模型档案，拒绝回退到可变 active profile")
-        }
-        val selectedProfile = profile
-        if (gateway != null && selectedProfile != null) {
-            val messages = buildPayload(model, prompt, imageDataUrl)["messages"]
-                ?.jsonArray
-                ?.map { it.jsonObject }
-                ?: error("图片分析请求构造失败")
-            val reply = gateway.complete(
+        // Production has one inference path. A dependency failure must surface, never
+        // select a second HTTP transport with different protocol, auth and replay rules.
+        val gateway = modelGateway.get()
+        val selectedProfile = requireNotNull(profile) { "视觉模型请求缺少冻结模型档案" }
+        val messages = buildPayload(model, prompt, imageDataUrl)["messages"]
+            ?.jsonArray
+            ?.map { it.jsonObject }
+            ?: error("图片分析请求构造失败")
+        // Bind the key already used for cache admission to the actual inference request.
+        val binding = if (selectedProfile.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.API_KEY)
+            com.labteto.dshmobile.local.model.LocalMediaCredentialBinding(selectedProfile,
+                com.labteto.dshmobile.local.model.LocalResolvedCredential(apiKey, selectedProfile.authKind))
+        else kotlin.coroutines.EmptyCoroutineContext
+        val reply = withContext(binding) {
+            gateway.complete(
                 model = model,
                 baseUrl = baseUrl,
                 messages = messages,
                 tools = JsonArray(emptyList()),
                 profile = selectedProfile,
             )
-            usageTracker.get().record(
-                model = model,
-                usage = reply.usage,
-                requestId = reply.requestId,
-                context = usageContext?.copy(
-                    action = TokenUsageAction.VISION,
-                    taskLabel = usageContext.taskLabel ?: prompt.take(120),
-                ) ?: TokenUsageContext(
-                    mode = LocalUsageMode.WORK,
-                    action = TokenUsageAction.VISION,
-                    taskLabel = prompt.take(120),
-                ),
-                promptBreakdown = reply.promptBreakdown,
-                route = reply.routeIdentity,
-            )
-            com.labteto.dshmobile.local.model.requireCompletedModelReply(reply)
-            return@withContext reply.content?.trim()?.takeIf(String::isNotBlank)
-                ?: error("当前模型返回了空文本")
         }
-
-        val payload = buildPayload(model, prompt, imageDataUrl)
-        val request = Request.Builder()
-            .url(endpoint(baseUrl))
-            .header("Authorization", "Bearer $apiKey")
-            .header("Content-Type", "application/json")
-            .post(payload.toString().toRequestBody(JSON_MEDIA))
-            .build()
-        try {
-            withCancellableModelResponse(client.newCall(request)) { response ->
-                val body = response.readBounded()
-                if (!response.isSuccessful) {
-                    val detail = runCatching {
-                        json.parseToJsonElement(body).jsonObject["error"]?.jsonObject
-                            ?.get("message")?.jsonPrimitive?.content
-                    }.getOrNull()
-                    throw LocalModelException(
-                        code = "VISION_HTTP_${response.code}",
-                        message = "当前模型图片请求失败（HTTP ${response.code}）：${detail ?: body.take(500)}",
-                        retryable = response.code == 408 || response.code == 429 || response.code >= 500,
-                    )
-                }
-                val root = json.parseToJsonElement(body).jsonObject
-                usageTracker.get().record(
-                    model = model,
-                    usage = parseDeepSeekOpenAiUsage(root),
-                    requestId = UUID.randomUUID().toString(),
-                    context = usageContext?.copy(
-                        action = TokenUsageAction.VISION,
-                        taskLabel = usageContext.taskLabel ?: prompt.take(120),
-                    ) ?: TokenUsageContext(
-                        mode = LocalUsageMode.WORK,
-                        action = TokenUsageAction.VISION,
-                        taskLabel = prompt.take(120),
-                    ),
-                    route = LocalModelRouteIdentity(
-                        provider = LocalModelPresets.find(model, baseUrl)?.provider.orEmpty(),
-                        model = model,
-                        baseUrl = normalizeModelBaseUrl(baseUrl),
-                        authKind = LocalModelAuthKind.API_KEY.name,
-                        protocol = LocalModelProtocol.CHAT_COMPLETIONS.name,
-                    ),
-                )
-                parseRoot(root)
-            }
-        } catch (error: LocalModelException) {
-            throw error
-        } catch (error: SocketTimeoutException) {
-            throw LocalModelException(
-                code = "VISION_TIMEOUT",
-                message = "当前模型图片推理超时：${error.message ?: "请求未在时限内完成"}",
-                retryable = true,
-                cause = error,
-            )
-        } catch (error: java.io.IOException) {
-            throw LocalModelException(
-                code = "VISION_NETWORK",
-                message = "当前模型图片请求网络失败：${error.message ?: "网络异常"}",
-                retryable = true,
-                cause = error,
-            )
-        }
+        usageTracker.get().record(
+            model = model,
+            usage = reply.usage,
+            requestId = reply.requestId,
+            context = usageContext?.copy(
+                action = TokenUsageAction.VISION,
+                taskLabel = usageContext.taskLabel ?: prompt.take(120),
+            ) ?: TokenUsageContext(
+                mode = LocalUsageMode.WORK,
+                action = TokenUsageAction.VISION,
+                taskLabel = prompt.take(120),
+            ),
+            promptBreakdown = reply.promptBreakdown,
+            route = reply.routeIdentity,
+        )
+        com.labteto.dshmobile.local.model.requireCompletedModelReply(reply)
+        return@withContext reply.content?.trim()?.takeIf(String::isNotBlank)
+            ?: error("当前模型返回了空文本")
     }
 
     internal fun buildPayload(
@@ -275,54 +190,13 @@ class VisionClient @Inject constructor(
         }.trim().ifBlank { error("当前模型返回了空文本") }
     }
 
-    private fun endpoint(baseUrl: String): String {
-        val clean = normalizeModelBaseUrl(baseUrl).trimEnd('/')
-        return if (clean.endsWith("/chat/completions")) clean else "$clean/chat/completions"
-    }
-
     private fun validateImageDataUrl(value: String) {
         require(value.startsWith("data:image/")) { "图片输入必须是图片 data URL" }
         require(";base64," in value.take(128)) { "图片输入必须使用 base64 data URL" }
         require(value.length <= MAX_IMAGE_DATA_URL_CHARS) { "图片输入超过大小上限" }
     }
 
-    private fun Response.readBounded(maxBytes: Int = MAX_RESPONSE_BYTES): String {
-        val responseBody = body ?: return ""
-        val declared = responseBody.contentLength()
-        if (declared > maxBytes) {
-            throw LocalModelException(
-                code = "VISION_RESPONSE_TOO_LARGE",
-                message = "当前模型响应超过 ${maxBytes} 字节上限",
-                retryable = false,
-            )
-        }
-        val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
-        responseBody.byteStream().use { input ->
-            val buffer = ByteArray(16 * 1024)
-            var total = 0
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                total += read
-                if (total > maxBytes) {
-                    throw LocalModelException(
-                        code = "VISION_RESPONSE_TOO_LARGE",
-                        message = "当前模型响应超过 ${maxBytes} 字节上限",
-                        retryable = false,
-                    )
-                }
-                output.write(buffer, 0, read)
-            }
-        }
-        return output.toString(Charsets.UTF_8.name())
-    }
-
     private companion object {
-        val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
-        const val CONNECT_TIMEOUT_SECONDS = 15L
-        const val READ_TIMEOUT_SECONDS = 180L
-        const val WRITE_TIMEOUT_SECONDS = 90L
-        const val MAX_RESPONSE_BYTES = 4 * 1024 * 1024
         const val MAX_IMAGE_DATA_URL_CHARS = 24 * 1024 * 1024
     }
 }

@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local.vision
 
 import java.io.File
+import com.labteto.dshmobile.local.model.routeFingerprint
+import com.labteto.dshmobile.local.model.localMediaCredentialSignature
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.UUID
@@ -8,7 +10,7 @@ import java.util.UUID
 /**
  * App-private cache for completed workspace-image vision analyses.
  *
- * Keys bind image content, vision endpoint, model and the exact task prompt. The cache
+ * Keys bind the exact image request, credential, model route and task prompt. The cache
  * never invents a generic summary and never skips explicit tool approval; it only avoids paying
  * for the same already-approved analysis twice.
  */
@@ -26,8 +28,8 @@ internal class LocalVisionAnalysisCache(
         root.mkdirs()
     }
 
-    fun get(file: File, route: LocalVisionRoute, prompt: String): String? {
-        val entry = entryFor(file, route, prompt)
+    fun get(imageDataUrl: String, route: LocalVisionRoute, prompt: String, credentialKey: String): String? {
+        val entry = entryFor(imageDataUrl, route, prompt, credentialKey)
         if (!entry.isFile) return null
         if (clock() - entry.lastModified() > ttlMillis || entry.length() > MAX_ENTRY_BYTES) {
             entry.delete()
@@ -43,11 +45,11 @@ internal class LocalVisionAnalysisCache(
         return value
     }
 
-    fun put(file: File, route: LocalVisionRoute, prompt: String, result: String) {
+    fun put(imageDataUrl: String, route: LocalVisionRoute, prompt: String, result: String, credentialKey: String) {
         val bytes = result.toByteArray(Charsets.UTF_8)
         if (bytes.isEmpty() || bytes.size > MAX_ENTRY_BYTES) return
         root.mkdirs()
-        val entry = entryFor(file, route, prompt)
+        val entry = entryFor(imageDataUrl, route, prompt, credentialKey)
         val temporary = File(root, ".${entry.name}.${UUID.randomUUID()}.tmp")
         try {
             FileOutputStream(temporary).use { output ->
@@ -65,27 +67,29 @@ internal class LocalVisionAnalysisCache(
         }
     }
 
-    private fun entryFor(file: File, route: LocalVisionRoute, prompt: String): File {
+    private fun entryFor(imageDataUrl: String, route: LocalVisionRoute, prompt: String, credentialKey: String): File {
         val keyMaterial = buildString {
             append(CACHE_VERSION).append('\u0000')
-            append(contentIdentity(file)).append('\u0000')
+            append(contentIdentity(imageDataUrl)).append('\u0000')
             append(route.baseUrl.trim().trimEnd('/')).append('\u0000')
             append(route.model.trim()).append('\u0000')
             append(route.profile?.id.orEmpty()).append('\u0000')
+            append(route.profile?.routeFingerprint().orEmpty()).append('\u0000')
+            append(localMediaCredentialSignature(route.profile?.id.orEmpty(), credentialKey)).append('\u0000')
             append(prompt)
         }
         return File(root, sha256(keyMaterial.toByteArray(Charsets.UTF_8)) + ".txt")
     }
 
-    private fun contentIdentity(file: File): String {
+    private fun contentIdentity(imageDataUrl: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(32 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
+        // Hash the immutable bytes actually submitted to inference. Reopening the workspace
+        // path after inference could bind an old answer to a newly replaced image.
+        var offset = 0
+        while (offset < imageDataUrl.length) {
+            val end = minOf(offset + 32 * 1024, imageDataUrl.length)
+            digest.update(imageDataUrl.substring(offset, end).toByteArray(Charsets.UTF_8))
+            offset = end
         }
         return digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
     }
@@ -116,7 +120,7 @@ internal class LocalVisionAnalysisCache(
             .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
     private companion object {
-        const val CACHE_VERSION = "vision-cache-v2-full-prompt"
+        const val CACHE_VERSION = "vision-cache-v3-account-route"
         const val DEFAULT_TTL_MILLIS = 7L * 24L * 60L * 60L * 1000L
         const val DEFAULT_MAX_BYTES = 8L * 1024L * 1024L
         const val DEFAULT_MAX_ENTRIES = 256

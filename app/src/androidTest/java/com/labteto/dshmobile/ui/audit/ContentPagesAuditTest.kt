@@ -75,6 +75,7 @@ class ContentPagesAuditTest(
                                 currentGalleryId = entry.id, currentGalleryStoryId = null,
                                 currentHasUnsavedChanges = false, currentSessionId = "ui-audit", canSave = false,
                                 onSaveCurrent = { _, _, _, _ -> error("视觉样例") },
+                                onReload = { Result.success(Unit) },
                                 onHistory = { _, _, _ -> com.labteto.dshmobile.uicontract.UiPersonaGalleryHistoryReceipt.Missing },
                                 onEditStoryDetails = { _, _, _, _ -> error("视觉样例") },
                                 onRenameStory = { _, _, _ -> error("视觉样例") },

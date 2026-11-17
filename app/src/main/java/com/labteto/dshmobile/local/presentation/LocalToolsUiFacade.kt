@@ -102,7 +102,7 @@ class LocalToolsUiFacade @Inject internal constructor(
                 com.labteto.dshmobile.uicontract.UiToolConnection.FAILED
         }
         com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(it.id, it.transport, it.target, it.tools,
-            registration = registration, connection = connection,
+            registration = registration, connection = connection, unavailableTools = it.unavailableTools,
             selection = com.labteto.dshmobile.uicontract.uiMcpToolSelection(it.id, selectedIds))
         }
     }

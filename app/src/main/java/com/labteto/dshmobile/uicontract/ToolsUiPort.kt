@@ -16,6 +16,7 @@ data class UiMcpServerSnapshot(
     val selection: UiToolSelection = UiToolSelection.UNKNOWN,
     val connection: UiToolConnection = UiToolConnection.HEALTH_UNCHECKED,
     val authorization: UiToolAuthorization = UiToolAuthorization.REQUIRED_PER_CALL,
+    val unavailableTools: Map<String, String> = emptyMap(),
 )
 /** The UI can identify a declared service by ID and public target, but health and
  * individual tool authorization still belong to the Tool owner. */

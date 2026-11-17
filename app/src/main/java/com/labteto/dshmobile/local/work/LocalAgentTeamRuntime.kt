@@ -1081,44 +1081,15 @@ internal class LocalAgentTeamRuntime(
         return rows.joinToString("\n") + state.failure?.let { "\nfailure=$it" }.orEmpty()
     }
 
-    /**
-     * Team workspace write admission reads current EventLog projection at tool time.
-     * Work Task scopes are genuine execution permissions, not only UI warnings.
-     * Lead or user must explicitly assign the task and write_scopes. This does not
-     * bypass the sandbox or ToolApproval checks in the real executor.
-     */
-    internal suspend fun requireMemberWorkspaceMutation(
-        sessionId: String,
-        jobId: String,
-        call: LocalToolCall,
-        workspaceRoot: java.io.File,
-        registeredTool: com.labteto.dshmobile.harness.tools.HarnessTool? = null,
-    ) {
+    /** Task claims coordinate concurrent members; tool permissions belong to the shared executor. */
+    internal fun requireMemberTaskOwnership(sessionId: String, jobId: String) {
+        requireCurrentRootAuthorization(sessionId, jobId)
         val snapshot = project(sessionId)
-        require(snapshot.failure == null) { "TEAM_PROJECTION_INVALID" }
-        val member = snapshot.members.singleOrNull { it.jobId == jobId }
-            ?: error("TEAM_WORKSPACE_MEMBER_NOT_FOUND")
-        require(member.phase == LocalTeamMemberPhase.ACTIVE) { "TEAM_WORKSPACE_MEMBER_NOT_ACTIVE" }
         val tasks = snapshot.tasks.filter {
-            it.ownerId == member.id && it.status == LocalTeamTaskStatus.IN_PROGRESS
+            it.ownerId == snapshot.members.single { member -> member.jobId == jobId }.id &&
+                it.status == LocalTeamTaskStatus.IN_PROGRESS
         }
         require(tasks.size <= 1) { "TEAM_WRITE_MULTIPLE_ACTIVE_TASKS" }
-        val current = tasks.singleOrNull()
-        current?.rootUserRevision?.let { rev ->
-            LocalAgentRootDirectiveSnapshot(sessionId, rev).requireCurrent(
-                sessionId, eventLogFor(sessionId),
-            )
-        }
-        val scope = kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]
-            as? com.labteto.dshmobile.local.files.LocalWorkspaceExecutionContext
-        val nativeWrite = com.labteto.dshmobile.local.tools.LocalToolPolicy.canonical(call.name) in setOf("write", "edit", "apply_patch")
-        val wholeRepository = nativeWrite && current?.writeScopes.orEmpty().any { scope?.coversRepository(it) == true }
-        enforceTeamMemberWorkspaceMutation(
-            call = call, writeScopes = current?.writeScopes.orEmpty().filterNot { wholeRepository && scope?.coversRepository(it) == true }
-                .map { if (nativeWrite) scope?.localPath(it) ?: it else it },
-            workspaceRoot = scope?.rootFor(workspaceRoot) ?: workspaceRoot, registeredTool = registeredTool,
-            wholeWorkspaceAllowed = wholeRepository,
-        )
     }
 
     internal fun memberFrozenRole(sessionId: String, jobId: String): JsonObject? =

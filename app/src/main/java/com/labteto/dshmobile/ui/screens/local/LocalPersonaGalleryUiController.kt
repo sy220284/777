@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import com.labteto.dshmobile.observability.AppLog
+import com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
@@ -28,6 +30,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Owns persona-gallery UI state, persistence, portraits and model-assisted maintenance. */
@@ -38,6 +42,7 @@ internal class LocalPersonaGalleryUiController(
     private val scope: CoroutineScope,
 ) {
     private val state = runtime.state
+    private val galleryRead = Mutex()
     private val _gallery = MutableStateFlow<List<PersonaGalleryEntry>>(emptyList())
     private val transfer = LocalPersonaTransferCoordinator(runtime, chatUi)
     val gallery: StateFlow<List<PersonaGalleryEntry>> = _gallery.asStateFlow()
@@ -45,27 +50,45 @@ internal class LocalPersonaGalleryUiController(
     val personaPresets: List<PersonaPreset> = PersonaPresetCatalog.presets
     suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = runSuspendResult {
         runtime.chat.configureChatPersona(profile).getOrThrow()
-        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+        refreshGalleryAfterCommit()
     }
     init {
         scope.launch(Dispatchers.IO) {
-            runCatching { chatUi.galleryEntries() }.onSuccess { _gallery.value = it }
+            reloadGallery().onFailure { AppLog.failure("PersonaGallery", "initial_gallery_read", it) }
         }
     }
+
+/** A read failure is retryable without replaying the preceding write. */
+suspend fun reloadGallery(): Result<Unit> = runSuspendResult {
+    galleryRead.withLock {
+        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+    }
+}
+
+private suspend fun refreshGalleryAfterCommit() {
+    reloadGallery().onFailure { error ->
+        AppLog.failure("PersonaGallery", "refresh_after_commit", error)
+        withContext(Dispatchers.Main) {
+            android.widget.Toast.makeText(appContext,
+                "操作已完成，图集列表刷新失败；请点击重新读取图集，无需重复操作",
+                android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+}
 
 suspend fun saveCurrentToGallery(
     notes: String,
     existingId: String? = null,
     existingStoryId: String? = null,
     forceNewStory: Boolean = false,
-): Result<PersonaGalleryEntry> = runSuspendResult {
+): Result<UiPersonaGallerySaveReceipt.Saved> = runSuspendResult {
     val identity = runtime.chat.snapshot().identity ?: error("当前会话不可用，请重试")
     when (val receipt = runtime.chat.save(com.labteto.dshmobile.uicontract.SavePersonaGalleryCommand(
         identity, notes, existingId, existingStoryId, forceNewStory))) {
         is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Saved -> {
             notifyDeferred(receipt.sessionSync)
-            _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
-            _gallery.value.firstOrNull { it.id == receipt.galleryId } ?: error("已保存，但无法刷新图集")
+            refreshGalleryAfterCommit()
+            receipt
         }
         com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Rejected -> error("会话已变化或正在使用，请重试")
         is com.labteto.dshmobile.uicontract.UiPersonaGallerySaveReceipt.Failed -> error(receipt.message ?: "保存失败")
@@ -149,7 +172,7 @@ suspend fun createGalleryPersona(profile: PersonaProfile): Result<PersonaGallery
             history = emptyList(),
             chatState = ChatCharacterState(),
             notes = "",
-        ).entry.also { _gallery.value = chatUi.galleryEntries() }
+        ).entry.also { refreshGalleryAfterCommit() }
     }
     // Preserve the old create-and-use flow for an empty one-to-one chat.
     // In an existing conversation or a group, creating a gallery card must not replace the cast.
@@ -215,7 +238,7 @@ suspend fun applyGallerySuggestions(
         chatUi.applyGallerySuggestions(id, suggestions)
             ?: error("图集条目已不存在")
     }
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+    refreshGalleryAfterCommit()
     if (state.value.chat.galleryId == id) {
         runtime.chat.configureChatPersona(updated.persona)
     }
@@ -265,7 +288,7 @@ suspend fun setGalleryPortrait(id: String, uri: Uri): Result<PersonaGalleryEntry
             throw error
         }
     }
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+    refreshGalleryAfterCommit()
     updated
 }
 
@@ -277,7 +300,7 @@ suspend fun removeGalleryPortrait(id: String): Result<PersonaGalleryEntry> = run
             ?: error("图集条目已不存在")
     }
     deleteManagedPortrait(previous.portraitPath)
-    _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+    refreshGalleryAfterCommit()
     updated
 }
 
@@ -295,7 +318,7 @@ suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, 
     when (val receipt = runtime.chat.submit(com.labteto.dshmobile.uicontract.PersonaStoryUiCommand.SaveDetails(identity, id, storyId, notes, storyStage))) {
         is com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Saved -> {
             notifyDeferred(receipt.sessionSync)
-            _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+            refreshGalleryAfterCommit()
         }
         com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Missing -> error("图集故事已不存在")
         is com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Failed -> error(receipt.message ?: "保存失败")
@@ -305,7 +328,7 @@ suspend fun editGalleryStoryDetails(id: String, storyId: String, notes: String, 
 suspend fun renameGalleryStory(id: String, storyId: String, title: String): Result<Unit> = runSuspendResult {
     withContext(Dispatchers.IO) {
         check(chatUi.renameStory(id, storyId, title)) { "图集故事已不存在" }
-        _gallery.value = chatUi.galleryEntries()
+        refreshGalleryAfterCommit()
     }
 }
 
@@ -320,7 +343,7 @@ internal suspend fun importGalleryPersona(
     mimeType: String?,
 ): Result<PersonaGalleryEntry> = runSuspendResult {
     transfer.import(bytes, fileName, mimeType).also {
-        _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+        refreshGalleryAfterCommit()
     }
 }
 
@@ -328,7 +351,7 @@ suspend fun installPersonaPreset(id: String): Result<PersonaGalleryEntry> = runS
     val preset = PersonaPresetCatalog.find(id) ?: error("人物预置不存在")
     val entry = withContext(Dispatchers.IO) {
         PersonaPresetArtworkInstaller(appContext, chatUi).install(preset).also {
-            _gallery.value = runSuspendResult { chatUi.galleryEntries() }.getOrDefault(_gallery.value)
+            refreshGalleryAfterCommit()
         }
     }
     entry
@@ -339,7 +362,7 @@ suspend fun deleteGalleryEntry(id: String): Result<Unit> = runSuspendResult {
     when (val receipt = runtime.chat.delete(com.labteto.dshmobile.uicontract.DeletePersonaGalleryCommand(identity, id))) {
         is com.labteto.dshmobile.uicontract.UiPersonaGalleryDeletionReceipt.Deleted -> {
             notifyDeferred(receipt.sessionSync, "已删除")
-            _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+            refreshGalleryAfterCommit()
             receipt.portraitCleanupWarning?.let { warning -> withContext(Dispatchers.Main) { android.widget.Toast.makeText(appContext, warning, android.widget.Toast.LENGTH_LONG).show() } }
         }
         com.labteto.dshmobile.uicontract.UiPersonaGalleryDeletionReceipt.Missing -> error("图集条目已不存在")
@@ -352,7 +375,7 @@ suspend fun deleteGalleryStory(id: String, storyId: String): Result<Unit> = runS
     when (val receipt = runtime.chat.submit(com.labteto.dshmobile.uicontract.PersonaStoryUiCommand.Delete(identity, id, storyId))) {
         is com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Saved -> {
             notifyDeferred(receipt.sessionSync, "已删除")
-            _gallery.value = withContext(Dispatchers.IO) { chatUi.galleryEntries() }
+            refreshGalleryAfterCommit()
         }
         com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Missing -> error("图集故事已不存在")
         is com.labteto.dshmobile.uicontract.UiPersonaStoryReceipt.Failed -> error(receipt.message ?: "删除失败")
@@ -366,7 +389,7 @@ suspend fun deleteGalleryHistoryMessage(
 ): Result<Unit> = runSuspendResult {
     withContext(Dispatchers.IO) {
         check(chatUi.deleteHistoryMessage(id, storyId, messageKey)) { "gallery_archive_missing" }
-        _gallery.value = chatUi.galleryEntries()
+        refreshGalleryAfterCommit()
     }
 }
 

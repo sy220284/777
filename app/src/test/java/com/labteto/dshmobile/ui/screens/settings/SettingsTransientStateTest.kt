@@ -37,6 +37,40 @@ class SettingsTransientStateTest {
         assertFalse(owner.launch { fail("已销毁的ViewModel不得接受新操作") })
         assertFalse(SettingsStorageOperations(backgroundScope).busy.value)
     }
+    @Test fun failedProjectionReadPreservesCommittedOutcomeAndDoesNotReplayTheAction() = runTest {
+        val owner = SettingsStorageOperations(backgroundScope)
+        var writes = 0
+        val failure = java.io.IOException("status unavailable")
+        var reported: Exception? = null
+        owner.launch {
+            writes++
+            owner.refreshAfterCommit("恢复计划已提交", { throw failure }) { reported = it }
+        }
+        runCurrent()
+        assertEquals(1, writes)
+        assertSame(failure, reported)
+        assertNull(owner.status.value)
+        assertTrue(owner.notice.value.orEmpty().contains("恢复计划已提交"))
+        assertTrue(owner.notice.value.orEmpty().contains("无需重复操作"))
+        assertFalse(owner.busy.value)
+    }
+
+    @Test fun cancellationDuringProjectionReadRetainsTheCommittedReceipt() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val owner = SettingsStorageOperations(scope)
+        owner.launch {
+            owner.refreshAfterCommit("备份已导出", { kotlinx.coroutines.awaitCancellation() }) {
+                fail("取消不得当作刷新错误吞掉")
+            }
+        }
+        assertEquals("备份已导出", owner.notice.value)
+        assertTrue(owner.busy.value)
+        scope.cancel()
+        runCurrent()
+        assertFalse(owner.busy.value)
+        assertEquals("备份已导出", owner.notice.value)
+    }
+
     @Test fun cancellingModelEditorClearsSecretAndInvalidatesOutstandingCallbacks() {
         val draft = ApiModelEditorState()
         draft.showEditor.value = true

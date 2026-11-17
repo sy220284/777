@@ -65,7 +65,7 @@ internal class LocalSubagentRunnerFactory(
     private val nestedReadonlySchemas: (() -> JsonArray)? = null,
     private val executeTeamTool: (suspend (String, String, LocalToolCall) -> AgentToolResult)? = null,
     private val requireTeamRootAuthorization: ((String, String) -> Unit)? = null,
-    private val requireTeamWorkspaceMutation: (suspend (String, String, LocalToolCall) -> Unit)? = null,
+    private val requireTeamTaskOwnership: ((String, String) -> Unit)? = null,
     private val importToolImages: suspend (com.labteto.dshmobile.harness.tools.ToolRichContent?) -> List<com.labteto.dshmobile.local.attachment.LocalImportedAttachment> = { emptyList() },
 ) {
     suspend fun pinBackend(backend: com.labteto.dshmobile.local.agent.LocalAgentExecutionBackend) = backendRuntime.pin(backend)
@@ -164,8 +164,8 @@ internal class LocalSubagentRunnerFactory(
         requireTeamRootAuthorization = requireTeamRootAuthorization?.let { check ->
             { jobId -> check(runSessionId(), jobId) }
         },
-        requireTeamWorkspaceMutation = if (requireTeamWorkspaceMutation == null) null else {
-            jobId, call -> requireTeamWorkspaceMutation.invoke(runSessionId(), jobId, call)
+        requireTeamTaskOwnership = if (requireTeamTaskOwnership == null) null else {
+            jobId -> requireTeamTaskOwnership.invoke(runSessionId(), jobId)
         },
         importToolImages = importToolImages,
         state = runnerState,

@@ -544,6 +544,7 @@ fun LocalHarnessScreen(
         deactivateDiaryEntry = viewModel::deactivateDiaryEntry,
         hasUnsavedCurrentPersona = viewModel::hasUnsavedCurrentPersona,
         currentGalleryHasUnsavedChanges = viewModel::currentGalleryHasUnsavedChanges,
+        reloadGallery = viewModel::reloadGallery,
         saveCurrentToGallery = viewModel::saveCurrentToGallery,
         galleryHistory = viewModel::galleryHistory,
         editGalleryStoryDetails = viewModel::editGalleryStoryDetails,

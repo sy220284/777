@@ -90,7 +90,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     override fun clearChatStyleGuardHits() = chatStyleGuardSettings.clearHits()
     override suspend fun diagnoseNetwork(target: String) = web.diagnose(target)
     override suspend fun sessionStorageStatus(): LocalSessionStorageStatus = sessionStorage.storageStatus()
-    override suspend fun compactSessionStorage(): LocalSessionStorageStatus = sessionStorage.compactStorage()
+    override suspend fun compactSessionStorage() = sessionStorage.compactStorage()
     override suspend fun exportSessionStorage(output: OutputStream) = sessionStorage.exportStorage(output)
     override suspend fun exportCompleteSessionStorage(output: OutputStream) = sessionStorage.exportCompleteStorage(output)
     override suspend fun stageRestoreSessionStorage(archive: java.io.InputStream) =

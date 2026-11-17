@@ -3,6 +3,7 @@ package com.labteto.dshmobile.interop.mcp
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.tools.HarnessTool
+import com.labteto.dshmobile.harness.tools.JsonSchemaValidator
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
@@ -98,6 +99,7 @@ data class McpServerSnapshot(
     val target: String,
     val tools: List<String>,
     val lifecycle: McpServerLifecycle = McpServerLifecycle.REGISTERED,
+    val unavailableTools: Map<String, String> = emptyMap(),
 )
 
 /** A single ordered Owner transition; null means a server was removed, not success. */
@@ -185,6 +187,7 @@ class McpToolBridgePlugin(
         val toolNames: List<String>,
         val definitionBytes: Int,
         val remoteToolCount: Int,
+        val unavailableTools: Map<String, String>,
     ) {
         data class DisconnectTicket(
             val started: Boolean,
@@ -298,7 +301,8 @@ class McpToolBridgePlugin(
                 else -> McpServerLifecycle.REGISTERED
             }
             McpServerSnapshot(binding.id, binding.transport, binding.displayTarget,
-                if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(), phase)
+                if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(), phase,
+                binding.unavailableTools)
         }
         val pending = (connectingIds + reconnectingIds)
             .filterNot(servers::containsKey)
@@ -494,6 +498,9 @@ class McpToolBridgePlugin(
                             page.snapshot.orEmpty().forEach { server -> add(buildJsonObject {
                                 put("server_id", server.id); put("transport", server.transport)
                                 put("state", server.lifecycle.name)
+                                put("unavailable_tools", buildJsonObject {
+                                    server.unavailableTools.forEach { (name, reason) -> put(name, reason) }
+                                })
                                 put("tools", buildJsonArray { server.tools.forEach { add(JsonPrimitive(it)) } })
                             }) }
                         })
@@ -638,6 +645,7 @@ class McpToolBridgePlugin(
                 transport = binding.transport,
                 target = binding.displayTarget,
                 tools = if (binding.isTransportFailed()) emptyList() else binding.toolNames.toList(),
+                unavailableTools = binding.unavailableTools,
             )
         }
     }
@@ -731,7 +739,23 @@ class McpToolBridgePlugin(
             require(remoteDefinitions.size <= MAX_REMOTE_TOOLS) {
                 "MCP 服务工具过多：${remoteDefinitions.size}，上限 $MAX_REMOTE_TOOLS"
             }
-            val names = definitions.map { definition -> localToolName(serverId, definition.name) }
+            // A server's declarations are independent capabilities. An unsupported schema
+            // must remain unavailable, without discarding unrelated valid tools/resources.
+            val unavailable = linkedMapOf<String, String>()
+            val prepared = definitions.mapNotNull { definition ->
+                try {
+                    val schema = normalizeRemoteParameterSchema(definition.inputSchema)
+                    val problem = JsonSchemaValidator.validateSchema(schema, requireObjectRoot = true)
+                    if (problem != null) {
+                        unavailable[definition.name] = problem
+                        null
+                    } else definition to schema
+                } catch (error: IllegalArgumentException) {
+                    unavailable[definition.name] = error.message ?: "参数 schema 无效"
+                    null
+                }
+            }
+            val names = prepared.map { (definition, _) -> localToolName(serverId, definition.name) }
             val definitionBytes = definitions.sumOf { definition ->
                 definition.raw.toString().toByteArray(Charsets.UTF_8).size
             }
@@ -748,12 +772,17 @@ class McpToolBridgePlugin(
                 toolNames = names,
                 definitionBytes = definitionBytes,
                 remoteToolCount = remoteDefinitions.size,
+                unavailableTools = unavailable.toMap(),
             )
             val connectedMessage = buildString {
                 append("已连接 MCP 服务：").append(serverId)
                 append("\n传输：").append(transport)
                 append("\n目标：").append(displayTarget)
                 append("\n注册工具数：").append(names.size)
+                if (unavailable.isNotEmpty()) {
+                    append("\n未注册工具（当前 schema 不支持或无效）：")
+                    unavailable.forEach { (name, reason) -> append("\n").append(name).append(": ").append(reason) }
+                }
                 if (names.isNotEmpty()) {
                     append("\n工具：").append(names.joinToString(", "))
                 }
@@ -772,7 +801,8 @@ class McpToolBridgePlugin(
                 require(totalDefinitionBytes <= MAX_TOTAL_DEFINITION_BYTES) {
                     "MCP 工具定义总大小超过全局上限"
                 }
-                definitions.zip(names).forEach { (definition, localName) ->
+                prepared.zip(names).forEach { (preparedTool, localName) ->
+                    val (definition, parameterSchema) = preparedTool
                     context.tools.register(
                         HarnessTool(
                             name = localName,
@@ -785,7 +815,7 @@ class McpToolBridgePlugin(
                                             .take(MAX_REMOTE_DESCRIPTION_CHARS),
                                     )
                                 },
-                                parameterSchema = normalizeRemoteParameterSchema(definition.inputSchema),
+                                parameterSchema = parameterSchema,
                             ),
                             access = ToolAccess.PRIVILEGED,
                             approvalPolicy = ToolApprovalPolicy.ALWAYS,
@@ -990,6 +1020,9 @@ class McpToolBridgePlugin(
                         put("server_id", binding.id)
                         put("transport", binding.transport)
                         put("target", binding.displayTarget)
+                        put("unavailable_tools", buildJsonObject {
+                            binding.unavailableTools.forEach { (name, reason) -> put(name, reason) }
+                        })
                         put("tools", buildJsonArray {
                             binding.toolNames.forEach { add(JsonPrimitive(it)) }
                         })

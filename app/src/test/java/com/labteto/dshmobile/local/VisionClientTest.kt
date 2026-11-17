@@ -9,32 +9,49 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VisionClientTest {
     private val json = Json { ignoreUnknownKeys = true }
-    private val client = VisionClient(OkHttpClient(), json)
+    private val client = VisionClient(json)
 
     @Test
     fun providerImageLimitCountsDecodedBytesAndPaddingBeforeNetwork() = runBlocking {
         var requested = false
-        val transport = OkHttpClient.Builder().addInterceptor {
-            requested = true
-            throw AssertionError("Oversized image reached network")
-        }.build()
+        val limitedClient = VisionClient(json,
+            javax.inject.Provider { error("不应记录用量") },
+            javax.inject.Provider {
+                requested = true
+                throw AssertionError("Oversized image reached model admission")
+            })
         val limit = LocalModelPresets.maxNativeImageBytesFor("MiniMax-M3", "https://api.minimaxi.com/v1")
         // limit and limit+1 have the same encoded length; padding distinguishes the extra byte.
         val encodedLength = ((limit + 2) / 3 * 4).toInt()
         val image = "data:image/png;base64," + "A".repeat(encodedLength - 1) + "="
-        val error = runCatching { VisionClient(transport, json).analyze(
+        val error = runCatching { limitedClient.analyze(
             "test", "https://api.minimaxi.com/v1", "MiniMax-M3", "test", image,
         ) }.exceptionOrNull()
         assertTrue(error is IllegalArgumentException)
         assertTrue(error?.message.orEmpty().contains("上传大小限制"))
         assertTrue(!requested)
+    }
+
+    @Test
+    fun gatewayInitializationFailurePropagatesWithoutSelectingAnAlternateTransport() = runBlocking {
+        val failure = IllegalStateException("gateway initialization failed")
+        val failing = VisionClient(json,
+            javax.inject.Provider { error("不应记录用量") },
+            javax.inject.Provider { throw failure })
+        val error = runCatching {
+            failing.analyze("key", "https://vision.example/v1", "vision", "分析",
+                "data:image/png;base64,AAAA", profile = com.labteto.dshmobile.local.model.LocalModelProfile(
+                    "vision", "vision", "https://vision.example/v1"))
+        }.exceptionOrNull()
+        // Coroutine stack-trace recovery may copy the exception across withContext.
+        assertEquals(failure.javaClass, error?.javaClass)
+        assertEquals(failure.message, error?.message)
     }
 
     @Test

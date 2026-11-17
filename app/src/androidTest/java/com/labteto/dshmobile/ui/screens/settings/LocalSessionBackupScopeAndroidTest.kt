@@ -27,6 +27,7 @@ class LocalSessionBackupScopeAndroidTest {
                     LocalSessionStorageCard(
                         status = status,
                         busy = false,
+                        onRefresh = {},
                         onCompact = {},
                         onExport = {},
                         onExportFull = {},

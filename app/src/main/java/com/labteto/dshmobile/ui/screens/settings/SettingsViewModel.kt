@@ -413,7 +413,7 @@ class SettingsViewModel @Inject constructor(
     suspend fun localSessionStorageStatus(): LocalSessionStorageStatus =
         localHarness.sessionStorageStatus()
 
-    suspend fun compactLocalSessionStorage(): LocalSessionStorageStatus =
+    suspend fun compactLocalSessionStorage() =
         localHarness.compactSessionStorage()
 
     suspend fun exportLocalSessionStorage(uri: Uri): Long = withContext(Dispatchers.IO) {
