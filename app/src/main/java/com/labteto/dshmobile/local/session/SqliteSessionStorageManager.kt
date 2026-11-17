@@ -320,9 +320,18 @@ internal class SqliteSessionStorageManager(
             validateSnapshotEventCursors(
                 File(staging, SNAPSHOT_ENTRY), File(staging, EVENT_ENTRY),
             )
-            File(staging, "READY").writeText(if (completeStudio) "sqlite-v3-studio" else "sqlite-v2-media")
+            val sessions = countRows(File(staging, SNAPSHOT_ENTRY), "session_snapshots")
+            // READY must never outlive the archive bytes it authorizes. Flush the verified
+            // tree before exposing the plan; a later status/count read is not its commit.
+            staging.walkBottomUp().onFail { _, failure -> throw failure }.forEach { file ->
+                if (file.isDirectory) DurableFileCommit.syncDirectory(file)
+                else DurableFileCommit.syncFile(file)
+            }
+            DurableFileCommit.replace(File(staging, "READY"),
+                (if (completeStudio) "sqlite-v3-studio" else "sqlite-v2-media").toByteArray())
             check(staging.renameTo(pendingRoot)) { "SQLite 备份无法提交恢复计划" }
-            return countRows(File(pendingRoot, SNAPSHOT_ENTRY), "session_snapshots")
+            DurableFileCommit.syncDirectory(requireNotNull(pendingRoot.parentFile))
+            return sessions
         } finally {
             if (staging.exists()) staging.deleteRecursively()
         }
@@ -350,6 +359,7 @@ internal class SqliteSessionStorageManager(
             staged.isFile && installed.isFile && sameBytes(staged, installed)
         }) { "已有恢复数据写入，请重启继续完成，不能直接取消" }
         check(pendingRoot.deleteRecursively()) { "无法清除未启动的恢复计划" }
+        DurableFileCommit.syncDirectory(requireNotNull(pendingRoot.parentFile))
         return true
     }
 
@@ -400,12 +410,7 @@ internal class SqliteSessionStorageManager(
         mediaBackup.validateStaged(pendingRoot, mediaNames)
         // Durable fence: never allow UI cancellation after any installed media/DB bytes.
         val installing = File(pendingRoot, "INSTALLING")
-        if (!installing.exists()) {
-            java.io.FileOutputStream(installing).use { stream ->
-                stream.write(byteArrayOf(1))
-                stream.fd.sync()
-            }
-        }
+        DurableFileCommit.replace(installing, byteArrayOf(1))
         // Preserve Studio staging until Session DBs commit. A process death
         // replays only the same verified bytes, with no duplicated side effects.
         if (completeStudio) {

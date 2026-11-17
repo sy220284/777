@@ -76,7 +76,8 @@ internal fun ConnectorInventoryBrowser(
         ConnectorItem(
             id = server.id,
             title = visual.title,
-            description = "已添加 · " + server.tools.size + " 项工具 · " + server.transport.uppercase(),
+            description = "已添加 · " + server.tools.size + " 项可用工具 · " + server.transport.uppercase() +
+                if (server.unavailableTools.isEmpty()) "" else " · ${server.unavailableTools.size} 项不可用（查看连接详情）",
             visual = visual,
             configured = true,
             local = local,

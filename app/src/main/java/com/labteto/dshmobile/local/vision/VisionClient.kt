@@ -115,13 +115,20 @@ class VisionClient @Inject constructor(
                 ?.jsonArray
                 ?.map { it.jsonObject }
                 ?: error("图片分析请求构造失败")
-            val reply = gateway.complete(
-                model = model,
-                baseUrl = baseUrl,
-                messages = messages,
-                tools = JsonArray(emptyList()),
-                profile = selectedProfile,
-            )
+            // Bind the key already used for cache admission to the actual inference request.
+            val binding = if (selectedProfile.authKind == com.labteto.dshmobile.local.model.LocalModelAuthKind.API_KEY)
+                com.labteto.dshmobile.local.model.LocalMediaCredentialBinding(selectedProfile,
+                    com.labteto.dshmobile.local.model.LocalResolvedCredential(apiKey, selectedProfile.authKind))
+            else kotlin.coroutines.EmptyCoroutineContext
+            val reply = withContext(binding) {
+                gateway.complete(
+                    model = model,
+                    baseUrl = baseUrl,
+                    messages = messages,
+                    tools = JsonArray(emptyList()),
+                    profile = selectedProfile,
+                )
+            }
             usageTracker.get().record(
                 model = model,
                 usage = reply.usage,

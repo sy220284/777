@@ -205,16 +205,16 @@ class LocalVisionPlugin(
                         .getOrElse { error ->
                             return@HarnessToolExecutor visionFileFailure(error)
                         }
-                    val refresh = input.optionalBoolean("refresh")
-                    if (!refresh) {
-                        analysisCache?.get(file, route, prompt)?.let { cached ->
-                            return@HarnessToolExecutor ToolResult(cached)
-                        }
-                    }
                     val dataUrl = runCatching { imageFileDataUrl(file) }
                         .getOrElse { error ->
                             return@HarnessToolExecutor visionFileFailure(error)
                         }
+                    val refresh = input.optionalBoolean("refresh")
+                    if (!refresh) {
+                        analysisCache?.get(dataUrl, route, prompt, key)?.let { cached ->
+                            return@HarnessToolExecutor ToolResult(cached)
+                        }
+                    }
                     val result = analyzeDataUrl(
                         prompt = prompt,
                         imageDataUrl = dataUrl,
@@ -226,7 +226,17 @@ class LocalVisionPlugin(
                             toolContext.attributes["call_id"] as? String,
                         ),
                     )
-                    if (!result.isError) analysisCache?.put(file, route, prompt, result.content)
+                    if (!result.isError) {
+                        try {
+                            analysisCache?.put(dataUrl, route, prompt, result.content, key)
+                        } catch (error: java.io.IOException) {
+                            // A paid analysis is already complete; optional caching cannot
+                            // erase its actual answer or encourage another inference call.
+                            com.labteto.dshmobile.observability.AppLog.failure(
+                                "Vision", "cache_completed_analysis", error, sessionId = toolContext.sessionId,
+                            )
+                        }
+                    }
                     result
                 },
             ),

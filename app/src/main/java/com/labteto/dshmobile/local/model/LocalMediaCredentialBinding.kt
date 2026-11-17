@@ -9,8 +9,13 @@ internal class LocalMediaCredentialBinding(
     private val credential: LocalResolvedCredential,
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<LocalMediaCredentialBinding>
-    init { require(profile.authKind == LocalModelAuthKind.API_KEY && credential.authKind == LocalModelAuthKind.API_KEY) }
     val signature: String = localMediaCredentialSignature(profile.id, credential.bearerToken)
+    init {
+        require(profile.authKind == LocalModelAuthKind.API_KEY && credential.authKind == LocalModelAuthKind.API_KEY)
+        require(profile.credentialBinding == null || profile.credentialBinding == signature) {
+            "媒体凭据已变化，请重新选择当前模型档案"
+        }
+    }
     fun resolveFor(requested: LocalModelProfile): LocalResolvedCredential {
         require(requested.id == profile.id && requested.routeFingerprint() == profile.routeFingerprint()) {
             "媒体请求与冻结账户路由不一致"

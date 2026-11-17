@@ -1800,7 +1800,7 @@ fun ToolsScreen(
                         SyButton(
                             text = stringResource(R.string.cap_center_view_tools),
                             onClick = { expandedMcpServer = if (expandedMcpServer == server.id) null else server.id },
-                            enabled = server.tools.isNotEmpty(),
+                            enabled = server.tools.isNotEmpty() || server.unavailableTools.isNotEmpty(),
                             size = SyButtonSize.Small,
                             variant = SyButtonVariant.Ghost,
                         )
@@ -1814,7 +1814,12 @@ fun ToolsScreen(
                     }
                     if (expandedMcpServer == server.id) {
                         Text(
-                            server.tools.joinToString(" · "),
+                            buildString {
+                                append(server.tools.joinToString(" · "))
+                                server.unavailableTools.forEach { (name, reason) ->
+                                    append("\n未注册工具 ").append(name).append("：").append(reason)
+                                }
+                            },
                             style = DsType.caption11.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.padding(bottom = SyMetric.gapMd),

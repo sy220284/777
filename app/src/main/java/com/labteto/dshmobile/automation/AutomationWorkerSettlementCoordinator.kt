@@ -284,55 +284,55 @@ internal class AutomationWorkerSettlementCoordinator(
         sessionId: String?,
         resultText: String? = null,
     ) {
-        if (!task.notify) return
-        val settings = try {
-            hostsStore.settingsOnce()
+        try {
+            if (!task.notify) return
+            val settings = hostsStore.settingsOnce()
+            currentCoroutineContext().ensureActive()
+            if (!settings.notifyLocalJobs) return
+            val chatSuccess = task.mode == AutomationMode.CHAT &&
+                titleRes == R.string.tasks_notification_complete
+            val title = if (chatSuccess) {
+                context.getString(
+                    R.string.tasks_chat_notification_title,
+                    task.actorName?.takeIf(String::isNotBlank)
+                        ?: context.getString(R.string.tasks_chat_character_fallback),
+                )
+            } else {
+                context.getString(titleRes)
+            }
+            val text = if (chatSuccess) {
+                resultText?.replace("\n", " ")?.trim()?.take(180)
+                    ?.takeIf(String::isNotBlank)
+                    ?: context.getString(R.string.tasks_notification_open_result)
+            } else {
+                context.getString(R.string.tasks_notification_open_result)
+            }
+            store.withCurrentGeneration(task.id, task.scheduleGeneration) { current ->
+                if (current.notify) {
+                    notifications.postLocalSession(
+                        id = stableNotificationId("automation", task.id),
+                        title = title,
+                        text = text,
+                        sessionId = sessionId,
+                        notificationKey = "automation:${task.id}",
+                        settings = settings,
+                        kind = when {
+                            chatSuccess -> LocalNotificationKind.CHAT_MESSAGE
+                            titleRes == R.string.tasks_notification_failed -> LocalNotificationKind.FAILURE
+                            titleRes == R.string.tasks_notification_blocked -> LocalNotificationKind.NEEDS_ACTION
+                            else -> LocalNotificationKind.RESULT
+                        },
+                    )
+                }
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
+            // The run receipt is already durable. Notification permission can change between
+            // canPost() and notify(); this must not skip arming the next scheduled execution.
             com.labteto.dshmobile.observability.AppLog.failure(
-                "AutomationWorkerSettlement", "read_notification_preference", error,
-                sessionId = sessionId,
+                "AutomationWorkerSettlement", "deliver_notification", error, sessionId = sessionId,
             )
-            return
-        }
-        currentCoroutineContext().ensureActive()
-        if (!settings.notifyLocalJobs) return
-        val chatSuccess = task.mode == AutomationMode.CHAT &&
-            titleRes == R.string.tasks_notification_complete
-        val title = if (chatSuccess) {
-            context.getString(
-                R.string.tasks_chat_notification_title,
-                task.actorName?.takeIf(String::isNotBlank)
-                    ?: context.getString(R.string.tasks_chat_character_fallback),
-            )
-        } else {
-            context.getString(titleRes)
-        }
-        val text = if (chatSuccess) {
-            resultText?.replace("\n", " ")?.trim()?.take(180)
-                ?.takeIf(String::isNotBlank)
-                ?: context.getString(R.string.tasks_notification_open_result)
-        } else {
-            context.getString(R.string.tasks_notification_open_result)
-        }
-        store.withCurrentGeneration(task.id, task.scheduleGeneration) { current ->
-            if (current.notify) {
-                notifications.postLocalSession(
-                    id = stableNotificationId("automation", task.id),
-                    title = title,
-                    text = text,
-                    sessionId = sessionId,
-                    notificationKey = "automation:${task.id}",
-                    settings = settings,
-                    kind = when {
-                        chatSuccess -> LocalNotificationKind.CHAT_MESSAGE
-                        titleRes == R.string.tasks_notification_failed -> LocalNotificationKind.FAILURE
-                        titleRes == R.string.tasks_notification_blocked -> LocalNotificationKind.NEEDS_ACTION
-                        else -> LocalNotificationKind.RESULT
-                    },
-                )
-            }
         }
     }
 }

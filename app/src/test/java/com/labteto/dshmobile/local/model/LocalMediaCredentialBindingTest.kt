@@ -40,6 +40,17 @@ class LocalMediaCredentialBindingTest {
         assertThrows(IllegalArgumentException::class.java) { binding.resolveFor(profile.copy(id = "other")) }
         assertThrows(IllegalArgumentException::class.java) { binding.resolveFor(profile.copy(baseUrl = "https://other.example/v1")) }
     }
+    @Test fun bindingRejectsAKeyThatDoesNotBelongToTheFrozenProfileRevision() {
+        val profile = LocalModelProfile("same", "vision", "https://api.example/v1",
+            credentialBinding = localMediaCredentialSignature("same", "key-a"))
+        assertThrows(IllegalArgumentException::class.java) {
+            LocalMediaCredentialBinding(profile, LocalResolvedCredential("key-b", LocalModelAuthKind.API_KEY))
+        }
+        val binding = LocalMediaCredentialBinding(profile,
+            LocalResolvedCredential("key-a", LocalModelAuthKind.API_KEY))
+        assertEquals("key-a", binding.resolveFor(profile).bearerToken)
+    }
+
     @Test fun processLocalAccountPartitionDoesNotChangeDurableRouteFingerprint() {
         val first = LocalModelProfile("one", "model", "https://api.example/v1")
         val second = first.copy(id = "two")
