@@ -153,7 +153,10 @@ class McpClient(
         discoverTools(allowUnsupported).tools
 
     /** Also returns individually rejected HTTP-header annotations for Owner/UI visibility. */
-    internal suspend fun discoverTools(allowUnsupported: Boolean = false): McpToolDiscovery {
+    internal suspend fun discoverTools(
+        allowUnsupported: Boolean = false,
+        enforceHttpHeaders: Boolean = false,
+    ): McpToolDiscovery {
         val tools = mutableListOf<McpToolDefinition>()
         val names = mutableSetOf<String>()
         val cursors = mutableSetOf<String>()
@@ -185,7 +188,7 @@ class McpClient(
                     raw = tool,
                 )
             }
-            val next = result["nextCursor"]?.takeUnless { it == JsonNull } ?: return admitToolHeaders(tools)
+            val next = result["nextCursor"]?.takeUnless { it == JsonNull } ?: return admitToolHeaders(tools, enforceHttpHeaders)
             val value = next.jsonPrimitive
             require(value.isString && value.content.length in 1..MAX_CURSOR_CHARS && cursors.add(value.content)) {
                 "MCP 分页游标无效或重复"
@@ -196,9 +199,13 @@ class McpClient(
     }
 
 
-    private fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery =
+    private fun admitToolHeaders(
+        definitions: List<McpToolDefinition>,
+        enforceHttpHeaders: Boolean,
+    ): McpToolDiscovery =
         (transport as? McpHttpToolAdmission)?.admitToolHeaders(definitions)
-            ?: McpToolDiscovery(definitions, emptyMap())
+            ?: if (enforceHttpHeaders) McpHttpToolHeaders.admit(definitions).first
+            else McpToolDiscovery(definitions, emptyMap())
 
     suspend fun callTool(name: String, arguments: JsonObject): JsonObject =
         transport.request(
@@ -284,20 +291,30 @@ class McpStreamableHttpTransport(
     @Volatile private var headerRules: Map<String, List<McpHttpParameterHeader>> = emptyMap()
 
     override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery {
-        val valid = mutableListOf<McpToolDefinition>()
-        val rejected = linkedMapOf<String, String>()
-        val nextRules = linkedMapOf<String, List<McpHttpParameterHeader>>()
-        definitions.forEach { definition ->
-            try {
-                val compiled = McpHttpToolHeaders.compile(definition.inputSchema)
-                valid += definition
-                nextRules[definition.name] = compiled
-            } catch (error: IllegalArgumentException) {
-                rejected[definition.name] = error.message ?: "x-mcp-header 注解无效"
-            }
+        val (admitted, rules) = McpHttpToolHeaders.admit(definitions)
+        headerRules = rules
+        return admitted
+    }
+
+    /**
+     * The Binder worker owns the HTTP wire and sees tools/list before the host
+     * finishes Tool Registry admission. Compile the same rules here, in the
+     * actual process that constructs requests, including paginated tool lists.
+     */
+    private fun rememberToolHeaders(response: JsonObject) {
+        val tools = ((response["result"] as? JsonObject)?.get("tools") as? JsonArray)
+            ?: return
+        val definitions = tools.map { element ->
+            val raw = element as? JsonObject ?: error("MCP tools/list 工具定义无效")
+            val name = (raw["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: error("MCP tools/list 缺少工具名称")
+            McpToolDefinition(name, null, raw["inputSchema"] as? JsonObject
+                ?: JsonObject(emptyMap()), raw)
         }
-        headerRules = nextRules.toMap()
-        return McpToolDiscovery(valid, rejected)
+        val (_, rules) = McpHttpToolHeaders.admit(definitions)
+        synchronized(this) {
+            headerRules = headerRules + rules
+        }
     }
 
     // MCP calls may mutate remote state; do not replay after connection failure or redirect.
@@ -351,7 +368,9 @@ class McpStreamableHttpTransport(
                 if (!response.isSuccessful) {
                     throw response.mcpHttpFailure(response.readMcpBodyBounded())
                 }
-                response.readMcpRpcResponse(id, json)
+                response.readMcpRpcResponse(id, json).also { result ->
+                    if (method == "tools/list") rememberToolHeaders(result)
+                }
             }
         }
 
