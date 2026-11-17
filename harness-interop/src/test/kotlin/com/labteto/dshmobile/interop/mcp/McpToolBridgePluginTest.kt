@@ -31,6 +31,55 @@ import org.junit.Test
 
 class McpToolBridgePluginTest {
     @Test
+    fun standardRemoteSchemaSupportsNullableReferencesAndStillChecksArgumentsAndApproval() = runTest {
+        var calls = 0
+        val key = "$"
+        val transport = object : McpTransport {
+            override suspend fun request(method: String, params: JsonObject): JsonObject = when (method) {
+                "tools/list" -> Json.parseToJsonElement("""{"result":{"tools":[{
+                    "name":"nullable","inputSchema":{"type":"object",
+                      "${key}defs":{"label":{"anyOf":[{"type":"string","minLength":2},{"type":"null"}]}},
+                      "properties":{"label":{"${key}ref":"#/${key}defs/label","default":null}},
+                      "required":["label"],"additionalProperties":false}
+                }]}}""").jsonObject
+                "tools/call" -> {
+                    calls++
+                    assertTrue(params["arguments"]!!.jsonObject.containsKey("label"))
+                    Json.parseToJsonElement("""{"result":{"content":[{"type":"text","text":"ok"}]}}""").jsonObject
+                }
+                else -> error("unexpected method $method")
+            }
+            override fun close() = Unit
+        }
+        val plugin = McpToolBridgePlugin(OkHttpClient(), Json, transportFactory = { transport })
+        val registry = PluginRegistry()
+        registry.install(plugin)
+        try {
+            val connected = registry.context.tools.execute("mcp_http_connect", buildJsonObject {
+                put("server_id", "standard"); put("endpoint", "https://example.com/mcp")
+            }, context = ToolContext(approval = { true }))
+            assertFalse(connected.isError)
+            assertTrue(plugin.lifecycleSnapshots().single().unavailableTools.isEmpty())
+            val blocked = registry.context.tools.execute("mcp_standard_nullable",
+                Json.parseToJsonElement("""{"label":null}""").jsonObject)
+            assertTrue(blocked.isError)
+            assertEquals(0, calls)
+            val invalid = registry.context.tools.execute("mcp_standard_nullable",
+                Json.parseToJsonElement("""{"label":"x"}""").jsonObject,
+                context = ToolContext(approval = { true }))
+            assertTrue(invalid.isError)
+            assertEquals("INVALID_TOOL_ARGUMENTS", invalid.errorCode)
+            assertEquals(0, calls)
+            for (args in listOf("""{"label":null}""", """{"label":"ok"}""")) {
+                val result = registry.context.tools.execute("mcp_standard_nullable",
+                    Json.parseToJsonElement(args).jsonObject, context = ToolContext(approval = { true }))
+                assertFalse(result.isError)
+            }
+            assertEquals(2, calls)
+        } finally { plugin.uninstall(registry.context) }
+    }
+
+    @Test
     fun unsupportedToolSchemaDoesNotDisconnectValidToolsAndRemainsVisible() = runTest {
         var remoteCalls = 0
         var closed = false
@@ -38,7 +87,7 @@ class McpToolBridgePluginTest {
             override suspend fun request(method: String, params: JsonObject): JsonObject = when (method) {
                 "tools/list" -> Json.parseToJsonElement("""{"result":{"tools":[
                     {"name":"supported","inputSchema":{"type":"object","additionalProperties":false}},
-                    {"name":"complex","inputSchema":{"type":"object","properties":{"x":{"anyOf":[{"type":"string"},{"type":"null"}]}}}}
+                    {"name":"complex","inputSchema":{"type":"object","properties":{"x":{"${'$'}ref":"#/${'$'}defs/missing"}}}}
                 ]}}""").jsonObject
                 "tools/call" -> {
                     remoteCalls++
@@ -61,12 +110,12 @@ class McpToolBridgePluginTest {
             }, context = ToolContext(approval = { true }))
             assertFalse(connected.isError)
             assertTrue(connected.content.contains("complex"))
-            assertTrue(connected.content.contains("anyOf"))
+            assertTrue(connected.content.contains("missing"))
             assertTrue(registry.context.tools.names().contains("mcp_partial_supported"))
             assertFalse(registry.context.tools.names().contains("mcp_partial_complex"))
             val snapshot = plugin.lifecycleSnapshots().single()
             assertEquals(McpServerLifecycle.REGISTERED, snapshot.lifecycle)
-            assertTrue(snapshot.unavailableTools.getValue("complex").contains("anyOf"))
+            assertTrue(snapshot.unavailableTools.getValue("complex").contains("missing"))
             assertEquals(snapshot.unavailableTools, plugin.serverSnapshots().single().unavailableTools)
             val listed = registry.context.tools.execute("mcp_server_list", buildJsonObject { })
             assertTrue(listed.content.contains("unavailable_tools"))

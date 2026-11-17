@@ -365,7 +365,11 @@ class McpNegotiatingHttpTransport(
     http: OkHttpClient,
     json: Json,
     modernClientCapabilities: JsonObject = JsonObject(emptyMap()),
-) : McpTransport, McpTerminationSource, McpResourceDiscovery {
+) : McpTransport, McpTerminationSource, McpResourceDiscovery, McpHttpToolAdmission {
+    override fun admitToolHeaders(definitions: List<McpToolDefinition>): McpToolDiscovery =
+        if (selected === modern) modern.admitToolHeaders(definitions)
+        else McpToolDiscovery(definitions, emptyMap())
+
     override suspend fun supportedResourceMethods(): Set<String> =
         selected?.let { discoverMcpResourceMethods(it) } ?: emptySet()
 

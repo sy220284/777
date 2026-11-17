@@ -1078,7 +1078,34 @@ fun LocalHarnessScreen(
             }
         }
     }
-    if (syWideViewport) {
+    // The first-launch decision is made after persisted sessions and models load.
+    // Keep the conversation shell out of the hierarchy until that decision is
+    // settled; otherwise the sidebar becomes interactive before onboarding appears.
+    if (!onboardingDecided) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface(),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator()
+            }
+        }
+    } else if (presentFirstLaunch) {
+        FirstLaunchOnboarding(
+            onSkip = ::finishFirstLaunch,
+            onStart = { selectedMode ->
+                finishFirstLaunch()
+                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
+            },
+            onConfigureModel = { _ ->
+                finishFirstLaunch()
+                // Model settings are global. Switching sessions here would complete later
+                // and reset navigation after the user has already entered configuration.
+                prepareSettingsEntry(SettingsDestination.MODELS)
+                pushFeature(LocalFeaturePage.SETTINGS)
+            },
+        )
+    } else if (syWideViewport) {
         Row(Modifier.fillMaxSize()) {
             syDrawerContent()
             Box(Modifier.weight(1f)) { sySceneContent() }
@@ -1196,23 +1223,6 @@ fun LocalHarnessScreen(
             onDismiss = {
                 pendingWorkCapability = null
                 workCapabilityConfirmed = false
-            },
-        )
-    }
-
-    if (presentFirstLaunch && !shell.loading) {
-        FirstLaunchOnboarding(
-            onSkip = ::finishFirstLaunch,
-            onStart = { selectedMode ->
-                finishFirstLaunch()
-                if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
-            },
-            onConfigureModel = { _ ->
-                finishFirstLaunch()
-                // Model settings are global. Switching sessions here would complete later
-                // and reset navigation after the user has already entered configuration.
-                prepareSettingsEntry(SettingsDestination.MODELS)
-                pushFeature(LocalFeaturePage.SETTINGS)
             },
         )
     }

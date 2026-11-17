@@ -90,3 +90,9 @@ Android 本机模式目标是语义等价，不要求复制桌面宿主的物理
 - 当前 main + PR head 的最终组合 CI。
 
 详见 [VALIDATION.md](VALIDATION.md)。
+
+## MCP Schema 兼容
+
+原生工具与外部 MCP 工具参数均采用 JSON Schema Draft 2020-12 默认方言，并识别标准引擎支持的显式 Draft 4/6/7/2019-09。参数 Schema 由 `com.networknt:json-schema-validator:2.0.8` 编译，共享 kotlinx.serialization 运行库保持现有 1.7.3。定义进入共享 Tool Registry 时编译一次并由注册对象持有；普通调用、tool_call 与 Code Mode 共用该编译结果，输入在执行前统一校验并按权限审批，不存在未校验的兼容旁路。
+
+跨网络引用资源不隐式下载；服务应把工具依赖的定义放在自己的 `inputSchema` 内。无法解析的引用或不支持的方言会给出具体未注册原因，服务中其他有效工具可继续使用。`format` 按所选 JSON Schema 方言的 assertion/annotation 语义处理；它不替代实际网络工具的目标与权限验证。

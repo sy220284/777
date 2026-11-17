@@ -104,7 +104,12 @@ data class HarnessTool(
     val metadata: ToolMetadata,
     val timeoutMillis: Long? = null,
     val executor: HarnessToolExecutor,
-)
+) {
+    internal val parameterValidation: CompiledToolParameters by lazy {
+        val parameters = (schema["function"] as JsonObject)["parameters"] as JsonObject
+        CompiledToolParameters.compile(parameters)
+    }
+}
 
 class ToolRegistry private constructor(
     private val tools: RegistryEntries<HarnessTool>,
@@ -113,15 +118,15 @@ class ToolRegistry private constructor(
 ) {
     constructor() : this(RegistryEntries(), ToolLifecycleAdmission(), ToolHookRegistry())
     fun register(tool: HarnessTool, replace: Boolean = false) {
-        validateToolRegistration(tool)
         val normalized = tool.withContractDescription()
+        validateToolRegistration(normalized)
         tools.register(normalized.name, normalized, replace)
     }
     fun unregister(name: String): HarnessTool? = tools.remove(name)
     fun get(name: String): HarnessTool? = tools.get(name)
 
-    /** Side-effect-free schema preflight. The real call still revalidates all guards. */
-    internal fun validateArguments(tool: HarnessTool, input: JsonObject): String? =
+    /** Shared side-effect-free schema preview for UI and Code Mode; execution keeps its guards. */
+    fun validateArguments(tool: HarnessTool, input: JsonObject): String? =
         validateToolInput(tool, input)
 
     /** Preview static fields while allowing prior step result references to resolve later. */
@@ -130,9 +135,7 @@ class ToolRegistry private constructor(
         input: JsonObject,
         isDeferred: (JsonElement) -> Boolean,
     ): String? {
-        val parameters = (tool.schema["function"] as? JsonObject)
-            ?.get("parameters") as? JsonObject ?: return null
-        return JsonSchemaValidator.validateTrustedDeferred(input, parameters, isDeferred)
+        return tool.parameterValidation.validateDeferred(input, isDeferred)
     }
 
     fun names(): List<String> = tools.snapshot().keys.toList()
@@ -502,29 +505,18 @@ class ToolRegistry private constructor(
         require(!description.isNullOrEmpty()) {
             "工具 description 不能为空：${tool.name}"
         }
-        val parameters = function["parameters"] as? JsonObject
-            ?: error("工具 parameters 必须是对象 schema：${tool.name}")
-        val parameterType = (parameters["type"] as? JsonPrimitive)
-            ?.takeIf { it.isString }
-            ?.content
-        require(parameterType == "object") {
-            "工具 parameters 根类型必须是 object：${tool.name}"
+        require(function["parameters"] is JsonObject) {
+            "工具 parameters 必须是对象 schema：${tool.name}"
         }
-        JsonSchemaValidator.validateSchema(
-            schema = parameters,
-            requireObjectRoot = true,
-        )?.let { problem ->
-            throw IllegalArgumentException(
-                "工具 parameters schema 非法：${tool.name}：$problem"
-            )
+        try {
+            tool.parameterValidation
+        } catch (error: IllegalArgumentException) {
+            throw IllegalArgumentException("工具 parameters schema 非法：${tool.name}：${error.message}", error)
         }
     }
 
-    private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? {
-        val function = tool.schema["function"] as? JsonObject ?: return null
-        val parameters = function["parameters"] as? JsonObject ?: return null
-        return JsonSchemaValidator.validateTrusted(input, parameters)
-    }
+    private fun validateToolInput(tool: HarnessTool, input: JsonObject): String? =
+        tool.parameterValidation.validate(input)
 
 
 

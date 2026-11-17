@@ -10,7 +10,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
- * Shared bounded JSON-Schema subset used by tool arguments and structured Agent results.
+ * Bounded legacy schema validator for structured Agent outputs and fixed UI documents.
+ * Tool arguments use the compiled standard JSON Schema engine in ToolParameterValidation.
  */
 object JsonSchemaValidator {
     private val supportedTypes = setOf(

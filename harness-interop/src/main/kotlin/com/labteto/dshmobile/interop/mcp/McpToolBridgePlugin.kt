@@ -3,7 +3,6 @@ package com.labteto.dshmobile.interop.mcp
 import com.labteto.dshmobile.harness.plugin.HarnessContext
 import com.labteto.dshmobile.harness.plugin.HarnessPlugin
 import com.labteto.dshmobile.harness.tools.HarnessTool
-import com.labteto.dshmobile.harness.tools.JsonSchemaValidator
 import com.labteto.dshmobile.harness.tools.HarnessToolExecutor
 import com.labteto.dshmobile.harness.tools.ToolAccess
 import com.labteto.dshmobile.harness.tools.ToolApprovalPolicy
@@ -728,7 +727,8 @@ class McpToolBridgePlugin(
         }
         val registered = mutableListOf<String>()
         try {
-            val remoteDefinitions = client.listTools(allowUnsupported = true)
+            val discovery = client.discoverTools(allowUnsupported = true, enforceHttpHeaders = transport == "http")
+            val remoteDefinitions = discovery.tools
             val resourceDefinitions = resourceToolDefinitions(
                 serverId, remoteDefinitions, client.supportedResourceMethods(),
             )
@@ -741,15 +741,13 @@ class McpToolBridgePlugin(
             }
             // A server's declarations are independent capabilities. An unsupported schema
             // must remain unavailable, without discarding unrelated valid tools/resources.
-            val unavailable = linkedMapOf<String, String>()
+            val unavailable = linkedMapOf<String, String>().apply {
+                putAll(discovery.rejectedTools)
+            }
             val prepared = definitions.mapNotNull { definition ->
                 try {
                     val schema = normalizeRemoteParameterSchema(definition.inputSchema)
-                    val problem = JsonSchemaValidator.validateSchema(schema, requireObjectRoot = true)
-                    if (problem != null) {
-                        unavailable[definition.name] = problem
-                        null
-                    } else definition to schema
+                    definition to schema
                 } catch (error: IllegalArgumentException) {
                     unavailable[definition.name] = error.message ?: "参数 schema 无效"
                     null
@@ -769,24 +767,11 @@ class McpToolBridgePlugin(
                 clientFactory = clientFactory,
                 beforeCall = beforeCall,
                 client = client,
-                toolNames = names,
+                toolNames = registered,
                 definitionBytes = definitionBytes,
                 remoteToolCount = remoteDefinitions.size,
-                unavailableTools = unavailable.toMap(),
+                unavailableTools = unavailable,
             )
-            val connectedMessage = buildString {
-                append("已连接 MCP 服务：").append(serverId)
-                append("\n传输：").append(transport)
-                append("\n目标：").append(displayTarget)
-                append("\n注册工具数：").append(names.size)
-                if (unavailable.isNotEmpty()) {
-                    append("\n未注册工具（当前 schema 不支持或无效）：")
-                    unavailable.forEach { (name, reason) -> append("\n").append(name).append(": ").append(reason) }
-                }
-                if (names.isNotEmpty()) {
-                    append("\n工具：").append(names.joinToString(", "))
-                }
-            }
 
             mutex.withLock {
                 require(acceptingConnections) { "MCP 插件正在卸载，连接已取消" }
@@ -803,8 +788,7 @@ class McpToolBridgePlugin(
                 }
                 prepared.zip(names).forEach { (preparedTool, localName) ->
                     val (definition, parameterSchema) = preparedTool
-                    context.tools.register(
-                        HarnessTool(
+                    val localTool = HarnessTool(
                             name = localName,
                             schema = functionToolSchema(
                                 name = localName,
@@ -902,9 +886,14 @@ class McpToolBridgePlugin(
                                     }
                                 }
                             },
-                        ),
-                    )
-                    registered += localName
+                        )
+                    try {
+                        context.tools.register(localTool)
+                        registered += localName
+                    } catch (error: IllegalArgumentException) {
+                        // One invalid remote schema must not hide independent valid tools.
+                        unavailable[definition.name] = error.message ?: "参数 schema 无效"
+                    }
                 }
                 servers[serverId] = binding
                 releaseConnectionReservationLocked(serverId)
@@ -931,6 +920,20 @@ class McpToolBridgePlugin(
                     }
                 }
             }
+            val connectedMessage = buildString {
+                append("已连接 MCP 服务：").append(serverId)
+                append("\n传输：").append(transport)
+                append("\n目标：").append(displayTarget)
+                append("\n注册工具数：").append(registered.size)
+                if (unavailable.isNotEmpty()) {
+                    append("\n未注册工具（当前 schema 不支持或无效）：")
+                    unavailable.forEach { (name, reason) -> append("\n").append(name).append(": ").append(reason) }
+                }
+                if (registered.isNotEmpty()) {
+                    append("\n工具：").append(registered.joinToString(", "))
+                }
+            }
+
             return connectedMessage
         } catch (error: Exception) {
             withContext(NonCancellable) {
@@ -1106,11 +1109,9 @@ class McpToolBridgePlugin(
                 put("additionalProperties", true)
             }
         }
-        val type = schema["type"]?.jsonPrimitive?.contentOrNull
-        require(type == null || type == "object") {
-            "MCP 工具参数根 schema 必须是 object"
-        }
-        return if (type == null) {
+        // Keep MCP's omitted root type compatible; the shared registry checks
+        // invalid or non-object roots once when it compiles the standard schema.
+        return if (schema["type"] == null) {
             JsonObject(schema + ("type" to JsonPrimitive("object")))
         } else {
             schema

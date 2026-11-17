@@ -35,6 +35,7 @@ class McpExternalLoopbackProtocolAndroidTest {
         val server = ServerSocket(0, 4, InetAddress.getByName("127.0.0.1"))
         server.soTimeout = 20_000
         val methods = ConcurrentLinkedQueue<String>()
+        val requestHeaders = ConcurrentLinkedQueue<Map<String, String>>()
         val serverError = AtomicReference<Throwable?>()
         val peer = Thread({
             try {
@@ -46,9 +47,12 @@ class McpExternalLoopbackProtocolAndroidTest {
                         val first = requireNotNull(input.readLine()) { "No HTTP request" }
                         check(first.startsWith("POST /mcp HTTP/1.")) { "Bad HTTP path: $first" }
                         var length = -1
+                        val headersOnWire = linkedMapOf<String, String>()
                         while (true) {
                             val line = input.readLine() ?: error("HTTP headers truncated")
                             if (line.isEmpty()) break
+                            val header = line.substringBefore(':').lowercase(java.util.Locale.ROOT)
+                            headersOnWire[header] = line.substringAfter(':').trim()
                             if (line.startsWith("Content-Length:", ignoreCase = true))
                                 length = line.substringAfter(':').trim().toInt()
                         }
@@ -64,10 +68,17 @@ class McpExternalLoopbackProtocolAndroidTest {
                         val method = request.getValue("method").jsonPrimitive.content
                         val id = request.getValue("id")
                         methods.add(method)
+                        requestHeaders.add(headersOnWire)
                         val result = when (method) {
-                            "tools/list" -> """{"tools":[{"name":"echo","description":"loopback fixture","inputSchema":{"type":"object"}}]}"""
+                            "tools/list" -> """{"tools":[{"name":"echo","description":"loopback fixture","inputSchema":{
+                                "type":"object","properties":{"routing":{"type":"object","properties":{
+                                  "region":{"type":"string","x-mcp-header":"Region"}
+                                }}}
+                            }}]}"""
                             "tools/call" -> {
                                 check(request["params"]?.jsonObject?.get("name")?.jsonPrimitive?.content == "echo")
+                                check(headersOnWire["mcp-name"] == "echo")
+                                check(headersOnWire["mcp-param-region"] == "west")
                                 """{"content":[{"type":"text","text":"ok"}],"isError":false}"""
                             }
                             else -> error("Unexpected MCP method $method")
@@ -98,7 +109,7 @@ class McpExternalLoopbackProtocolAndroidTest {
             val called = withTimeout(20_000) {
                 transport.request("tools/call", buildJsonObject {
                     put("name", "echo")
-                    put("arguments", buildJsonObject { put("text", "once") })
+                    put("arguments", buildJsonObject { put("routing", buildJsonObject { put("region", "west") }) })
                 })
             }
             assertTrue(called["result"].toString().contains("ok"))
@@ -110,5 +121,8 @@ class McpExternalLoopbackProtocolAndroidTest {
         assertNull("MCP TCP peer failed", serverError.get())
         assertEquals("one discovery, one tool call; no hidden replay",
             listOf("tools/list", "tools/call"), methods.toList())
+        assertEquals("tools/call", requestHeaders.last()["mcp-method"])
+        assertEquals("west", requestHeaders.last()["mcp-param-region"])
+        assertEquals("echo", requestHeaders.last()["mcp-name"])
     }
 }

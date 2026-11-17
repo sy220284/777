@@ -11,7 +11,9 @@ import com.labteto.dshmobile.harness.tools.ToolResult
 import com.labteto.dshmobile.harness.tools.functionToolSchema
 import com.labteto.dshmobile.uicontract.UiToolDraftValidation
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -68,6 +70,30 @@ class LocalToolCapabilityDraftValidatorTest {
         assertTrue(validateCapabilityDraftAgainstRegistry(registry, "test_catalog", arguments,
             """{"mode":"inspect",}""") is UiToolDraftValidation.Rejected)
         assertEquals(0, calls.get())
+    }
+
+    @Test fun workDraftUsesFullStandardSchemaForBothNativeAndRemoteTools() {
+        val schema = Json.parseToJsonElement("""{
+          "type":"object","properties":{"option":{"anyOf":[{"type":"string","minLength":2},{"type":"null"}]}},
+          "required":["option"],"additionalProperties":false
+        }""").jsonObject
+        val registry = ToolRegistry()
+        for (name in listOf("native_full", "remote_full")) {
+            registry.register(HarnessTool(
+                name = name, schema = functionToolSchema(name, "统一 Schema 测试", parameterSchema = schema),
+                access = ToolAccess.READ_ONLY, approvalPolicy = ToolApprovalPolicy.NEVER,
+                exposure = ToolExposure.CORE, metadata = ToolMetadata(family = "TEST"),
+                executor = HarnessToolExecutor { _, _, _ -> ToolResult("unexpected") },
+            ))
+            assertEquals(UiToolDraftValidation.Valid,
+                validateCapabilityDraftAgainstRegistry(registry, name, schema, """{"option":null}"""))
+            assertEquals(UiToolDraftValidation.Valid,
+                validateCapabilityDraftAgainstRegistry(registry, name, schema, """{"option":"ok"}"""))
+            assertTrue(validateCapabilityDraftAgainstRegistry(registry, name, schema,
+                """{"option":"x"}""") is UiToolDraftValidation.Rejected)
+            assertTrue(validateCapabilityDraftAgainstRegistry(registry, name, schema,
+                """{"option":2}""") is UiToolDraftValidation.Rejected)
+        }
     }
 
     @Test fun revokedOrUpdatedRegistrationNeverAcceptsPreviousSchema() {

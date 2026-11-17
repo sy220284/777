@@ -20,6 +20,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -58,6 +61,15 @@ class SettingsPageAuditTest(
     @get:Rule val rules: RuleChain = RuleChain.outerRule(permission).around(compose)
 
     @Test fun pageRendersWithItsBackActionAndKeepsNativeVisualEvidence() {
+        val onboardingSkip = compose.activity.getString(R.string.shenyan_onboarding_skip)
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithText(onboardingSkip).fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNodes().isNotEmpty()
+        }
+        if (compose.onAllNodesWithText(onboardingSkip).fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithText(onboardingSkip).performClick()
+        }
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag(SY_COMPOSER_FIELD_TAG, useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()

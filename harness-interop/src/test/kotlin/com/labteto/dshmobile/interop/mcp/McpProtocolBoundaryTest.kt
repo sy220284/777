@@ -179,7 +179,9 @@ class McpProtocolBoundaryTest {
             val id = payload["id"]!!.jsonPrimitive.content
             val code = if (method == "tools/call") 404 else 200
             val body = if (code == 404) "{}" else
-                """{"jsonrpc":"2.0","id":$id,"result":{"tools":[]}}"""
+                """{"jsonrpc":"2.0","id":$id,"result":{"tools":[
+                    {"name":"irreversible","inputSchema":{"type":"object"}}
+                ]}}"""
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                 .code(code).message("simulated").body(body.toResponseBody()).build()
         }.build()
