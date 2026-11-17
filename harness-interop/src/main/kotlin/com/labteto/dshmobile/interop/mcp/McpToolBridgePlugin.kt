@@ -929,7 +929,7 @@ class McpToolBridgePlugin(
                     append("\n未注册工具（当前 schema 不支持或无效）：")
                     unavailable.forEach { (name, reason) -> append("\n").append(name).append(": ").append(reason) }
                 }
-                if (names.isNotEmpty()) {
+                if (registered.isNotEmpty()) {
                     append("\n工具：").append(registered.joinToString(", "))
                 }
             }
