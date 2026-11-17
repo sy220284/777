@@ -238,10 +238,6 @@ internal fun LocalWorkspaceFilesDialog(
         shareableFiles.map { it.path }.distinct()
     }
 
-    LaunchedEffect(visibleSharePaths) {
-        selected.retainAll(visibleSharePaths.toSet())
-    }
-
     fun toggle(path: String) {
         if (path !in visibleSharePaths || !isShareableWorkspacePath(path)) return
         if (path in selected) selected.remove(path)
@@ -922,9 +918,10 @@ internal fun LocalWorkspaceFilesDialog(
                             SyButton(
                                 text = stringResource(R.string.local_files_select_all),
                                 onClick = {
-                                    selected.clear()
-                                    selected.addAll(visibleSharePaths.take(MAX_LOCAL_SHARE_FILES))
-                                    shareError = if (visibleSharePaths.size > MAX_LOCAL_SHARE_FILES) limitText else null
+                                    val additions = visibleSharePaths.filterNot { it in selected }
+                                    val remaining = (MAX_LOCAL_SHARE_FILES - selected.size).coerceAtLeast(0)
+                                    selected.addAll(additions.take(remaining))
+                                    shareError = if (additions.size > remaining) limitText else null
                                 },
                                 modifier = Modifier.weight(1f),
                                 size = SyButtonSize.Small,

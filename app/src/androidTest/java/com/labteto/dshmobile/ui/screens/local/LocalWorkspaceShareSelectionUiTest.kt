@@ -594,6 +594,44 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.onNodeWithText("查看下载").assertExists()
     }
     @Test
+    fun changingSearchKeepsOffscreenSelectionAndSelectAllAddsVisibleResults() {
+        val files = listOf(LocalWorkspaceFile("成果/第一份.md", 5L, 1L),
+            LocalWorkspaceFile("成果/第二份.md", 10L, 2L))
+        val saved = java.util.Collections.synchronizedList(mutableListOf<String>())
+        compose.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(
+                    mode = LocalFilesMode.CONVERSATION, sessionId = "offscreen-selection",
+                    workspacePath = context.filesDir.absolutePath,
+                    loadWorkspace = { emptyList() },
+                    loadConversation = { LocalConversationFiles(artifacts = files) },
+                    loadPreview = { path -> LocalWorkspaceFilePreview(files.first { it.path == path }) },
+                    saveToDownloads = { path ->
+                        saved += path
+                        "Download/神言神语/${path.substringAfterLast('/')}"
+                    },
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("第一份.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_files_select)).performClick()
+        compose.onNodeWithText("第一份.md").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("第二份")
+        compose.onNodeWithText(context.getString(R.string.local_files_selected_count, 1)).assertExists()
+        compose.onNodeWithText("第一份.md").assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.local_files_select_all)).performClick()
+        compose.onNodeWithText(context.getString(R.string.local_files_selected_count, 2)).assertExists()
+        compose.onNodeWithText("保存到下载").performClick()
+        compose.waitUntil(5_000) { saved.size == 2 }
+        compose.runOnIdle {
+            assertEquals(listOf("成果/第一份.md", "成果/第二份.md"), saved)
+        }
+    }
+
+    @Test
     fun rebuildingFileBrowserRetainsSelectedArtifacts() {
         val files = listOf(LocalWorkspaceFile("成果/第一份.md", 5L, 1L),
             LocalWorkspaceFile("成果/第二份.md", 10L, 2L))
