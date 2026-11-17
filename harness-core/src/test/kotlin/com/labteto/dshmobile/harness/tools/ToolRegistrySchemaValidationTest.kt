@@ -108,8 +108,7 @@ executor = HarnessToolExecutor { _, input, _ ->
                         put("type", "object")
                         put("properties", buildJsonObject {
                             put("name", buildJsonObject {
-                                put("type", "string")
-                                put("minimum", 1)
+                                put("type", "unsupported-type")
                             })
                         })
                     })
