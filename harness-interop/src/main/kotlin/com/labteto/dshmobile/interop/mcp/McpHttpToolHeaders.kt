@@ -25,6 +25,24 @@ internal object McpHttpToolHeaders {
     private val token = Regex("[!#\\$%&'*+.^_`|~0-9A-Za-z-]+")
     private val integerLimit = BigDecimal("9007199254740991")
 
+    /** Same independent per-tool admission in the host and the real Android HTTP worker. */
+    fun admit(definitions: List<McpToolDefinition>):
+        Pair<McpToolDiscovery, Map<String, List<McpHttpParameterHeader>>> {
+        val accepted = mutableListOf<McpToolDefinition>()
+        val rejected = linkedMapOf<String, String>()
+        val rules = linkedMapOf<String, List<McpHttpParameterHeader>>()
+        definitions.forEach { definition ->
+            try {
+                val fields = compile(definition.inputSchema)
+                accepted += definition
+                rules[definition.name] = fields
+            } catch (error: IllegalArgumentException) {
+                rejected[definition.name] = error.message ?: "x-mcp-header 注解无效"
+            }
+        }
+        return McpToolDiscovery(accepted, rejected) to rules.toMap()
+    }
+
     fun compile(inputSchema: JsonObject): List<McpHttpParameterHeader> {
         val headers = mutableListOf<McpHttpParameterHeader>()
         val seen = mutableSetOf<String>()
