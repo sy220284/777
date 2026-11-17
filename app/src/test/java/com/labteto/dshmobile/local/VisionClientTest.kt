@@ -49,7 +49,9 @@ class VisionClientTest {
                 "data:image/png;base64,AAAA", profile = com.labteto.dshmobile.local.model.LocalModelProfile(
                     "vision", "vision", "https://vision.example/v1"))
         }.exceptionOrNull()
-        org.junit.Assert.assertSame(failure, error)
+        // Coroutine stack-trace recovery may copy the exception across withContext.
+        assertEquals(failure.javaClass, error?.javaClass)
+        assertEquals(failure.message, error?.message)
     }
 
     @Test
