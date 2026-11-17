@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -592,4 +593,33 @@ class LocalWorkspaceShareSelectionUiTest {
         }
         compose.onNodeWithText("查看下载").assertExists()
     }
+    @Test
+    fun rebuildingFileBrowserRetainsSelectedArtifacts() {
+        val files = listOf(LocalWorkspaceFile("成果/第一份.md", 5L, 1L),
+            LocalWorkspaceFile("成果/第二份.md", 10L, 2L))
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            DshTheme {
+                LocalWorkspaceFilesDialog(mode = LocalFilesMode.CONVERSATION,
+                    sessionId = "selection-restore", workspacePath = context.filesDir.absolutePath,
+                    loadWorkspace = { emptyList() },
+                    loadConversation = { LocalConversationFiles(artifacts = files) },
+                    loadPreview = { path -> LocalWorkspaceFilePreview(files.first { it.path == path }) },
+                    onDismiss = {})
+            }
+        }
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText("第一份.md").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_files_select)).performClick()
+        compose.onNodeWithText("第一份.md").performClick()
+        compose.onNodeWithText("第二份.md").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithText(context.getString(R.string.local_files_selected_count, 2))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.local_files_selected_count, 2)).assertExists()
+    }
+
 }

@@ -39,11 +39,12 @@ fun SyTopBar(
     actionPainter: Painter? = null,
     backIcon: ImageVector = FeatherIcons.ChevronLeft,
     plainBackButton: Boolean = false,
+    titleAlpha: Float = 1f,
 ) {
     com.shenyan.designsystem.components.SyTopBar(
         title = title, onBack = onBack,
         backContentDescription = backContentDescription, modifier = modifier,
-        subtitle = subtitle, largeTitle = largeTitle,
+        subtitle = subtitle, largeTitle = largeTitle, titleAlpha = titleAlpha,
         actionIcon = actionIcon, actionContentDescription = actionContentDescription,
         actionEnabled = actionEnabled, onAction = onAction,
         actionPainter = actionPainter, backIcon = backIcon,

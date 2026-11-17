@@ -547,4 +547,29 @@ class LocalConversationComposerRegressionTest {
         compose.onNodeWithTag(SY_COMPOSER_FIELD_TAG).assertTextContains("保留草稿")
     }
 
+    @Test
+    fun modelAndReasoningAreVisibleBeforeSending() {
+        var selected = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(loading = false, configured = true,
+                        sessionId = "model-label", usageMode = LocalUsageMode.WORK),
+                    activeModelProfile = LocalModelProfile("model", "deepseek-v4-pro", "https://example.com",
+                        displayName = "我的工作模型"),
+                    input = "保留这份草稿", attachments = emptyList(), onInputChange = {},
+                    onRemoveAttachment = {}, onClearAttachments = {}, onOpenAttachmentPicker = {},
+                    onOpenModelPicker = { selected++ }, onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false }, onSend = { _, _ -> LocalSendResult.Empty },
+                    onStop = {}, onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onNodeWithText("我的工作模型").assertIsDisplayed()
+        com.labteto.dshmobile.ui.audit.captureUiAudit(compose, "dsh-flow-composer")
+        compose.onNodeWithTag("composer-model-selection").performClick()
+        compose.onNodeWithText("保留这份草稿").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(1, selected) }
+    }
+
 }

@@ -1,9 +1,9 @@
 {
   "schema": "777.v6.current-ui/1",
-  "baselineCommit": "73d86a8db525d22336c8ff45fbc7bdd1d2f4f9c9",
-  "asOf": "2026-11-16",
+  "baselineCommit": "be89abc08d8049062b6299db645691d6793dacf9",
+  "asOf": "2026-11-17",
   "platform": "Android mobile",
-  "sourceOfTruth": "Android Compose，main@73d86a8d + PR #926；最终增量按用户要求完成源码审阅并提交",
+  "sourceOfTruth": "Android Compose；DSH 参考体验优化基于 main@be89abc，验证状态以当前分支检查为准",
   "routes": [
     {
       "id": "HOME",
@@ -22,7 +22,8 @@
         "模型／能力",
         "运行中停止／排队",
         "审批／提问弹窗",
-        "工作会话菜单：工作记录与交付（历史分页、工具详情、目标步骤与成果版本关联）"
+        "工作会话菜单：工作记录与交付（历史分页、工具详情、目标步骤与成果版本关联）",
+        "输入区：当前模型与思考档位文字、按键盘可用空间调整"
       ]
     },
     {
@@ -89,6 +90,7 @@
       "label": "设置",
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/settings/SettingsScreen.kt",
       "entries": [
+        "设置搜索：别名检索、目标定位与返回恢复",
         "外观",
         "模型",
         "账户",
@@ -103,6 +105,7 @@
   ],
   "settingsDestinations": [
     "ROOT",
+    "SEARCH",
     "SESSION",
     "APPEARANCE",
     "CHAT",
@@ -239,7 +242,7 @@
       "Android 16 / API 36",
       "Android 17 / API 37"
     ],
-    "settingsCasesPerPlatform": 71,
+    "settingsCasesPerPlatform": 74,
     "releaseVersion": "777.397",
     "releaseTourNodes": 13,
     "candidateTourNodes": 12,

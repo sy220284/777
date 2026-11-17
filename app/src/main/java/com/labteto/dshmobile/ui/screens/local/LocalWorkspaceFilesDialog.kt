@@ -178,8 +178,12 @@ internal fun LocalWorkspaceFilesDialog(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    var selecting by rememberSaveable(mode, sessionId, section, directory) { mutableStateOf(false) }
-    val selected = remember(mode, sessionId, section, directory) { mutableStateListOf<String>() }
+    val selectionScope = listOf(mode.name, sessionId, workspacePath, section.toString(), directory, entryRequest.toString())
+    val selection = rememberSaveable(selectionScope, saver = workspaceSelectionSaver(selectionScope)) {
+        WorkspaceSelectionState()
+    }
+    var selecting by selection.active
+    val selected = selection.paths
     var sharing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var savedLocation by remember(mode, sessionId, section, directory) { mutableStateOf<String?>(null) }
@@ -558,8 +562,8 @@ internal fun LocalWorkspaceFilesDialog(
         fun stillCurrent(): Boolean =
             loadEpoch == epoch && directory == pageDirectory && section == currentSection &&
                 query.trim() == currentQuery
-        selected.clear()
-        selecting = false
+        // Refresh retains the current selection. Only a complete Owner snapshot can
+        // remove missing files; partial directory/search pages must keep offscreen items.
         loading = true
         loadingNextPage = false
         loadingNextSearchPage = false
@@ -592,6 +596,21 @@ internal fun LocalWorkspaceFilesDialog(
                 }
             }
             if (stillCurrent()) {
+                val complete = when (mode) {
+                    LocalFilesMode.WORKSPACE -> currentQuery.isBlank() && nextDirectoryOffset == null
+                    LocalFilesMode.CONVERSATION -> true
+                }
+                val available = when (mode) {
+                    LocalFilesMode.WORKSPACE -> entries.filterNot { it.isDirectory }.map { it.path }
+                    LocalFilesMode.CONVERSATION -> (conversation.artifacts + conversation.involved).map { it.path }
+                }.toSet()
+                val retained = reconcileWorkspaceSelection(selected.toList(), available, complete)
+                val removed = selected.size - retained.size
+                if (removed > 0) {
+                    selected.clear()
+                    selected.addAll(retained)
+                    shareError = "已移除 $removed 个不再可用的已选文件，其余选择已保留"
+                }
                 lastLoadedSearch = currentQuery
                 previewPath?.let { path -> openPreview(path) }
             }

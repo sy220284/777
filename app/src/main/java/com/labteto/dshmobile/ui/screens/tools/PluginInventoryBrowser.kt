@@ -188,9 +188,9 @@ internal fun PluginInventoryBrowser(
     val context = LocalContext.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var query by rememberSaveable { mutableStateOf("") }
-    var showSearch by rememberSaveable { mutableStateOf(false) }
     var showMarketActions by remember { mutableStateOf(false) }
-    var selectedCategory by rememberSaveable { mutableIntStateOf(0) }
+    var addedOnly by rememberSaveable { mutableStateOf(false) }
+    var selectedGroup by rememberSaveable { mutableStateOf<ExtensionGroup?>(null) }
     var transportFilter by rememberSaveable { mutableStateOf(PluginTransportFilter.ALL) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var figmaCollectionExpanded by rememberSaveable { mutableStateOf(false) }
@@ -386,14 +386,14 @@ internal fun PluginInventoryBrowser(
     val catalogue = local + connected + pluginPageSkills + availablePresets + curated + officialPlugins
     val list = catalogue.asSequence().filter { item ->
         marketplaceTabAllows(
-            selectedTab = selectedCategory, skillsOnly = skillsOnly,
+            addedOnly = addedOnly, skillsOnly = skillsOnly,
             installedSkill = item.installedSkill,
             installable = item.installablePreset || item.installableCurated ||
                 item.id.startsWith("codex-plugin:"),
             connectedService = item.connectedService,
             localPlugin = item.id.startsWith("local:") || item.installedPlugin,
-            group = item.group,
-        ) && (!item.connectedService || selectedCategory != 1 ||
+            group = item.group, selectedGroup = selectedGroup,
+        ) && (!item.connectedService ||
             connectedServices.firstOrNull { "service:${it.id}" == item.id }?.let {
                 pluginTransportMatches(it.transport, transportFilter)
             } == true)
@@ -403,7 +403,7 @@ internal fun PluginInventoryBrowser(
         .thenBy { it.first.name }).map { it.first }.toList()
 
     val figmaSkills = list.filter { it.id.startsWith("curated-skill:figma-") }
-    val groupFigmaSkills = query.isBlank() && selectedCategory == 0 && figmaSkills.size >= 3
+    val groupFigmaSkills = query.isBlank() && !addedOnly && selectedGroup == null && figmaSkills.size >= 3
     val visibleList = if (!groupFigmaSkills) list else {
         val other = list.filterNot { it.id.startsWith("curated-skill:figma-") }
         if (figmaCollectionExpanded) figmaSkills + other else other
@@ -416,63 +416,46 @@ internal fun PluginInventoryBrowser(
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
             )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                LazyRow(
-                    modifier = Modifier.weight(1f).testTag("plugin-category-list"),
-                    contentPadding = PaddingValues(start = SyMetric.gapSection, end = SyMetric.gapSm),
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                ) {
-                    items(5) { category ->
-                        SyFilterChip(
-                            text = if (skillsOnly) when (category) {
-                                1 -> "已安装"
-                                2 -> "办公效率"
-                                3 -> "开发研究"
-                                4 -> "创意设计"
-                                else -> "发现"
-                            } else when (category) {
-                                1 -> "已连接"
-                                2 -> "已安装"
-                                3 -> "设备与自动化"
-                                4 -> "创意设计"
-                                else -> "发现"
-                            },
-                            selected = selectedCategory == category,
-                            onClick = { selectedCategory = category },
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = {
-                        showSearch = !showSearch
-                        if (!showSearch) query = ""
-                    },
-                    modifier = Modifier.testTag("plugin-inventory-search-trigger"),
-                ) {
-                    Icon(FeatherIcons.Search, contentDescription = "查找技能或插件",
-                        tint = colors.text)
-                }
-                IconButton(
-                    onClick = { showMarketActions = true },
-                    modifier = Modifier.testTag("plugin-inventory-more"),
-                ) {
-                    Icon(FeatherIcons.MoreVertical, contentDescription = "更多操作",
-                        tint = colors.text)
+            Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
+                verticalAlignment = Alignment.CenterVertically) {
+                SySegmented(
+                    segments = listOf(SySegment("discover", stringResource(R.string.extension_discover)),
+                        SySegment("added", stringResource(R.string.extension_added))),
+                    selectedKey = if (addedOnly) "added" else "discover",
+                    onSelect = { addedOnly = it == "added" },
+                    modifier = Modifier.weight(1f).testTag("plugin-ownership-tabs"), stretch = true,
+                )
+                IconButton(onClick = { showMarketActions = true },
+                    modifier = Modifier.testTag("plugin-inventory-more")) {
+                    Icon(FeatherIcons.MoreVertical, contentDescription = "更多操作", tint = colors.text)
                 }
             }
-            if (showSearch) {
-                SySearchField(
-                    value = query, onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth()
-                        .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm)
-                        .testTag("plugin-inventory-search"),
-                    placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search
-                        else R.string.tools_catalog_search),
-                )
+            SySearchField(
+                value = query, onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm)
+                    .testTag("plugin-inventory-search"),
+                placeholder = stringResource(if (skillsOnly) R.string.skills_catalog_search else R.string.tools_catalog_search),
+            )
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().testTag("plugin-category-list"),
+                contentPadding = PaddingValues(horizontal = SyMetric.gapSection),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                items(listOf<ExtensionGroup?>(null) + ExtensionGroup.entries, key = { it?.name ?: "all" }) { group ->
+                    SyFilterChip(
+                        text = when (group) {
+                            ExtensionGroup.OFFICE -> "办公效率"
+                            ExtensionGroup.DEVELOPMENT -> "开发研究"
+                            ExtensionGroup.CREATIVE -> "创意设计"
+                            ExtensionGroup.AUTOMATION -> "设备与自动化"
+                            ExtensionGroup.GENERAL -> "通用能力"
+                            null -> stringResource(R.string.extension_all_categories)
+                        },
+                        selected = selectedGroup == group,
+                        onClick = { selectedGroup = group },
+                    )
+                }
             }
             if (loading && list.isNotEmpty()) {
                 Text(
@@ -781,8 +764,6 @@ internal fun PluginInventoryBrowser(
                 }
                 Column(Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.name, style = DsType.headline17.withReadingWeight(),
-                        color = colors.text)
                     Text(item.detail, style = DsType.std14.withReadingWeight(),
                         color = colors.textSecondary)
                 }

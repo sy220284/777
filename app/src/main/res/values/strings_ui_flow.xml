@@ -1,0 +1,12 @@
+<resources>
+    <string name="settings_search_title">搜索设置</string>
+    <string name="settings_search_hint">搜索名称、用途或常用说法</string>
+    <string name="settings_search_empty">没有找到对应设置，试试功能名称或用途</string>
+    <string name="settings_search_count">找到 %1$d 项设置</string>
+    <string name="settings_search_path">设置 › %1$s</string>
+    <string name="settings_search_focus">已定位到搜索结果</string>
+    <string name="extension_discover">发现</string>
+    <string name="extension_added">已添加</string>
+    <string name="extension_all_categories">全部类别</string>
+    <string name="composer_plan_active">规划已开启</string>
+</resources>

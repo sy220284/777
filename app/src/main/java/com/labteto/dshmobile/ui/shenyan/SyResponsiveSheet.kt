@@ -67,7 +67,7 @@ fun SyResponsiveSheet(
     floating: Boolean = false,
     surfaceTier: SyMaterialTier = SyMaterialTier.L4_OVERLAY,
     seamlessBackground: Boolean = true,
-    dimScrimWhenSeamless: Boolean = false,
+    dimScrimWhenSeamless: Boolean = true,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -102,7 +102,13 @@ fun SyResponsiveSheet(
                         if (!subtitle.isNullOrBlank())
                             Text(subtitle, color = p.secondaryText)
                     }
-                    trailing?.invoke()
+                    if (trailing != null) trailing() else if (dismissEnabled) {
+                        com.shenyan.designsystem.components.SyIconButton(
+                            icon = com.labteto.dshmobile.ui.components.FeatherIcons.X,
+                            contentDescription = androidx.compose.ui.res.stringResource(com.labteto.dshmobile.R.string.common_close),
+                            onClick = onDismiss,
+                        )
+                    }
                 }
             }
             if (scrollable) {

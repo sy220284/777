@@ -4,6 +4,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,7 +23,7 @@ import com.labteto.dshmobile.ui.theme.DsAnimations
 /** Keeps one context-sensitive send/stop button pinned to the right. */
 @Composable
 internal fun LocalConversationComposerExpandedRow(
-    visible: Boolean,
+    expansion: Transition<Boolean>,
     menuControl: @Composable () -> Unit,
     modelControl: @Composable () -> Unit,
     replySuggestionsControl: @Composable () -> Unit,
@@ -35,8 +36,8 @@ internal fun LocalConversationComposerExpandedRow(
     val tempo = com.shenyan.designsystem.foundation.LocalSyMotionTempo.current
     val reveal = tween<IntSize>(motion.duration(motion.composerRevealMs, reduced, tempo), easing = motion.ease)
     val fade = tween<Float>(motion.duration(motion.composerFadeMs, reduced, tempo), easing = motion.ease)
-    AnimatedVisibility(
-        visible = visible,
+    expansion.AnimatedVisibility(
+        visible = { it },
         enter = expandVertically(
             animationSpec = reveal,
             expandFrom = Alignment.Top,
@@ -52,17 +53,11 @@ internal fun LocalConversationComposerExpandedRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
-                ) {
-                    menuControl()
-                    modelControl()
-                    capabilityControls(false)
-                    planControl()
-                    replySuggestionsControl()
-                }
+                menuControl()
+                Box(Modifier.weight(1f)) { modelControl() }
+                capabilityControls(false)
+                planControl()
+                replySuggestionsControl()
                 primaryAction()
             }
         }

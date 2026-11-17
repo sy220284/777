@@ -15,6 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -37,6 +39,7 @@ fun SyTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     largeTitle: Boolean = false,
+    titleAlpha: Float = 1f,
     actionIcon: ImageVector? = null,
     actionPainter: Painter? = null,
     actionContentDescription: String? = null,
@@ -62,7 +65,8 @@ fun SyTopBar(
             ) {
                 Text(
                     title,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().alpha(titleAlpha)
+                        .then(if (titleAlpha < .5f) Modifier.clearAndSetSemantics { } else Modifier),
                     style = if (largeTitle) MaterialTheme.typography.titleLarge
                         else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,

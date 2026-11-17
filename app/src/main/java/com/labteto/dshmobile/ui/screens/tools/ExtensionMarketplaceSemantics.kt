@@ -76,27 +76,18 @@ internal fun skillMcpHttpsEndpoint(requirement: UiSkillRequirement): String? {
 
 /** Filtering is based on actual installation/source, never on translated display labels. */
 internal fun marketplaceTabAllows(
-    selectedTab: Int,
+    addedOnly: Boolean,
     skillsOnly: Boolean,
     installedSkill: Boolean,
     installable: Boolean,
     connectedService: Boolean,
     localPlugin: Boolean,
     group: ExtensionGroup,
-): Boolean = if (skillsOnly) when (selectedTab) {
-    0 -> installedSkill || installable
-    1 -> installedSkill
-    2 -> (installedSkill || installable) && group == ExtensionGroup.OFFICE
-    3 -> (installedSkill || installable) && group == ExtensionGroup.DEVELOPMENT
-    4 -> (installedSkill || installable) && group == ExtensionGroup.CREATIVE
-    else -> false
-} else when (selectedTab) {
-    0 -> installedSkill || installable || localPlugin || connectedService
-    1 -> connectedService
-    2 -> installedSkill || localPlugin
-    3 -> (installedSkill || installable || localPlugin) && group == ExtensionGroup.AUTOMATION
-    4 -> (installedSkill || installable || localPlugin) && group == ExtensionGroup.CREATIVE
-    else -> false
+    selectedGroup: ExtensionGroup? = null,
+): Boolean {
+    val owned = installedSkill || (!skillsOnly && (localPlugin || connectedService))
+    val discoverable = owned || installable
+    return (if (addedOnly) owned else discoverable) && (selectedGroup == null || group == selectedGroup)
 }
 
 /** Use importer-validated immutable source identity for every official plugin ownership check. */
