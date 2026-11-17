@@ -104,12 +104,10 @@ data class HarnessTool(
     val metadata: ToolMetadata,
     val timeoutMillis: Long? = null,
     val executor: HarnessToolExecutor,
-    /** Native schemas and external JSON Schema have different declared contracts. */
-    val parameterDialect: ToolParameterDialect = ToolParameterDialect.NATIVE,
 ) {
     internal val parameterValidation: CompiledToolParameters by lazy {
         val parameters = (schema["function"] as JsonObject)["parameters"] as JsonObject
-        CompiledToolParameters.compile(parameters, parameterDialect)
+        CompiledToolParameters.compile(parameters)
     }
 }
 
@@ -507,13 +505,8 @@ class ToolRegistry private constructor(
         require(!description.isNullOrEmpty()) {
             "工具 description 不能为空：${tool.name}"
         }
-        val parameters = function["parameters"] as? JsonObject
-            ?: error("工具 parameters 必须是对象 schema：${tool.name}")
-        val parameterType = (parameters["type"] as? JsonPrimitive)
-            ?.takeIf { it.isString }
-            ?.content
-        require(parameterType == "object") {
-            "工具 parameters 根类型必须是 object：${tool.name}"
+        require(function["parameters"] is JsonObject) {
+            "工具 parameters 必须是对象 schema：${tool.name}"
         }
         try {
             tool.parameterValidation
