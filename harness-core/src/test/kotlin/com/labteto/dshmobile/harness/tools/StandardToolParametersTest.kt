@@ -15,7 +15,10 @@ import org.junit.Test
 class StandardToolParametersTest {
     private fun json(text: String) = Json.parseToJsonElement(text)
     private fun schema(text: String) = json(text).jsonObject
-    private fun compile(text: String) = CompiledToolParameters.compile(schema(text), ToolParameterDialect.JSON_SCHEMA)
+    private fun compile(text: String) = CompiledToolParameters.compile(schema(text))
+    private fun problem(definition: JsonObject) = runCatching {
+        CompiledToolParameters.compile(definition)
+    }.exceptionOrNull()?.message
     private val key = "$"
 
     @Test fun nullableReferencesAndMetadataRetainAllConstraints() {
@@ -102,16 +105,28 @@ class StandardToolParametersTest {
             """{"type":"object","properties":{"x":{"${key}ref":"https://example.invalid/unregistered"}}}""",
             """{"type":"object","${key}schema":"https://example.invalid/custom-dialect"}""",
             """{"type":"object","properties":{"x":{"type":"invented"}}}""",
-        )) assertNotNull(raw, ToolParameterSchemas.problem(schema(raw), ToolParameterDialect.JSON_SCHEMA))
+        )) assertNotNull(raw, problem(schema(raw)))
     }
 
-    @Test fun nativeContractsRemainStrictAndStandardDefinitionsNeverLoseTheirKeywords() {
-        val input = schema("""{"type":"object","properties":{"x":{"type":["string","null"],"default":null}}}""")
-        assertNotNull(ToolParameterSchemas.problem(input, ToolParameterDialect.NATIVE))
-        assertNull(ToolParameterSchemas.problem(input, ToolParameterDialect.JSON_SCHEMA))
+    @Test fun nativeAndMcpToolsShareTheSameFullSchemaWithoutDuplicateDialectChecks() = runTest {
+        val input = schema("""{"type":"object","properties":{"x":{"type":["string","null"],"default":null}},
+          "required":["x"],"additionalProperties":false}""")
+        assertNull(problem(input))
         val registry = ToolRegistry()
         registry.register(tool(input))
-        assertEquals(input, registry.get("remote")!!.schema["function"]!!.jsonObject["parameters"])
+        registry.register(HarnessTool(
+            name = "native", schema = functionToolSchema("native", "native", parameterSchema = input),
+            access = ToolAccess.READ_ONLY, approvalPolicy = ToolApprovalPolicy.NEVER,
+            exposure = ToolExposure.CORE, metadata = ToolMetadata("test"),
+            executor = HarnessToolExecutor { _, _, _ -> ToolResult("ok") },
+        ))
+        for (name in listOf("native", "remote")) {
+            assertEquals(input, registry.get(name)!!.schema["function"]!!.jsonObject["parameters"])
+            assertEquals("INVALID_TOOL_ARGUMENTS", registry.execute(name, schema("""{"x":2}""")).errorCode)
+            assertEquals("INVALID_TOOL_ARGUMENTS", registry.execute(name, schema("""{"x":null,"extra":1}""")).errorCode)
+            assertFalse(registry.execute(name, schema("""{"x":null}"""),
+                context = ToolContext(approval = { true })).isError)
+        }
     }
 
     @Test fun deferredPreflightChecksKnownSiblingsWithoutGuessingConditionalResults() {
@@ -168,7 +183,6 @@ class StandardToolParametersTest {
         name = "remote", schema = functionToolSchema("remote", "remote", parameterSchema = parameters),
         access = ToolAccess.PRIVILEGED, approvalPolicy = ToolApprovalPolicy.ALWAYS,
         exposure = ToolExposure.CORE, metadata = ToolMetadata("test"),
-        parameterDialect = ToolParameterDialect.JSON_SCHEMA,
         executor = HarnessToolExecutor { _, _, _ -> execute() },
     )
 }
