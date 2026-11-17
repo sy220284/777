@@ -243,7 +243,7 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.onNodeWithTag("work_git_commit_load").performClick()
         compose.waitUntil(5_000) {
             compose.onNodeWithTag("work_git_commit_input").fetchSemanticsNode().config
-                .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Focused) == false
+                [androidx.compose.ui.semantics.SemanticsProperties.Focused] == false
         }
         compose.onNodeWithTag("work_git_commit_input").assertIsNotFocused()
         compose.waitUntil(5_000) {
