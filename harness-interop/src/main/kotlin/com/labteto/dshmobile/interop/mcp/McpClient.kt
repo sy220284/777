@@ -155,7 +155,7 @@ class McpClient(
     /** Also returns individually rejected HTTP-header annotations for Owner/UI visibility. */
     internal suspend fun discoverTools(
         allowUnsupported: Boolean = false,
-        enforceHttpHeaders: Boolean = false,
+        enforceHttpHeaders: Boolean = true,
     ): McpToolDiscovery {
         val tools = mutableListOf<McpToolDefinition>()
         val names = mutableSetOf<String>()
@@ -352,7 +352,10 @@ class McpStreamableHttpTransport(
                 "resources/read" -> enriched["uri"] as? JsonPrimitive
                 else -> null
             }
-            name?.takeIf { it.isString }?.content?.let {
+            if (method in setOf("tools/call", "prompts/get", "resources/read")) {
+                require(name?.isString == true) { "MCP $method 缺少有效的 Mcp-Name 来源字段" }
+            }
+            name?.content?.let {
                 builder.header("Mcp-Name", encodeHeaderValue(it))
             }
             if (method == "tools/call") {
