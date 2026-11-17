@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToIndex
@@ -240,6 +241,7 @@ class LocalWorkspaceShareSelectionUiTest {
         compose.onNodeWithText("指定提交").performClick()
         compose.onNodeWithTag("work_git_commit_input").performTextInput("abcdef1234567")
         compose.onNodeWithTag("work_git_commit_load").performClick()
+        compose.onNodeWithTag("work_git_commit_input").assertIsNotFocused()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("独立代码历史仍可查看").fetchSemanticsNodes().isNotEmpty() &&
                 compose.onAllNodesWithText("安全历史记录读取失败").fetchSemanticsNodes().isNotEmpty()

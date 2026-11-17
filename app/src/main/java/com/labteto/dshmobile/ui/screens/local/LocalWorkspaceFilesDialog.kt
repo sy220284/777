@@ -44,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -178,6 +180,8 @@ internal fun LocalWorkspaceFilesDialog(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val selectionScope = listOf(mode.name, sessionId, workspacePath, section.toString(), directory, entryRequest.toString())
     val selection = rememberSaveable(selectionScope, saver = workspaceSelectionSaver(selectionScope)) {
         WorkspaceSelectionState()
@@ -459,6 +463,9 @@ internal fun LocalWorkspaceFilesDialog(
             gitError = "请粘贴要审查的 Git 提交哈希"
             return
         }
+        // Submitting a commit closes the editor: results and review history need the viewport.
+        focusManager.clearFocus()
+        keyboardController?.hide()
         gitJob?.cancel()
         gitJob = scope.launch {
             gitLoading = true
