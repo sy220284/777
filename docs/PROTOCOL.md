@@ -88,7 +88,7 @@ API 模型档案可选保存非秘密的 `credentialBinding`，由配置 Owner �
 
 ## MCP 工具参数 Schema
 
-MCP `inputSchema` 保留原始标准约束，参数根为 object。外部工具在注册时显式采用 JSON Schema 方言，未声明 `$schema` 时按 Draft 2020-12；显式 Draft 4/6/7/2019-09/2020-12 由标准引擎解释。nullable 类型、组合条件、`$defs`/`definitions`、局部引用/anchor、布尔子 Schema、字符串/数值/容器约束不会在接入时被删改。编译后的校验器属于该次不可变工具注册，普通调用、`tool_call` 和 Code Mode 的最终执行共用它；原生工具仍使用原有受控 Schema 契约。
+所有工具参数（原生工具与 MCP `inputSchema`）均使用同一标准 JSON Schema 引擎，参数根为 object。，未声明 `$schema` 时按 Draft 2020-12；显式 Draft 4/6/7/2019-09/2020-12 由标准引擎解释。nullable 类型、组合条件、`$defs`/`definitions`、局部引用/anchor、布尔子 Schema、字符串/数值/容器约束不会在接入时被删改。工具注册时只编译一次参数定义，编译后的校验器属于该次不可变工具注册，普通调用、`tool_call` 和 Code Mode 的最终执行共用它。权限分级与审批策略由工具注册信息独立确定，不通过额外的 Schema 校验分支实现。
 
 引用只解析该工具定义内已声明的资源，不会为 `$ref` 自动访问网络。缺失引用、未知方言或无效定义使该工具保持未注册，原因通过连接结果、服务发现与 UI 详情公开，其他有效工具仍可使用。远端 Schema 或 annotations 不授予执行权限，MCP 工具仍逐次按高权限审批。
 
