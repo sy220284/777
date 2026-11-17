@@ -21,47 +21,22 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Native authoring contracts stay strict; external tools declare standard JSON Schema. */
-enum class ToolParameterDialect { NATIVE, JSON_SCHEMA }
-
-object ToolParameterSchemas {
-    fun problem(schema: JsonObject, dialect: ToolParameterDialect): String? = try {
-        CompiledToolParameters.compile(schema, dialect)
-        null
-    } catch (error: IllegalArgumentException) {
-        error.message ?: "参数 schema 无效"
-    }
-}
-
+/** All tools use the same JSON Schema compiler, preview and execution validator. */
 /** Compiled once on the immutable registration, shared by preflight and real execution. */
 internal abstract class CompiledToolParameters {
     abstract fun validate(value: JsonElement): String?
     abstract fun validateDeferred(value: JsonElement, deferred: (JsonElement) -> Boolean): String?
 
     companion object {
-        fun compile(schema: JsonObject, dialect: ToolParameterDialect): CompiledToolParameters {
+        fun compile(schema: JsonObject): CompiledToolParameters {
             require(schema["type"] == JsonPrimitive("object")) { "工具参数根类型必须是 object" }
-            return when (dialect) {
-                ToolParameterDialect.NATIVE -> {
-                    JsonSchemaValidator.validateSchema(schema, requireObjectRoot = true)?.let {
-                        throw IllegalArgumentException(it)
-                    }
-                    NativeParameters(schema)
-                }
-                ToolParameterDialect.JSON_SCHEMA -> try {
-                    StandardParameters(schema)
-                } catch (error: SchemaException) {
-                    throw IllegalArgumentException(error.message ?: "JSON Schema 编译失败", error)
-                }
+            return try {
+                StandardParameters(schema)
+            } catch (error: SchemaException) {
+                throw IllegalArgumentException(error.message ?: "JSON Schema 编译失败", error)
             }
         }
     }
-}
-
-private class NativeParameters(private val schema: JsonObject) : CompiledToolParameters() {
-    override fun validate(value: JsonElement) = JsonSchemaValidator.validateTrusted(value, schema)
-    override fun validateDeferred(value: JsonElement, deferred: (JsonElement) -> Boolean) =
-        JsonSchemaValidator.validateTrustedDeferred(value, schema, deferred)
 }
 
 private class StandardParameters(private val definition: JsonObject) : CompiledToolParameters() {
