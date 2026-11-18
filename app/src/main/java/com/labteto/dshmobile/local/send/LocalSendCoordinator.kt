@@ -135,6 +135,7 @@ internal fun prepareLocalSend(
                         bytes = attachment.bytes,
                         attachmentId = attachment.attachmentId,
                         source = LocalMessageMediaSource.USER,
+                        pdfPages = attachment.pdfPages,
                     ),
                 )
             }

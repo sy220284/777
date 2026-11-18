@@ -6,6 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.model.visibleAssistantText
+import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
+import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.ui.AgentOperationKind
 import com.labteto.dshmobile.ui.components.FeatherIcons
 
@@ -65,3 +67,25 @@ internal fun localWorkToolFailed(content: String): Boolean =
     "工具执行失败" in content || "[TOOL_TIMEOUT]" in content ||
         "[MODEL_TIMEOUT]" in content || "[NETWORK_ERROR]" in content ||
         "[DNS_FAILED]" in content || "[SSRF_BLOCKED]" in content
+
+/** Preserve the human-readable finding even when its tool receipt is folded away. */
+internal data class LocalWorkFindingSummary(val label: String, val text: String)
+
+internal fun localWorkFindingSummary(message: LocalHarnessMessage): LocalWorkFindingSummary? {
+    if (message.role != "tool" || message.toolName != "work_finding" ||
+        completedWorkToolPhase(message) != LocalToolUiPhase.COMPLETED) return null
+    val content = message.content
+    val detail = if (content.contains("；发现="))
+        content.substringAfter("；发现=").substringBefore("；来源回执=").trim().take(280)
+    else ""
+    val status = if (content.contains("状态="))
+        content.substringAfter("状态=").substringBefore("；")
+    else ""
+    val title = when (status) {
+        "supported" -> "调查线索 · 有来源支持"
+        "rejected" -> "调查修正 · 已排除假说"
+        "hypothesis" -> "发现新线索 · 待核查"
+        else -> "调查发现已整理"
+    }
+    return LocalWorkFindingSummary(title, detail)
+}

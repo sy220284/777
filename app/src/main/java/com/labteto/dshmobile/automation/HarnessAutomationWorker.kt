@@ -73,6 +73,7 @@ class HarnessAutomationWorker(
         val id = inputData.getString(HarnessAutomationScheduler.KEY_TASK_ID)
             ?: return Result.failure()
         val manualRun = inputData.getBoolean(HarnessAutomationScheduler.KEY_MANUAL_RUN, false)
+        val approvalResume = inputData.getBoolean(HarnessAutomationScheduler.KEY_APPROVAL_RESUME, false)
         val entry = EntryPointAccessors.fromApplication(
             applicationContext,
             WorkerEntryPoint::class.java,
@@ -94,7 +95,7 @@ class HarnessAutomationWorker(
         // the task, keep this WorkManager request pending instead of reporting a false success.
         val lease = AutomationExecutionRegistry.tryAcquire(id) ?: return Result.retry()
         return try {
-            doOwnedWork(id, manualRun, manualExecutionId, entry, requestedGeneration)
+            doOwnedWork(id, manualRun, manualExecutionId, entry, requestedGeneration, approvalResume)
         } finally {
             lease.close()
         }
@@ -106,6 +107,7 @@ class HarnessAutomationWorker(
         manualExecutionId: String?,
         entry: WorkerEntryPoint,
         requestedGeneration: Long,
+        approvalResume: Boolean,
     ): Result {
         val store = entry.automationStore()
         val scheduler = entry.automationScheduler()
@@ -126,6 +128,8 @@ class HarnessAutomationWorker(
         ) return Result.success()
 
         // Manual WorkManager re-entry must reconcile the SAME durable execution, not send it again.
+        if (approvalResume && (!manualRun || task.mode != AutomationMode.WORK ||
+            task.workSessionId.isNullOrBlank())) return Result.failure()
         val recovering = if (manualRun) task.activeManualStartedAt != null
             else task.status == AutomationStatus.RUNNING && task.lastRunAt != null
         val started = when {
@@ -169,7 +173,7 @@ class HarnessAutomationWorker(
                 runtime.prepareWorkSession(
                     text = task.prompt,
                     preferredSessionId = task.workSessionId,
-                    recoverInterrupted = recovering,
+                    recoverInterrupted = recovering || approvalResume,
                 ).also { sessionId ->
                     task = store.updateIf(
                         id,
@@ -187,7 +191,7 @@ class HarnessAutomationWorker(
                 AutomationMode.WORK -> runtime.runWork(
                     text = task.prompt,
                     preferredSessionId = workSessionId,
-                    recoverInterrupted = recovering,
+                    recoverInterrupted = recovering || approvalResume,
                 )
                 AutomationMode.CHAT -> runtime.runChat(
                     instruction = task.prompt,
@@ -227,6 +231,7 @@ class HarnessAutomationWorker(
                     started = started,
                     manualExecutionId = manualExecutionId,
                     run = run,
+                    approvalResume = approvalResume,
                 )
                 LocalAutomationRunStatus.BLOCKED -> settlement.settleBlocked(
                     id = id,

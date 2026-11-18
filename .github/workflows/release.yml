@@ -350,4 +350,9 @@ jobs:
           name: ${{ steps.version.outputs.tag }}
           files: |
             .release-assets/*
+          body: |
+            ## 安装要求
+            - 此安装包适用于 Android 16 及以上、支持 arm64-v8a 的设备。
+            - Android 15 及以下系统和仅支持 x86_64 或 32 位 ABI 的设备无法安装此包。
+            - x86_64 模拟器可按[兼容性说明](https://github.com/sy220284/777/blob/main/docs/COMPATIBILITY.md)自行构建调试包。
           generate_release_notes: true

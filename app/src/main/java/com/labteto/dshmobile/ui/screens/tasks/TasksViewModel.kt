@@ -89,6 +89,11 @@ class TasksViewModel @Inject constructor(
     fun pause(id: String) = manage(id, TasksNotice.PAUSED) { AutomationUiCommand.Pause(id) }
     fun resume(id: String) = manage(id, TasksNotice.RESUMED) { AutomationUiCommand.Resume(id) }
     fun runNow(id: String) = manage(id, TasksNotice.RUN_STARTED) { AutomationUiCommand.RunNow(id) }
+    fun approveBlocked(id: String) = manage(id, TasksNotice.RUN_STARTED) {
+        val generation = mutableState.value.tasks.firstOrNull { it.id == id }
+            ?.scheduleGeneration ?: -1L
+        AutomationUiCommand.ApproveBlocked(id, generation)
+    }
 
     private fun manage(id: String, success: TasksNotice, command: () -> AutomationUiCommand) {
         if (id in mutableState.value.busyIds) return

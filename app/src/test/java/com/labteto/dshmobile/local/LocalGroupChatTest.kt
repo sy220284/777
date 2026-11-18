@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.chat.LocalGroupChatMember
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.local.chat.MAX_GROUP_CHAT_RESPONDERS_PER_TURN
 import com.labteto.dshmobile.local.chat.groupChatResponders
+import com.labteto.dshmobile.local.chat.groupSpeechDirectedInput
 import com.labteto.dshmobile.local.chat.groupMemberMemoryQuery
 import com.labteto.dshmobile.local.chat.groupMemberMayStaySilent
 import com.labteto.dshmobile.local.chat.groupMessageVisibleContent
@@ -40,6 +41,17 @@ class LocalGroupChatTest {
         displayName = "赵二",
         chatState = ChatCharacterState(),
     )
+
+    @Test
+    fun explicitSpeakerChoiceOverridesMessageCuesAndAllowsSameNamedMembers() {
+        val otherAyaka = ayaka.copy(galleryId = "another-ayaka")
+        val roster = listOf(ayaka, kafka, zhao, otherAyaka)
+        val directed = groupSpeechDirectedInput("请大家依次回答", roster, otherAyaka)
+        assertEquals(listOf(otherAyaka), groupChatResponders(directed, roster.reversed()))
+        val all = groupSpeechDirectedInput("@赵二 你怎么看", roster, null)
+        assertEquals(roster, groupChatResponders(all, roster))
+        roster.forEachIndexed { index, member -> assertFalse(groupMemberMayStaySilent(all, member, index)) }
+    }
 
     @Test
     fun groupFollowUpMemoryUsesOnlyDeliveredSpeechAndKeepsItBounded() {

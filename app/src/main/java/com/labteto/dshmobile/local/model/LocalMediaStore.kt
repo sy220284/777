@@ -32,6 +32,25 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     private val mutableError = MutableStateFlow<String?>(null)
     val recoveryErrors: StateFlow<String?> = mutableError
 
+    private val routePreferences by lazy { context.getSharedPreferences("local_media_routes", Context.MODE_PRIVATE) }
+    private val preferredRoutes = MutableStateFlow<Map<LocalMediaKind, String>?>(null)
+    internal val mediaRoutes: StateFlow<Map<LocalMediaKind, String>?> get() = preferredRoutes
+
+    @Synchronized
+    internal fun loadMediaRoutes() {
+        preferredRoutes.value = LocalMediaKind.entries.mapNotNull { kind ->
+            routePreferences.getString(kind.name, null)?.let { kind to it }
+        }.toMap()
+    }
+
+    @Synchronized
+    internal fun setMediaRoute(kind: LocalMediaKind, offerId: String?) {
+        val editor = routePreferences.edit()
+        if (offerId == null) editor.remove(kind.name) else editor.putString(kind.name, offerId)
+        check(editor.commit()) { "创作账户选择未能保存" }
+        loadMediaRoutes()
+    }
+
     @Synchronized
     fun initialize() = operation {
         if (initialized) return@operation
@@ -153,6 +172,12 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun updateVideo(id: String, transition: (LocalMediaVideoTask) -> LocalMediaVideoTask) = update(id) { row ->
         row.copy(video = transition(row.video ?: error("视频任务不存在")))
     }
+    @Synchronized
+    internal fun pollableVideos(): List<LocalMediaVideoTask> = operation {
+        initialize()
+        database.pollableVideos()
+    }
+
     /** Saved local media results are retrieved by the single result() lookup below. */
     @Synchronized
     fun videosNeedingDelivery(): List<LocalMediaVideoTask> = operation {

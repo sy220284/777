@@ -284,6 +284,20 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun sidebarAndWorkspaceSearchRetainIndependentContinuationsForTheSameQuery() {
+        repeat(99) { index -> root.resolve("report-$index.md").writeText("正文") }
+        val sidebar = workspace.searchSidebarWorkspacePage("report", 0)
+        val workspacePage = workspace.searchWorkspacePage("report", 0, pageSize = 1)
+
+        val olderSidebar = workspace.searchSidebarWorkspacePage("report", requireNotNull(sidebar.nextOffset))
+        val olderWorkspace = workspace.searchWorkspacePage("report", requireNotNull(workspacePage.nextOffset), pageSize = 1)
+
+        assertEquals(99, (sidebar.files + olderSidebar.files).map { it.path }.distinct().size)
+        assertEquals(null, olderSidebar.nextOffset)
+        assertTrue(workspacePage.files.single().path != olderWorkspace.files.single().path)
+    }
+
+    @Test
     fun searchPagesReturnAllMatchingPathsWithoutDuplicateOrEagerContentReads() {
         val folder = root.resolve("任务/搜索目录").apply { mkdirs() }
         repeat(235) { n -> folder.resolve("报告-${n.toString().padStart(4, '0')}.md").writeText("不应预览的正文") }
@@ -964,6 +978,32 @@ class LocalWorkspaceTest {
             workspace.exportFileForUi(root.resolve("exports/large.bin").absolutePath,
                 java.io.ByteArrayOutputStream())
         }
+    }
+
+    @Test
+    fun directoryArchivePreservesPathsAndContentsPastShareSelectionLimit() {
+        val folder = root.resolve("供交付").apply { mkdirs() }
+        val nested = folder.resolve("正文").apply { mkdirs() }
+        folder.resolve("空目录").mkdirs()
+        folder.resolve(".git").apply { mkdirs() }.resolve("config").writeText("内部")
+        repeat(305) { index -> nested.resolve("$index.txt").writeText("第 $index 项") }
+        val output = java.io.ByteArrayOutputStream()
+        assertEquals(305, workspace.exportDirectoryArchiveForUi("供交付", output))
+
+        val names = mutableSetOf<String>()
+        java.util.zip.ZipInputStream(output.toByteArray().inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                assertTrue(names.add(entry.name))
+                if (!entry.isDirectory) {
+                    val index = entry.name.substringAfterLast('/').substringBefore('.')
+                    assertEquals("第 $index 项", zip.readBytes().toString(Charsets.UTF_8))
+                }
+            }
+        }
+        assertTrue("空目录/" in names)
+        assertTrue("正文/304.txt" in names)
+        assertTrue(names.none { it.startsWith(".git/") })
     }
 
     @Test

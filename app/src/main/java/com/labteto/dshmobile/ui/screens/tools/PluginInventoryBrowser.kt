@@ -123,6 +123,7 @@ internal fun PluginInventoryBrowser(
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var showMarketActions by remember { mutableStateOf(false) }
     var addedOnly by rememberSaveable { mutableStateOf(true) }
+    var catalogueQuery by rememberSaveable { mutableStateOf("") }
     var showOwnedInDiscover by rememberSaveable { mutableStateOf(false) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var showCreateSkill by remember { mutableStateOf(false) }
@@ -257,8 +258,19 @@ internal fun PluginInventoryBrowser(
             configuredConnector = item.id == "connector:github" && githubConfigured,
         )
     }
-    val owned = catalogue.filter(isAdded).sortedBy { it.name }
-    val discoverable = catalogue.filterNot(isAdded).sortedBy { it.name }
+    val query = catalogueQuery.trim()
+    val originalSkillText = buildMap {
+        skills.forEach { put("skill:${it.name}", listOf(it.displayName.orEmpty(), it.description)) }
+        presets.filterNot { it.id in installedSkillIds }.forEach {
+            put("skill:${it.id}", listOf(it.title, it.description))
+        }
+    }
+    val matchesSearch: (InventoryRow) -> Boolean = { item ->
+        (listOf(item.id, item.name, item.detail, item.sourceLabel) + originalSkillText[item.id].orEmpty())
+            .any { it.contains(query, ignoreCase = true) }
+    }
+    val owned = catalogue.filter(isAdded).filter(matchesSearch).sortedBy { it.name }
+    val discoverable = catalogue.filterNot(isAdded).filter(matchesSearch).sortedBy { it.name }
     val visible = if (addedOnly) owned else discoverable
     val isConnector: (InventoryRow) -> Boolean = {
         it.id.startsWith("service:") || it.id.startsWith("connector:")
@@ -324,6 +336,14 @@ internal fun PluginInventoryBrowser(
                         tint = colors.textTertiary, modifier = Modifier.size(17.dp))
                 }
             }
+            SyTextField(
+                value = catalogueQuery,
+                onValueChange = { catalogueQuery = it.take(128) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection)
+                    .testTag("plugin-inventory-search"),
+                placeholder = { Text(stringResource(R.string.tools_catalog_search)) },
+                singleLine = true,
+            )
             if (loading && visible.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.common_loading),
@@ -359,8 +379,13 @@ internal fun PluginInventoryBrowser(
                 if (sections.none { it.entries.isNotEmpty() } && error == null && !loading) {
                     item(key = "inventory-empty") {
                         Text(
-                            if (addedOnly) "尚未添加技能、插件或连接器"
-                            else "暂无可添加的能力；可查看已添加的项目",
+                            when {
+                                query.isNotEmpty() && !addedOnly && owned.isNotEmpty() &&
+                                    !showOwnedInDiscover -> "可添加项目中没有匹配项；可展开下方已添加项目"
+                                query.isNotEmpty() -> stringResource(R.string.tools_catalog_no_match)
+                                addedOnly -> "尚未添加技能、插件或连接器"
+                                else -> "暂无可添加的能力；可查看已添加的项目"
+                            },
                             style = DsType.std14.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
@@ -735,11 +760,13 @@ internal fun PluginInventoryBrowser(
             footer = {
                 SyButton(
                     text = "确认安装",
-                    enabled = !loading && githubImportUrl.trim().startsWith("https://github.com/"),
+                    enabled = !loading && githubImportUrl.trim().let {
+                        it.startsWith("https://github.com/", ignoreCase = true) ||
+                            it.startsWith("github.com/", ignoreCase = true)
+                    },
                     onClick = {
                         val source = githubImportUrl.trim()
                         showGitHubImport = false
-                        githubImportUrl = ""
                         onInstallGitHubSkill(source)
                     },
                     modifier = Modifier.fillMaxWidth().testTag("skill-install-github-confirm"),

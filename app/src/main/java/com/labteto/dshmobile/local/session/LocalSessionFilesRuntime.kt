@@ -220,6 +220,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     override suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile> =
         kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchWorkspaceFileNames(query) }
 
+    override suspend fun searchSidebarWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
+        kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchSidebarWorkspacePage(query, offset) }
+
     override suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
         kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
 
@@ -328,6 +331,59 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         }
         return locations
     }
+
+    override suspend fun saveWorkHandoffDocument(sourceSessionId: String, document: String): String =
+        withContext(Dispatchers.IO) {
+            require(sourceSessionId.isNotBlank() && document.isNotBlank()) { "交接原文为空" }
+            val parsed = kotlinx.serialization.json.Json.decodeFromString(
+                WorkHandoffDocument.serializer(), document,
+            )
+            require(parsed.version == 1 && parsed.sourceSessionId == sourceSessionId &&
+                parsed.messages.isNotEmpty() && parsed.messages.all {
+                    it.messageId.isNotBlank() && it.role in setOf("user", "assistant")
+                }) { "交接原文与来源会话不匹配" }
+            val checksum = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(document.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val path = "工作交接/所选消息全文-$checksum.json"
+            val expected = "sha256:$checksum"
+            val existing = workspace.fileVersion(path)
+            if (existing.revision == "absent") {
+                val saved = workspace.writeIfVersion(path, "absent", document)
+                check(saved.revision == expected) { "交接原文保存后校验失败" }
+            } else {
+                check(existing.revision == expected) { "交接原文文件已被更改，请重新保存" }
+            }
+            path
+        }
+
+    override suspend fun exportWorkspaceArchive(directory: String, destination: android.net.Uri): Int =
+        withContext(Dispatchers.IO) {
+            require(destination.scheme == "content") { "需要选择一个文件保存位置" }
+            val staged = File.createTempFile("workspace-directory-", ".zip", context.cacheDir)
+            try {
+                resourceScheduler.withResource(HarnessResourceKind.FILE_IO, "file:export_archive",
+                    priority = HarnessResourcePriority.BACKGROUND) {
+                    kotlinx.coroutines.runInterruptible {
+                        val count = staged.outputStream().buffered().use { workspace.exportDirectoryArchiveForUi(directory, it) }
+                        context.contentResolver.openOutputStream(destination, "wt")?.buffered()?.use { output ->
+                            staged.inputStream().use { input ->
+                                val buffer = ByteArray(64 * 1024)
+                                while (true) {
+                                    if (Thread.currentThread().isInterrupted) throw InterruptedException()
+                                    val size = input.read(buffer)
+                                    if (size < 0) break
+                                    output.write(buffer, 0, size)
+                                }
+                            }
+                        } ?: error("无法打开压缩包保存位置")
+                        count
+                    }
+                }
+            } finally {
+                staged.delete()
+            }
+        }
 
     override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
         withContext(Dispatchers.IO) {

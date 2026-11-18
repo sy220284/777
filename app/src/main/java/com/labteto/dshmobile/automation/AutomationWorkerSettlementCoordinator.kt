@@ -34,6 +34,7 @@ internal class AutomationWorkerSettlementCoordinator(
         started: Long,
         manualExecutionId: String?,
         run: LocalAutomationRunResult,
+        approvalResume: Boolean = false,
     ) {
         val finished = System.currentTimeMillis()
         val chained = !manualRun && usesChainedAutomationScheduling(task)
@@ -59,6 +60,12 @@ internal class AutomationWorkerSettlementCoordinator(
                 ?.takeIf { it >= started }
             committedWaiting = waitingRequested && userActivityDuringRun == null
             committedNext = when {
+                manualRun && approvalResume && current.recurringMinutes != null ->
+                    if (usesChainedAutomationScheduling(current)) nextAnchoredAutomationRun(
+                        current, finished,
+                    ) else checkedAutomationFutureMillis(
+                        finished, requireNotNull(current.recurringMinutes), "任务周期",
+                    )
                 manualRun -> current.nextRunAt
                 waitingRequested && userActivityDuringRun != null ->
                     nextAutomationRunAfterUserActivity(current, userActivityDuringRun)
@@ -74,6 +81,8 @@ internal class AutomationWorkerSettlementCoordinator(
                 else -> current.nextRunAt
             }
             val nextStatus = when {
+                manualRun && approvalResume ->
+                    if (current.recurringMinutes != null) AutomationStatus.SCHEDULED else AutomationStatus.COMPLETED
                 manualRun -> current.status
                 committedWaiting -> AutomationStatus.WAITING_USER
                 chained || deferredOneShot || current.recurringMinutes != null -> AutomationStatus.SCHEDULED
@@ -88,7 +97,7 @@ internal class AutomationWorkerSettlementCoordinator(
                     current.workSessionId
                 },
                 status = nextStatus,
-                nextRunAt = if (manualRun) current.nextRunAt else committedNext ?: current.nextRunAt,
+                nextRunAt = if (manualRun && !approvalResume) current.nextRunAt else committedNext ?: current.nextRunAt,
                 lastResult = truncateWithoutSplittingSurrogatePair(resultText, 20_000),
                 lastError = null,
                 failureStreak = if (manualRun) current.failureStreak else 0,
@@ -115,7 +124,10 @@ internal class AutomationWorkerSettlementCoordinator(
                 resultText = run.output,
             )
         }
-        if (mayEnqueueNextAfterAutomationSettlement(manualRun, updated, committedNext)) {
+        if (mayEnqueueNextAfterAutomationSettlement(manualRun, updated, committedNext) ||
+            (approvalResume && updated?.status == AutomationStatus.SCHEDULED &&
+                updated.recurringMinutes != null && usesChainedAutomationScheduling(updated) &&
+                committedNext != null)) {
             scheduler.enqueueNextChained(id, requireNotNull(committedNext), requestedGeneration)
         }
         if (updated != null && committedWaiting) {

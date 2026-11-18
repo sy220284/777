@@ -41,6 +41,7 @@ sealed interface LocalMessageBlock {
         val bytes: Long,
         val attachmentId: String? = null,
         val source: LocalMessageMediaSource = LocalMessageMediaSource.USER,
+        val pdfPages: List<Int> = emptyList(),
     ) : LocalMessageBlock
 
     /**

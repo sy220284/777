@@ -11,4 +11,5 @@ data class LocalImportedAttachment(
     val attachmentId: String? = null,
     val width: Int? = null,
     val height: Int? = null,
+    val pdfPages: List<Int> = emptyList(),
 )

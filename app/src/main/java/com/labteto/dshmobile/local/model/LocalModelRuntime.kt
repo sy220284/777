@@ -164,7 +164,8 @@ class LocalModelRuntime @Inject constructor(
         protocol: LocalModelProtocol? = null,
         profileId: String? = null,
         credentialSourceProfileId: String? = null,
-    ): String = configuration.test(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
+        probe: LocalModelProbe = LocalModelProbe.TEXT,
+    ): String = configuration.test(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId, probe)
 
     internal suspend fun discoverApiModels(
         apiKey: String,

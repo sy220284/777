@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -129,10 +130,10 @@ class MainPagesAuditTourTest {
         }
         page(R.string.tools_title, "main-tools") {
             // One capability directory replaces the former plugin/skill/connector tabs.
-            // Verify the default installed view and that the retired controls are absent.
+            // The unified capability directory now supports local search; retired category tabs stay absent.
             compose.onNodeWithTag("plugin-ownership-tabs").assertExists()
             compose.onNodeWithTag("plugin-category-list").assertDoesNotExist()
-            compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
+            compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
             captureUiAudit(compose, "main-skills")
             // Secondary configuration returns through the same top-bar and system-back stack.
             compose.onNodeWithTag("capability-settings-entry").performClick()

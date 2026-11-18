@@ -10,23 +10,25 @@ class LocalMediaAutoRouteTest {
     private fun p(id: String, model: String, host: String) =
         LocalModelProfile(id = id, model = model, baseUrl = host, authKind = LocalModelAuthKind.API_KEY)
 
-    @Test fun prefersCurrentSupportedAccountAndPreservesExplicitChoice() {
+    @Test fun aSingleEligibleRouteCanBeUsedAndMultipleAccountsRequireAChoice() {
         val openai = p("oa", "gpt-6", "https://api.openai.com/v1")
         val mini = p("mm", "MiniMax-M2.7", "https://api.minimaxi.com/v1")
         val offers = LocalMediaCatalog.offers(listOf(openai, mini))
-        val auto = LocalMediaCatalog.selectOffer(offers, LocalMediaKind.VIDEO, "oa")
-        assertEquals("mm", auto?.profile?.id)
-        val video = offers.first { it.kind == LocalMediaKind.VIDEO }
-        assertEquals(video.id, LocalMediaCatalog.selectOffer(offers, LocalMediaKind.VIDEO, "oa", video.id)?.id)
-        assertEquals("oa", LocalMediaCatalog.selectOffer(offers, LocalMediaKind.SPEECH, "oa")?.profile?.id)
+        val video = LocalMediaCatalog.selectOffer(offers, LocalMediaKind.VIDEO, null)
+        assertEquals("mm", video?.profile?.id)
+        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.SPEECH, null))
+        val speech = offers.first { it.kind == LocalMediaKind.SPEECH && it.profile.id == "oa" }
+        assertEquals(speech, LocalMediaCatalog.selectOffer(offers, LocalMediaKind.SPEECH, speech.id))
+        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.VIDEO, speech.id))
     }
 
-    @Test fun missingCapabilityDoesNotFabricateProviderOrRoute() {
+    @Test fun aDeletedSavedRouteNeverSwitchesToAnotherAccount() {
         val openai = p("oa", "gpt-6", "https://api.openai.com/v1")
         val offers = LocalMediaCatalog.offers(listOf(openai))
-        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.VIDEO, "oa"))
-        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.IMAGE, "oa", "deleted-model"))
-        assertEquals("oa", LocalMediaCatalog.selectOffer(offers, LocalMediaKind.IMAGE, "oa")?.profile?.id)
+        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.VIDEO, null))
+        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.IMAGE, "deleted-model"))
+        assertNull(LocalMediaCatalog.selectOffer(offers, LocalMediaKind.SPEECH, "deleted-model"))
+        assertEquals("oa", LocalMediaCatalog.selectOffer(offers, LocalMediaKind.SPEECH, null)?.profile?.id)
     }
 
     @Test fun historyRecreationPreservesExactAccountAndCreatorParameters() {

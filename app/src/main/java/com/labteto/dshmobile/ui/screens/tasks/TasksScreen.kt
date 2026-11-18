@@ -296,6 +296,7 @@ private fun WorkTasksScreen(
                                 onRunNow = { viewModel.runNow(selectedTask.id) },
                                 onEdit = { startEdit(selectedTask) },
                                 onOpenSession = onOpenSession,
+                                onApproveBlocked = { viewModel.approveBlocked(selectedTask.id) },
                             )
                         }
                         else -> Column(

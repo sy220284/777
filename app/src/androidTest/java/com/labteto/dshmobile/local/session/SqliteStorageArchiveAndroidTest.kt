@@ -262,4 +262,79 @@ class SqliteStorageArchiveAndroidTest {
                 .deleteRecursively()
         }
     }
+
+    @Test fun crossDeviceRestoreMergesExistingSessionsAndPreservesDivergentIdentity() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val uid = UUID.randomUUID().toString()
+        val sourceSnapshot = "merge-source-$uid-snap.db"
+        val sourceEvents = "merge-source-$uid-events.db"
+        val localSnapshot = "merge-target-$uid-snap.db"
+        val localEvents = "merge-target-$uid-events.db"
+        val key = "merge-$uid"
+        val pending = java.io.File(context.filesDir, "local-harness/.sqlite-restore-pending-$key")
+        val archive = ByteArrayOutputStream()
+        fun save(snapshots: SqliteSessionSnapshotStore, events: SqliteSessionEventDatabase,
+                 id: String, title: String) {
+            snapshots.write(id, Json.encodeToJsonElement(
+                LocalHarnessSession.serializer(), LocalHarnessSession(id=id,title=title),
+            ).jsonObject, 42L)
+            events.append(id,"user/message",buildJsonObject { put("content",title) })
+        }
+        try {
+            SqliteSessionSnapshotStore(context,Json,sourceSnapshot).use { snapshots ->
+                SqliteSessionEventDatabase(context,Json,sourceEvents).use { events ->
+                    save(snapshots,events,"same-session","外部设备不同分支")
+                    save(snapshots,events,"incoming-only","外部设备专属会话")
+                    SqliteSessionStorageManager(context,snapshots,events,
+                        sourceSnapshot,sourceEvents,"merge-export-$uid").exportAll(archive)
+                }
+            }
+            SqliteSessionSnapshotStore(context,Json,localSnapshot).use { snapshots ->
+                SqliteSessionEventDatabase(context,Json,localEvents).use { events ->
+                    save(snapshots,events,"same-session","本机保留的原会话")
+                    save(snapshots,events,"local-only","本机专属会话")
+                    val manager=SqliteSessionStorageManager(context,snapshots,events,
+                        localSnapshot,localEvents,key)
+                    assertEquals(2,manager.stageRestore(archive.toByteArray()))
+                    assertEquals("sqlite-v2-media-merge",
+                        java.io.File(pending,"READY").readText(Charsets.UTF_8))
+                    assertEquals("本机保留的原会话",
+                        snapshots.read("same-session")?.document?.payload
+                            ?.get("title")?.toString()?.trim('"'))
+                }
+            }
+            SqliteSessionSnapshotStore(context,Json,localSnapshot).use { snapshots ->
+                SqliteSessionEventDatabase(context,Json,localEvents).use { events ->
+                    val manager=SqliteSessionStorageManager(context,snapshots,events,
+                        localSnapshot,localEvents,key)
+                    assertEquals(2,manager.applyPendingRestore())
+                    assertEquals(0,manager.applyPendingRestore())
+                }
+            }
+            SqliteSessionSnapshotStore(context,Json,localSnapshot).use { snapshots ->
+                SqliteSessionEventDatabase(context,Json,localEvents).use { events ->
+                    val titles=snapshots.ids().associateWith { id ->
+                        snapshots.read(id)?.document?.payload?.get("title")?.toString()?.trim('"')
+                    }
+                    assertEquals(4,titles.size)
+                    assertEquals("本机保留的原会话",titles["same-session"])
+                    assertEquals("本机专属会话",titles["local-only"])
+                    assertEquals("外部设备专属会话",titles["incoming-only"])
+                    val importedSibling = titles.entries.single {
+                        it.key !in setOf("same-session","incoming-only","local-only")
+                    }
+                    assertEquals("外部设备不同分支",importedSibling.value)
+                    assertEquals(0L,events.latestSequence(importedSibling.key))
+                    assertEquals(0L,events.latestSequence("same-session"))
+                    assertEquals(0L,events.latestSequence("incoming-only"))
+                    assertEquals(0L,events.latestSequence("local-only"))
+                    assertTrue(!pending.exists())
+                }
+            }
+        } finally {
+            pending.deleteRecursively()
+            listOf(sourceSnapshot,sourceEvents,localSnapshot,localEvents)
+                .forEach(context::deleteDatabase)
+        }
+    }
 }

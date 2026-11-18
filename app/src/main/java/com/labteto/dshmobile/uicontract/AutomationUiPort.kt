@@ -44,6 +44,7 @@ sealed interface AutomationUiCommand {
     data class Pause(val id: String) : AutomationUiCommand
     data class Resume(val id: String) : AutomationUiCommand
     data class RunNow(val id: String) : AutomationUiCommand
+    data class ApproveBlocked(val id: String, val expectedGeneration: Long) : AutomationUiCommand
 }
 enum class UiAutomationRejection { STALE_CONTEXT, STALE_TASK, INVALID_INPUT, MISSING, OWNER_REJECTED }
 sealed interface AutomationUiReceipt {

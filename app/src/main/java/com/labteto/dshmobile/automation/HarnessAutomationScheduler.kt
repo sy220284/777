@@ -351,6 +351,9 @@ class HarnessAutomationScheduler @Inject constructor(
 
     fun pauseTask(id: String): Boolean {
         val task = store.get(id) ?: return false
+        // Pausing a blocked Work task and then resuming it would bypass the
+        // single-call approval fence and replay the prompt from the beginning.
+        if (task.mode == AutomationMode.WORK && task.status == AutomationStatus.BLOCKED) return false
         if (task.status == AutomationStatus.PAUSED) return true
         require(task.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
         val paused = store.updateIf(
@@ -394,13 +397,20 @@ class HarnessAutomationScheduler @Inject constructor(
         return true
     }
 
-    fun runTaskNow(id: String): Boolean {
+    fun runTaskNow(id: String, approvalResume: Boolean = false): Boolean {
         val task = store.get(id) ?: return false
+        // Blocked Work may contain a side-effectful tool; ordinary "Run now"
+        // would start the prompt from the beginning and could repeat that effect.
+        if (task.mode == AutomationMode.WORK && task.status == AutomationStatus.BLOCKED &&
+            !approvalResume) return false
+        if (approvalResume && (task.mode != AutomationMode.WORK ||
+            task.status != AutomationStatus.BLOCKED || task.workSessionId.isNullOrBlank())) return false
         val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
             .setInputData(
                 Data.Builder()
                     .putString(KEY_TASK_ID, id)
                     .putBoolean(KEY_MANUAL_RUN, true)
+                    .putBoolean(KEY_APPROVAL_RESUME, approvalResume)
                     .putLong(KEY_SCHEDULE_GENERATION, task.scheduleGeneration)
                     .build(),
             )
@@ -718,6 +728,7 @@ class HarnessAutomationScheduler @Inject constructor(
         const val KEY_TASK_ID = "task_id"
         const val KEY_MANUAL_RUN = "manual_run"
         const val KEY_SCHEDULE_GENERATION = "schedule_generation"
+        const val KEY_APPROVAL_RESUME = "approval_resume"
         const val WORK_TAG = "harness-automation"
         fun workName(id: String, generation: Long = 0L) = automationWorkName(id, generation)
         fun manualWorkName(id: String, generation: Long? = null) =

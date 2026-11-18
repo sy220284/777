@@ -25,6 +25,7 @@ internal fun ConversationActionsMenu(
     onOpenWorkEvidence: (() -> Unit)? = null,
     onOpenDocuments: (() -> Unit)? = null,
     onOpenSample: (() -> Unit)? = null,
+    onSearchMessages: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var expanded by remember { mutableStateOf(false) }
@@ -41,8 +42,10 @@ internal fun ConversationActionsMenu(
         SyConversationActionPopup(
             expanded = expanded,
             onDismiss = { expanded = false },
-            primaryActionCount = listOfNotNull(onOpenWorkEvidence, onOpenDocuments, onOpenSample).size,
-            items = onOpenWorkEvidence?.let { open -> listOf(SyMenuItem(
+            primaryActionCount = listOfNotNull(onSearchMessages, onOpenWorkEvidence, onOpenDocuments, onOpenSample).size,
+            items = onSearchMessages?.let { open -> listOf(SyMenuItem(
+                text = stringResource(R.string.sy_v6_search_messages), icon = FeatherIcons.Search, onClick = open,
+            )) }.orEmpty() + onOpenWorkEvidence?.let { open -> listOf(SyMenuItem(
                 text = stringResource(R.string.work_evidence_title), icon = ConversationMenuIcons.WorkEvidence, onClick = open,
             )) }.orEmpty() + onOpenDocuments?.let { open -> listOf(SyMenuItem(
                 text = stringResource(R.string.local_session_documents),

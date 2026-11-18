@@ -1,6 +1,8 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.automation.AutomationMode
+import com.labteto.dshmobile.automation.AutomationStatus
+import com.labteto.dshmobile.local.work.WorkAutomationApprovalResumeLedger
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.automation.AutomationUiDefaults
 import com.labteto.dshmobile.automation.AutomationScheduleType
@@ -36,6 +38,7 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
     private val scheduler: HarnessAutomationScheduler,
     private val state: LocalRuntimeStateStore,
     private val planning: AutomationPlanningService,
+    private val approvalLedger: WorkAutomationApprovalResumeLedger,
 ) : AutomationUiPort {
     private fun context(snapshot: LocalHarnessState) = UiAutomationContext(state.uiBindingIdentity(snapshot),
         snapshot.usageMode, snapshot.chat.groupChat.enabled, snapshot.chat.chatPersona.name)
@@ -98,6 +101,17 @@ class LocalAutomationUiPortComposition @Inject internal constructor(
                 is AutomationUiCommand.Pause -> scheduler.pauseTask(command.id)
                 is AutomationUiCommand.Resume -> scheduler.resumeTask(command.id)
                 is AutomationUiCommand.RunNow -> scheduler.runTaskNow(command.id)
+                is AutomationUiCommand.ApproveBlocked -> {
+                    val task = scheduler.list().firstOrNull { it.id == command.id }
+                        ?: return AutomationUiReceipt.Rejected(UiAutomationRejection.MISSING)
+                    if (task.scheduleGeneration != command.expectedGeneration)
+                        return AutomationUiReceipt.Rejected(UiAutomationRejection.STALE_TASK)
+                    if (task.mode != AutomationMode.WORK || task.status != AutomationStatus.BLOCKED ||
+                        task.workSessionId.isNullOrBlank())
+                        return AutomationUiReceipt.Rejected(UiAutomationRejection.INVALID_INPUT)
+                    approvalLedger.authorize(requireNotNull(task.workSessionId)) &&
+                        scheduler.runTaskNow(task.id, approvalResume = true)
+                }
             }
             if (applied) AutomationUiReceipt.Applied()
             else AutomationUiReceipt.Rejected(UiAutomationRejection.OWNER_REJECTED)

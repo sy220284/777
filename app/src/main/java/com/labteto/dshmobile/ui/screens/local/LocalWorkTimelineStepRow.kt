@@ -169,22 +169,13 @@ internal fun WorkTimelineStepRow(
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
     val receipts = listOf(message) + groupedMessages
     val hasDetails = operationGroup || message.content.isNotBlank() || message.blocks.isNotEmpty() ||
+        message.toolCallId != null || message.toolErrorCode != null ||
+        !activity?.argumentsPreview.isNullOrBlank() ||
         groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
     val activities = receipts.mapNotNull { userFacingWorkToolAction(it.toolName) }.distinct()
-    val isFinding = !operationGroup && message.toolName == "work_finding" &&
-        phase == LocalToolUiPhase.COMPLETED
-    val findingText = if (isFinding && message.content.contains("；发现="))
-        message.content.substringAfter("；发现=").substringBefore("；来源回执=").trim().take(280)
-    else ""
-    val findingStatus = if (isFinding && message.content.contains("状态="))
-        message.content.substringAfter("状态=").substringBefore("；")
-    else ""
-    val findingLabel = when (findingStatus) {
-        "supported" -> "调查线索 · 有来源支持"
-        "rejected" -> "调查修正 · 已排除假说"
-        "hypothesis" -> "发现新线索 · 待核查"
-        else -> if (isFinding) "调查发现已整理" else null
-    }
+    val finding = if (operationGroup) null else localWorkFindingSummary(message)
+    val findingText = finding?.text.orEmpty()
+    val findingLabel = finding?.label
     val groupLabel = if (operationGroup) {
         val summary = activities.take(2).joinToString("、").ifBlank { "工具操作" }
         "$summary · 已完成 ${receipts.size} 项"
@@ -213,7 +204,14 @@ internal fun WorkTimelineStepRow(
                     variant = SyButtonVariant.Ghost)
             }) {
             Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
-            message.toolErrorCode?.let { Text(it, style = DsType.small13.withReadingWeight()) }
+            message.toolCallId?.let { Text("调用标识：$it", style = DsType.small13.withReadingWeight()) }
+            activity?.argumentsPreview?.takeIf(String::isNotBlank)?.let { preview ->
+                Text("调用参数", style = DsType.small13.withReadingWeight())
+                SelectionContainer {
+                    Text(preview, style = DsType.std14.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                }
+            }
             receipts.forEachIndexed { index, receipt ->
                 if (operationGroup || repeatCount > 1) {
                     Text(if (operationGroup) "第 ${index + 1} 项 · " +
@@ -221,12 +219,18 @@ internal fun WorkTimelineStepRow(
                         else "第 ${index + 1} 次检查",
                         style = DsType.small13.withReadingWeight())
                 }
+                receipt.toolErrorCode?.let { code ->
+                    Text("错误代码：$code", style = DsType.small13.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
+                }
                 receipt.blocks.filterIsInstance<com.labteto.dshmobile.local.session.LocalMessageBlock.Image>().forEach { image ->
                     LocalTranscriptImage(image, workspacePath)
                 }
-                SelectionContainer {
-                    Text(receipt.content, style = DsType.std14.withReadingWeight(),
-                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                if (receipt.content.isNotBlank()) {
+                    SelectionContainer {
+                        Text(receipt.content, style = DsType.std14.withReadingWeight(),
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                    }
                 }
             }
         }
@@ -244,7 +248,7 @@ internal fun completedWorkToolPhase(
 }
 
 @Composable
-private fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String =
+internal fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String =
     naturalWorkToolAction(name, argumentsPreview)
         ?: userFacingWorkToolAction(name)
         ?: stringResource(userFacingWorkToolActionRes(name)
@@ -315,7 +319,7 @@ private fun WorkToolStatusRow(
                 Text(status, style = DsType.small13.withReadingWeight(), color = tint)
             }
         }
-        if (labelOverride != null && onClick != null) {
+        if (onClick != null) {
             Icon(imageVector = FeatherIcons.ChevronRight, contentDescription = "展开操作明细",
                 tint = colors.textSecondary, modifier = Modifier.size(16.dp))
         }
@@ -325,7 +329,29 @@ private fun WorkToolStatusRow(
 @Composable
 internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem) {
     if (activity.phase !in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING)) return
-    WorkToolStatusRow(activity.name, activity.phase, argumentsPreview = activity.argumentsPreview)
+    var detailsOpen by remember(activity.executionId, activity.declaredSequence, activity.callId) {
+        mutableStateOf(false)
+    }
+    WorkToolStatusRow(activity.name, activity.phase, argumentsPreview = activity.argumentsPreview,
+        onClick = { detailsOpen = true })
+    if (detailsOpen) {
+        SyResponsiveSheet(title = "执行中 · 工具调用", onDismiss = { detailsOpen = false },
+            scrollable = true, seamlessBackground = false,
+            trailing = {
+                SyButton("关闭", onClick = { detailsOpen = false }, size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost)
+            }) {
+            Text(workToolPhaseText(activity.phase), style = DsType.std14Strong.withReadingWeight())
+            Text("调用标识：${activity.callId}", style = DsType.small13.withReadingWeight())
+            activity.argumentsPreview?.takeIf(String::isNotBlank)?.let { preview ->
+                Text("调用参数", style = DsType.small13.withReadingWeight())
+                SelectionContainer {
+                    Text(preview, style = DsType.std14.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                }
+            }
+        }
+    }
 }
 
 @Composable

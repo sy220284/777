@@ -435,6 +435,10 @@ internal class LocalWorkComposition @Inject constructor(
         modelAdmission = LocalWorkExecutionControl().asModelAdmissionPort(),
     )
 
+    internal suspend fun executeApprovedAutomationTool(
+        sessionId: String, call: LocalToolCall,
+    ): AgentToolResult = backgroundTools.executeApprovedAutomationTool(call, sessionId)
+
     internal fun schedulePersistentRecovery() {
         // Both startup and session switches must wait for the full durable projection before
         // reconciling team mailboxes, instead of accessing a partially rebuilt snapshot.
