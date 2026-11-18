@@ -351,6 +351,9 @@ class HarnessAutomationScheduler @Inject constructor(
 
     fun pauseTask(id: String): Boolean {
         val task = store.get(id) ?: return false
+        // Pausing a blocked Work task and then resuming it would bypass the
+        // single-call approval fence and replay the prompt from the beginning.
+        if (task.mode == AutomationMode.WORK && task.status == AutomationStatus.BLOCKED) return false
         if (task.status == AutomationStatus.PAUSED) return true
         require(task.scheduleGeneration < Long.MAX_VALUE) { "自动任务排程 generation 已耗尽" }
         val paused = store.updateIf(

@@ -181,7 +181,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             blockedReason.get()?.let { reason ->
                 persistTranscript(
                     session = session,
-                    messages = listOf(userMessage),
+                    messages = if (pendingApproval != null) emptyList() else listOf(userMessage),
                     finalRole = "system",
                     finalContent = reason,
                     eventLog = boundEventLog,
@@ -230,7 +230,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             val detail = "后台任务执行超时，已停止本轮任务"
             persistTranscript(
                 session = session,
-                messages = listOf(userMessage),
+                messages = if (pendingApproval != null) emptyList() else listOf(userMessage),
                 finalRole = "system",
                 finalContent = detail,
                 eventLog = boundEventLog,
@@ -255,7 +255,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             val detail = "后台任务失败：" + (error.message ?: error::class.java.simpleName)
             persistTranscript(
                 session = session,
-                messages = listOf(userMessage),
+                messages = if (pendingApproval != null) emptyList() else listOf(userMessage),
                 finalRole = "system",
                 finalContent = detail,
                 eventLog = boundEventLog,

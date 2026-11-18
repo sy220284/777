@@ -333,7 +333,7 @@ internal fun TaskCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                if (task.recurringMinutes != null) {
+                if (task.recurringMinutes != null && task.status != AutomationStatus.BLOCKED) {
                     SyButton(
                         text = stringResource(
                             if (task.status == AutomationStatus.PAUSED) R.string.tasks_resume
