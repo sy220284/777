@@ -172,6 +172,26 @@ class LocalWorkToolDisclosureTest {
         assertSame(original, foldWorkToolsToTurnStart(original))
     }
 
+    @Test fun structuredFindingRemainsVisibleAsNarrativeWithOriginalReceiptFolded() {
+        val discovery = tool("discovery", 20).copy(
+            toolName = "work_finding",
+            content = "已记录调查线索 ID=x；状态=hypothesis；发现=调用链存在明显重复；来源回执=read-1",
+        )
+        val displayed = foldWorkToolsToTurnStart(buildLocalTranscript(listOf(
+            message("user", "user", "检查实现", 1),
+            discovery,
+            message("final", "assistant", "已整理修改结论", 30),
+        )))
+        assertEquals(listOf("message:user", "work-tools:user",
+            "work-step:work-finding:discovery", "message:final"), displayed.map { it.key })
+        assertEquals(listOf("discovery"),
+            (displayed[1] as LocalTranscriptItem.WorkTools).toolIds())
+        val finding = (displayed[2] as LocalTranscriptItem.WorkStep).message.content
+        assertTrue(finding.contains("发现新线索 · 待核查"))
+        assertTrue(finding.contains("调用链存在明显重复"))
+        assertEquals("message:final", displayed.last().key)
+    }
+
     @Test fun compactPollsStillCountEveryReceipt() {
         val first = tool("first", 4)
         val second = tool("second", 5)
