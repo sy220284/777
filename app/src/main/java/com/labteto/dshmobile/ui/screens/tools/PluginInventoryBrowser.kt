@@ -100,6 +100,7 @@ internal fun PluginInventoryBrowser(
     onRetry: (() -> Unit)? = null,
     onBack: () -> Unit,
     onManageConnections: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     githubConfigured: Boolean = false,
     onGitHub: () -> Unit = {},
     onAddMcp: () -> Unit = {},
@@ -154,8 +155,6 @@ internal fun PluginInventoryBrowser(
             editedSkillDisplayName = skills.firstOrNull { it.name == skillEditor.id }?.displayName.orEmpty()
         }
     }
-    val installedStatus = stringResource(R.string.tools_catalog_installed)
-    val connectionStatus = stringResource(R.string.tools_catalog_connections)
     // The built-in skill runtime is represented by individual installed skills.
     val local = localIds.filterNot { it == "android-local-builtins" }.sorted().map { id ->
         val label = when (id) {
@@ -326,13 +325,13 @@ internal fun PluginInventoryBrowser(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                stringResource(if (loading) R.string.common_loading else if (addedOnly) R.string.skills_catalog_empty else R.string.tools_catalog_empty),
+                                if (loading) stringResource(R.string.common_loading)
+                                else if (addedOnly) "尚未添加技能、插件或连接器"
+                                else "暂无可添加的能力",
                                 style = DsType.std14.withReadingWeight(),
                                 color = colors.textSecondary,
                             )
-                            // The existing V5 service-nav action above remains available here.
-                            // Do not render a second visually identical external-service button.
-                        }
+                                        }
                     }
                 } else {
                     items(list, key = { it.id }) { item ->
@@ -678,7 +677,7 @@ internal fun PluginInventoryBrowser(
             SyButton(text = "添加 MCP 连接器", variant = SyButtonVariant.Ghost,
                 onClick = { showMarketActions = false; onAddMcp() }, modifier = Modifier.fillMaxWidth())
             SyButton(text = "能力与权限设置", variant = SyButtonVariant.Ghost,
-                onClick = { showMarketActions = false; onManageConnections() }, modifier = Modifier.fillMaxWidth())
+                onClick = { showMarketActions = false; onOpenSettings() }, modifier = Modifier.fillMaxWidth())
         }
     }
     if (showGitHubImport && onInstallGitHubSkill != null) {
