@@ -394,13 +394,16 @@ class HarnessAutomationScheduler @Inject constructor(
         return true
     }
 
-    fun runTaskNow(id: String): Boolean {
+    fun runTaskNow(id: String, approvalResume: Boolean = false): Boolean {
         val task = store.get(id) ?: return false
+        if (approvalResume && (task.mode != AutomationMode.WORK ||
+            task.status != AutomationStatus.BLOCKED || task.workSessionId.isNullOrBlank())) return false
         val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
             .setInputData(
                 Data.Builder()
                     .putString(KEY_TASK_ID, id)
                     .putBoolean(KEY_MANUAL_RUN, true)
+                    .putBoolean(KEY_APPROVAL_RESUME, approvalResume)
                     .putLong(KEY_SCHEDULE_GENERATION, task.scheduleGeneration)
                     .build(),
             )
@@ -718,6 +721,7 @@ class HarnessAutomationScheduler @Inject constructor(
         const val KEY_TASK_ID = "task_id"
         const val KEY_MANUAL_RUN = "manual_run"
         const val KEY_SCHEDULE_GENERATION = "schedule_generation"
+        const val KEY_APPROVAL_RESUME = "approval_resume"
         const val WORK_TAG = "harness-automation"
         fun workName(id: String, generation: Long = 0L) = automationWorkName(id, generation)
         fun manualWorkName(id: String, generation: Long? = null) =
