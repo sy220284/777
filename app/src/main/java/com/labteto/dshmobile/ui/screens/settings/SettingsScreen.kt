@@ -531,10 +531,6 @@ fun SettingsScreen(
                             pageStack = settingsNavigationPush(pageStack, entry.destination)
                         })
                     SettingsDestination.ROOT -> {
-                        AppSettingsRow(icon = FeatherIcons.Search,
-                            title = stringResource(R.string.settings_search_title),
-                            subtitle = stringResource(R.string.settings_search_hint),
-                            onClick = { openPage(SettingsDestination.SEARCH) }, compact = true)
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_appearance_experience)) {
                             AppSettingsRow(icon = SyEntryIcons.Appearance,
                                 title = stringResource(settingsPageEntry(SettingsDestination.APPEARANCE)!!.titleRes),
