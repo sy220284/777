@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.ThemePreference
@@ -115,7 +117,11 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-connector:github").assertDoesNotExist()
         compose.onNodeWithTag("discover-owned-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("capability-inventory-list")
+            .performScrollToNode(hasTestTag("plugin-inventory-card-local:android-runtime"))
         compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertExists()
+        compose.onNodeWithTag("capability-inventory-list")
+            .performScrollToNode(hasTestTag("plugin-inventory-card-connector:github"))
         compose.onNodeWithTag("plugin-inventory-card-connector:github").assertExists()
     }
 
