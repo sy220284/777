@@ -26,9 +26,12 @@ import kotlinx.serialization.json.put
  * No device-wide automatic approval, prompt replay or silent side-effect retries.
  */
 @Singleton
-internal class WorkAutomationApprovalResumeLedger @Inject constructor(
-    private val storage: LocalSessionStorageRuntime,
+internal class WorkAutomationApprovalResumeLedger private constructor(
+    private val eventLogFor: (String) -> LocalSessionEventLog,
 ) {
+    @Inject internal constructor(storage: LocalSessionStorageRuntime) : this(storage.eventLogs::get)
+    /** File-backed EventLogs in JVM tests exercise the same durable event protocol. */
+    internal constructor(eventLogFor: (String) -> LocalSessionEventLog, testOwner: Unit) : this(eventLogFor)
     internal data class Pending(
         val sessionId: String,
         val blockSequence: Long,
@@ -43,7 +46,7 @@ internal class WorkAutomationApprovalResumeLedger @Inject constructor(
         val step: Int,
         val callId: String,
     )
-    private fun log(sessionId: String) = storage.eventLogs.get(sessionId)
+    private fun log(sessionId: String) = eventLogFor(sessionId)
 
     private fun callDigest(call: LocalToolCall): String {
         val bytes = (call.name + "\n" + call.id + "\n" + call.arguments.toString())
