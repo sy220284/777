@@ -18,6 +18,8 @@ CLASSES=[
  'com.labteto.dshmobile.ui.screens.settings.SettingsNavigationStateRestorationTest',
  'com.labteto.dshmobile.ui.audit.MainPagesAuditTourTest',
  'com.labteto.dshmobile.ui.audit.ContentPagesAuditTest',
+ 'com.labteto.dshmobile.ui.screens.local.LocalSessionEntryRegressionTest',
+ 'com.labteto.dshmobile.ui.screens.local.LocalDrawerEntryVisibilityRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest',
