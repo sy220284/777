@@ -180,7 +180,7 @@ class TokenUsageDatabaseAndroidTest {
         val original = record("from-v1").copy(model = "MiniMax-M3")
         old.execSQL(
             "INSERT INTO records (id, timestamp, payload) VALUES (?, ?, ?)",
-            arrayOf(original.requestId, original.timestamp, json.encodeToString(TokenUsageRecord.serializer(), original)),
+            arrayOf<Any>(original.requestId, original.timestamp, json.encodeToString(TokenUsageRecord.serializer(), original)),
         )
         old.setVersion(1)
         old.close()
