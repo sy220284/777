@@ -969,7 +969,7 @@ fun ToolsScreen(
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     val catalogueStateHolder = rememberSaveableStateHolder()
-    var showConnectorSettings by rememberSaveable { mutableStateOf(false) }
+    var showCapabilitySettings by rememberSaveable { mutableStateOf(false) }
     var showAdvancedConfiguration by rememberSaveable { mutableStateOf(false) }
     var showToolDirectory by rememberSaveable { mutableStateOf(false) }
     var toolDirectoryQuery by rememberSaveable { mutableStateOf("") }
@@ -987,7 +987,7 @@ fun ToolsScreen(
         )
     }
 
-    BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showAgentSettings || showConnectorSettings || handleRootSystemBack) {
+    BackHandler(enabled = showGitHubBrowser || showGitHubConfig || showAgentSettings || showCapabilitySettings || handleRootSystemBack) {
         when {
             showGitHubBrowser -> showGitHubBrowser = false
             showGitHubConfig -> {
@@ -996,7 +996,7 @@ fun ToolsScreen(
                 githubToken = ""
             }
             showAgentSettings -> showAgentSettings = false
-            showConnectorSettings -> showConnectorSettings = false
+            showCapabilitySettings -> showCapabilitySettings = false
             else -> onClose()
         }
     }
@@ -1056,20 +1056,20 @@ fun ToolsScreen(
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                     SyTopBar(
                         title = stringResource(
-                            if (showConnectorSettings) R.string.cap_center_settings_group
+                            if (showCapabilitySettings) R.string.cap_center_settings_group
                             else R.string.tools_title,
                         ),
                         onBack = {
-                            if (showConnectorSettings) showConnectorSettings = false else onClose()
+                            if (showCapabilitySettings) showCapabilitySettings = false else onClose()
                         },
                         backContentDescription = stringResource(R.string.common_back),
-                        actionIcon = if (showConnectorSettings) null else FeatherIcons.RefreshCw,
+                        actionIcon = if (showCapabilitySettings) null else FeatherIcons.RefreshCw,
                         actionContentDescription = stringResource(R.string.tools_refresh),
-                        actionEnabled = !state.loading && !showConnectorSettings,
-                        onAction = if (showConnectorSettings) null else viewModel::refresh,
+                        actionEnabled = !state.loading && !showCapabilitySettings,
+                        onAction = if (showCapabilitySettings) null else viewModel::refresh,
                     )
                     Box(Modifier.weight(1f)) {
-                        if (!showConnectorSettings) {
+                        if (!showCapabilitySettings) {
                             catalogueStateHolder.SaveableStateProvider("capability-catalogue") {
                             PluginInventoryBrowser(
                                 localIds = state.localPlugins,
@@ -1091,7 +1091,7 @@ fun ToolsScreen(
                                 onRetry = viewModel::refresh,
                                 onBack = onClose,
                                 onManageConnections = { showExternalConfig = true },
-                                onOpenSettings = { showConnectorSettings = true },
+                                onOpenSettings = { showCapabilitySettings = true },
                                 onReturnToChat = onClose,
                                 onUseCapability = onUseCapability,
                                 onInstallPreset = viewModel::installPreset,
