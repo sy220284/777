@@ -671,7 +671,8 @@ internal fun PluginInventoryBrowser(
             SyButton(text = "GitHub 连接器", variant = SyButtonVariant.Ghost,
                 onClick = { showMarketActions = false; onGitHub() }, modifier = Modifier.fillMaxWidth())
             SyButton(text = "添加 MCP 连接器", variant = SyButtonVariant.Ghost,
-                onClick = { showMarketActions = false; onAddMcp() }, modifier = Modifier.fillMaxWidth())
+                onClick = { showMarketActions = false; onAddMcp() },
+                modifier = Modifier.fillMaxWidth().testTag("capability-menu-add-mcp"))
             SyButton(text = "能力与权限设置", variant = SyButtonVariant.Ghost,
                 onClick = { showMarketActions = false; onOpenSettings() }, modifier = Modifier.fillMaxWidth())
         }
