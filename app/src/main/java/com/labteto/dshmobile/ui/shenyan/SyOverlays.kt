@@ -2,6 +2,9 @@ package com.labteto.dshmobile.ui.shenyan
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +18,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -52,9 +57,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
@@ -291,67 +299,118 @@ fun SyPopupMenu(
     }
 }
 
-/** Keeps exact RTL and on-screen action placement instead of moving tool menus. */
+internal fun contextActionMenuPosition(
+    anchor: IntRect,
+    popup: IntSize,
+    viewport: IntRect,
+    direction: LayoutDirection,
+    touchAnchor: IntOffset?,
+    gap: Int,
+): IntOffset {
+    val maxX = (viewport.right - popup.width).coerceAtLeast(viewport.left)
+    val maxY = (viewport.bottom - popup.height).coerceAtLeast(viewport.top)
+    val alignedX = when (direction) {
+        LayoutDirection.Ltr -> anchor.right - popup.width
+        LayoutDirection.Rtl -> anchor.left
+    }
+    val x = (touchAnchor?.let { it.x - popup.width / 2 } ?: alignedX)
+        .coerceIn(viewport.left, maxX)
+    val below = (touchAnchor?.y ?: anchor.bottom) + gap
+    val above = (touchAnchor?.y ?: anchor.top) - popup.height - gap
+    val y = when {
+        below in viewport.top..maxY -> below
+        above in viewport.top..maxY -> above
+        else -> below.coerceIn(viewport.top, maxY)
+    }
+    return IntOffset(x, y)
+}
+
+/** Positions message actions at the press, with a layout anchor for buttons and accessibility. */
 @Composable
 fun SyContextActionMenu(
-    expanded: Boolean, onDismiss: () -> Unit, items: List<SyMenuItem>,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    items: List<SyMenuItem>,
+    touchAnchor: IntOffset? = null,
 ) {
-    if (!expanded || items.isEmpty()) return
+    val visibility = remember { MutableTransitionState(false) }
+    visibility.targetState = expanded && items.isNotEmpty()
+    if (!visibility.currentState && !visibility.targetState) return
     val p = LocalSyColors.current
-    val maxMenuWidth = (LocalConfiguration.current.screenWidthDp.dp - 24.dp).coerceAtLeast(220.dp)
-    val provider = remember {
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val safeDrawing = WindowInsets.safeDrawing
+    val left = safeDrawing.getLeft(density, direction)
+    val top = safeDrawing.getTop(density)
+    val right = safeDrawing.getRight(density, direction)
+    val bottom = safeDrawing.getBottom(density)
+    val maxMenuWidth = (configuration.screenWidthDp.dp - with(density) { (left + right).toDp() } - 16.dp)
+        .coerceAtLeast(1.dp)
+    val availableHeight = configuration.screenHeightDp.dp - with(density) { (top + bottom).toDp() }
+    val maxMenuHeight = availableHeight.coerceIn(1.dp, (configuration.screenHeightDp.dp * .60f).coerceAtLeast(1.dp))
+    val gap = with(density) { 8.dp.roundToPx() }
+    val provider = remember(touchAnchor, left, top, right, bottom, gap) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect, windowSize: IntSize,
                 layoutDirection: LayoutDirection, popupContentSize: IntSize,
             ): IntOffset {
-                val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-                val x = when(layoutDirection) {
-                    LayoutDirection.Ltr -> anchorBounds.right - popupContentSize.width
-                    LayoutDirection.Rtl -> anchorBounds.left
-                }.coerceIn(0,maxX)
-                val below = anchorBounds.bottom
-                val above = anchorBounds.top - popupContentSize.height
-                val y = when {
-                    below + popupContentSize.height <= windowSize.height -> below
-                    above >= 0 -> above
-                    else -> (windowSize.height - popupContentSize.height).coerceAtLeast(0)
-                }
-                return IntOffset(x,y)
+                val viewport = IntRect(
+                    left, top,
+                    (windowSize.width - right).coerceAtLeast(left),
+                    (windowSize.height - bottom).coerceAtLeast(top),
+                )
+                return contextActionMenuPosition(
+                    anchorBounds, popupContentSize, viewport, layoutDirection, touchAnchor, gap,
+                )
             }
         }
     }
-    Popup(popupPositionProvider = provider, onDismissRequest = onDismiss,
+    val reduceMotion = LocalSyReduceMotion.current
+    val tempo = LocalSyMotionTempo.current
+    val duration = SyMotion.duration(SyMotion.selectMs, reduceMotion, tempo)
+    val origin = TransformOrigin(.5f, 0f)
+    Popup(
+        popupPositionProvider = provider, onDismissRequest = onDismiss,
         properties = PopupProperties(
-            focusable = true, dismissOnBackPress = true,
-            dismissOnClickOutside = true, clippingEnabled = true)) {
-        SySceneBackgroundSurface(
-            modifier = Modifier.widthIn(max = maxMenuWidth),
-            shape = RoundedCornerShape(SyMetric.radiusControl),
-            tag = "sySeamlessContextScene",
+            focusable = expanded, dismissOnBackPress = expanded,
+            dismissOnClickOutside = expanded, clippingEnabled = true,
+        ),
+    ) {
+        AnimatedVisibility(
+            visibleState = visibility,
+            enter = fadeIn(tween(duration)) + scaleIn(tween(duration), initialScale = .96f, transformOrigin = origin),
+            exit = fadeOut(tween(duration)) + scaleOut(tween(duration), targetScale = .96f, transformOrigin = origin),
         ) {
-            // Wrap actions rather than allowing the popup to run off the display.
-            FlowRow(
-                modifier = Modifier.widthIn(max = maxMenuWidth).padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            SySceneBackgroundSurface(
+                modifier = Modifier.widthIn(max = maxMenuWidth).heightIn(max = maxMenuHeight),
+                shape = RoundedCornerShape(SyMetric.radiusControl),
+                tag = "sySeamlessContextScene",
             ) {
-                items.forEach { item ->
-                    Column(
-                        Modifier.width(96.dp).heightIn(min = 72.dp)
-                            .clickable { onDismiss(); item.onClick() }
-                            .padding(horizontal = 6.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
-                    ) {
-                        item.icon?.let {
-                            Icon(it, contentDescription = null, modifier = Modifier.size(22.dp),
-                                tint = if (item.danger) p.dangerInk else p.textSecondary)
+                // Wrap actions rather than allowing the popup to run off the display.
+                FlowRow(
+                    modifier = Modifier.widthIn(max = maxMenuWidth).verticalScroll(rememberScrollState()).padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items.forEach { item ->
+                        Column(
+                            Modifier.width(96.dp).heightIn(min = 72.dp)
+                                .clickable(enabled = expanded) { onDismiss(); item.onClick() }
+                                .padding(horizontal = 6.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                        ) {
+                            item.icon?.let {
+                                Icon(it, contentDescription = null, modifier = Modifier.size(22.dp),
+                                    tint = if (item.danger) p.dangerInk else p.textSecondary)
+                            }
+                            Text(item.text, color = if (item.danger) p.dangerInk else p.text,
+                                style = MaterialTheme.typography.labelSmall,
+                                textAlign = TextAlign.Center, maxLines = 2,
+                                overflow = TextOverflow.Ellipsis)
                         }
-                        Text(item.text, color = if (item.danger) p.dangerInk else p.text,
-                            style = MaterialTheme.typography.labelSmall,
-                            textAlign = TextAlign.Center, maxLines = 2,
-                            overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

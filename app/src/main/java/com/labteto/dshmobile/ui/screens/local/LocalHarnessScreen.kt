@@ -70,6 +70,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.labteto.dshmobile.ui.screens.tasks.TasksViewModel
+import com.labteto.dshmobile.ui.screens.tools.CapabilityDestination
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -274,8 +276,7 @@ fun LocalHarnessScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (pendingWorkCapability != null && !workCapabilityConfiguring) workCapabilityOpenVersion += 1
     }
-    var toolsStartAtPlugins by rememberSaveable { mutableStateOf(false) }
-    var toolsStartAtSkills by rememberSaveable { mutableStateOf(false) }
+    var capabilityDestination by rememberSaveable { mutableStateOf(CapabilityDestination.OVERVIEW) }
     var showGroupSetup by rememberSaveable { mutableStateOf(false) }
     var returnToGroupAfterPersona by rememberSaveable { mutableStateOf(false) }
     var showPersonaGallerySavePrompt by rememberSaveable { mutableStateOf(false) }
@@ -481,8 +482,7 @@ fun LocalHarnessScreen(
     fun handoffWorkCapability(prompt: String) {
         composerHandoff = listOf(shell.sessionId, prompt)
         taskMode = null
-        toolsStartAtPlugins = false
-        toolsStartAtSkills = false
+        capabilityDestination = CapabilityDestination.OVERVIEW
         resetFeatureNavigation()
     }
 
@@ -747,12 +747,11 @@ fun LocalHarnessScreen(
             onCloseDrawer = { scope.launch { closeDrawerPromptly() } },
         ),
         localToolsFeatureUiContribution(
-            startAtPlugins = toolsStartAtPlugins,
-            startAtSkills = toolsStartAtSkills,
+            destination = capabilityDestination,
             onUseCapability = ::useWorkCapability,
             onSettingsDestinationChange = ::prepareSettingsEntry,
             onPushFeature = ::pushFeature,
-            onPopFeature = { toolsStartAtPlugins = false; toolsStartAtSkills = false; popFeature() },
+            onPopFeature = { capabilityDestination = CapabilityDestination.OVERVIEW; popFeature() },
             onOpenFromDrawer = ::openFeatureFromDrawer,
             onCloseDrawer = { scope.launch { closeDrawerPromptly() } },
         ),
@@ -1008,7 +1007,10 @@ fun LocalHarnessScreen(
                 },
                 onOpenDiary = { openDrawerEntry(LocalFeatureDrawerEntry.DIARY) },
                 onTasks = { openDrawerEntry(LocalFeatureDrawerEntry.TASKS) },
-                onTools = { openDrawerEntry(LocalFeatureDrawerEntry.TOOLS) },
+                onTools = {
+                    capabilityDestination = CapabilityDestination.OVERVIEW
+                    openDrawerEntry(LocalFeatureDrawerEntry.TOOLS)
+                },
                 onSettings = { openDrawerEntry(LocalFeatureDrawerEntry.SETTINGS) },
             )
     }
@@ -1218,10 +1220,15 @@ fun LocalHarnessScreen(
             ),
             onPromptChange = { pendingWorkCapability = it },
             onSummaryChange = { workHandoffSummary = it },
-            onConfigureCapabilities = {
+            onConfigureCapabilities = { kind ->
+                capabilityDestination = when (kind) {
+                    LocalTaskCapabilityKind.GITHUB -> CapabilityDestination.GITHUB
+                    LocalTaskCapabilityKind.MCP -> CapabilityDestination.MCP
+                    LocalTaskCapabilityKind.PLUGINS -> CapabilityDestination.PLUGINS
+                    LocalTaskCapabilityKind.WEB_SEARCH -> CapabilityDestination.SETTINGS
+                    else -> CapabilityDestination.OVERVIEW
+                }
                 workCapabilityConfiguring = true
-                toolsStartAtPlugins = false
-                toolsStartAtSkills = false
                 pushFeature(LocalFeaturePage.TOOLS)
             },
             onRefreshCapabilities = { workCapabilityOpenVersion += 1 },

@@ -266,13 +266,12 @@ private fun WorkTasksScreen(
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                 ) {
-                    if (state.managementFailed || state.managementError != null) {
-                        Text(state.managementError?.takeIf(String::isNotBlank)
-                            ?: stringResource(R.string.tasks_operation_failed), color = colors.dangerInk)
-                        SyButton(stringResource(R.string.common_retry), onClick = { viewModel.refresh() })
-                    }
+                    TaskManagementFeedback(
+                        state, onRefresh = { viewModel.refresh() }, showNotice = false, showLoading = false,
+                    )
                     when {
                         state.loading && state.tasks.isEmpty() -> Text(stringResource(R.string.common_loading))
+                        state.listLoadFailed && state.tasks.isEmpty() && !showCreate -> Unit
                         showCreate -> TaskEditorPane(
                             state = editorState,
                             viewModel = viewModel,

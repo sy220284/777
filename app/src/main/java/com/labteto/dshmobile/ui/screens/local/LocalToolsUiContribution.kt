@@ -3,10 +3,10 @@ package com.labteto.dshmobile.ui.screens.local
 import com.labteto.dshmobile.local.feature.LocalFeatureModuleId
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.tools.ToolsScreen
+import com.labteto.dshmobile.ui.screens.tools.CapabilityDestination
 
 internal fun localToolsFeatureUiContribution(
-    startAtPlugins: Boolean,
-    startAtSkills: Boolean,
+    destination: CapabilityDestination,
     onUseCapability: (String) -> Unit,
     onSettingsDestinationChange: (SettingsDestination) -> Unit,
     onPushFeature: (LocalFeaturePage) -> Unit,
@@ -27,8 +27,7 @@ internal fun localToolsFeatureUiContribution(
     check(page == LocalFeaturePage.TOOLS) { "Tools received non-TOOLS route: $page" }
     ToolsScreen(
         onClose = onPopFeature,
-        startAtPlugins = startAtPlugins,
-        startAtSkills = startAtSkills,
+        destination = destination,
         onUseCapability = onUseCapability,
         // The ability center owns Back from every tab and returns to the caller.
         handleRootSystemBack = true,

@@ -83,6 +83,7 @@ private data class InventoryRow(
 @Composable
 internal fun PluginInventoryBrowser(
     localIds: List<String>,
+    destination: CapabilityDestination = CapabilityDestination.OVERVIEW,
     connectedServices: List<McpServerSnapshot> = emptyList(),
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
@@ -122,7 +123,15 @@ internal fun PluginInventoryBrowser(
     val context = LocalContext.current
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var showMarketActions by remember { mutableStateOf(false) }
-    var addedOnly by rememberSaveable { mutableStateOf(true) }
+    var addedOnly by rememberSaveable(destination) { mutableStateOf(true) }
+    var kindFilter by rememberSaveable(destination) {
+        mutableStateOf(when (destination) {
+            CapabilityDestination.SKILLS -> ExtensionKind.SKILL
+            CapabilityDestination.PLUGINS -> ExtensionKind.PLUGIN
+            CapabilityDestination.GITHUB, CapabilityDestination.MCP -> ExtensionKind.CONNECTOR
+            else -> null
+        })
+    }
     var catalogueQuery by rememberSaveable { mutableStateOf("") }
     var showOwnedInDiscover by rememberSaveable { mutableStateOf(false) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
@@ -248,7 +257,12 @@ internal fun PluginInventoryBrowser(
         sourceLabel = "777 · MCP",
         marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "可添加"),
     )
-    val catalogue = local + connected + installedSkills + availablePresets + listOf(github, addMcp)
+    val catalogue = when (kindFilter) {
+        ExtensionKind.SKILL -> installedSkills + availablePresets
+        ExtensionKind.PLUGIN -> local
+        ExtensionKind.CONNECTOR -> connected + listOf(github, addMcp)
+        null -> local + connected + installedSkills + availablePresets + listOf(github, addMcp)
+    }
     val isAdded: (InventoryRow) -> Boolean = { item ->
         marketplaceTabAllows(
             addedOnly = true,
@@ -310,6 +324,20 @@ internal fun PluginInventoryBrowser(
                     modifier = Modifier.testTag("plugin-inventory-more")) {
                     Icon(FeatherIcons.MoreVertical, contentDescription = "更多操作", tint = colors.text)
                 }
+            }
+            kindFilter?.let { kind ->
+                val label = when (kind) {
+                    ExtensionKind.SKILL -> R.string.capability_filter_skills
+                    ExtensionKind.PLUGIN -> R.string.capability_filter_plugins
+                    ExtensionKind.CONNECTOR -> R.string.capability_filter_connectors
+                }
+                SyButton(
+                    text = stringResource(label),
+                    onClick = { kindFilter = null },
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.padding(horizontal = SyMetric.gapSection)
+                        .testTag("capability-clear-kind-filter"),
+                )
             }
             Surface(
                 onClick = onOpenSettings,
@@ -383,6 +411,7 @@ internal fun PluginInventoryBrowser(
                                 query.isNotEmpty() && !addedOnly && owned.isNotEmpty() &&
                                     !showOwnedInDiscover -> "可添加项目中没有匹配项；可展开下方已添加项目"
                                 query.isNotEmpty() -> stringResource(R.string.tools_catalog_no_match)
+                                kindFilter != null -> stringResource(R.string.capability_filter_empty)
                                 addedOnly -> "尚未添加技能、插件或连接器"
                                 else -> "暂无可添加的能力；可查看已添加的项目"
                             },
@@ -726,7 +755,13 @@ internal fun PluginInventoryBrowser(
         }
     }
     if (showMarketActions) {
-        SyResponsiveSheet(title = "能力管理", onDismiss = { showMarketActions = false }) {
+        SyResponsiveSheet(title = "能力管理", onDismiss = { showMarketActions = false }, scrollable = true) {
+            SyButton(
+                text = stringResource(R.string.skills_title),
+                onClick = { kindFilter = ExtensionKind.SKILL; showMarketActions = false },
+                modifier = Modifier.fillMaxWidth(),
+                variant = SyButtonVariant.Ghost,
+            )
             if (onImportSkill != null) SyButton(
                 text = "导入技能文件",
                 onClick = { showMarketActions = false; onImportSkill() },
