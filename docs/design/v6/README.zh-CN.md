@@ -13,7 +13,7 @@
 
 - **[V6.4 视觉与材质设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)**：更精致的层次、光影与对比；动态壁纸实际位置取色、最终合成可读性、不同 L4 浮层外观、控件排版、微动效、验证标准。
 - **[V6.3 动效事实与 V6.4 微动效目标](V6-MOTION-EXPERIENCE.zh-CN.md)**：保留当前快速交互，增强状态驱动的 Work/Tasks/Tools/Composer 微动效。
-- 2026-11-13 主线 `02544aa4` 是本轮事实基线；GitHub 文档规范已区分“当前实现”与“待实施设计”。这轮不更改安卓源码或声称设计已同步到 Figma/Canva。
+- **当前实现**以 [V6 现行规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)、[状态台账](STATUS.zh-CN.md)和对应 Compose 代码为准；V6.4 仍是独立待实施方案，在线设计同步与设备验收按实际结果确认。
 
 ## 现有成熟交互与专用视觉的权威来源
 
