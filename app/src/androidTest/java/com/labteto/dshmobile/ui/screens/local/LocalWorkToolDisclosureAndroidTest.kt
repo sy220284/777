@@ -4,7 +4,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -183,5 +188,50 @@ class LocalWorkToolDisclosureAndroidTest {
         compose.onNodeWithTag("work-tool-disclosure:many").performClick()
         compose.onNodeWithTag("work-tool-disclosure:many").performClick()
         compose.onNodeWithTag("work-tool:t120").assertIsDisplayed()
+    }
+
+    @Test fun largeTextAndThemeChangesKeepDisclosureAccessibleAcrossMobileWidths() {
+        val width = mutableIntStateOf(320)
+        val scale = mutableFloatStateOf(1f)
+        val theme = mutableStateOf(ThemePreference.LIGHT)
+        val operations = listOf(
+            LocalTranscriptItem.WorkStep(LocalHarnessMessage(
+                "a", "tool", "已有结果", createdAt = 1,
+                toolName = "read", toolCallId = "a", toolIsError = false,
+            )),
+            LocalTranscriptItem.WorkStep(LocalHarnessMessage(
+                "b", "tool", "最新结果", createdAt = 2,
+                toolName = "edit", toolCallId = "b", toolIsError = false,
+            )),
+        )
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, scale.floatValue)) {
+                DshTheme(preference = theme.value) {
+                    Column(Modifier.width(width.intValue.dp)) {
+                        LocalWorkToolDisclosureRow(
+                            LocalTranscriptItem.WorkTools("responsive", operations),
+                            workspacePath = "",
+                        )
+                    }
+                }
+            }
+        }
+        val scenarios = listOf(
+            Triple(320, 2f, ThemePreference.LIGHT),
+            Triple(390, 2f, ThemePreference.DARK),
+            Triple(430, 1f, ThemePreference.LIGHT),
+        )
+        scenarios.forEach { (dp, fontScale, preference) ->
+            compose.runOnIdle {
+                width.intValue = dp
+                scale.floatValue = fontScale
+                theme.value = preference
+            }
+            val header = compose.onNodeWithTag("work-tool-disclosure:responsive")
+            header.assertIsDisplayed().assertHasClickAction()
+            assertTrue("工作记录在 ${dp}dp 下不能横向溢出",
+                header.fetchSemanticsNode().boundsInRoot.width <= dp + 1f)
+            compose.onNodeWithText("工具执行记录 · 2 项").assertIsDisplayed()
+        }
     }
 }
