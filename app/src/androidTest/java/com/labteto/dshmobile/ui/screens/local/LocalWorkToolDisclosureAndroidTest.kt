@@ -114,7 +114,7 @@ class LocalWorkToolDisclosureAndroidTest {
                 }
             }
         }
-        compose.onNodeWithText("最新：读取文件 · 执行中").assertIsDisplayed()
+        compose.onNodeWithText("最新：读取文件内容 · 执行中").assertIsDisplayed()
         compose.runOnIdle {
             operations.value = listOf(
                 LocalTranscriptItem.WorkStep(LocalHarnessMessage(
@@ -127,7 +127,7 @@ class LocalWorkToolDisclosureAndroidTest {
                 )),
             )
         }
-        compose.onNodeWithText("最新：修改文件 · 已完成").assertIsDisplayed()
+        compose.onNodeWithText("最新：修改文件内容 · 已完成").assertIsDisplayed()
         compose.onNodeWithTag("work-tool-disclosure:live").performClick()
         val newY = compose.onNodeWithTag("work-tool:new")
             .fetchSemanticsNode().boundsInRoot.top
