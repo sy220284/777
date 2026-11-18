@@ -252,64 +252,56 @@ class LocalSkillStoreTest {
     }
 
 
-    @Test fun sevenRetiredPresetsAreArchivedWithEveryUserFile() = inWorkspace { store, workspace, root ->
-        val retired = setOf(
-            "document-summary", "data-insights", "translation-localization",
-            "writing-polish", "bug-investigation", "longform-outline", "research-check",
-        )
-        assertEquals(retired, LocalPresetSkillCatalog.retiredIds)
-        retired.forEach { id ->
-            workspace.write(".dsh/skills/$id/SKILL.md", "用户维护的原始内容 $id\n")
+    private fun bundledBaseline(document: String): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(document.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+
+    @Test fun obsoleteUntouchedBundledSkillIsUnregisteredWithoutHistoricalArchive() =
+        inWorkspace { store, workspace, root ->
+            val oldId = "old-bundled-example"
+            val original = buildLocalSkillDocument(oldId, "已退出的内置规则", "旧指令")
+            workspace.write(".dsh/skills/$oldId/SKILL.md", original)
+            workspace.write(".dsh/skills/$oldId/.bundled-baseline-sha256", bundledBaseline(original) + "\n")
+            workspace.write(".dsh/skills/$oldId/user-notes.md", "用户自己留下的附件")
+            workspace.write(".dsh/skills/handmade/SKILL.md",
+                "---\ndescription: personal\n---\n用户自己安装的技能")
+
+            assertEquals(setOf(oldId), store.seedOnce())
+            assertFalse(workspace.skills().contains(oldId))
+            assertFalse(workspace.modelSkillCatalog().contains(oldId))
+            assertFalse(root.resolve(".dsh/skills/$oldId/SKILL.md").exists())
+            assertFalse(root.resolve(".dsh/skills/$oldId/.bundled-baseline-sha256").exists())
+            assertEquals("用户自己留下的附件",
+                root.resolve(".dsh/skills/$oldId/user-notes.md").readText())
+            assertFalse(root.resolve(".dsh/retired-skills/general-presets-v1").exists())
+            assertTrue(workspace.skills().contains("handmade"))
+            assertEquals(emptySet<String>(), store.seedOnce())
+            assertFalse(workspace.skills().contains(oldId))
         }
-        workspace.write(".dsh/skills/writing-polish/user-notes.md", "独立的个人补充文件")
-        workspace.write(".dsh/skills/my-owned/SKILL.md", "---\ndescription: personal\n---\n私人规则")
-        store.seedOnce()
 
-        assertEquals(setOf("code-review", "imagegen", "minimax-media", "minimax-music-gen", "minimax-playlist"),
-            store.presets().map { it.id }.toSet())
-        retired.forEach { id ->
-            assertFalse(workspace.skills().contains(id))
-            assertTrue(store.presets().none { it.id == id })
-            assertEquals("用户维护的原始内容 $id\n",
-                root.resolve(".dsh/retired-skills/general-presets-v1/$id/SKILL.md").readText())
+    @Test fun locallyEditedFormerBundledSkillRemainsUserOwned() =
+        inWorkspace { store, workspace, root ->
+            val oldId = "former-customized-example"
+            val original = buildLocalSkillDocument(oldId, "旧版说明", "官方规则")
+            val edited = original + "\n用户自定义的新规则\n"
+            workspace.write(".dsh/skills/$oldId/SKILL.md", edited)
+            workspace.write(".dsh/skills/$oldId/.bundled-baseline-sha256", bundledBaseline(original) + "\n")
+            assertEquals(emptySet<String>(), store.seedOnce())
+            assertEquals(edited, workspace.readSkill(oldId))
+            assertTrue(root.resolve(".dsh/skills/$oldId/.bundled-baseline-sha256").isFile)
+            assertTrue(workspace.modelSkillCatalog().contains(oldId))
         }
-        assertEquals("独立的个人补充文件",
-            root.resolve(".dsh/retired-skills/general-presets-v1/writing-polish/user-notes.md").readText())
-        assertTrue(workspace.skills().contains("my-owned"))
-        assertTrue(workspace.skills().contains("code-review"))
-        assertTrue(workspace.skills().contains("imagegen"))
-        assertTrue(root.resolve(".dsh/skills/.general-presets-retired-v1").isFile)
-        assertThrows(IllegalArgumentException::class.java) { store.install("research-check") }
-        store.seedOnce()
-        assertTrue(root.resolve(".dsh/retired-skills/general-presets-v1/longform-outline/SKILL.md").isFile)
-    }
 
-    @Test fun retiredSkillAttachmentsWithoutInstructionArePreserved() = inWorkspace { store, workspace, root ->
-        workspace.write(".dsh/skills/writing-polish/notes.txt", "删除技能后残留的用户资料")
-        store.seedOnce()
-        assertEquals("删除技能后残留的用户资料",
-            root.resolve(".dsh/retired-skills/general-presets-v1/writing-polish/notes.txt").readText())
-        assertFalse(root.resolve(".dsh/skills/writing-polish").exists())
-    }
-
-    @Test fun retiredSkillMigrationCanRetryAfterArchiveCollision() = inWorkspace { store, workspace, root ->
-        workspace.write(".dsh/skills/document-summary/SKILL.md", "待迁移的文档技能")
-        workspace.write(".dsh/skills/writing-polish/SKILL.md", "待迁移的写作技能")
-        workspace.write(".dsh/retired-skills/general-presets-v1/writing-polish/SKILL.md", "原有归档，不能覆盖")
-        assertThrows(IllegalArgumentException::class.java) { store.seedOnce() }
-        assertFalse(root.resolve(".dsh/skills/.general-presets-retired-v1").exists())
-        assertTrue(root.resolve(".dsh/skills/writing-polish/SKILL.md").isFile)
-        assertEquals("原有归档，不能覆盖",
-            root.resolve(".dsh/retired-skills/general-presets-v1/writing-polish/SKILL.md").readText())
-        val archive = root.resolve(".dsh/retired-skills/general-presets-v1")
-        Files.move(archive.resolve("writing-polish").toPath(), archive.resolve("writing-polish-earlier").toPath())
-        store.seedOnce()
-        assertEquals("待迁移的写作技能",
-            archive.resolve("writing-polish/SKILL.md").readText())
-        assertEquals("原有归档，不能覆盖",
-            archive.resolve("writing-polish-earlier/SKILL.md").readText())
-        assertTrue(root.resolve(".dsh/skills/.general-presets-retired-v1").isFile)
-    }
+    @Test fun obsoleteBundledSkillWithoutAttachmentsRemovesItsEmptyDirectory() =
+        inWorkspace { store, workspace, root ->
+            val id = "unlisted-example"
+            val original = buildLocalSkillDocument(id, "过时预置", "旧规则")
+            workspace.write(".dsh/skills/$id/SKILL.md", original)
+            workspace.write(".dsh/skills/$id/.bundled-baseline-sha256", bundledBaseline(original))
+            assertEquals(setOf(id), store.seedOnce())
+            assertFalse(root.resolve(".dsh/skills/$id").exists())
+        }
 
     @Test fun manuallyCreatedSkillSupportsLongInstructions() = inWorkspace { store, workspace, _ ->
         val instructions = "长篇技能规则。".repeat(20_000)
