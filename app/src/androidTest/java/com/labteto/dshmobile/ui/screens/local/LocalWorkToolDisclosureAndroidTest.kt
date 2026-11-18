@@ -97,7 +97,7 @@ class LocalWorkToolDisclosureAndroidTest {
                 LocalHarnessMessage("read", "tool", "已读取 doc.md", createdAt = 4,
                     toolName = "read", toolCallId = "same", toolIsError = false)))
         }
-        compose.onNodeWithText("已完成").assertIsDisplayed()
+        compose.onNodeWithText("最新：读取文件内容 · 已完成").assertIsDisplayed()
         compose.onNodeWithTag("work-tool:same").assertIsDisplayed()
         compose.onNodeWithText("当前已经完成第一阶段。").assertIsDisplayed()
     }
