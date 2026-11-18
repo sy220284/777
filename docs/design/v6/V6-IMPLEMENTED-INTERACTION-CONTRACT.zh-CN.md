@@ -45,7 +45,7 @@
 - 可交互行保证至少 48dp 触控，使用 `stateDescription` 告知 TalkBack 状态；文字与图标同时表达状态，不能只靠颜色。
 - 工作消息仍位于时间线，不新增独立运行中心和旧式 Work 五段分页。
 
-**源代码**：[Work 步骤](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineStepRow.kt)、[工作状态投影](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkSurfaceComponents.kt)。
+**源代码**：[Work 步骤](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkTimelineStepRow.kt)、[工作 UI 贡献](../../../app/src/main/java/com/labteto/dshmobile/ui/screens/local/LocalWorkUiContribution.kt)。
 
 ## 5. 导航、共享动画与输入区
 
