@@ -74,11 +74,14 @@ internal fun skillMcpHttpsEndpoint(requirement: UiSkillRequirement): String? {
     return url
 }
 
-/** A single directory uses verified installation state for both views. */
+/** Classification for added and discover views; browsing owned items in discover is explicit. */
 internal fun marketplaceTabAllows(
     addedOnly: Boolean,
     installedSkill: Boolean,
     connectedService: Boolean,
     localPlugin: Boolean,
     configuredConnector: Boolean,
-): Boolean = !addedOnly || installedSkill || connectedService || localPlugin || configuredConnector
+): Boolean {
+    val owned = installedSkill || connectedService || localPlugin || configuredConnector
+    return if (addedOnly) owned else !owned
+}
