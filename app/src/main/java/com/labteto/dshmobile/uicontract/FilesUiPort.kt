@@ -18,6 +18,7 @@ interface FilesUiPort {
     suspend fun workspaceDirectoryPage(path: String, offset: Int): LocalWorkspaceDirectoryPage
     suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile>
     suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage
+    suspend fun searchSidebarWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage
     suspend fun stopWorkspaceSearch(query: String): Boolean
     fun observeWorkspaceFiles(paths: List<String>): kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange>
     suspend fun conversationFiles(sessionId: String): LocalConversationFiles
@@ -25,6 +26,9 @@ interface FilesUiPort {
     suspend fun previewWorkspaceFilePage(path: String, offset: Long): LocalWorkspaceFilePreview
     suspend fun importWorkspaceFile(uri: android.net.Uri): String
     suspend fun saveWorkspaceFileToDownloads(path: String): String
+    suspend fun exportWorkspaceArchive(directory: String, destination: android.net.Uri): Int
+    /** Save only explicitly selected, public dialogue into an immutable on-device Work reference. */
+    suspend fun saveWorkHandoffDocument(sourceSessionId: String, document: String): String
     suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long
     suspend fun publishedWorkspaceSnapshot(path: String): UiPublishedDownload?
 

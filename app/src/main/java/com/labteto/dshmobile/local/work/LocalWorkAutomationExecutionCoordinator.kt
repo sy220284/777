@@ -10,6 +10,10 @@ import com.labteto.dshmobile.local.agent.LocalSubagentCapabilities
 import com.labteto.dshmobile.local.agent.LocalSubagentHistoryMode
 import com.labteto.dshmobile.local.agent.LocalSubagentLaunchSpec
 import com.labteto.dshmobile.local.model.LocalModelRunContext
+import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.resolveRecoveryModelProfile
+import com.labteto.dshmobile.local.runtime.LocalAgentRunRouteIdentity
+import com.labteto.dshmobile.local.runtime.LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT
 import com.labteto.dshmobile.local.model.truncateWithoutSplittingSurrogatePair
 import com.labteto.dshmobile.local.runtime.LOCAL_TRANSCRIPT_RUNTIME_WINDOW_MESSAGES
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
@@ -50,6 +54,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
     private val sessionStorage: LocalSessionStorageRuntime,
     private val work: LocalWorkComposition,
     private val wake: LocalForegroundTurnWakeCoordinator,
+    private val approvalLedger: WorkAutomationApprovalResumeLedger,
 ) : LocalWorkAutomationExecutionPort {
     private val sessionCoordinator get() = sessionStorage.coordinator
     override suspend fun prepareSession(
@@ -84,8 +89,11 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
         val session = requireWorkAutomationSession(sessionStorage.coordinator.read(sessionId))
         val boundState = boundState(session)
         val boundEventLog = sessionStorage.eventLogs.get(sessionId)
+        val pendingApproval = if (recoverInterrupted) approvalLedger.authorized(sessionId) else null
         val recovery = try {
-            if (recoverInterrupted) {
+            if (pendingApproval != null) {
+                LocalWorkAutomationRecoveryPlan(prompt, profile = approvedModelProfile(boundEventLog))
+            } else if (recoverInterrupted) {
                 prepareWorkAutomationRecovery(
                     prompt = prompt,
                     sessionId = sessionId,
@@ -123,7 +131,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             content = prompt,
             createdAt = System.currentTimeMillis(),
         )
-        if (!recoverInterrupted || !hasMatchingUser(boundEventLog, prompt)) {
+        if ((!recoverInterrupted || !hasMatchingUser(boundEventLog, prompt)) && pendingApproval == null) {
             boundEventLog.append("user/message", buildJsonObject {
                 put("content", prompt)
                 put("automation", true)
@@ -131,18 +139,23 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             })
         }
 
-        var blockedReason: String? = null
+        val blockedReason = java.util.concurrent.atomic.AtomicReference<String?>()
         val runner = work.automationRunner(
             sessionId = sessionId,
             boundState = boundState,
             onApprovalBlocked = { reason ->
-                if (blockedReason == null) blockedReason = reason
+                blockedReason.compareAndSet(null, reason)
             },
         )
 
         try {
             val result = withTimeout(budget.remainingMillis()) {
                 val execute: suspend () -> LocalSubagentResult = {
+                    val continuation = pendingApproval?.let { granted ->
+                        approvalLedger.execute(granted) { call ->
+                            work.executeApprovedAutomationTool(sessionId, call)
+                        }
+                    }
                     runner.runResult(
                         LocalSubagentLaunchSpec(
                             task = executionTask,
@@ -155,6 +168,9 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                                 historyMode = LocalSubagentHistoryMode.ISOLATED,
                             ),
                         ),
+                        recoveredHistory = continuation?.history,
+                        recoveredStep = continuation?.step ?: 0,
+                        executionFence = { blockedReason.get()?.let { throw CancellationException(it) } },
                     )
                 }
                 recoveredProfile?.let { profile ->
@@ -162,10 +178,10 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 } ?: execute()
             }
 
-            blockedReason?.let { reason ->
+            blockedReason.get()?.let { reason ->
                 persistTranscript(
                     session = session,
-                    messages = listOf(userMessage),
+                    messages = if (pendingApproval != null) emptyList() else listOf(userMessage),
                     finalRole = "system",
                     finalContent = reason,
                     eventLog = boundEventLog,
@@ -192,9 +208,12 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 LocalWorkAutomationStatus.CANCELLED -> result.output.ifBlank { "后台任务已取消" }
                 else -> result.output.ifBlank { "后台任务失败" }
             }
+            if (pendingApproval != null) approvalLedger.finalize(
+                sessionId, pendingApproval, status.name.lowercase(), output,
+            )
             persistTranscript(
                 session = session,
-                messages = listOf(userMessage),
+                messages = if (pendingApproval != null) emptyList() else listOf(userMessage),
                 finalRole = if (status == LocalWorkAutomationStatus.DELIVERED) "assistant" else "system",
                 finalContent = output,
                 eventLog = boundEventLog,
@@ -211,7 +230,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             val detail = "后台任务执行超时，已停止本轮任务"
             persistTranscript(
                 session = session,
-                messages = listOf(userMessage),
+                messages = if (pendingApproval != null) emptyList() else listOf(userMessage),
                 finalRole = "system",
                 finalContent = detail,
                 eventLog = boundEventLog,
@@ -224,13 +243,19 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (blocked: LocalHarnessBlockedException) {
+            val detail = blocked.message ?: "后台审批续跑需要核对工具执行结果"
+            return@withOwner LocalWorkAutomationResult(
+                sessionId = sessionId, output = detail,
+                status = LocalWorkAutomationStatus.BLOCKED, detail = detail,
+            )
         } catch (error: Exception) {
             AppLog.warn("WorkAutomation", "failure=true operation=run_scheduled_work " +
                 "session_id=${sessionId.take(80)} cause_type=${error.javaClass.simpleName}")
             val detail = "后台任务失败：" + (error.message ?: error::class.java.simpleName)
             persistTranscript(
                 session = session,
-                messages = listOf(userMessage),
+                messages = if (pendingApproval != null) emptyList() else listOf(userMessage),
                 finalRole = "system",
                 finalContent = detail,
                 eventLog = boundEventLog,
@@ -250,6 +275,23 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 wake.startNextIfIdle()?.start()
             }
         }
+    }
+
+    private fun approvedModelProfile(log: LocalSessionEventLog): LocalModelProfile {
+        val checkpoint = log.latest(LOCAL_AUTOMATION_RUN_CHECKPOINT_EVENT)
+            ?: error("待审批任务缺少原运行记录")
+        val data = checkpoint.data
+        val route = LocalAgentRunRouteIdentity(
+            profileId = data["profile_id"]?.jsonPrimitive?.contentOrNull,
+            authKind = data["auth_kind"]?.jsonPrimitive?.contentOrNull,
+            protocol = data["protocol"]?.jsonPrimitive?.contentOrNull,
+            credentialRef = data["credential_ref"]?.jsonPrimitive?.contentOrNull,
+            fingerprint = data["route_fingerprint"]?.jsonPrimitive?.contentOrNull,
+            model = data["model"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            baseUrl = data["base_url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        )
+        return resolveRecoveryModelProfile(runtimeStateStore.state.value.modelProfiles, route)
+            ?: error("原后台任务的模型账户或路由发生变化，请重新配置后继续")
     }
 
     private suspend fun awaitReady() {

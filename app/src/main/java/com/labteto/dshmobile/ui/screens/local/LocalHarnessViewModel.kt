@@ -248,6 +248,10 @@ class LocalHarnessViewModel @Inject constructor(
         force: Boolean = false,
     ) = transcriptHistoryController.prepare(sessionId, force)
 
+    internal suspend fun searchTranscript(
+        sessionId: String, query: String, cursor: com.labteto.dshmobile.uicontract.UiMessageSearchCursor?,
+    ) = sessionUi.searchMessages(sessionId, query, cursor)
+
     internal suspend fun loadOlderTranscript(sessionId: String): Result<Int> =
         transcriptHistoryController.loadOlder(sessionId)
 
@@ -429,6 +433,9 @@ class LocalHarnessViewModel @Inject constructor(
         return securityReviewFacade.approve(sessionId, repository, review, diff)
     }
 
+    internal suspend fun exportWorkspaceArchive(directory: String, destination: Uri) =
+        filesUi.exportWorkspaceArchive(directory, destination)
+
     suspend fun importWorkspaceFile(uri: Uri): String = filesUi.importWorkspaceFile(uri)
     internal suspend fun publishedWorkspaceFile(path: String) = filesUi.publishedWorkspaceSnapshot(path)
     internal suspend fun saveWorkspaceFileToDownloads(path: String) = filesUi.saveWorkspaceFileToDownloads(path)
@@ -441,6 +448,8 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun workspaceDirectoryPage(path: String, offset: Int) = filesUi.workspaceDirectoryPage(path, offset)
     suspend fun searchWorkspaceFiles(query: String) = filesUi.searchWorkspaceFiles(query)
     suspend fun searchWorkspacePage(query: String, offset: Int) = filesUi.searchWorkspacePage(query, offset)
+    internal suspend fun searchSidebarWorkspacePage(query: String, offset: Int) =
+        filesUi.searchSidebarWorkspacePage(query, offset)
     suspend fun stopWorkspaceSearch(query: String) = filesUi.stopWorkspaceSearch(query)
     internal fun observeWorkspaceFiles(paths: List<String>) =
         filesUi.observeWorkspaceFiles(paths)
@@ -560,6 +569,16 @@ class LocalHarnessViewModel @Inject constructor(
             LocalUsageMode.WORK -> runtime.work.stop()
         }
     }
+    internal suspend fun searchWorkHandoff(
+        sessionId: String, query: String, cursor: com.labteto.dshmobile.uicontract.UiMessageSearchCursor?,
+    ) = sessionUi.searchHandoffMessages(sessionId, query, cursor)
+
+    internal suspend fun loadWorkHandoffReferences(sessionId: String, ids: Set<String>) =
+        sessionUi.handoffMessagesById(sessionId, ids)
+
+    internal suspend fun saveWorkHandoffDocument(sourceSessionId: String, document: String) =
+        filesUi.saveWorkHandoffDocument(sourceSessionId, document)
+
     internal fun workHandoffSummary(): String = runtime.session.currentHandoffSummary()
     internal fun createWorkContinuation(sourceSessionId: String, summary: String): Boolean {
         if (state.value.sessionId != sourceSessionId || state.value.usageMode != LocalUsageMode.CHAT) return false

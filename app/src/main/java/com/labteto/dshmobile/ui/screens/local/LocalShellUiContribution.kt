@@ -99,6 +99,7 @@ internal fun localShellFeatureUiContribution(
             onRegenerate = actions.regenerate,
             onGenerateReplySuggestions = actions.generateReplySuggestions,
             onSampleSession = actions.sampleSession,
+            searchTranscript = actions.searchTranscript,
             onLoadOlderTranscript = actions.loadOlderTranscript,
             onImportAttachment = actions.importAttachment,
             onStop = actions.stop,

@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.LocalMediaOffer
 import com.labteto.dshmobile.local.presentation.LocalMediaCreationRuntime
 import com.labteto.dshmobile.local.model.LocalMediaVideoTask
@@ -21,6 +22,9 @@ import javax.inject.Inject
 @HiltViewModel
 class LocalMediaStudioViewModel @Inject constructor(private val creation: LocalMediaCreationRuntime) : ViewModel() {
     val storageError get() = creation.storageError
+    internal val mediaRoutes get() = creation.mediaRoutes
+    internal suspend fun setMediaRoute(kind: LocalMediaKind, offer: LocalMediaOffer?) =
+        creation.setMediaRoute(kind, offer)
     private val archiveLimit = MutableStateFlow(LocalMediaCreationRuntime.PAGE_SIZE)
     val archive = archiveLimit.flatMapLatest { creation.observe(null, it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalMediaPage())

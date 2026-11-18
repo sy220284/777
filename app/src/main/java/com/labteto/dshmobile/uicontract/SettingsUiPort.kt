@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.uicontract
 
+import com.labteto.dshmobile.local.model.LocalModelProbe
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.model.DeepSeekProviderBalance
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
@@ -68,7 +69,8 @@ interface SettingsUiPort {
     fun selectModel(id: String)
     fun removeModel(id: String)
     suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null,
-        profileId: String? = null, credentialSourceProfileId: String? = null): String
+        profileId: String? = null, credentialSourceProfileId: String? = null,
+        probe: LocalModelProbe = LocalModelProbe.TEXT): String
     suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: LocalModelProtocol,
         credentialSourceProfileId: String? = null): List<String>
     fun configureImageInputMode(mode: LocalImageInputMode)

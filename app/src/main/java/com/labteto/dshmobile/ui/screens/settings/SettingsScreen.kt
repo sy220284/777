@@ -939,8 +939,8 @@ fun SettingsScreen(
 
                     SettingsDestination.USAGE_LOG -> {
                         UsageLogPage(
-                            analytics = usageAnalytics,
                             selectedModel = selectedUsageModel,
+                            loadPage = viewModel::usageHistoryPage,
                             onOpenRequest = { requestId ->
                                 usageDetailSelection = UsageDetailSelection.Request(requestId)
                                 usageDetailBackSelection = null

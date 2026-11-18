@@ -69,6 +69,45 @@ class SqliteSessionMediaRestoreAndroidTest {
         }
     }
 
+    @Test fun backupRejectsAnExistingDifferentAttachmentBeforeCreatingRestorePlan() {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(base.cacheDir, "backup-conflict-" + UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val source = isolatedContext(base, File(root, "source").apply { mkdirs() })
+            val destination = isolatedContext(base, File(root, "destination").apply { mkdirs() })
+            val relative = "local-harness/workspace/.dsh/attachments/shared.png"
+            val incoming = File(source.filesDir, relative).apply {
+                check(parentFile!!.mkdirs())
+                writeText("backup contents")
+            }
+            val existing = File(destination.filesDir, relative).apply {
+                check(parentFile!!.mkdirs())
+                writeText("local contents")
+            }
+            val archive = ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(source, Json).use { snapshots ->
+                SqliteSessionEventDatabase(source, Json).use { events ->
+                    SqliteSessionStorageManager(source, snapshots, events).exportAll(archive)
+                }
+            }
+            SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination, Json).use { events ->
+                    val manager = SqliteSessionStorageManager(destination, snapshots, events)
+                    val failure = org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+                        manager.stageRestore(archive.toByteArray())
+                    }
+                    assertTrue(failure.message.orEmpty().contains("shared.png"))
+                    assertTrue(!manager.status().pendingRestore)
+                    assertEquals("local contents", existing.readText())
+
+                    existing.writeBytes(incoming.readBytes())
+                    assertEquals(0, manager.stageRestore(archive.toByteArray()))
+                    assertTrue(manager.status().pendingRestore)
+                }
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun backupStagesAndRestoresBothDatabasesAndOriginalImage() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val unique = UUID.randomUUID().toString().replace("-", "")
@@ -390,48 +429,73 @@ class SqliteSessionMediaRestoreAndroidTest {
         } finally { root.deleteRecursively() }
     }
 
-    @Test fun completeBackupRejectsExistingStudioDataBeforeStagingAnyRestore() {
-        val base = InstrumentationRegistry.getInstrumentation().targetContext
-        val root = File(base.cacheDir, "complete-backup-conflict-" + UUID.randomUUID()).apply { mkdirs() }
+    @Test fun completeBackupMergesExistingStudioAndRenamesConflictingPaidOriginal() {
+        val base=InstrumentationRegistry.getInstrumentation().targetContext
+        val root=File(base.cacheDir,"complete-merge-"+UUID.randomUUID()).apply { mkdirs() }
         try {
-            val source = isolatedContext(base, File(root, "source").apply { mkdirs() })
-            val destination = isolatedContext(base, File(root, "destination").apply { mkdirs() })
-            val sourceFile = File(source.filesDir, "media-studio/original.png")
-            check(sourceFile.parentFile!!.mkdirs())
-            sourceFile.writeBytes(byteArrayOf(1, 2, 3))
-            LocalMediaDatabase(source, Json).use { db ->
-                db.migrate(listOf(LocalMediaRecord(id = "original",
-                    result = LocalMediaResult("original", "test", "test", "IMAGE", 1L,
-                        fileName = "original.png", sessionId = "chat"))))
+            val source=isolatedContext(base,File(root,"source").apply { mkdirs() })
+            val destination=isolatedContext(base,File(root,"destination").apply { mkdirs() })
+            val incoming=File(source.filesDir,"media-studio/original.png")
+            check(incoming.parentFile!!.mkdirs())
+            incoming.writeBytes(byteArrayOf(1,2,3))
+            LocalMediaDatabase(source,Json).use { db ->
+                db.migrate(listOf(LocalMediaRecord(id="original",
+                    result=LocalMediaResult("original","test","test","IMAGE",1L,
+                        fileName="original.png",sessionId="external-chat"))))
             }
-            val archive = ByteArrayOutputStream()
-            SqliteSessionSnapshotStore(source, Json).use { snapshots ->
-                SqliteSessionEventDatabase(source, Json).use { events ->
-                    SqliteSessionStorageManager(source, snapshots, events,
-                        studioJson = Json,
-                        stageStudioSnapshot = { LocalMediaStore(source, Json).stageMediaStudioBackup(it) },
-                    ).exportAll(archive, includeMediaStudio = true)
+            val archive=ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(source,Json).use { snapshots ->
+                SqliteSessionEventDatabase(source,Json).use { events ->
+                    events.append("external-chat","user/message",buildJsonObject { put("content","source") })
+                    SqliteSessionStorageManager(source,snapshots,events,studioJson=Json,
+                        stageStudioSnapshot = {
+                            LocalMediaStore(source,Json).stageMediaStudioBackup(it)
+                        }).exportAll(archive,includeMediaStudio=true)
                 }
             }
-            LocalMediaDatabase(destination, Json).use { db ->
-                db.migrate(listOf(LocalMediaRecord(id = "existing",
-                    result = LocalMediaResult("existing", "test", "test", "TRANSCRIBE", 1L,
-                        textOutput = "必须保留的历史记录", sessionId = "other"))))
+            val local=File(destination.filesDir,"media-studio/original.png")
+            check(local.parentFile!!.mkdirs())
+            local.writeBytes(byteArrayOf(4,5,6))
+            LocalMediaDatabase(destination,Json).use { db ->
+                db.migrate(listOf(
+                    LocalMediaRecord(id="existing",
+                        result=LocalMediaResult("existing","test","test","IMAGE",1L,
+                            fileName="original.png",sessionId="local-chat")),
+                    LocalMediaRecord(id="local-text",
+                        result=LocalMediaResult("local-text","test","test","TRANSCRIBE",2L,
+                            textOutput="本机原始成果必须保留",sessionId="local-chat")),
+                ))
             }
-            SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
-                SqliteSessionEventDatabase(destination, Json).use { events ->
-                    val manager = SqliteSessionStorageManager(destination, snapshots, events,
-                        studioJson = Json)
-                    org.junit.Assert.assertThrows(IllegalStateException::class.java) {
-                        manager.stageRestore(ByteArrayInputStream(archive.toByteArray()))
-                    }
-                    assertTrue(!manager.status().pendingRestore)
+            val pending=File(destination.filesDir,"local-harness/.sqlite-restore-pending-default")
+            SqliteSessionSnapshotStore(destination,Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination,Json).use { events ->
+                    events.append("local-chat","user/message",buildJsonObject { put("content","local") })
+                    val manager=SqliteSessionStorageManager(destination,snapshots,events,studioJson=Json)
+                    assertEquals(0,manager.stageRestore(ByteArrayInputStream(archive.toByteArray())))
+                    assertEquals("sqlite-v3-studio-merge",File(pending,"READY").readText())
                 }
             }
-            LocalMediaDatabase(destination, Json).use { db ->
-                assertEquals("必须保留的历史记录", db.get("existing")?.result?.textOutput)
-                assertEquals(null, db.get("original"))
+            SqliteSessionSnapshotStore(destination,Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination,Json).use { events ->
+                    val manager=SqliteSessionStorageManager(destination,snapshots,events,studioJson=Json)
+                    assertEquals(0,manager.applyPendingRestore())
+                    assertEquals(0,manager.applyPendingRestore())
+                }
             }
+            LocalMediaDatabase(destination,Json).use { db ->
+                assertEquals("本机原始成果必须保留",db.get("local-text")?.result?.textOutput)
+                assertEquals("original.png",db.get("existing")?.result?.fileName)
+                val imported=requireNotNull(db.get("original")?.result?.fileName)
+                assertTrue(imported!="original.png")
+                assertEquals(byteArrayOf(1,2,3).toList(),
+                    File(destination.filesDir,"media-studio/$imported").readBytes().toList())
+            }
+            assertEquals(byteArrayOf(4,5,6).toList(),local.readBytes().toList())
+            SqliteSessionEventDatabase(destination,Json).use { events ->
+                assertEquals("local",events.pageAfter("local-chat",-1L).single().data["content"]?.toString()?.trim('"'))
+                assertEquals("source",events.pageAfter("external-chat",-1L).single().data["content"]?.toString()?.trim('"'))
+            }
+            assertTrue(!pending.exists())
         } finally { root.deleteRecursively() }
     }
 

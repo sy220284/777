@@ -25,6 +25,7 @@ internal fun renderLocalPdfForModel(
     file: File,
     maxPages: Int,
     maxEdge: Int = 1_800,
+    selectedPages: List<Int> = emptyList(),
 ): LocalPdfRenderResult {
     require(file.isFile) { "PDF 附件不存在" }
     require(maxPages > 0) { "PDF 页数预算必须大于 0" }
@@ -33,10 +34,13 @@ internal fun renderLocalPdfForModel(
     ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
         PdfRenderer(descriptor).use { renderer ->
             val pageCount = renderer.pageCount
+            require(selectedPages.size <= maxPages && selectedPages.all { it in 1..pageCount }) {
+                "所选 PDF 页码超出文件范围或当前请求的图片预算"
+            }
+            val requestedPages = selectedPages.ifEmpty { (1..minOf(pageCount, maxPages)).toList() }
             val pages = buildList {
-                val renderCount = minOf(pageCount, maxPages)
-                repeat(renderCount) { index ->
-                    val page = renderer.openPage(index)
+                for (pageNumber in requestedPages.distinct()) {
+                    val page = renderer.openPage(pageNumber - 1)
                     try {
                         val longest = maxOf(page.width, page.height).coerceAtLeast(1)
                         val scale = maxEdge.toFloat() / longest.toFloat()
@@ -60,7 +64,7 @@ internal fun renderLocalPdfForModel(
                             }
                             add(
                                 LocalPdfPageImage(
-                                    pageNumber = index + 1,
+                                    pageNumber = pageNumber,
                                     mediaType = "image/jpeg",
                                     bytes = encoded,
                                 ),

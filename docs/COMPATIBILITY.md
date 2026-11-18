@@ -14,7 +14,13 @@ Kotlin: 2.4.20
 AGP: 9.4.0
 ```
 
-Android 16 以下设备不在支持范围。
+| 系统与处理器 | 当前支持范围 |
+| --- | --- |
+| Android 16 及以上 + arm64-v8a | 官方 APK |
+| Android 16 及以上 + x86_64 | 自行构建调试 APK，供模拟器验证 |
+| Android 15 及以下系统、仅支持 32 位 ABI 的设备 | 无可安装的 APK |
+
+安装前在系统「关于手机」中检查 Android 版本。已连接 ADB 的设备可用 `adb shell getprop ro.product.cpu.abilist` 检查是否包含 `arm64-v8a`。官方发布流程验证最低系统版本、签名、APK ABI 和内置 Node.js、Python、Git 运行时 ABI。
 
 ## 本机模式
 

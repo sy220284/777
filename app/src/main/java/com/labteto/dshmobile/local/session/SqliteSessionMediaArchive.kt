@@ -178,6 +178,23 @@ internal class SqliteSessionMediaArchive(
         }
     }
 
+    /** Check the complete destination before publishing an import plan or installing bytes. */
+    fun validateDestination(staging: File) {
+        val source = File(staging, STAGED_MEDIA_DIR)
+        if (!source.exists()) return
+        check(!Files.isSymbolicLink(workspace.toPath()) &&
+            !Files.isSymbolicLink(File(workspace, ".dsh").toPath()) &&
+            !Files.isSymbolicLink(directory.toPath())) { "媒体恢复路径存在符号链接" }
+        val files = requireNotNull(source.listFiles()) { "无法检查待恢复附件" }
+        files.forEach { file ->
+            val destination = File(directory, file.name)
+            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                check(Files.isRegularFile(destination.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                    sameBytes(file, destination)) { "本地已有不同内容的同名附件：${file.name}" }
+            }
+        }
+    }
+
     /**
      * Install bytes before restoring the two databases; a crash after media copy
      * leaves only idempotent extra files, never a live DB pointing to missing bytes.
@@ -185,18 +202,10 @@ internal class SqliteSessionMediaArchive(
     fun installStaged(staging: File) {
         val from = File(staging, STAGED_MEDIA_DIR)
         if (!from.exists()) return
+        validateDestination(staging)
         val target = directory
-        check(!Files.isSymbolicLink(workspace.toPath()) &&
-            !Files.isSymbolicLink(File(workspace, ".dsh").toPath()) &&
-            !Files.isSymbolicLink(target.toPath())) { "媒体恢复路径存在符号链接" }
         check(target.mkdirs() || target.isDirectory) { "无法创建媒体恢复目录" }
-        val files = from.listFiles().orEmpty().sortedBy(File::getName)
-        // Check every conflict first; never partially install over user-owned data.
-        files.forEach { file ->
-            val dest = File(target, file.name)
-            if (dest.exists()) check(Files.isRegularFile(dest.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                sameBytes(file, dest)) { "本地已有不同内容的同名附件：${file.name}" }
-        }
+        val files = requireNotNull(from.listFiles()) { "无法读取待恢复附件" }.sortedBy(File::getName)
         files.forEach { file ->
             val dest = File(target, file.name)
             if (!dest.exists()) {

@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
@@ -138,6 +139,9 @@ internal fun buildLocalUserModelMessage(
                     put("name", attachment.name)
                     put("bytes", attachment.bytes)
                     attachment.attachmentId?.let { put("attachmentId", it) }
+                    if (attachment.pdfPages.isNotEmpty()) {
+                        put("pdfPages", JsonArray(attachment.pdfPages.map { JsonPrimitive(it) }))
+                    }
                     attachment.width?.let { put("width", it) }
                     attachment.height?.let { put("height", it) }
                 })
@@ -252,6 +256,34 @@ internal suspend fun prepareLocalMultimodalMessages(
                     require(file.isFile) { "文件附件不存在：$relative" }
                     val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: file.name
                     val mediaType = obj["mediaType"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
+                    val isPdf = com.labteto.dshmobile.local.attachment.isLocalPdf(name, mediaType)
+                    val selectedPdfPages = (obj["pdfPages"] as? JsonArray)?.map { page ->
+                        (page as? JsonPrimitive)?.intOrNull ?: error("PDF 页码无效")
+                    }.orEmpty()
+                    if (selectedPdfPages.isNotEmpty()) {
+                        require(isPdf && mode != LocalImageInputMode.TOOL &&
+                            selectedPdfPages.size <= minOf(pdfPageSlots, MAX_LOCAL_PDF_RENDER_PAGES)) {
+                            "所选 PDF 页面需要支持图片理解的模型，且不得超过本轮图片预算"
+                        }
+                        val render = {
+                            renderLocalPdfForModel(file, maxPages = minOf(pdfPageSlots, MAX_LOCAL_PDF_RENDER_PAGES),
+                                selectedPages = selectedPdfPages)
+                        }
+                        val result = if (resourceScheduler == null) render() else
+                            resourceScheduler.withResource(HarnessResourceKind.MEDIA_DECODE, "model:pdf-pages") { render() }
+                        add(buildJsonObject {
+                            put("type", "text")
+                            put("text", "[PDF 指定页：$name · 第 ${result.pages.joinToString(", ") { it.pageNumber.toString() }} 页（共 ${result.pageCount} 页）]")
+                        })
+                        for (page in result.pages) {
+                            activeImages++
+                            activeRawBytes += page.bytes.size
+                            require(activeRawBytes <= budget.maxRawBytes) { "所选 PDF 页超过本轮图片大小预算" }
+                            add(modelImageUrl(page.mediaType, page.bytes))
+                        }
+                        pdfPageSlots -= result.pages.size
+                        return@forEach
+                    }
                     // Send the active document as a request-scoped input_file when this is an
                     // official OpenAI Responses route. No Files upload API or durable Base64.
                     val nativeMime = openAiNativeFileMime(name)
@@ -356,8 +388,6 @@ internal suspend fun prepareLocalMultimodalMessages(
                         })
                     }
 
-                    val isPdf = name.endsWith(".pdf", ignoreCase = true) ||
-                        mediaType.substringBefore(';').trim().equals("application/pdf", ignoreCase = true)
                     val shouldRenderPdf = isPdf &&
                         mode != LocalImageInputMode.TOOL &&
                         pdfPageSlots > 0 &&

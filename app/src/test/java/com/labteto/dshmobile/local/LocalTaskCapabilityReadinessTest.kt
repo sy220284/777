@@ -86,6 +86,19 @@ class LocalTaskCapabilityReadinessTest {
         ).isEmpty())
     }
 
+    @Test fun oneActionNegationDoesNotCancelTheRequirementOfAnotherSelectedTool() {
+        val readiness = LocalTaskCapabilityReadinessProjector.project(
+            "不要自动点击，只读取当前界面树",
+            githubConfigured = null,
+            networkSearchEnabled = false,
+            accessibilityActive = false,
+            requiredDeviceCapabilities = setOf(ToolDeviceRequirement.ACCESSIBILITY),
+        )
+        assertEquals(listOf(LocalTaskCapabilityReadiness(
+            LocalTaskCapabilityKind.ACCESSIBILITY, LocalTaskCapabilityState.CONNECTION_REQUIRED,
+        )), readiness)
+    }
+
     @Test fun screenCaptureIsShownOnlyForRequestedTasksAndRequiresPerSessionApproval() {
         assertEquals(
             listOf(LocalTaskCapabilityReadiness(

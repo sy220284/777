@@ -49,6 +49,19 @@ class LocalWorkHandoffMaterialsTest {
     }
 
     @Test
+    fun chosenDialogueStaysVisibleWhenQueryChangesAndPrivateReasoningIsRemoved() {
+        val candidates = workHandoffDialogueCandidates(
+            listOf(row("older", "assistant", "<think>内部推理</think>可引用材料"),
+                row("newer", "user", "新查找目标")),
+            emptyList(),
+        )
+        assertEquals(listOf("older", "newer"),
+            visibleWorkHandoffMessages(candidates, "新查找", listOf("older")).map { it.id })
+        assertFalse(candidates.first().matchesWorkHandoffQuery("内部推理"))
+        assertTrue(candidates.first().matchesWorkHandoffQuery("可引用"))
+    }
+
+    @Test
     fun selectedMediaOnlyMessageKeepsVerifiedWorkspaceReferenceWithoutCopyingBytes() {
         val hash = "a".repeat(64)
         val media = LocalHarnessMessage(
@@ -101,5 +114,32 @@ class LocalWorkHandoffMaterialsTest {
         assertTrue(result.contains("消息ID: long"))
         assertTrue(result.contains("（节选）"))
         assertTrue(result.length < 1400)
+    }
+
+    @Test
+    fun longSelectedMessagePreservesFullTextInStructuredLocalHandoff() {
+        val fullText = ("第一段。\n第二段里的词语和标点！\n").repeat(350)
+        val chosen = listOf(
+            row("long-1", "user", fullText),
+            row("hidden", "tool", "内部工具结果", tool = "read"),
+        )
+        val document = workHandoffFullDocument("chat-source", chosen, listOf("long-1"))
+        val parsed = kotlinx.serialization.json.Json.decodeFromString(
+            WorkHandoffDocument.serializer(), document,
+        )
+        assertEquals("chat-source", parsed.sourceSessionId)
+        assertEquals(listOf("long-1"), parsed.messages.map { it.messageId })
+        assertEquals(fullText, parsed.messages.single().text)
+        assertFalse(document.contains("内部工具结果"))
+        val summary = workHandoffSummaryWithSelectedMessages(
+            "用户备注", "chat-source", chosen, listOf("long-1"),
+            fullTextReference = "工作交接/所选消息全文-sha.json",
+        )
+        assertTrue(summary.contains("工作区/工作交接/所选消息全文-sha.json"))
+        assertTrue(summary.contains("完整原文"))
+        assertTrue(summary.length < 1_000)
+        assertTrue(runCatching {
+            workHandoffFullDocument("chat-source", chosen, listOf("hidden"))
+        }.isFailure)
     }
 }

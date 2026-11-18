@@ -37,6 +37,7 @@ internal fun localWorkFeatureUiContribution(
             loadWorkspace = actions.workspaceFiles,
             saveToDownloads = actions.saveWorkspaceFileToDownloads,
             importFromPhone = actions.importWorkspaceFile,
+            exportDirectoryArchive = actions.exportWorkspaceArchive,
             loadDirectory = actions.workspaceDirectory,
             loadDirectoryPage = actions.workspaceDirectoryPage,
             loadSearch = actions.searchWorkspaceFiles,

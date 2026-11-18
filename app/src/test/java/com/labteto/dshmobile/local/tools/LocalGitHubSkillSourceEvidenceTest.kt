@@ -83,6 +83,22 @@ class LocalGitHubSkillSourceEvidenceTest {
         }
     }
 
+    @Test fun slashBranchResolvesLongestAdvertisedRevisionAndSurvivesReceipt() {
+        val sha = "abcdef0123456789abcdef0123456789abcdef01"
+        val selected = PublicGitHubSkillLocation.parse(
+            "github.com/openai/skills/tree/feature/mobile/skills/example",
+            setOf("feature", "feature/mobile"),
+        )
+        val encoded = PublicGitHubSkillLocation.parse(
+            "https://github.com/openai/skills/tree/feature%2Fmobile/skills/example",
+        )
+        assertEquals("feature/mobile", selected.ref)
+        assertEquals("skills/example", selected.directory)
+        assertEquals(selected, encoded)
+        val receipt = githubSkillSourceEvidence(selected, sha).toString(Charsets.UTF_8)
+        assertEquals(selected to sha, parseGitHubSkillUpdateSource(receipt))
+    }
+
     @Test fun snapshotOnlyImportsRequestedSkillAndPinsProvenance() {
         val source = PublicGitHubSkillLocation.parse(
             "https://github.com/openai/skills/tree/main/skills/.curated/example-skill")
