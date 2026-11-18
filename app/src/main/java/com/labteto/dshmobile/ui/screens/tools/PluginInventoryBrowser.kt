@@ -204,7 +204,8 @@ internal fun PluginInventoryBrowser(
             sourceLabel = if (skill.sourceUrl != null) "GitHub · 已固定来源" else "777 · 本地技能",
             marketState = installedSkillMarketState(skill.modelInvocable, skill.sourceWarning, skill.requirements))
     }
-    val availablePresets = presets.filterNot { it.installed }.map { preset ->
+    val installedSkillIds = skills.mapTo(hashSetOf()) { it.name }
+    val availablePresets = presets.filterNot { it.installed || it.id in installedSkillIds }.map { preset ->
         val copy = extensionPresentation(preset.id, preset.title, preset.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + preset.id, copy.title, copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
