@@ -129,6 +129,7 @@ class LocalWorkToolDisclosureAndroidTest {
         }
         compose.onNodeWithText("最新：修改文件内容 · 已完成").assertIsDisplayed()
         compose.onNodeWithTag("work-tool-disclosure:live").performClick()
+        compose.onNodeWithTag("work-tool-filter:all").assertIsSelected()
         val newY = compose.onNodeWithTag("work-tool:new")
             .fetchSemanticsNode().boundsInRoot.top
         val oldY = compose.onNodeWithTag("work-tool:old")
