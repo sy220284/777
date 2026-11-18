@@ -119,6 +119,13 @@ internal fun latestWorkTool(operations: List<LocalTranscriptItem>): WorkToolLate
         else -> error("工具列表包含非工具消息：${newest.key}")
     }
 
+/** Find the latest still-active call for the persistent, low-profile composer status. */
+internal fun latestRunningWorkTool(operations: List<LocalTranscriptItem>): WorkToolLatest? =
+    latestWorkTool(operations.filter { item ->
+        workToolPhase(item) == LocalToolUiPhase.RUNNING ||
+            workToolPhase(item) == LocalToolUiPhase.DECLARED
+    })
+
 internal fun visibleWorkToolOperations(
     operations: List<LocalTranscriptItem>,
     filter: WorkToolListFilter,
