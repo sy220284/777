@@ -65,15 +65,12 @@ private data class InventoryRow(
     val connectedService: Boolean,
     val icon: ImageVector = FeatherIcons.Globe,
     val accent: Color = Color(0xFF62758A),
-    val group: ExtensionGroup = ExtensionGroup.GENERAL,
     val documentIcon: Int? = null,
     val available: Boolean = true,
     val modelInvocable: Boolean = true,
     val installedSkill: Boolean = false,
-    val installedPlugin: Boolean = false,
     val installablePreset: Boolean = false,
     val sourceUrl: String? = null,
-    val sourceIdentity: com.labteto.dshmobile.uicontract.UiSkillSourceIdentity? = null,
     val sourceWarning: String? = null,
     val rollbackAvailable: Boolean = false,
     val sourceLabel: String = "",
@@ -85,7 +82,6 @@ private data class InventoryRow(
 @Composable
 internal fun PluginInventoryBrowser(
     localIds: List<String>,
-    activeToolHookIds: List<String> = emptyList(),
     connectedServices: List<McpServerSnapshot> = emptyList(),
     skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
@@ -177,7 +173,7 @@ internal fun PluginInventoryBrowser(
         }
         val copy = extensionPresentation(id, label, stringResource(hint), ExtensionKind.PLUGIN)
         InventoryRow("local:$id", copy.title, copy.description, connectedService = false,
-            icon = copy.icon, accent = copy.accent, group = copy.group, documentIcon = copy.documentIcon,
+            icon = copy.icon, accent = copy.accent, documentIcon = copy.documentIcon,
             sourceLabel = "777 · 随应用安装",
             marketState = ExtensionMarketState(ExtensionMarketStatus.BUILTIN, "已内置 · 按需授权"))
     }
@@ -193,16 +189,15 @@ internal fun PluginInventoryBrowser(
             marketState = connectorMarketState(server.registration, server.connection),
             icon = copy.icon,
             accent = copy.accent,
-            group = copy.group,
         )
     }
     val installedSkills = skills.map { skill ->
         val copy = extensionPresentation(skill.name, skill.displayName, skill.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + skill.name, copy.title, copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
-            group = copy.group, documentIcon = copy.documentIcon,
+            documentIcon = copy.documentIcon,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
-            sourceUrl = skill.sourceUrl, sourceIdentity = skill.sourceIdentity,
+            sourceUrl = skill.sourceUrl,
             sourceWarning = skill.sourceWarning,
             rollbackAvailable = skill.rollbackAvailable,
             requirements = skill.requirements,
@@ -213,7 +208,7 @@ internal fun PluginInventoryBrowser(
         val copy = extensionPresentation(preset.id, preset.title, preset.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + preset.id, copy.title, copy.description,
             connectedService = false, icon = copy.icon, accent = copy.accent,
-            group = copy.group, documentIcon = copy.documentIcon,
+            documentIcon = copy.documentIcon,
             available = false, installablePreset = true,
             sourceLabel = "777 · 内置精选",
             marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "待安装"))

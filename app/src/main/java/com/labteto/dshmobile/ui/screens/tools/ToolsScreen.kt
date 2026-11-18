@@ -120,7 +120,6 @@ data class ToolsUiState(
     val servers: List<McpServerSnapshot> = emptyList(),
     val githubConfigured: Boolean = false,
     val localPlugins: List<String> = emptyList(),
-    val activeToolHookIds: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
     val pendingSkillUpdates: Map<String, String> = emptyMap(),
@@ -301,7 +300,7 @@ class ToolsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             // Only real inventory changes reload the affected page state.
-            // Switching tabs continues to reuse the current snapshot.
+            // The unified directory reuses the current snapshot.
             merge(localTools.skillChanges(), localTools.serverChanges()).collectLatest {
                 // A skill directory can be created before SKILL.md is written.
                 delay(220)
@@ -310,7 +309,6 @@ class ToolsViewModel @Inject constructor(
                     val skills = localTools.installedSkills()
                     val presets = localTools.presetSkills()
                     val plugins = localTools.installedPluginIds()
-                    val activeHookIds = localTools.activeToolHookIds()
                     val githubConfigured = localTools.githubConfigured()
                     val activeIds = skills.map { it.name }.toSet()
                     _state.value = _state.value.copy(
@@ -318,7 +316,6 @@ class ToolsViewModel @Inject constructor(
                         skills = skills,
                         presets = presets,
                         localPlugins = plugins,
-                        activeToolHookIds = activeHookIds,
                         githubConfigured = githubConfigured,
                         pendingSkillUpdates = _state.value.pendingSkillUpdates.filterKeys { it in activeIds },
                         upToDateSkills = _state.value.upToDateSkills.filterTo(mutableSetOf()) { it in activeIds },
@@ -351,7 +348,6 @@ class ToolsViewModel @Inject constructor(
                     servers = servers,
                     githubConfigured = localTools.githubConfigured(),
                     localPlugins = plugins,
-                    activeToolHookIds = localTools.activeToolHookIds(),
                     skills = skills,
                     presets = presets,
                 )
@@ -1069,7 +1065,6 @@ fun ToolsScreen(
                         if (!showConnectorSettings) {
                             PluginInventoryBrowser(
                                 localIds = state.localPlugins,
-                                activeToolHookIds = state.activeToolHookIds,
                                 connectedServices = state.servers,
                                 skills = state.skills,
                                 presets = state.presets,
