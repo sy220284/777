@@ -66,7 +66,7 @@ internal class WorkAutomationApprovalResumeLedger private constructor(
             ?.takeIf(String::isNotBlank) ?: return null
         val name = event.data["tool"]?.jsonPrimitive?.contentOrNull
             ?.takeIf(String::isNotBlank) ?: return null
-        return Blocked(event.sequence, LocalToolCall(id,name,args),
+        return Blocked(event.sequence, LocalToolCall(id,name,args,args.toString()),
             event.data["summary"]?.jsonPrimitive?.contentOrNull.orEmpty())
     }
     private fun stepFor(log: LocalSessionEventLog, blocked: Blocked): Pair<Int,Pair<String,List<JsonObject>>>? {
