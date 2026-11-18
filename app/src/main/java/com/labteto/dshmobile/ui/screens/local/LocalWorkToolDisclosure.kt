@@ -167,9 +167,13 @@ internal fun LocalWorkToolDisclosureRow(
     val latestText = "最新：$currentAction · $currentStatus"
     val issues = counts.failed + counts.cancelled + counts.uncertain
 
-    // Follow a newly inserted head only while the reader is already at the head.
-    // Scrolling through old receipts remains under the reader's control.
-    LaunchedEffect(group.turnId, expanded, filter, group.operations.size) {
+    // Opening again or switching filters begins with the latest matching receipt.
+    LaunchedEffect(group.turnId, expanded, filter) {
+        if (expanded) listState.scrollToItem(0)
+    }
+    // New receipts follow only when the reader was already watching the latest record.
+    // Manual scrolling through older receipts is never forcibly interrupted.
+    LaunchedEffect(group.turnId, group.operations.size) {
         if (expanded && listState.firstVisibleItemIndex == 0 &&
             listState.firstVisibleItemScrollOffset <= 24) {
             listState.scrollToItem(0)
