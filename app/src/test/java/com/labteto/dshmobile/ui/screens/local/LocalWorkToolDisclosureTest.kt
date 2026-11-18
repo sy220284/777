@@ -205,9 +205,8 @@ class LocalWorkToolDisclosureTest {
         val newest = LocalTranscriptItem.WorkStep(tool("new", 2))
         val visible = visibleWorkToolOperations(listOf(old, newest), WorkToolListFilter.ALL)
         assertEquals(listOf(newest.key, old.key), visible.map(LocalTranscriptItem::key))
-        assertEquals("new", latestWorkTool(listOf(old, newest))?.name?.let { _ ->
-            (visible.first() as LocalTranscriptItem.WorkStep).message.id
-        })
+        assertEquals("new", (visible.first() as LocalTranscriptItem.WorkStep).message.id)
+        assertEquals("mcp__GitHub__fetch_file", latestWorkTool(listOf(old, newest))?.name)
     }
 
     @Test fun runningAndIssueFiltersKeepNewestFirstAndNeverHideOtherReceipts() {
