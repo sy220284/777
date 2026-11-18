@@ -356,7 +356,7 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
-                if (visible.isEmpty() && error == null && !loading) {
+                if (sections.none { it.entries.isNotEmpty() } && error == null && !loading) {
                     item(key = "inventory-empty") {
                         Text(
                             if (addedOnly) "尚未添加技能、插件或连接器"
