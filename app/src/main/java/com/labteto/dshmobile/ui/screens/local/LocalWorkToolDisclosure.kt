@@ -9,9 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +35,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsType
+import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
@@ -83,10 +88,54 @@ internal fun workToolDisclosureCounts(operations: List<LocalTranscriptItem>): Wo
     return WorkToolDisclosureCounts(total, running, failed, cancelled, uncertain)
 }
 
+/** A single source of ordering/filtering for the compact, virtualized operation list. */
+internal enum class WorkToolListFilter { ALL, RUNNING, ISSUES }
+
+internal data class WorkToolLatest(
+    val name: String?,
+    val argumentsPreview: String?,
+    val phase: LocalToolUiPhase,
+)
+
+internal fun workToolPhase(item: LocalTranscriptItem): LocalToolUiPhase = when (item) {
+    is LocalTranscriptItem.WorkPendingTool -> item.activity.phase
+    is LocalTranscriptItem.WorkStep -> completedWorkToolPhase(
+        item.groupedMessages.lastOrNull() ?: item.message,
+    )
+    else -> error("工具列表包含非工具消息：${item.key}")
+}
+
+internal fun latestWorkTool(operations: List<LocalTranscriptItem>): WorkToolLatest? =
+    when (val newest = operations.lastOrNull()) {
+        is LocalTranscriptItem.WorkPendingTool -> WorkToolLatest(
+            newest.activity.name, newest.activity.argumentsPreview, newest.activity.phase,
+        )
+        is LocalTranscriptItem.WorkStep -> WorkToolLatest(
+            (newest.groupedMessages.lastOrNull() ?: newest.message).toolName,
+            newest.activity?.argumentsPreview,
+            workToolPhase(newest),
+        )
+        null -> null
+        else -> error("工具列表包含非工具消息：${newest.key}")
+    }
+
+internal fun visibleWorkToolOperations(
+    operations: List<LocalTranscriptItem>,
+    filter: WorkToolListFilter,
+): List<LocalTranscriptItem> = operations.asReversed().filter { item ->
+    when (filter) {
+        WorkToolListFilter.ALL -> true
+        WorkToolListFilter.RUNNING -> workToolPhase(item) in
+            setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING)
+        WorkToolListFilter.ISSUES -> workToolPhase(item) in
+            setOf(LocalToolUiPhase.FAILED, LocalToolUiPhase.CANCELLED, LocalToolUiPhase.OUTCOME_UNKNOWN)
+    }
+}
+
 /**
- * One quiet disclosure at the beginning of each Work reply. The expandable inner list is
- * progressively mounted in fixed-size batches to avoid composing hundreds of receipt views
- * at once. All operations remain reachable, with no data truncation or model replay.
+ * One per-turn disclosure stays in the transcript; nested receipts are a bounded-height
+ * LazyColumn. Newest-first ordering and the live summary share the same event projection.
+ * Nothing is truncated or replayed, and older rows remain reachable via virtual scrolling.
  */
 @Composable
 internal fun LocalWorkToolDisclosureRow(
@@ -95,8 +144,31 @@ internal fun LocalWorkToolDisclosureRow(
 ) {
     val colors = LocalSyColors.current
     var expanded by rememberSaveable(group.turnId) { mutableStateOf(false) }
-    var visibleCount by rememberSaveable(group.turnId) { mutableIntStateOf(24) }
+    var filter by rememberSaveable(group.turnId) { mutableStateOf(WorkToolListFilter.ALL) }
     val counts = remember(group.operations) { workToolDisclosureCounts(group.operations) }
+    val newest = remember(group.operations) { latestWorkTool(group.operations) }
+    val display = remember(group.operations, filter) {
+        visibleWorkToolOperations(group.operations, filter)
+    }
+    val listState = rememberLazyListState()
+    val currentAction = newest?.let {
+        workToolActionLabel(it.name, it.argumentsPreview)
+    } ?: "工具操作"
+    val currentStatus = newest?.phase?.let {
+        if (it == LocalToolUiPhase.COMPLETED) "已完成" else workToolPhaseText(it)
+    } ?: "待确认"
+    val latestText = "最新：$currentAction · $currentStatus"
+    val issues = counts.failed + counts.cancelled + counts.uncertain
+
+    // Follow a newly inserted head only while the reader is already at the head.
+    // Scrolling through old receipts remains under the reader's control.
+    LaunchedEffect(group.turnId, expanded, filter, group.operations.size) {
+        if (expanded && listState.firstVisibleItemIndex == 0 &&
+            listState.firstVisibleItemScrollOffset <= 24) {
+            listState.scrollToItem(0)
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
@@ -110,7 +182,8 @@ internal fun LocalWorkToolDisclosureRow(
                 }
                 .heightIn(min = SyMetric.touch)
                 .semantics(mergeDescendants = true) {
-                    stateDescription = (if (expanded) "已展开" else "已折叠") + "，${counts.summary}"
+                    stateDescription = (if (expanded) "已展开" else "已折叠") +
+                        "，$latestText，${counts.summary}"
                 },
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             verticalAlignment = Alignment.CenterVertically,
@@ -121,19 +194,33 @@ internal fun LocalWorkToolDisclosureRow(
                 tint = colors.textSecondary,
                 modifier = Modifier.size(18.dp),
             )
-            // Two reading lines keep long error/running summaries legible at 320dp.
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "工具执行记录 · ${counts.total} 项",
-                    style = DsType.small13.withReadingWeight(),
+                    style = DsType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 Text(
-                    counts.summary,
+                    latestText,
                     style = DsType.small13.withReadingWeight(),
-                    color = if (counts.failed > 0) colors.dangerInk
-                        else if (counts.uncertain > 0) colors.warningInk else colors.textTertiary,
+                    color = when (newest?.phase) {
+                        LocalToolUiPhase.FAILED -> colors.dangerInk
+                        LocalToolUiPhase.OUTCOME_UNKNOWN -> colors.warningInk
+                        else -> colors.textSecondary
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (counts.running > 0 || issues > 0) {
+                    Text(
+                        counts.summary,
+                        style = DsType.small13.withReadingWeight(),
+                        color = if (counts.failed > 0) colors.dangerInk
+                            else if (counts.uncertain > 0) colors.warningInk
+                            else colors.textSecondary,
+                        maxLines = 2,
+                    )
+                }
             }
         }
         if (expanded) {
@@ -141,27 +228,63 @@ internal fun LocalWorkToolDisclosureRow(
                 modifier = Modifier.fillMaxWidth().padding(start = SyMetric.gapMd),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
-                group.operations.take(visibleCount).forEach { item ->
-                    when (item) {
-                        is LocalTranscriptItem.WorkStep -> WorkTimelineStepRow(
-                            message = item.message,
-                            workspacePath = workspacePath,
-                            repeatCount = item.repeatCount,
-                            activity = item.activity,
-                            groupedMessages = item.groupedMessages,
-                            operationGroup = item.operationGroup,
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                    SyButton(
+                        text = "全部",
+                        onClick = { filter = WorkToolListFilter.ALL },
+                        size = SyButtonSize.Small,
+                        variant = if (filter == WorkToolListFilter.ALL)
+                            SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    )
+                    if (counts.running > 0 || filter == WorkToolListFilter.RUNNING) {
+                        SyButton(
+                            text = "执行中 ${counts.running}",
+                            onClick = { filter = WorkToolListFilter.RUNNING },
+                            size = SyButtonSize.Small,
+                            variant = if (filter == WorkToolListFilter.RUNNING)
+                                SyButtonVariant.Outline else SyButtonVariant.Ghost,
                         )
-                        is LocalTranscriptItem.WorkPendingTool -> WorkPendingToolRow(item.activity)
-                        else -> error("工具折叠区包含非工具消息：${item.key}")
+                    }
+                    if (issues > 0 || filter == WorkToolListFilter.ISSUES) {
+                        SyButton(
+                            text = "异常 $issues",
+                            onClick = { filter = WorkToolListFilter.ISSUES },
+                            size = SyButtonSize.Small,
+                            variant = if (filter == WorkToolListFilter.ISSUES)
+                                SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                        )
                     }
                 }
-                if (visibleCount < group.operations.size) {
-                    SyButton(
-                        text = "继续查看操作记录（剩余 ${group.operations.size - visibleCount} 项）",
-                        onClick = { visibleCount = (visibleCount + 24).coerceAtMost(group.operations.size) },
-                        size = SyButtonSize.Small,
-                        variant = SyButtonVariant.Ghost,
+                if (display.isEmpty()) {
+                    Text(
+                        if (filter == WorkToolListFilter.RUNNING) "当前没有执行中的操作"
+                        else "当前没有异常操作",
+                        style = DsType.small13.withReadingWeight(),
+                        color = colors.textSecondary,
                     )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)
+                            .testTag("work-tool-list:${group.turnId}"),
+                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    ) {
+                        items(display, key = { it.key }) { item ->
+                            when (item) {
+                                is LocalTranscriptItem.WorkStep -> WorkTimelineStepRow(
+                                    message = item.message,
+                                    workspacePath = workspacePath,
+                                    repeatCount = item.repeatCount,
+                                    activity = item.activity,
+                                    groupedMessages = item.groupedMessages,
+                                    operationGroup = item.operationGroup,
+                                )
+                                is LocalTranscriptItem.WorkPendingTool ->
+                                    WorkPendingToolRow(item.activity)
+                                else -> error("工具列表包含非工具消息：${item.key}")
+                            }
+                        }
+                    }
                 }
             }
         }
