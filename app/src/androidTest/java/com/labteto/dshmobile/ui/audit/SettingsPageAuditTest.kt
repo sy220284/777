@@ -22,6 +22,7 @@ import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -92,6 +93,13 @@ class SettingsPageAuditTest(
         captureScrollableUiAudit(compose, "settings-${destination.name}-${theme.name}-$fontScale-$width", "settings-audit-frame")
         val modelUsageTitle = compose.activity.getString(R.string.settings_page_model_usage)
         if (destination == SettingsDestination.ROOT) {
+            // The home page has no duplicate full-width search row; top-bar search remains usable.
+            val searchTitle = compose.activity.getString(R.string.settings_search_title)
+            compose.onNodeWithText(searchTitle).assertDoesNotExist()
+            compose.onNodeWithContentDescription(searchTitle).performClick()
+            compose.onNodeWithTag("settings-search-input").assertExists()
+            compose.onNodeWithContentDescription(compose.activity.getString(R.string.common_back)).performClick()
+            compose.waitForIdle()
             // The entry belongs to settings home and must keep the existing usage navigation intact.
             compose.onNodeWithText(modelUsageTitle).assertExists()
             compose.onNodeWithText(modelUsageTitle).performScrollTo().performClick()
