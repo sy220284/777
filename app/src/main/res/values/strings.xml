@@ -2479,4 +2479,7 @@
     <string name="local_pdf_choose_pages">选择 PDF 页码</string>
     <string name="local_pdf_choose_pages_hint">例如 2,4-6，最多 6 页。选页后仅发送对应页面，需要支持图片理解的模型。</string>
     <string name="local_pdf_pages_placeholder">留空使用默认读取范围</string>
+    <string name="tasks_approve_resume">审批并继续</string>
+    <string name="tasks_approve_resume_title">确认本次工具操作</string>
+    <string name="tasks_approve_resume_warning">确认后仅批准本次显示的操作，执行记录将保留。运行中断时会先核对已执行结果，避免重复操作。</string>
 </resources>
