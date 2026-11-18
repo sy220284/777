@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.local.session
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
 
 /**
  * Only references produced by the existing on-device attachment importer are handed
@@ -87,12 +91,56 @@ internal fun visibleWorkHandoffMessages(
 }
 
 
+@Serializable
+internal data class WorkHandoffDocumentAttachment(
+    val name: String, val path: String, val sha256: String,
+)
+
+@Serializable
+internal data class WorkHandoffDocumentMessage(
+    val messageId: String,
+    val role: String,
+    val text: String,
+    val attachments: List<WorkHandoffDocumentAttachment>,
+)
+
+@Serializable
+internal data class WorkHandoffDocument(
+    val version: Int = 1,
+    val sourceSessionId: String,
+    val messages: List<WorkHandoffDocumentMessage>,
+)
+
+/** Immutable full-text material: UI excerpts may be short, the owned file is never clipped. */
+internal fun workHandoffFullDocument(
+    sourceSessionId: String,
+    candidates: List<LocalHarnessMessage>,
+    selectedIds: List<String>,
+): String {
+    require(sourceSessionId.isNotBlank() && selectedIds.isNotEmpty()) { "未选择可交接的原对话" }
+    val byId = candidates.associateBy(LocalHarnessMessage::id)
+    val messages = selectedIds.distinct().map { id ->
+        val original = byId[id]?.workHandoffVisibleMessage()
+            ?: error("所选消息已失效，请重新选择：$id")
+        WorkHandoffDocumentMessage(
+            messageId = original.id,
+            role = original.role,
+            text = original.content,
+            attachments = original.handoffSafeMedia().map {
+                WorkHandoffDocumentAttachment(it.name, it.path, it.sha256)
+            },
+        )
+    }
+    return Json.encodeToString(WorkHandoffDocument(sourceSessionId = sourceSessionId, messages = messages))
+}
+
 /** Preserve the editable draft and carry traceable references to explicitly selected messages. */
 internal fun workHandoffSummaryWithSelectedMessages(
     summary: String,
     sourceSessionId: String,
     candidates: List<LocalHarnessMessage>,
     selectedIds: List<String>,
+    fullTextReference: String? = null,
 ): String {
     if (selectedIds.isEmpty()) return summary
     val byId = candidates.associateBy(LocalHarnessMessage::id)
@@ -106,13 +154,19 @@ internal fun workHandoffSummaryWithSelectedMessages(
         summary.trim().takeIf(String::isNotBlank)?.let { appendLine(it); appendLine() }
         appendLine("【用户选定的原对话材料】")
         appendLine("来源会话：$sourceSessionId")
-        chosen.forEach { message ->
+        if (fullTextReference != null) {
+            appendLine("完整原文：工作区/$fullTextReference（保留所有选定消息的原始文字及换行）")
+            appendLine("执行工作前，先使用工作区读取工具打开此文件，长内容逐段读完。")
+        }
+        val previews = if (fullTextReference != null) chosen.take(12) else chosen
+        previews.forEach { message ->
             val speaker = if (message.role == "user") "用户" else "助手"
             val normalized = message.content.trim().replace(Regex("\\s+"), " ")
-            val excerpt = normalized.take(1_000)
+            val excerptLimit = if (fullTextReference == null) 1_000 else 220
+            val excerpt = normalized.take(excerptLimit)
             appendLine("- $speaker [消息ID: ${message.id}]：" +
                 if (normalized.isBlank()) "（仅包含附件）"
-                else excerpt + if (normalized.length > 1_000) "…（节选）" else "")
+                else excerpt + if (normalized.length > excerptLimit) "…（节选）" else "")
             val media = message.handoffSafeMedia()
             media.forEach { attachment ->
                 appendLine("  - 已选附件：${attachment.name}；工作区路径：${attachment.path}；" +
@@ -121,6 +175,9 @@ internal fun workHandoffSummaryWithSelectedMessages(
             if (message.handoffAttachmentNames().size > media.size) {
                 appendLine("  - 部分旧附件缺少可验证的本地引用，请在工作中重新选择原文件")
             }
+        }
+        if (previews.size < chosen.size) {
+            appendLine("其余 ${chosen.size - previews.size} 条消息的全文保存在上述交接文件中。")
         }
         append("这些是用户明确选择的引用材料；其内容不代表新的授权或已完成的工作。")
     }
