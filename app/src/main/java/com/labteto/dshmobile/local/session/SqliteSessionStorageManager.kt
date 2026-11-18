@@ -241,9 +241,10 @@ internal class SqliteSessionStorageManager(
     @Synchronized
     fun stageRestore(archive: InputStream): Int {
         require(!pendingRoot.exists()) { "已有待恢复数据，请重启应用处理" }
-        check(snapshots.readSummaries().isEmpty() && restorableEmptyEditor(events.readableDatabase)) {
-            "为防止覆盖现有会话，SQLite 备份目前只允许恢复到空会话库"
-        }
+        // Existing sessions are preserved by an additive, durable merge at the next
+        // process-start boundary. The old empty-target restore contract remains intact.
+        val merging = snapshots.readSummaries().isNotEmpty() ||
+            !restorableEmptyEditor(events.readableDatabase)
         val staging = File(context.filesDir, "local-harness/.sqlite-restore-${UUID.randomUUID()}")
         check(staging.mkdirs()) { "无法建立 SQLite 恢复隔离目录" }
         try {
@@ -308,7 +309,7 @@ internal class SqliteSessionStorageManager(
             if (completeStudio) {
                 requireNotNull(studioReceiver) { "完整备份缺少媒体工作室数据库与文件清单" }
                     .validateStaged()
-                LocalMediaStudioBackupInstaller(context, studioJson).validateDestination(
+                if (!merging) LocalMediaStudioBackupInstaller(context, studioJson).validateDestination(
                     File(staging, STUDIO_STAGE_DIR),
                 )
             } else {
@@ -328,8 +329,9 @@ internal class SqliteSessionStorageManager(
                 if (file.isDirectory) DurableFileCommit.syncDirectory(file)
                 else DurableFileCommit.syncFile(file)
             }
+            val version = if (completeStudio) "sqlite-v3-studio" else "sqlite-v2-media"
             DurableFileCommit.replace(File(staging, "READY"),
-                (if (completeStudio) "sqlite-v3-studio" else "sqlite-v2-media").toByteArray())
+                (if (merging) "$version-merge" else version).toByteArray())
             check(staging.renameTo(pendingRoot)) { "SQLite 备份无法提交恢复计划" }
             DurableFileCommit.syncDirectory(requireNotNull(pendingRoot.parentFile))
             return sessions
@@ -373,8 +375,25 @@ internal class SqliteSessionStorageManager(
         val ready = File(pendingRoot, "READY")
         if (!ready.isFile) return 0
         val restoreVersion = ready.readText()
-        check(restoreVersion in setOf("sqlite-v2-media", "sqlite-v3-studio")) { "未知的 SQLite 恢复版本" }
-        val completeStudio = restoreVersion == "sqlite-v3-studio"
+        check(restoreVersion in setOf("sqlite-v2-media", "sqlite-v3-studio",
+            "sqlite-v2-media-merge", "sqlite-v3-studio-merge")) {
+            "未知的 SQLite 恢复版本"
+        }
+        val completeStudio = restoreVersion.startsWith("sqlite-v3-studio")
+        if (restoreVersion.endsWith("-merge")) {
+            // All original files stay untouched until an immutable merged pair is
+            // prepared. Interrupted installs replay from the same verified images.
+            val imported = SqliteCrossDeviceMerge(context, studioJson).apply(
+                pendingRoot, snapshotFile, eventFile, completeStudio,
+            )
+            check(!Files.exists(committedRoot.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                "已提交的跨设备恢复目录发生冲突"
+            }
+            Files.move(pendingRoot.toPath(), committedRoot.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            DurableFileCommit.syncDirectory(requireNotNull(committedRoot.parentFile))
+            cleanupCommittedRestore()
+            return imported
+        }
         val sources = listOf(
             File(pendingRoot, SNAPSHOT_ENTRY) to snapshotFile,
             File(pendingRoot, EVENT_ENTRY) to eventFile,
