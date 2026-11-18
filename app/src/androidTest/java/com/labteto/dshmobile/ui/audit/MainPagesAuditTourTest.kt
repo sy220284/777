@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasText
@@ -145,10 +146,10 @@ class MainPagesAuditTourTest {
 
             // The discover tab survives a round trip to capability settings.
             compose.onNodeWithText(text(R.string.extension_discover)).performClick()
-            compose.onNodeWithText("可连接的服务").assertExists()
+            compose.onNodeWithText(text(R.string.extension_discover)).assertIsSelected()
             compose.onNodeWithTag("capability-settings-entry").performClick()
             compose.onNodeWithContentDescription(text(R.string.common_back)).performClick()
-            compose.onNodeWithText("可连接的服务").assertExists()
+            compose.onNodeWithText(text(R.string.extension_discover)).assertIsSelected()
             compose.onNodeWithText(text(R.string.extension_added)).performClick()
 
             compose.onNodeWithText(text(R.string.extension_discover)).performClick()
