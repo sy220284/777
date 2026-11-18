@@ -138,7 +138,7 @@ internal fun PermissionSetupFlow(
 
     BackHandler {
         when (page) {
-            2 -> if (chosen.isEmpty()) onBack() else startWalk(0)
+            2 -> page = 0
             1 -> page = 0
             else -> onBack()
         }

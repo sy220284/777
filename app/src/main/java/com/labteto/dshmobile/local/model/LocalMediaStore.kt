@@ -153,6 +153,12 @@ class LocalMediaStore @Inject constructor(@ApplicationContext private val contex
     fun updateVideo(id: String, transition: (LocalMediaVideoTask) -> LocalMediaVideoTask) = update(id) { row ->
         row.copy(video = transition(row.video ?: error("视频任务不存在")))
     }
+    @Synchronized
+    internal fun pollableVideos(): List<LocalMediaVideoTask> = operation {
+        initialize()
+        database.pollableVideos()
+    }
+
     /** Saved local media results are retrieved by the single result() lookup below. */
     @Synchronized
     fun videosNeedingDelivery(): List<LocalMediaVideoTask> = operation {

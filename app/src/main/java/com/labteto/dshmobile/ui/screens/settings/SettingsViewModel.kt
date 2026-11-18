@@ -455,6 +455,10 @@ class SettingsViewModel @Inject constructor(
         appServer.usage.groupDetail(kind, key, modelFilter)
     }
 
+    suspend fun usageHistoryPage(model: String?, cursor: String?) = withContext(Dispatchers.IO) {
+        appServer.usage.historyPage(model, sinceMillis = null, cursor = cursor, limit = 40)
+    }
+
     suspend fun usageRecord(requestId: String): TokenUsageRecord? = withContext(Dispatchers.IO) {
         appServer.usage.requestDetail(requestId)
     }

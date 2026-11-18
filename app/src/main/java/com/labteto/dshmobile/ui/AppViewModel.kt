@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.connection.AppSettings
 import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.update.AvailableUpdate
 import com.labteto.dshmobile.update.UpdateChecker
 import com.labteto.dshmobile.update.UpdateInstaller
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,17 +33,17 @@ class AppViewModel @Inject constructor(
 
     private val _updateInstallStatus = MutableStateFlow<String?>(null)
     val updateInstallStatus: StateFlow<String?> = _updateInstallStatus.asStateFlow()
+    private val _updateCandidate = MutableStateFlow<AvailableUpdate?>(null)
+    val updateCandidate: StateFlow<AvailableUpdate?> = _updateCandidate.asStateFlow()
+    private var awaitingInstallPermission: AvailableUpdate? = null
     private var updateJob: Job? = null
 
-    /**
-     * Manual update flow only.
-     *
-     * The app never contacts GitHub on launch. A tap in Settings checks once, and when a newer
-     * signed APK is available it immediately downloads, verifies and hands it to Android's system
-     * installer.
-     */
-    fun checkForUpdateAndInstall(currentVersion: String) {
+    fun checkForUpdate(currentVersion: String) {
         if (updateJob?.isActive == true) return
+        awaitingInstallPermission?.let {
+            _updateCandidate.value = it
+            return
+        }
         updateJob = viewModelScope.launch {
             _updateInstallStatus.value = "正在检查更新…"
             val update = try {
@@ -60,6 +61,21 @@ class AppViewModel @Inject constructor(
                 return@launch
             }
 
+            _updateInstallStatus.value = "发现新版本 ${update.version}，等待确认下载。"
+            _updateCandidate.value = update
+        }
+    }
+
+    fun dismissUpdate() {
+        _updateCandidate.value = null
+    }
+
+    fun confirmUpdate() {
+        if (updateJob?.isActive == true) return
+        val update = _updateCandidate.value ?: return
+        _updateCandidate.value = null
+        awaitingInstallPermission = null
+        updateJob = viewModelScope.launch {
             _updateInstallStatus.value = if (update.patchChain.isNotEmpty()) {
                 val patchBytes = update.patchChain.sumOf { it.size }
                 val mib = patchBytes.toDouble() / (1024.0 * 1024.0)
@@ -68,7 +84,9 @@ class AppViewModel @Inject constructor(
                 "发现新版本 ${update.version}，正在下载完整 APK 并校验…"
             }
             _updateInstallStatus.value = try {
-                updateInstaller.downloadVerifyAndLaunch(update).message
+                val result = updateInstaller.downloadVerifyAndLaunch(update)
+                if (!result.launchedInstaller) awaitingInstallPermission = update
+                result.message
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

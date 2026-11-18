@@ -284,6 +284,20 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun sidebarAndWorkspaceSearchRetainIndependentContinuationsForTheSameQuery() {
+        repeat(99) { index -> root.resolve("report-$index.md").writeText("正文") }
+        val sidebar = workspace.searchSidebarWorkspacePage("report", 0)
+        val workspacePage = workspace.searchWorkspacePage("report", 0, pageSize = 1)
+
+        val olderSidebar = workspace.searchSidebarWorkspacePage("report", requireNotNull(sidebar.nextOffset))
+        val olderWorkspace = workspace.searchWorkspacePage("report", requireNotNull(workspacePage.nextOffset), pageSize = 1)
+
+        assertEquals(99, (sidebar.files + olderSidebar.files).map { it.path }.distinct().size)
+        assertEquals(null, olderSidebar.nextOffset)
+        assertTrue(workspacePage.files.single().path != olderWorkspace.files.single().path)
+    }
+
+    @Test
     fun searchPagesReturnAllMatchingPathsWithoutDuplicateOrEagerContentReads() {
         val folder = root.resolve("任务/搜索目录").apply { mkdirs() }
         repeat(235) { n -> folder.resolve("报告-${n.toString().padStart(4, '0')}.md").writeText("不应预览的正文") }

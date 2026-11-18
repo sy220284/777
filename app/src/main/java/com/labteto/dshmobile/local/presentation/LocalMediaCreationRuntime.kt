@@ -48,6 +48,10 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 
 /** Sole operation owner. Media Store atomically commits receipt/result and owns indexed persistence. */
@@ -57,6 +61,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val api: LocalMediaApiClient,
     private val store: LocalMediaStore,
     private val credentialResolver: LocalModelCredentialResolver,
+    private val modelGateway: com.labteto.dshmobile.local.model.LocalModelGateway,
 ) : MediaUiPort {
     companion object { const val PAGE_SIZE = LocalMediaStore.PAGE_SIZE }
     override val pageSize: Int get() = PAGE_SIZE
@@ -186,6 +191,8 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO +
         CoroutineExceptionHandler { _, failure -> AppLog.failure("MediaCreation", "media_operation", failure) })
     private val downloads = mutableMapOf<String, Deferred<Unit>>()
+    private val videoPollSignal = Channel<Unit>(Channel.CONFLATED)
+    private val videoPollMutex = Mutex()
     private val imageDownloads = mutableMapOf<String, Deferred<MediaUiReceipt>>()
     override val storageError: StateFlow<String?> get() = store.recoveryErrors
     override fun observe(sessionId: String?, limit: Int): Flow<LocalMediaPage> = store.observe(sessionId, limit)
@@ -216,18 +223,68 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         withContext(Dispatchers.IO) { store.removeRevisionFamily(id) }
     }
     suspend fun dismissCreationJob(id: String) = removeResult(id)
-    suspend fun retryStorage() = withContext(Dispatchers.IO) { store.retryStorage() }
+    suspend fun retryStorage() {
+        withContext(Dispatchers.IO) { store.retryStorage() }
+        videoPollSignal.trySend(Unit)
+    }
 
     init {
         scope.launch {
             store.initialize()
             store.cleanupDeleted()
+            videoPollSignal.trySend(Unit)
             // Recovered downloads are processed incrementally, not launched as an unbounded batch.
             for (task in store.videosNeedingDelivery()) {
                 try { retryVideoSave(task.id) }
                 catch (cancelled: CancellationException) { if (!currentCoroutineContext().isActive) throw cancelled }
                 catch (failure: Exception) { AppLog.warn("MediaCreation", "resume_video_save", failure) }
             }
+        }
+    }
+
+    init {
+        scope.launch {
+            for (signal in videoPollSignal) {
+                try {
+                    pollActiveVideos()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    AppLog.warn("MediaCreation", "read_active_videos", failure)
+                }
+            }
+        }
+    }
+
+    private suspend fun pollActiveVideos() {
+        var interval = 15_000L
+        while (true) {
+            val tasks = store.pollableVideos()
+            if (tasks.isEmpty()) return
+            val offers = LocalMediaCatalog.offers(modelGateway.configuredProfiles())
+                .filter { it.kind == LocalMediaKind.VIDEO }.associateBy { it.id }
+            var hadFailure = false
+            for (task in tasks) {
+                val offer = offers[task.offerId]?.takeIf(task::belongsTo)
+                if (offer == null || !hasMatchingCredential(offer, task.credentialSignature)) {
+                    hadFailure = true
+                    continue
+                }
+                try {
+                    videoPollMutex.withLock {
+                        store.video(task.id)?.takeIf { it.phase in setOf(
+                            LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING,
+                        ) }?.let { refreshVideoLocked(offer, task.id) }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    hadFailure = true
+                    AppLog.warn("MediaCreation", "poll_active_video", failure)
+                }
+            }
+            interval = if (hadFailure) (interval * 2).coerceAtMost(90_000L) else 15_000L
+            delay(interval)
         }
     }
 
@@ -334,6 +391,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                     else -> error("此服务商未接入视频生成")
                 }
                 store.updateVideo(task.id) { LocalMediaVideoTransitions.accepted(it, external, System.currentTimeMillis()) }
+                videoPollSignal.trySend(Unit)
             } catch (cancelled: CancellationException) {
                 videoSubmissionFailure(task.id, cancelled, requestStarted); throw cancelled
             } catch (failure: Exception) { videoSubmissionFailure(task.id, failure, requestStarted) }
@@ -344,26 +402,30 @@ class LocalMediaCreationRuntime @Inject internal constructor(
         LocalMediaVideoTransitions.submissionFailed(it, failure, requestStarted, now = System.currentTimeMillis())
     }
     suspend fun refreshVideo(offer: LocalMediaOffer, taskId: String) = withContext(Dispatchers.IO) {
+        videoPollMutex.withLock { refreshVideoLocked(offer, taskId) }
+    }
+
+    private suspend fun refreshVideoLocked(offer: LocalMediaOffer, taskId: String) {
         validate(offer, LocalMediaKind.VIDEO)
         val task = store.video(taskId) ?: error("视频任务不存在或已删除")
         require(task.belongsTo(offer)) { "请恢复任务原账户配置后查询" }
-        // New tasks carry a key identity; read-only polling must not cross accounts.
-        // Legacy tasks lack this field: preserve explicit user-initiated GET polling
-        // on the matching original route rather than disabling historical tasks.
-        if (task.credentialSignature != null) {
-            require(task.credentialSignature == credentialResolver.mediaCredentialSignature(offer.profile)) {
-                "视频任务原账户凭据已变化，不能用新账户查询旧服务商任务"
-            }
+        // Freeze the checked credential for every request in this poll.
+        val binding = LocalMediaCredentialBinding(offer.profile,
+            credentialResolver.resolve(offer.profile.model, offer.profile.baseUrl, offer.profile))
+        require(task.credentialSignature == null || task.credentialSignature == binding.signature) {
+            "视频任务原账户凭据已变化，不能用新账户查询旧服务商任务"
         }
         require(task.phase in setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING, LocalMediaVideoPhase.SUCCEEDED)) { "任务没有可查询的服务商编号" }
         val id = task.providerTaskId ?: error("服务商尚未确认任务编号")
         try {
-            val status = when (offer.provider) {
-                LocalMediaProvider.MINIMAX -> miniMax.videoStatus(offer.profile, id).let {
-                    com.labteto.dshmobile.local.model.LocalMediaVideoWireStatus(it.state, it.downloadUrl)
+            val status = withContext(binding) {
+                when (offer.provider) {
+                    LocalMediaProvider.MINIMAX -> miniMax.videoStatus(offer.profile, id).let {
+                        com.labteto.dshmobile.local.model.LocalMediaVideoWireStatus(it.state, it.downloadUrl)
+                    }
+                    LocalMediaProvider.QWEN -> api.videoStatus(offer, id)
+                    else -> error("此服务商未接入视频查询")
                 }
-                LocalMediaProvider.QWEN -> api.videoStatus(offer, id)
-                else -> error("此服务商未接入视频查询")
             }
             val phase = when (status.state) {
                 "Queueing" -> LocalMediaVideoPhase.QUEUED

@@ -117,6 +117,7 @@ internal fun PluginInventoryBrowser(
     val skillCreationPrompt = stringResource(R.string.skills_create_in_chat_prompt)
     var showMarketActions by remember { mutableStateOf(false) }
     var addedOnly by rememberSaveable { mutableStateOf(true) }
+    var catalogueQuery by rememberSaveable { mutableStateOf("") }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
@@ -254,7 +255,10 @@ internal fun PluginInventoryBrowser(
             localPlugin = item.id.startsWith("local:"),
             configuredConnector = item.id == "connector:github" && githubConfigured,
         )
-    }.sortedWith(compareByDescending<InventoryRow> { isAdded(it) }.thenBy { it.name })
+    }.filter { item ->
+        val query = catalogueQuery.trim()
+        listOf(item.name, item.detail, item.sourceLabel).any { it.contains(query, ignoreCase = true) }
+    }.sortedWith(compareBy<InventoryRow> { !addedOnly && isAdded(it) }.thenBy { it.name })
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -277,6 +281,14 @@ internal fun PluginInventoryBrowser(
                     Icon(FeatherIcons.MoreVertical, contentDescription = "更多操作", tint = colors.text)
                 }
             }
+            SyTextField(
+                value = catalogueQuery,
+                onValueChange = { catalogueQuery = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection)
+                    .testTag("plugin-inventory-search"),
+                placeholder = { Text(stringResource(R.string.tools_catalog_search)) },
+                singleLine = true,
+            )
             if (loading && list.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.common_loading),
@@ -317,6 +329,7 @@ internal fun PluginInventoryBrowser(
                         ) {
                             Text(
                                 if (loading) stringResource(R.string.common_loading)
+                                else if (catalogueQuery.isNotBlank()) stringResource(R.string.tools_catalog_no_match)
                                 else if (addedOnly) "尚未添加技能、插件或连接器"
                                 else "暂无可添加的能力",
                                 style = DsType.std14.withReadingWeight(),
@@ -680,11 +693,13 @@ internal fun PluginInventoryBrowser(
             footer = {
                 SyButton(
                     text = "确认安装",
-                    enabled = !loading && githubImportUrl.trim().startsWith("https://github.com/"),
+                    enabled = !loading && githubImportUrl.trim().let {
+                        it.startsWith("https://github.com/", ignoreCase = true) ||
+                            it.startsWith("github.com/", ignoreCase = true)
+                    },
                     onClick = {
                         val source = githubImportUrl.trim()
                         showGitHubImport = false
-                        githubImportUrl = ""
                         onInstallGitHubSkill(source)
                     },
                     modifier = Modifier.fillMaxWidth().testTag("skill-install-github-confirm"),

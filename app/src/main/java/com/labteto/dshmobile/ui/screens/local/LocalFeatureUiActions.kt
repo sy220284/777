@@ -41,6 +41,7 @@ internal data class LocalShellFeatureUiActions(
     val regenerate: (String) -> Boolean,
     val generateReplySuggestions: suspend () -> Boolean,
     val sampleSession: suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult,
+    val searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
     val loadOlderTranscript: suspend (String) -> Result<Int>,
     val importAttachment: suspend (Uri) -> LocalImportedAttachment,
     val stop: () -> Unit,

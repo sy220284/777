@@ -281,6 +281,14 @@ fun LocalHarnessScreen(
     var modeIntro by remember { mutableStateOf<LocalUsageMode?>(null) }
     var pendingUsageMode by remember { mutableStateOf<LocalUsageMode?>(null) }
     val featurePage = localFeatureCurrent(featureStack)
+    var onboardingModeAfterSettings by rememberSaveable { mutableStateOf<LocalUsageMode?>(null) }
+    LaunchedEffect(featurePage, onboardingModeAfterSettings, shell.loading) {
+        if (featurePage == LocalFeaturePage.HOME && !shell.loading) {
+            val selectedMode = onboardingModeAfterSettings ?: return@LaunchedEffect
+            onboardingModeAfterSettings = null
+            if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
+        }
+    }
     LaunchedEffect(featurePage, workCapabilityConfiguring) {
         if (workCapabilityConfiguring &&
             featurePage != LocalFeaturePage.TOOLS && featurePage != LocalFeaturePage.SETTINGS) {
@@ -507,6 +515,7 @@ fun LocalHarnessScreen(
         regenerate = viewModel::regenerateReply,
         generateReplySuggestions = viewModel::generateReplySuggestions,
         sampleSession = viewModel::sampleSession,
+        searchTranscript = viewModel::searchTranscript,
         loadOlderTranscript = viewModel::loadOlderTranscript,
         importAttachment = viewModel::importAttachment,
         stop = viewModel::stop,
@@ -974,7 +983,7 @@ fun LocalHarnessScreen(
                 onTogglePinSession = viewModel::toggleSessionPinned,
                 onWorkspaceFiles = { openDrawerEntry(LocalFeatureDrawerEntry.WORKSPACE) },
                 searchTasks = searchTaskState.tasks,
-                loadSearchFiles = viewModel::workspaceFiles,
+                searchWorkspaceFiles = viewModel::searchSidebarWorkspacePage,
                 onSearchTask = { task ->
                     openDrawerEntry(LocalFeatureDrawerEntry.TASKS)
                     taskMode = task.mode
@@ -1097,7 +1106,8 @@ fun LocalHarnessScreen(
                 finishFirstLaunch()
                 if (selectedMode != shell.usageMode) viewModel.switchUsageMode(selectedMode)
             },
-            onConfigureModel = { _ ->
+            onConfigureModel = { selectedMode ->
+                onboardingModeAfterSettings = selectedMode
                 finishFirstLaunch()
                 // Model settings are global. Switching sessions here would complete later
                 // and reset navigation after the user has already entered configuration.

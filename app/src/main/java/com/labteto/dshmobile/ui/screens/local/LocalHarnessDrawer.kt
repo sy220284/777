@@ -65,8 +65,6 @@ import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.local.session.LocalSessionSectionSnapshot
@@ -143,7 +141,7 @@ internal fun LocalModeDrawer(
     onTogglePinSession: (String) -> Unit,
     onWorkspaceFiles: () -> Unit,
     searchTasks: List<AutomationTask>,
-    loadSearchFiles: suspend () -> List<LocalWorkspaceFile>,
+    searchWorkspaceFiles: suspend (String, Int) -> com.labteto.dshmobile.local.files.LocalWorkspaceSearchPage,
     onSearchTask: (AutomationTask) -> Unit,
     onSearchFile: (String) -> Unit,
     onOpenGroupChat: () -> Unit,
@@ -276,37 +274,42 @@ internal fun LocalModeDrawer(
         }?.takeIf(String::isNotBlank)
     }
     val crossModeSearch = searchOpen && historyQuery.isNotBlank()
-    var searchableFiles by remember { mutableStateOf<List<LocalWorkspaceFile>>(emptyList()) }
-    var fileSearchFailed by remember { mutableStateOf(false) }
-    // Refresh the file snapshot when the user refines a query; do not keep a stale list from
-    // the moment the drawer was opened. Debounce disk enumeration while the user is typing.
-    LaunchedEffect(searchOpen, drawerOpen, historyQuery) {
-        if (searchOpen && drawerOpen) {
-            if (historyQuery.isNotBlank()) delay(300)
-            fileSearchFailed = false
-            try {
-                searchableFiles = withContext(Dispatchers.IO) { loadSearchFiles() }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                searchableFiles = emptyList()
-                fileSearchFailed = true
-            }
-        } else if (!searchOpen) {
-            searchableFiles = emptyList()
+    val fileQuery = historyQuery.trim()
+    var matchedFiles by remember(fileQuery, crossModeSearch, drawerOpen) {
+        mutableStateOf(emptyList<LocalWorkspaceFile>())
+    }
+    var nextFilePage by remember(fileQuery, crossModeSearch, drawerOpen) { mutableStateOf<Int?>(null) }
+    var filePageRequest by remember(fileQuery, crossModeSearch, drawerOpen) { mutableStateOf(0) }
+    var fileSearchLoading by remember(fileQuery, crossModeSearch, drawerOpen) {
+        mutableStateOf(crossModeSearch && drawerOpen)
+    }
+    var fileSearchFailed by remember(fileQuery, crossModeSearch, drawerOpen) { mutableStateOf(false) }
+    val fileQueryTooLong = fileQuery.length > 128
+    LaunchedEffect(fileQuery, crossModeSearch, drawerOpen, filePageRequest) {
+        if (!crossModeSearch || !drawerOpen || fileQueryTooLong) {
+            fileSearchLoading = false
+            return@LaunchedEffect
+        }
+        if (filePageRequest == 0) delay(300)
+        fileSearchLoading = true
+        val offset = if (fileSearchFailed) 0 else nextFilePage ?: 0
+        fileSearchFailed = false
+        try {
+            val page = searchWorkspaceFiles(fileQuery, offset)
+            val visibleFiles = page.files.filter { isShareableWorkspacePath(it.path) }
+            matchedFiles = ((if (offset == 0) emptyList() else matchedFiles) + visibleFiles)
+                .distinctBy(LocalWorkspaceFile::path)
+            nextFilePage = page.nextOffset
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            fileSearchFailed = true
+        } finally {
+            fileSearchLoading = false
         }
     }
     val matchedTasks = remember(searchTasks, historyQuery, crossModeSearch) {
         if (crossModeSearch) localDrawerMatchingTasks(searchTasks, historyQuery) else emptyList()
-    }
-    val sortedSearchableFiles = remember(searchableFiles) {
-        searchableFiles.asSequence().filter { isShareableWorkspacePath(it.path) }
-            .distinctBy(LocalWorkspaceFile::path).sortedBy(LocalWorkspaceFile::path).toList()
-    }
-    val matchedFiles = remember(sortedSearchableFiles, historyQuery, crossModeSearch) {
-        if (crossModeSearch) sortedSearchableFiles.filter {
-            it.path.contains(historyQuery.trim(), ignoreCase = true)
-        } else emptyList()
     }
     val sortedSessions = remember(sessions) {
         sessions.sortedByDescending(LocalSessionSummary::updatedAt)
@@ -518,11 +521,18 @@ internal fun LocalModeDrawer(
                         )
                     }
                 }
-                if (crossModeSearch && fileSearchFailed) {
-                    item(key = "drawer-file-search-error") {
-                        Text(stringResource(R.string.local_files_read_failed),
-                            color = colors.textTertiary,
-                            style = DsType.navigationSupporting.withReadingWeight())
+                if (crossModeSearch && (fileSearchLoading || fileSearchFailed || fileQueryTooLong || nextFilePage != null)) {
+                    item(key = "drawer-file-search-status") {
+                        when {
+                            fileSearchLoading -> Text(stringResource(R.string.common_loading))
+                            fileQueryTooLong -> Text(stringResource(R.string.sidebar_file_search_query_limit))
+                            else -> SyButton(
+                                text = stringResource(if (fileSearchFailed) R.string.common_retry else R.string.sidebar_file_search_more),
+                                onClick = { filePageRequest++ },
+                                variant = SyButtonVariant.Ghost,
+                                size = SyButtonSize.Small,
+                            )
+                        }
                     }
                 }
 
@@ -723,7 +733,8 @@ internal fun LocalModeDrawer(
                 }
 
                 if (crossModeSearch && matchedPersonas.isEmpty() && matchedTasks.isEmpty() &&
-                    matchedFiles.isEmpty() && sessionSections.pinned.isEmpty() && ungroupedRecent.isEmpty() &&
+                    matchedFiles.isEmpty() && !fileSearchLoading && nextFilePage == null && !fileSearchFailed &&
+                    sessionSections.pinned.isEmpty() && ungroupedRecent.isEmpty() &&
                     visibleSectionGroups.all { it.second.isEmpty() } &&
                     !fileSearchFailed) {
                     item(key = "drawer-no-sessions") {

@@ -56,7 +56,16 @@ class LocalSessionUiFacade @Inject constructor(
             do {
                 coroutineContext.ensureActive()
                 // Reuse the authorized, generation-checked pager; keep only one bounded page.
-                page = messagePage(sessionId, continuation, 200)
+                val (messages, next) = rawTranscriptPage(sessionId, continuation, 200)
+                val visible = messages.mapNotNull { message ->
+                    val text = when (message.role) {
+                        "user" -> editableChatUserText(message)
+                        "assistant" -> com.labteto.dshmobile.local.model.visibleAssistantText(message.content)
+                        else -> return@mapNotNull null
+                    }
+                    projectTranscriptHistoryMessage(message.copy(content = text))
+                }
+                page = UiMessagePage(visible, next)
                 scanned += page.messages.size
                 hits = page.messages.filter { it.text.contains(normalized, ignoreCase = true) }.map { it.id }.toSet()
                 continuation = page.nextCursor

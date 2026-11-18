@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -408,24 +409,48 @@ internal fun UsageCalculationPage(
 
 @Composable
 internal fun UsageLogPage(
-    analytics: TokenUsageAnalyticsSnapshot,
+    selectedModel: String?,
+    loadPage: suspend (String?, String?) -> com.labteto.dshmobile.uicontract.UiUsageHistoryPage,
     onOpenRequest: (String) -> Unit,
-    selectedModel: String? = null,
 ) {
-    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val visibleAnalytics = selectedModel?.let { analytics.byModel[it] ?: TokenUsageAnalyticsSnapshot() } ?: analytics
-    if (visibleAnalytics.recentRecords.isEmpty()) {
-        EmptyUsageDetail(message = stringResource(R.string.usage_log_empty))
-        return
+    var records by remember(selectedModel) { mutableStateOf(emptyList<TokenUsageRecord>()) }
+    var cursor by remember(selectedModel) { mutableStateOf<String?>(null) }
+    var request by remember(selectedModel) { mutableIntStateOf(0) }
+    var loading by remember(selectedModel) { mutableStateOf(true) }
+    var error by remember(selectedModel) { mutableStateOf(false) }
+
+    LaunchedEffect(selectedModel, request) {
+        val from = if (error) null else cursor
+        loading = true
+        error = false
+        try {
+            val page = loadPage(selectedModel, from)
+            records = if (from == null) page.records else records + page.records
+            cursor = page.nextCursor
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            error = true
+        } finally {
+            loading = false
+        }
     }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            val records = visibleAnalytics.recentRecords.take(120)
-            records.forEachIndexed { index, record ->
-                UsageRequestRow(record = record, onClick = { onOpenRequest(record.requestId) })
-                if (index != records.lastIndex) UsageDivider()
-            }
+        Text(stringResource(R.string.usage_log_retention), style = DsType.caption11)
+        records.forEachIndexed { index, record ->
+            UsageRequestRow(record = record, onClick = { onOpenRequest(record.requestId) })
+            if (index != records.lastIndex) UsageDivider()
         }
+        if (loading) Text(stringResource(R.string.common_loading))
+        if (error) Text(stringResource(R.string.usage_log_load_failed))
+        if (!loading && !error && records.isEmpty()) {
+            EmptyUsageDetail(message = stringResource(R.string.usage_log_empty))
+        }
+        if (!loading && (error || cursor != null)) SyButton(
+            text = stringResource(if (error) R.string.common_retry else R.string.usage_log_older),
+            onClick = { request++ },
+            variant = SyButtonVariant.Ghost,
+        )
     }
 }
 
@@ -471,7 +496,7 @@ internal fun UsageGroupDetailPage(
     SectionHeading(stringResource(R.string.usage_log_title))
     Column(modifier = Modifier.fillMaxWidth()) {
         Column {
-            val records = detail.records.take(120)
+            val records = detail.records
             records.forEachIndexed { index, record ->
                 UsageRequestRow(record = record, onClick = { onOpenRequest(record.requestId) })
                 if (index != records.lastIndex) UsageDivider()

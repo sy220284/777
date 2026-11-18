@@ -673,44 +673,55 @@ class LocalWorkspace(
         val pageSize: Int,
         var nextPage: Int = 0,
     )
-    private val searchCursors = object : LinkedHashMap<String, SearchCursor>(4, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SearchCursor>?): Boolean =
+    private data class SearchKey(val query: String, val sidebar: Boolean)
+
+    private val searchCursors = object : LinkedHashMap<SearchKey, SearchCursor>(4, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<SearchKey, SearchCursor>?): Boolean =
             size > 4
     }
     // Cancelling/refreshing a query invalidates scans still running outside the shared lock.
-    private val searchTickets = HashMap<String, Long>()
+    private val searchTickets = HashMap<SearchKey, Long>()
     private var nextSearchTicket = 0L
 
     /**
      * Search results are materialized once per fresh query and paged in relevance order.
      * A changed file invalidates the old view rather than mixing different file generations.
      */
-    fun searchWorkspacePage(query: String, offset: Int = 0, pageSize: Int = 96): LocalWorkspaceSearchPage {
+    fun searchWorkspacePage(query: String, offset: Int = 0, pageSize: Int = 96): LocalWorkspaceSearchPage =
+        searchWorkspacePage(query, offset, pageSize, sidebar = false)
+
+    internal fun searchSidebarWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
+        searchWorkspacePage(query, offset, 96, sidebar = true)
+
+    private fun searchWorkspacePage(
+        query: String, offset: Int, pageSize: Int, sidebar: Boolean,
+    ): LocalWorkspaceSearchPage {
         val needle = query.trim()
         require(needle.isNotEmpty() && needle.length <= 128 &&
             offset >= 0 && pageSize in 1..256) { "搜索分页参数不合法" }
+        val key = SearchKey(needle, sidebar)
         // Never hold the shared cursor lock across filesystem traversal. A per-query
         // ticket prevents an older, cancelled scan from replacing a newer snapshot.
         val ticket = if (offset == 0) synchronized(searchCursors) {
-            searchCursors.remove(needle)
-            (++nextSearchTicket).also { searchTickets[needle] = it }
+            searchCursors.remove(key)
+            (++nextSearchTicket).also { searchTickets[key] = it }
         } else null
         val firstPage = if (ticket != null) try {
             SearchCursor(rankedWorkspaceFileNames(needle, isCurrent = {
-                synchronized(searchCursors) { searchTickets[needle] == ticket }
+                synchronized(searchCursors) { searchTickets[key] == ticket }
             }), pageSize)
         } catch (failure: Throwable) {
             synchronized(searchCursors) {
-                if (searchTickets[needle] == ticket) searchTickets.remove(needle)
+                if (searchTickets[key] == ticket) searchTickets.remove(key)
             }
             throw failure
         } else null
         return synchronized(searchCursors) {
             val cursor = if (firstPage != null) {
-                require(searchTickets[needle] == ticket) { "搜索已更新，请以当前关键词重新查询" }
-                searchTickets.remove(needle)
-                firstPage.also { searchCursors[needle] = it }
-            } else searchCursors[needle] ?: error("搜索会话已过期，请重新搜索")
+                require(searchTickets[key] == ticket) { "搜索已更新，请以当前关键词重新查询" }
+                searchTickets.remove(key)
+                firstPage.also { searchCursors[key] = it }
+            } else searchCursors[key] ?: error("搜索会话已过期，请重新搜索")
             require(cursor.pageSize == pageSize && cursor.nextPage == offset) {
                 "搜索游标已失效，请重新搜索"
             }
@@ -731,9 +742,9 @@ class LocalWorkspace(
     }
 
     fun stopWorkspaceSearch(query: String): Boolean = synchronized(searchCursors) {
-        val needle = query.trim()
-        val stoppedActiveScan = searchTickets.remove(needle) != null
-        searchCursors.remove(needle) != null || stoppedActiveScan
+        val key = SearchKey(query.trim(), sidebar = false)
+        val stoppedActiveScan = searchTickets.remove(key) != null
+        searchCursors.remove(key) != null || stoppedActiveScan
     }
 
     /**

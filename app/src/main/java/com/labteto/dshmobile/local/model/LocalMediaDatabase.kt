@@ -95,6 +95,10 @@ internal class LocalMediaDatabase(context: Context, private val json: Json, name
             false
         }
     fun pending(): List<LocalMediaRecord> = select("deleted=0 AND pending=1")
+
+    fun pollableVideos(): List<LocalMediaVideoTask> = select(
+        "deleted=0 AND json_extract(payload, '$.video.phase') IN ('QUEUED', 'PROCESSING')",
+    ).mapNotNull { it.video?.takeIf { task -> task.credentialSignature != null && task.providerTaskId != null } }
     fun deletions(): List<LocalMediaRecord> = select("deleted=1")
     private fun select(where: String): List<LocalMediaRecord> = readableDatabase.rawQuery("SELECT payload FROM media WHERE $where", null)
         .use { cursor -> buildList { while (cursor.moveToNext()) add(decode(cursor.getString(0))) } }

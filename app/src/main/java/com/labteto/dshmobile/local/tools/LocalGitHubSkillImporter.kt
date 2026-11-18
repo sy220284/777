@@ -36,7 +36,8 @@ internal data class PublicGitHubSkillLocation(
 ) {
     companion object {
         fun parse(link: String): PublicGitHubSkillLocation {
-            val url = URI(link.trim())
+            val input = link.trim()
+            val url = URI(if (input.startsWith("github.com/", ignoreCase = true)) "https://$input" else input)
             require(url.scheme.equals("https", true) && url.host.equals("github.com", true) &&
                 url.userInfo == null && url.port == -1 && url.rawQuery == null && url.rawFragment == null) {
                 "请输入 GitHub 网站的技能目录地址"

@@ -248,6 +248,10 @@ class LocalHarnessViewModel @Inject constructor(
         force: Boolean = false,
     ) = transcriptHistoryController.prepare(sessionId, force)
 
+    internal suspend fun searchTranscript(
+        sessionId: String, query: String, cursor: com.labteto.dshmobile.uicontract.UiMessageSearchCursor?,
+    ) = sessionUi.searchMessages(sessionId, query, cursor)
+
     internal suspend fun loadOlderTranscript(sessionId: String): Result<Int> =
         transcriptHistoryController.loadOlder(sessionId)
 
@@ -441,6 +445,8 @@ class LocalHarnessViewModel @Inject constructor(
     suspend fun workspaceDirectoryPage(path: String, offset: Int) = filesUi.workspaceDirectoryPage(path, offset)
     suspend fun searchWorkspaceFiles(query: String) = filesUi.searchWorkspaceFiles(query)
     suspend fun searchWorkspacePage(query: String, offset: Int) = filesUi.searchWorkspacePage(query, offset)
+    internal suspend fun searchSidebarWorkspacePage(query: String, offset: Int) =
+        filesUi.searchSidebarWorkspacePage(query, offset)
     suspend fun stopWorkspaceSearch(query: String) = filesUi.stopWorkspaceSearch(query)
     internal fun observeWorkspaceFiles(paths: List<String>) =
         filesUi.observeWorkspaceFiles(paths)

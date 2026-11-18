@@ -66,8 +66,6 @@ import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
-import com.labteto.dshmobile.ui.shenyan.SyTimeline
-import com.labteto.dshmobile.ui.shenyan.SyTimelineItem
 import com.labteto.dshmobile.ui.components.EmptyHero
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -268,18 +266,30 @@ internal fun TaskCard(
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
-            val timelineItems = mutableListOf<SyTimelineItem>()
-            for (receipt in task.runReceipts.asReversed()) {
-                timelineItems += SyTimelineItem(
-                    text = stringResource(
-                        R.string.tasks_run_history_item,
-                        formatTime(receipt.finishedAt),
-                        receiptStatusLabel(receipt),
-                    ),
-                    state = receiptStatus(receipt.status),
-                )
+            var historyExpanded by remember(task.id) { mutableStateOf(false) }
+            SyButton(
+                text = stringResource(if (historyExpanded) R.string.tasks_history_collapse else R.string.tasks_history_expand),
+                onClick = { historyExpanded = !historyExpanded },
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+            )
+            if (historyExpanded) {
+                for (receipt in task.runReceipts.asReversed()) {
+                    Text(
+                        stringResource(R.string.tasks_run_history_item, formatTime(receipt.finishedAt), receiptStatusLabel(receipt)),
+                        style = DsType.caption11.withReadingWeight(),
+                        color = colors.textSecondary,
+                    )
+                    receipt.sessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
+                        SyButton(
+                            text = stringResource(R.string.tasks_open_result),
+                            onClick = { onOpenSession(sessionId) },
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Ghost,
+                        )
+                    }
+                }
             }
-            SyTimeline(items = timelineItems, modifier = Modifier.fillMaxWidth())
         }
 
         if (task.mode == AutomationMode.CHAT) {
@@ -383,14 +393,6 @@ private fun receiptStatusLabel(receipt: AutomationRunReceipt): String {
     return if (detail.isNullOrBlank()) state else "$state · $detail"
 }
 
-private fun receiptStatus(status: AutomationStatus): SyStatus = when (status) {
-    AutomationStatus.COMPLETED -> SyStatus.Done
-    AutomationStatus.BLOCKED, AutomationStatus.WAITING_USER -> SyStatus.Warning
-    AutomationStatus.FAILED -> SyStatus.Failed
-    AutomationStatus.RUNNING, AutomationStatus.QUEUED -> SyStatus.Running
-    else -> SyStatus.Neutral
-}
-
 private fun taskStatus(status: AutomationStatus): SyStatus = when (status) {
     AutomationStatus.RUNNING, AutomationStatus.QUEUED -> SyStatus.Running
     AutomationStatus.COMPLETED -> SyStatus.Done
@@ -415,15 +417,14 @@ private fun taskStatusLabel(status: AutomationStatus): String = when (status) {
 
 @Composable
 private fun taskTiming(task: AutomationTask): String {
-    val terminalOneShot = task.recurringMinutes == null &&
-        task.status in setOf(AutomationStatus.COMPLETED, AutomationStatus.FAILED, AutomationStatus.BLOCKED)
-    return when {
-        task.status == AutomationStatus.WAITING_USER ->
-            stringResource(R.string.tasks_waiting_user_timing)
-        terminalOneShot && task.lastRunAt != null ->
-            stringResource(R.string.tasks_last_run, formatTime(task.lastRunAt))
-        else ->
-            stringResource(R.string.tasks_next_run, formatTime(task.nextRunAt))
+    return when (task.status) {
+        AutomationStatus.WAITING_USER -> stringResource(R.string.tasks_waiting_user_timing)
+        AutomationStatus.SCHEDULED -> stringResource(R.string.tasks_planned_run, formatTime(task.nextRunAt))
+        AutomationStatus.QUEUED -> stringResource(R.string.tasks_status_queued)
+        AutomationStatus.RUNNING -> task.lastRunAt?.let { stringResource(R.string.tasks_started_at, formatTime(it)) }
+            ?: taskStatusLabel(task.status)
+        else -> task.lastRunAt?.let { stringResource(R.string.tasks_last_run, formatTime(it)) }
+            ?: taskStatusLabel(task.status)
     }
 }
 

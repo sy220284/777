@@ -220,6 +220,9 @@ class LocalSessionFilesRuntime @Inject internal constructor(
     override suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile> =
         kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchWorkspaceFileNames(query) }
 
+    override suspend fun searchSidebarWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
+        kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchSidebarWorkspacePage(query, offset) }
+
     override suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage =
         kotlinx.coroutines.runInterruptible(Dispatchers.IO) { workspace.searchWorkspacePage(query, offset) }
 

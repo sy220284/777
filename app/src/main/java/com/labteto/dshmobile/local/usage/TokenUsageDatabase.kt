@@ -114,6 +114,49 @@ internal class TokenUsageDatabase(
             while (cursor.moveToNext()) add(json.decodeFromString(TokenUsageRecord.serializer(), cursor.getString(0)))
         }
     }
+    fun historyPage(model: String?, sinceMillis: Long?, cursor: String?, limit: Int):
+        com.labteto.dshmobile.uicontract.UiUsageHistoryPage {
+        val db = readableDatabase
+        val filters = mutableListOf<String>()
+        val args = mutableListOf<String>()
+        if (model != null) {
+            filters += "json_extract(payload, '$.model') = ?"
+            args += model
+        }
+        if (sinceMillis != null) {
+            filters += "timestamp >= ?"
+            args += sinceMillis.toString()
+        }
+        val where = filters.takeIf { it.isNotEmpty() }?.joinToString(" AND ", prefix = " WHERE ").orEmpty()
+        val total = db.rawQuery("SELECT COUNT(*) FROM records$where", args.toTypedArray()).use {
+            check(it.moveToFirst())
+            it.getInt(0)
+        }
+        if (cursor != null) {
+            val anchor = db.rawQuery("SELECT timestamp, rowid FROM records WHERE id = ?", arrayOf(cursor)).use {
+                require(it.moveToFirst()) { "历史记录已变化，请从第一页重新加载" }
+                it.getLong(0) to it.getLong(1)
+            }
+            filters += "(timestamp < ? OR (timestamp = ? AND rowid < ?))"
+            args += listOf(anchor.first.toString(), anchor.first.toString(), anchor.second.toString())
+        }
+        val pageWhere = filters.takeIf { it.isNotEmpty() }?.joinToString(" AND ", prefix = " WHERE ").orEmpty()
+        val page = db.rawQuery(
+            "SELECT payload FROM records$pageWhere ORDER BY timestamp DESC, rowid DESC LIMIT ?",
+            (args + (limit + 1).toString()).toTypedArray(),
+        ).use { rows ->
+            buildList {
+                while (rows.moveToNext()) add(json.decodeFromString(TokenUsageRecord.serializer(), rows.getString(0)))
+            }
+        }
+        val items = page.take(limit)
+        return com.labteto.dshmobile.uicontract.UiUsageHistoryPage(
+            records = items,
+            nextCursor = items.lastOrNull()?.requestId?.takeIf { page.size > limit },
+            totalMatching = total,
+        )
+    }
+
     fun recordById(id: String): TokenUsageRecord? = readableDatabase.rawQuery(
         "SELECT payload FROM records WHERE id = ?", arrayOf(id),
     ).use { cursor ->

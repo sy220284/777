@@ -18,6 +18,7 @@ interface FilesUiPort {
     suspend fun workspaceDirectoryPage(path: String, offset: Int): LocalWorkspaceDirectoryPage
     suspend fun searchWorkspaceFiles(query: String): List<LocalWorkspaceFile>
     suspend fun searchWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage
+    suspend fun searchSidebarWorkspacePage(query: String, offset: Int): LocalWorkspaceSearchPage
     suspend fun stopWorkspaceSearch(query: String): Boolean
     fun observeWorkspaceFiles(paths: List<String>): kotlinx.coroutines.flow.Flow<LocalWorkspaceFileChange>
     suspend fun conversationFiles(sessionId: String): LocalConversationFiles
