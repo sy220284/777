@@ -274,7 +274,7 @@ class LocalSkillStoreTest {
             assertFalse(root.resolve(".dsh/skills/$oldId/.bundled-baseline-sha256").exists())
             assertEquals("用户自己留下的附件",
                 root.resolve(".dsh/skills/$oldId/user-notes.md").readText())
-            assertFalse(root.resolve(".dsh/retired-skills/general-presets-v1").exists())
+            assertFalse(root.resolve(".dsh/retired-skills").exists())
             assertTrue(workspace.skills().contains("handmade"))
             assertEquals(emptySet<String>(), store.seedOnce())
             assertFalse(workspace.skills().contains(oldId))
