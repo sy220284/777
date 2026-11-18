@@ -21,6 +21,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,12 +50,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -63,7 +70,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.LocalChatBranchInfo
 import com.labteto.dshmobile.local.presentation.extractLocalCharacterThought
@@ -82,7 +91,6 @@ import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.model.LocalMediaKind
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
-import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
@@ -195,6 +203,8 @@ internal fun LocalMessageRow(
         }
     }
 
+    val pressAnchor = remember(message.id) { MessagePressAnchor() }
+    var menuAnchor by remember(message.id) { mutableStateOf<IntOffset?>(null) }
     when (message.role) {
         "user" -> {
             var actionsOpen by remember(message.id) { mutableStateOf(false) }
@@ -206,9 +216,13 @@ internal fun LocalMessageRow(
             ) {
                 Box {
                     Box(
-                        modifier = Modifier.combinedClickable(
+                        modifier = pressAnchor.observe(Modifier).combinedClickable(
                             onClick = { actionsOpen = false },
-                            onLongClick = onMessageLongClick ?: { pulse(); actionsOpen = true },
+                            onLongClick = onMessageLongClick ?: {
+                                pulse()
+                                menuAnchor = pressAnchor.point
+                                actionsOpen = true
+                            },
                         ),
                     ) {
                         LocalUserMessageContent(
@@ -218,13 +232,11 @@ internal fun LocalMessageRow(
                             skillDisplayNames = skillDisplayNames,
                         )
                     }
-                    val actionMenu: @Composable (Boolean, () -> Unit, List<SyMenuItem>) -> Unit =
-                        if (chatMode) { open, dismiss, items -> FluidMessageActionSheet(open, dismiss, items) }
-                        else { open, dismiss, items -> SyContextActionMenu(open, dismiss, items) }
-                    actionMenu(
-                        actionsOpen,
-                        { actionsOpen = false },
-                        buildList {
+                    SyContextActionMenu(
+                        expanded = actionsOpen,
+                        onDismiss = { actionsOpen = false },
+                        touchAnchor = menuAnchor,
+                        items = buildList {
                             if (copyText.isNotBlank()) {
                                 add(
                                     SyMenuItem(
@@ -347,11 +359,12 @@ internal fun LocalMessageRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Column(
-                    readingModifier.testTag("messageActionSurface:${message.id}").combinedClickable(
+                    pressAnchor.observe(readingModifier).testTag("messageActionSurface:${message.id}").combinedClickable(
                         onClick = { actionsExpanded = !actionsExpanded },
                         onLongClick = onMessageLongClick ?: if (secondaryActions.isNotEmpty()) {
                             {
                                 pulse()
+                                menuAnchor = pressAnchor.point
                                 actionsExpanded = true
                                 actionsOpen = true
                             }
@@ -386,7 +399,8 @@ internal fun LocalMessageRow(
                     ) {
                         Box(modifier = Modifier.testTag("messageActionToggle:${message.id}")) {
                             CompactMessageAction(
-                                icon = FeatherIcons.MoreVertical,
+                                icon = FeatherIcons.ChevronDown,
+                                iconRotation = if (actionsExpanded) 180f else 0f,
                                 contentDescription = if (actionsExpanded) "收起回复操作" else "展开回复操作",
                                 onClick = { actionsExpanded = !actionsExpanded },
                             )
@@ -448,12 +462,13 @@ internal fun LocalMessageRow(
                             CompactMessageAction(
                                 icon = FeatherIcons.MoreVertical,
                                 contentDescription = stringResource(R.string.fluid_message_actions),
-                                onClick = { actionsOpen = true },
+                                onClick = { menuAnchor = null; actionsOpen = true },
                             )
-                            SyPopupMenu(
+                            SyContextActionMenu(
                                 expanded = actionsOpen,
                                 onDismiss = { actionsOpen = false },
                                 items = secondaryActions,
+                                touchAnchor = menuAnchor,
                             )
                         }
                     }
@@ -461,6 +476,31 @@ internal fun LocalMessageRow(
             }
         }
     }
+}
+
+/** Records the active down position without taking the gesture from selection or scrolling. */
+private class MessagePressAnchor {
+    private var coordinates: LayoutCoordinates? = null
+    var point: IntOffset? = null
+        private set
+
+    fun observe(modifier: Modifier): Modifier = modifier
+        .onGloballyPositioned { coordinates = it }
+        .pointerInput(this@MessagePressAnchor) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                point = coordinates?.takeIf { it.isAttached }?.localToWindow(down.position)
+                    ?.takeIf { it.x.isFinite() && it.y.isFinite() }
+                    ?.let { IntOffset(it.x.roundToInt(), it.y.roundToInt()) }
+                try {
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                    } while (event.changes.any { it.pressed })
+                } finally {
+                    point = null
+                }
+            }
+        }
 }
 
 /** Model-produced image only; user-uploaded and tool images are not generated assets. */
@@ -763,6 +803,7 @@ internal fun CompactMessageAction(
     onClick: () -> Unit,
     enabled: Boolean = true,
     iconSize: androidx.compose.ui.unit.Dp = 18.dp,
+    iconRotation: Float = 0f,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Surface(
@@ -777,7 +818,7 @@ internal fun CompactMessageAction(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = if (enabled) colors.textTertiary else colors.textTertiary.copy(alpha = 0.38f),
-                modifier = Modifier.size(iconSize),
+                modifier = Modifier.size(iconSize).rotate(iconRotation),
             )
         }
     }

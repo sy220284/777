@@ -349,7 +349,7 @@ internal fun ApprovalDialog(
         },
     )
     SyResponsiveSheet(title = stringResource(R.string.local_approval_title), onDismiss = onDeny,
-        scrollable = true, seamlessBackground = false) {
+        dismissEnabled = false, showDragHandle = false, scrollable = true, seamlessBackground = false) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
             style = DsType.base16Strong.withReadingWeight(),
@@ -451,6 +451,8 @@ internal fun QuestionDialog(
     SyResponsiveSheet(
         title = stringResource(R.string.local_question_title),
         onDismiss = onDismiss,
+        dismissEnabled = false,
+        showDragHandle = false,
         scrollable = true,
         seamlessBackground = !requireConfirmation,
     ) {

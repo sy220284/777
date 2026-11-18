@@ -60,6 +60,23 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("capability-center-tabs").assertDoesNotExist()
     }
 
+    @Test fun skillDestinationFiltersTheCatalogueAndCanReturnToAllCapabilities() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-runtime"),
+                    destination = CapabilityDestination.SKILLS,
+                    skills = listOf(LocalSkillUiEntry("report", "Build a report", true)),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-skill:report").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertDoesNotExist()
+        compose.onNodeWithTag("capability-clear-kind-filter").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
+    }
+
     @Test fun stalePresetInstallFlagNeverDuplicatesAnAlreadyInstalledSkill() {
         compose.setContent {
             DshTheme {

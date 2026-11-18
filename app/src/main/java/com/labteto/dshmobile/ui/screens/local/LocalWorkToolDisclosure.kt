@@ -1,6 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
+import com.shenyan.designsystem.foundation.LocalSyReduceMotion
+import com.shenyan.designsystem.foundation.SyMotion
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
@@ -184,8 +188,13 @@ internal fun LocalWorkToolDisclosureRow(
         }
     }
 
+    val reducedMotion = LocalSyReduceMotion.current
+    val duration = SyMotion.duration(SyMotion.toolExpandMs, reducedMotion, LocalSyMotionTempo.current)
+    val motion = if (duration == 0) Modifier else Modifier.animateContentSize(
+        animationSpec = tween(durationMillis = duration, easing = SyMotion.ease),
+    )
     Column(
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        modifier = Modifier.fillMaxWidth().then(motion),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
     ) {
         Row(

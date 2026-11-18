@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso
 import com.labteto.dshmobile.local.interaction.LocalQuestion
 import com.labteto.dshmobile.local.interaction.LocalQuestionFormField
 import com.labteto.dshmobile.local.interaction.LOCAL_MCP_QUESTION_DECLINE
@@ -124,7 +125,12 @@ class McpElicitationDialogTest {
         compose.onNodeWithText("此操作将在浏览器打开：example.org。密码、密钥与支付信息仅在对方网页填写。")
             .assertIsDisplayed()
         compose.onNodeWithTag("mcp-form-submit").assertIsNotEnabled()
-        compose.onNodeWithTag("mcp-form-cancel").performClick()
+        Espresso.pressBack()
+        compose.runOnIdle {
+            assertEquals(0, cancelled)
+            assertNull(response)
+        }
+        compose.onNodeWithTag("mcp-form-cancel").assertIsDisplayed().performClick()
         compose.runOnIdle {
             assertEquals(1, cancelled)
             assertNull(response)
