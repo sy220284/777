@@ -85,6 +85,18 @@ internal sealed interface LocalTranscriptItem {
         override val key: String = workToolRowKey(activity.callId, activity.declaredSequence,
             activity.executionId, "pending:${activity.startedSequence}:${activity.callId}")
     }
+
+    /** UI-only activity disclosure for one user turn; each original operation stays addressable. */
+    data class WorkTools(
+        val turnId: String,
+        val operations: List<LocalTranscriptItem>,
+    ) : LocalTranscriptItem {
+        init {
+            require(operations.isNotEmpty())
+            require(operations.all { it is WorkPendingTool || it is WorkStep && it.message.role == "tool" })
+        }
+        override val key: String = "work-tools:$turnId"
+    }
 }
 
 /** A declaration stays stable from pending to receipt; legacy rows keep their durable message ID. */
@@ -94,6 +106,46 @@ private fun workToolRowKey(callId: String?, declaration: Long?, execution: Strin
         execution != null -> "work-tool:execution:$execution"
         else -> "work-tool:message:$fallback"
     }
+
+/**
+ * Fold tool operations from the same user turn into a single disclosure immediately after
+ * the user's message. Public progress, intermediate assistant narration, final answers,
+ * media and artifacts remain independent items in their original relative order.
+ *
+ * This transforms the existing visible timeline only; the durable event order and the
+ * Tool Capability projection stay authoritative. A pending call settling into a receipt
+ * updates the same turn disclosure without moving any public text.
+ */
+internal fun foldWorkToolsToTurnStart(items: List<LocalTranscriptItem>): List<LocalTranscriptItem> {
+    if (items.none { it is LocalTranscriptItem.WorkPendingTool ||
+            it is LocalTranscriptItem.WorkStep && it.message.role == "tool" }) return items
+    val result = ArrayList<LocalTranscriptItem>(items.size)
+    val operations = ArrayList<LocalTranscriptItem>()
+    var turnId = "historical-prefix"
+    var headerIndex = 0
+    fun flush() {
+        if (operations.isNotEmpty()) {
+            result.add(headerIndex, LocalTranscriptItem.WorkTools(turnId, operations.toList()))
+            operations.clear()
+        }
+    }
+    items.forEach { item ->
+        when {
+            item is LocalTranscriptItem.Message && item.message.role == "user" -> {
+                flush()
+                result += item
+                turnId = item.message.id
+                headerIndex = result.size
+            }
+            item is LocalTranscriptItem.WorkPendingTool ||
+                item is LocalTranscriptItem.WorkStep && item.message.role == "tool" ->
+                operations += item
+            else -> result += item
+        }
+    }
+    flush()
+    return result
+}
 
 /** Only recurring status polls are compacted; ordinary identical-looking calls stay distinct. */
 internal fun isRepeatedWorkPollingTool(name: String?): Boolean {
@@ -243,6 +295,7 @@ private fun pendingToolPrecedes(
                 (activity.declaredSequence ?: Long.MAX_VALUE))
         }
         is LocalTranscriptItem.Thinking -> item.messages.first().createdAt > timestamp
+        is LocalTranscriptItem.WorkTools -> true
         is LocalTranscriptItem.WorkPendingTool -> {
             val at = item.activity.declaredAt ?: Long.MAX_VALUE
             at > timestamp || (at == timestamp &&
@@ -470,7 +523,8 @@ internal fun localReplyStreamingBoundary(items: List<LocalTranscriptItem>): Loca
         item is LocalTranscriptItem.Message ||
             item is LocalTranscriptItem.Thinking ||
             item is LocalTranscriptItem.WorkPendingTool ||
-            item is LocalTranscriptItem.WorkStep
+            item is LocalTranscriptItem.WorkStep ||
+            item is LocalTranscriptItem.WorkTools
     }
 
 /**
@@ -516,6 +570,7 @@ internal fun mergeLocalMediaTimeline(
         is LocalTranscriptItem.CreationJob -> item.job.createdAtMillis
         is LocalTranscriptItem.VideoTask -> item.task.startedAtMillis
         is LocalTranscriptItem.WorkPendingTool -> Long.MAX_VALUE
+        is LocalTranscriptItem.WorkTools -> Long.MAX_VALUE
         is LocalTranscriptItem.WorkArtifact -> Long.MAX_VALUE
     }
     // Stable sort preserves original transcript order when event timestamps tie.
