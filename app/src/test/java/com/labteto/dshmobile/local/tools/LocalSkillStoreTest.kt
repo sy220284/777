@@ -301,7 +301,7 @@ class LocalSkillStoreTest {
         assertEquals("原有归档，不能覆盖",
             root.resolve(".dsh/retired-skills/general-presets-v1/writing-polish/SKILL.md").readText())
         val archive = root.resolve(".dsh/retired-skills/general-presets-v1")
-        Files.move(archive.resolve("writing-polish"), archive.resolve("writing-polish-earlier"))
+        Files.move(archive.resolve("writing-polish").toPath(), archive.resolve("writing-polish-earlier").toPath())
         store.seedOnce()
         assertEquals("待迁移的写作技能",
             archive.resolve("writing-polish/SKILL.md").readText())
