@@ -24,46 +24,16 @@ internal data class LocalPresetSkill(
 )
 
 internal object LocalPresetSkillCatalog {
+    /** Historical presets removed from the active directory on upgrade; user edits are archived. */
+    val retiredIds = setOf(
+        "document-summary", "data-insights", "translation-localization",
+        "writing-polish", "bug-investigation", "longform-outline", "research-check",
+    )
     private val triggers = mapOf(
-        "writing-polish" to "润色、改写和精修段落",
-        "longform-outline" to "小说大纲、人物弧线、伏笔和章节规划",
-        "document-summary" to "文档总结、会议纪要和待办提取",
-        "research-check" to "资料查询、来源核实和事实查证",
         "code-review" to "代码审查、PR 和回归风险",
         "imagegen" to "图像生成、图片编辑、参考图及 UI 素材创作",
-        "bug-investigation" to "故障排查、日志分析和崩溃定位",
-        "data-insights" to "数据统计、报表和趋势分析",
-        "translation-localization" to "翻译、术语统一和本地化",
     )
     val entries = listOf(
-        LocalPresetSkill("writing-polish", "写作润色", "润色文字、调整逻辑与语气，并保留作者表达。", """
-            用途：对已有文章、段落、文案进行改写、校对和语言优化。
-            适用：润色、改写、统一语气、精简内容及文字精修。
-            执行：识别原文用途和语气；修改歧义、重复、语病与结构；核查人物、数字、专有名词及原意。
-            交付：可以直接使用的修订稿；必要时简述关键修改与仍需作者确定的地方。
-            """.trimIndent()),
-        LocalPresetSkill("longform-outline", "长文与小说大纲", "设计人物、冲突、章节推进与伏笔回收。", """
-            用途：创作或完善小说、剧本及长篇叙事的整体结构。
-            适用：故事大纲、人物弧线、章节规划与伏笔安排。
-            执行：确认题材和已有设定；构造动机、阻力、选择、转折与后果；梳理章节时间线和角色知情范围；安排伏笔回收。
-            交付：分阶段大纲、章节事件、人物弧线及连续性提示。
-            """.trimIndent()),
-        LocalPresetSkill("document-summary", "文档提炼", "整理文件结论、重点、行动事项和依据。", """
-            用途：从用户提供的文件或会议资料中提取可回查的信息。
-            适用：摘要、会议纪要、风险梳理、行动项与资料对比。
-            执行：读取相关内容并标明读取范围；区分事实、观点与推断；提取日期、数字、结论、决策与责任信息。
-            交付：核心结论、重要依据及待办事项；原文未提供的字段标为未指定。
-            """.trimIndent()),
-        LocalPresetSkill("research-check", "资料研究与核实", "优先核对权威资料，分辨事实、版本与推断。", """
-            用途：核实技术文档、模型和 API 能力、外部事件、规则和可争议事实。
-            执行：
-            1. 明确问题、主体、时间范围与版本；若用户指定模型/账户/平台，不擅自替换。
-            2. 通过 web_search 找到一手权威来源，实际以 web_fetch 阅读正文，不能以摘要代替原文；资料就在工作区时先读本地文件。
-            3. 官方 OpenAI 问题优先开发者文档和帮助中心；其他服务商优先自身官方接口文档，并核对更新日期和适用地域。
-            4. 检查参数名称、接口版本、权限/额度、客户端能力、示例是否仍适用；技术结论须区分“官方支持”和“当前 777 已实现”。
-            5. 交叉复查冲突信息，引用具体页面或文件位置；无法联网、来源不足或未实际验证时明确说明。
-            交付：结论 → 权威证据/日期 → 与当前实现的差异 → 仍需核实的事项；禁止编造来源或把代码静态检查说成实测。
-            """.trimIndent()),
         LocalPresetSkill("code-review", "代码审查", "以真实缺陷和证据为中心审查 PR 与全量代码。", """
             用途：只读审查 PR、提交、代码模块、架构与回归风险；用户要求修复时再单独执行修改。
             执行：
@@ -85,24 +55,6 @@ internal object LocalPresetSkillCatalog {
             5. 长任务不重复提交以免重复扣费；需要批量时按用户授权逐个申请并跟进，避免静默并发收费。
             6. Chat 模式的 OpenAI 内建图像工具与独立媒体创作界面属于不同路径，按实际可用功能调用，不把一个模式的能力虚报为另一个模式已具备。
             交付：真实生成图片和可查看位置、实际服务商/模型、任务状态；无法执行时说明缺少哪项能力或权限。
-            """.trimIndent()),
-        LocalPresetSkill("bug-investigation", "故障定位", "追踪异常根因、提出修复并验证结果。", """
-            用途：定位用户可见的错误、崩溃、超时与异常行为。
-            适用：日志分析、失败复现、故障排查与修复回归。
-            执行：收集现象和触发步骤；追踪日志、调用链及状态转移；对比假设；修复后按原场景与关键边界验证。
-            交付：根因、证据、实际修复、回归结果以及仍待验证的条件。
-            """.trimIndent()),
-        LocalPresetSkill("data-insights", "数据分析", "统计指标、复核数据并解释趋势和异常。", """
-            用途：从提供的数据中形成可核算、可追溯的分析结果。
-            适用：数据清洗、统计、表格分析、指标比较和趋势解释。
-            执行：确认来源、单位、时间范围与计算口径；使用可用工具计算并复核；分析趋势、差异和异常，区分相关性与因果。
-            交付：关键指标、计算依据、可视化或表格及结论边界。
-            """.trimIndent()),
-        LocalPresetSkill("translation-localization", "翻译与本地化", "准确翻译文本并适配目标语言语境。", """
-            用途：将文本转换为目标语言，保留意思、格式与专业术语。
-            适用：多语言翻译、字幕文案、产品本地化和术语统一。
-            执行：确定语言、受众、语气及用途；翻译并统一术语；核对数字、姓名、链接、格式和语义。
-            交付：可直接使用的译文；必要时说明有歧义的表达及译法选择。
             """.trimIndent()),
     ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) } + LocalMiniMaxSkillCatalog.entries
 }
@@ -297,7 +249,39 @@ internal class LocalSkillStore(
         }
         migrateMiniMaxMobileSkills()
         archiveRetiredMiniMaxAdaptations()
+        archiveRetiredGeneralPresets()
         refreshInstalledBuiltIns()
+    }
+
+    /**
+     * Retire the seven historical general presets once per device, preserving original
+     * SKILL.md, user edits and accompanying files. The marker is committed last so an
+     * interrupted migration can finish on the next startup.
+     */
+    private fun archiveRetiredGeneralPresets() {
+        val marker = File(skillsDir, ".general-presets-retired-v1")
+        if (marker.exists()) return
+        val archive = File(workspace.path, ".dsh/retired-skills/general-presets-v1")
+        for (id in LocalPresetSkillCatalog.retiredIds) {
+            val source = File(skillsDir, id)
+            if (Files.notExists(source.toPath(), LinkOption.NOFOLLOW_LINKS)) continue
+            require(Files.isDirectory(source.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+                source.canonicalFile.parentFile == skillsDir.canonicalFile) {
+                "旧技能目录不可安全归档：$id"
+            }
+            // A previously uninstalled skill may have remaining user attachments,
+            // even though SKILL.md was removed. Archive these too.
+            if (Files.exists(File(source, "SKILL.md").toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                requireInstalled(id)
+            }
+            val destination = File(archive, id)
+            require(Files.notExists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                "旧技能归档位置已存在且源目录尚未迁移：$id"
+            }
+            require(archive.isDirectory || archive.mkdirs()) { "无法创建旧技能归档目录" }
+            Files.move(source.toPath(), destination.toPath())
+        }
+        workspace.write(".dsh/skills/.general-presets-retired-v1", "done\n")
     }
 
     /** Retire unavailable hosts and upgrade only untouched bundled instructions. */
@@ -470,6 +454,7 @@ internal class LocalSkillStore(
 internal class LocalSkillManager @Inject constructor(
     storage: LocalSessionStorageRuntime,
     @ApplicationContext context: Context,
+    private val pinnedInvocations: LocalPinnedInvocationStore,
 ) {
     private val storageWorkspace = storage.files.workspace
     private val store = LocalSkillStore(storageWorkspace) { id ->
@@ -487,6 +472,13 @@ internal class LocalSkillManager @Inject constructor(
     fun initializeDefaults() {
         LocalSkillPackageUpdater(storageWorkspace).recoverInterruptedTransactions()
         store.seedOnce()
+        // Persistent composer pins must not break the first Work turn after migration.
+        // Keep pins for any same-ID skill that the user later installs explicitly.
+        val active = store.installed().mapTo(hashSetOf()) { it.name }
+        pinnedInvocations.current().filter {
+            it.kind == LocalPinnedInvocation.Kind.SKILL &&
+                it.id in LocalPresetSkillCatalog.retiredIds && it.id !in active
+        }.forEach { pinnedInvocations.remove(it) }
     }
     fun installed(): List<LocalInstalledSkill> = store.installed()
 

@@ -148,14 +148,7 @@ internal fun discoverLocalWorkSkills(
 /** Intent hints rank the catalog; absence of a fixed keyword must not hide installed skills. */
 internal fun relevantSkillIdsForTask(input: String): Set<String> {
     val rules = listOf(
-        "writing-polish" to "润色|改写|精修|文案优化|校对|polish|rewrite|proofread",
-        "longform-outline" to "大纲|小说|章节|故事规划|剧本|长篇|伏笔|outline|novel",
-        "document-summary" to "总结文档|总结文件|摘要|会议纪要|提炼|总结材料|summarize|summary",
-        "research-check" to "调研|核实资料|资料研究|事实查证|来源|文献|research|fact.check",
         "code-review" to "代码审查|审计代码|审计一遍|检查代码|检查PR|审查PR|评审|\\bPR\\b|review|pull[\\s-]*request",
-        "bug-investigation" to "故障|报错|异常|崩溃|排查|bug|crash|debug|error",
-        "data-insights" to "数据分析|数据统计|报表|趋势分析|指标|统计口径|analytics|data.insight",
-        "translation-localization" to "翻译|本地化|译文|术语统一|translate|translation|localization",
         "imagegen" to "生成图片|图片生成|修图|编辑图片|参考图|绘制图片|图像创作|image.gen|image.edit",
         "minimax-media" to "图片生成|生成图片|生成视频|视频生成|配音|生成语音|媒体生成|image.gen|video.gen",
         "minimax-music-gen" to "生成音乐|生成歌曲|伴奏|作曲|音乐创作|music.gen",

@@ -206,14 +206,16 @@ class LocalWorkSkillActivationTest {
         val root = Files.createTempDirectory("skill-metadata-authority").toFile()
         try {
             val workspace = LocalWorkspace(root)
-            // A legacy hardcoded alias for writing-polish matches 润色, but this
-            // user's installed metadata deliberately limits when that skill applies.
+            // A user-imported skill may reuse a retired preset ID. Its own
+            // when-to-use metadata controls discovery instead of deleted aliases.
             workspace.write(".dsh/skills/writing-polish/SKILL.md",
                 "---\ndescription: legal proofreading\nwhen-to-use: 合同核对\n---\nOnly legal proofing.")
             workspace.write(".dsh/skills/custom-polish/SKILL.md",
                 "---\ndescription: prose styling\nwhen-to-use: 润色\n---\nImprove the prose.")
             val metadataGuidance = resolveLocalWorkSkillGuidance(workspace, "帮我润色稿件")
             assertTrue(metadataGuidance.indexOf("custom-polish：") < metadataGuidance.indexOf("writing-polish："))
+            assertFalse(relevantSkillIdsForTask("帮我润色稿件").contains("writing-polish"))
+            assertFalse(relevantSkillIdsForTask("帮我翻译文档").contains("translation-localization"))
             // Older installed skills without front matter remain discoverable
             // by the compatibility alias until they define their own trigger.
             workspace.write(".dsh/skills/code-review/SKILL.md",
