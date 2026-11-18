@@ -1110,17 +1110,7 @@ fun ToolsScreen(
                                 onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
                             )
                         } else Column(Modifier.fillMaxSize()) {
-                                val initialLoading = state.loading &&
-                                    state.localPlugins.isEmpty() &&
-                                    state.servers.isEmpty() &&
-                                    !state.githubConfigured
-                                if (initialLoading) {
-                                    SyLoadingState(
-                                        icon = SyEntryIcons.Tools,
-                                        label = stringResource(R.string.tools_loading),
-                                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    )
-                                } else Column(
+                                Column(
                                     modifier = Modifier
                                         .weight(1f)
                                         .verticalScroll(rememberScrollState())
