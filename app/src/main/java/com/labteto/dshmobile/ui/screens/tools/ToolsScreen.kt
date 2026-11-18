@@ -43,8 +43,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,8 +71,6 @@ import com.labteto.dshmobile.local.network.requiresAndroid17LocalNetworkPermissi
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.shenyan.SySegment
-import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
@@ -127,16 +123,6 @@ data class ToolsUiState(
     val activeToolHookIds: List<String> = emptyList(),
     val skills: List<com.labteto.dshmobile.local.presentation.LocalSkillUiEntry> = emptyList(),
     val presets: List<com.labteto.dshmobile.local.presentation.LocalPresetSkillUiEntry> = emptyList(),
-    val curatedSkills: List<String> = emptyList(),
-    val codexPlugins: List<com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot> = emptyList(),
-    val codexLoading: Boolean = false,
-    val codexError: String? = null,
-    val codexDetails: Map<String, com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot> = emptyMap(),
-    val codexLogos: Map<String, ByteArray> = emptyMap(),
-    val codexDetailLoadingId: String? = null,
-    val codexDetailError: String? = null,
-    val curatedLoading: Boolean = false,
-    val curatedError: String? = null,
     val pendingSkillUpdates: Map<String, String> = emptyMap(),
     val upToDateSkills: Set<String> = emptySet(),
     val createdSkillId: String? = null,
@@ -236,7 +222,6 @@ class ToolsViewModel @Inject constructor(
         if (query.isBlank()) localTools.capabilityCatalogue()
         else localTools.discoverCapabilities(query, Int.MAX_VALUE)
     private val operationGate = ToolsOperationGate()
-    private val requestedCodexLogos = mutableSetOf<String>()
     private var mcpLoginJob: kotlinx.coroutines.Job? = null
     private val _githubBrowse = MutableStateFlow(GitHubBrowseState())
     internal val githubBrowse: StateFlow<GitHubBrowseState> = _githubBrowse.asStateFlow()
@@ -369,16 +354,6 @@ class ToolsViewModel @Inject constructor(
                     activeToolHookIds = localTools.activeToolHookIds(),
                     skills = skills,
                     presets = presets,
-                    curatedSkills = _state.value.curatedSkills,
-                    codexPlugins = _state.value.codexPlugins,
-                    codexLoading = _state.value.codexLoading,
-                    codexError = _state.value.codexError,
-                    codexDetails = _state.value.codexDetails,
-                    codexLogos = _state.value.codexLogos,
-                    codexDetailLoadingId = _state.value.codexDetailLoadingId,
-                    codexDetailError = _state.value.codexDetailError,
-                    curatedLoading = _state.value.curatedLoading,
-                    curatedError = _state.value.curatedError,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -423,47 +398,23 @@ class ToolsViewModel @Inject constructor(
      * public HTTPS MCP endpoints; OAuth consent is still granted in the browser.
      * A failed authorization leaves the installed skill intact and visible for retry.
      */
-    private suspend fun finishSkillInstallation(
-        installedId: String,
-        officialPluginId: String? = null,
-        bundledSkillIds: List<String> = listOf(installedId),
-    ) {
-        require(bundledSkillIds.isNotEmpty()) { "安装结果没有技能" }
-        // One authoritative inventory snapshot serves the visible list and dependency checks.
+    private suspend fun finishSkillInstallation(installedId: String) {
         val installedSkills = localTools.installedSkills()
         _state.value = _state.value.copy(
-            skills = installedSkills,
-            presets = localTools.presetSkills(),
-            createdSkillId = installedId,
+            skills = installedSkills, presets = localTools.presetSkills(), createdSkillId = installedId,
         )
-        // The official catalog and installed-skill metadata feed one dependency batch.
-        // Service identity and user consent stay owned by ToolsFeature; this page projects progress.
-        val officialDetail = officialPluginId?.let { _state.value.codexDetails[it] }
-        val officialRequest = officialDetail?.mcpUrl?.let { endpoint ->
-            com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorization(
-                requireNotNull(officialDetail.mcpServerId) {
-                    "插件声明了 MCP 地址，但缺少服务标识"
-                }, endpoint)
-        }
-        val declared = buildList {
-            officialRequest?.let(::add)
-            installedSkills
-                .filter { it.name in bundledSkillIds }
-                .flatMap { it.requirements }
-                .filter { it.type.equals("mcp", ignoreCase = true) && !it.registered }
-                .forEach { requirement ->
-                    skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
-                        add(com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorization(
-                            requirement.value, endpoint))
-                    }
+        val declared = installedSkills.filter { it.name == installedId }
+            .flatMap { it.requirements }
+            .filter { it.type.equals("mcp", ignoreCase = true) && !it.registered }
+            .mapNotNull { requirement ->
+                skillMcpHttpsEndpoint(requirement)?.let { endpoint ->
+                    com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorization(
+                        requirement.value, endpoint)
                 }
-        }
-        val endpointConflicts = declared.groupBy { it.serverId }.filterValues { sources ->
-            sources.map { it.endpoint }.distinct().size > 1
-        }
-        require(endpointConflicts.isEmpty()) {
-            "同一 MCP 服务标识声明了不同端点，请核对插件和技能依赖来源"
-        }
+            }
+        require(declared.groupBy { it.serverId }.values.all { group ->
+            group.map { it.endpoint }.distinct().size == 1
+        }) { "同一 MCP 服务标识声明了不同端点，请核对技能依赖来源" }
         val currentServers = localTools.servers()
         val connectionStates = declared.distinctBy { it.serverId }.associateWith { request ->
             com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
@@ -478,17 +429,11 @@ class ToolsViewModel @Inject constructor(
             com.labteto.dshmobile.local.presentation.LocalExtensionMcpAuthorizationFailure(
                 request.serverId, "已有同名但目标地址不同的服务，请在连接器中处理标识冲突")
         }
-
         val failures = collisions + try {
             com.labteto.dshmobile.local.presentation.authorizeLocalExtensionMcpBatch(
                 requests = requests,
                 authorize = { request ->
-                    if (officialRequest != null && request.serverId == officialRequest.serverId &&
-                        officialPluginId != null) {
-                        localTools.connectCodexPlugin(officialPluginId)
-                    } else {
-                        localTools.loginMcp(request.serverId, request.endpoint, null)
-                    }
+                    localTools.loginMcp(request.serverId, request.endpoint, null)
                     Unit
                 },
                 onStart = { request, index, total ->
@@ -497,9 +442,7 @@ class ToolsViewModel @Inject constructor(
                         feedback = "已安装技能；正在授权 ${request.serverId}（${index}/${total}）",
                     )
                 },
-                onFinish = {
-                    _state.value = _state.value.copy(mcpLoginServerId = null)
-                },
+                onFinish = { _state.value = _state.value.copy(mcpLoginServerId = null) },
             )
         } catch (cancelled: CancellationException) {
             synchronizeExtensionInventory()
@@ -509,247 +452,16 @@ class ToolsViewModel @Inject constructor(
             )
             throw cancelled
         }
-
         synchronizeExtensionInventory()
-        val unresolved = _state.value.skills.filter { it.name in bundledSkillIds }
-            .flatMap { it.requirements }
-            .count { !it.registered }
-        val scope = if (bundledSkillIds.size > 1) "插件 ${officialPluginId ?: installedId} 的 ${bundledSkillIds.size} 项技能"
-            else "技能 ${installedId}"
-        val officialStatus = com.labteto.dshmobile.uicontract.uiMcpDeclaredConnection(
-            _state.value.servers, officialDetail?.mcpServerId, officialDetail?.mcpUrl)
-        _state.value = _state.value.copy(
-            feedback = when {
-                failures.isNotEmpty() -> "${scope}已安装；${failures.size} 项服务授权未完成（" +
-                    failures.joinToString("；") { "${it.serverId}：${it.message.take(140)}" } +
-                    "），已成功的连接保留。可在详情继续"
-                officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.TARGET_CONFLICT ->
-                    "${scope}已安装，但 MCP 标识已由其他地址占用；请在连接器中核对"
-                officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.REGISTERED_UNREADY ->
-                    "${scope}已安装，服务已登记但尚未确认工具可用；请在连接器中检查"
-                officialDetail?.mcpUrl != null &&
-                    officialStatus == com.labteto.dshmobile.uicontract.UiMcpDeclaredConnection.ABSENT ->
-                    "${scope}已安装，服务尚未登记；请进入详情连接账号"
-                unresolved != 0 ->
-                    "${scope}已安装，还有 ${unresolved} 项运行依赖需在详情中处理"
-                else -> "${scope}已安装，可直接使用"
-            },
-        )
-    }
-
-    /** Fetch on user entry to Skills; discovery never installs a package. */
-    fun refreshCuratedSkills() {
-        if (_state.value.curatedLoading) return
-        viewModelScope.launch {
-            _state.value = _state.value.copy(curatedLoading = true, curatedError = null)
-            try {
-                val names = localTools.curatedGitHubSkills()
-                    .filter { it.matches(Regex("[a-z][a-z0-9-]{1,47}")) }
-                    .distinct().sorted()
-                _state.value = _state.value.copy(curatedLoading = false, curatedSkills = names)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _state.value = _state.value.copy(curatedLoading = false,
-                    curatedError = "官方精选目录读取失败：" + (error.message ?: "请检查网络"))
-            }
-        }
-    }
-
-    /** Fetches official Codex catalog metadata, without installing or authorizing anything. */
-    fun refreshCodexPlugins(forceRefetch: Boolean = false) {
-        if (_state.value.codexLoading) return
-        viewModelScope.launch {
-            _state.value = _state.value.copy(codexLoading = true, codexError = null)
-            try {
-                val plugins = localTools.codexOfficialPlugins(forceRefetch)
-                val availableIds = plugins.map { it.id }.toSet()
-                val details = if (forceRefetch) emptyMap() else
-                    _state.value.codexDetails.filterKeys { it in availableIds }
-                if (forceRefetch) requestedCodexLogos.clear()
-                _state.value = _state.value.copy(
-                    codexLoading = false, codexPlugins = plugins,
-                    codexDetails = details, codexDetailError = null,
-                    codexLogos = if (forceRefetch) emptyMap() else
-                        _state.value.codexLogos.filterKeys { it in availableIds },
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                _state.value = _state.value.copy(
-                    codexLoading = false,
-                    codexError = "Codex 官方市场读取失败：" + (failure.message ?: "请检查网络"),
-                )
-            }
-        }
-    }
-
-    /** Fetch artwork only as a marketplace row becomes visible.
-     * Loading and errors stay separate from installation/authorization.
-     */
-    fun loadCodexPluginLogo(id: String) {
-        if (_state.value.codexPlugins.none { it.id == id } ||
-            id in _state.value.codexLogos || !requestedCodexLogos.add(id)) return
-        viewModelScope.launch {
-            try {
-                val bytes = localTools.codexPluginLogo(id) ?: return@launch
-                _state.value = _state.value.copy(
-                    codexLogos = _state.value.codexLogos + (id to bytes),
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                com.labteto.dshmobile.observability.AppLog.warn(
-                    "CodexPluginIcon", "官方插件图标加载失败：$id", failure,
-                )
-            }
-        }
-    }
-
-    /** Details are fetched on selection, not as dozens of extra startup requests. */
-    fun loadCodexPluginDetail(id: String) {
-        if (_state.value.codexPlugins.none { it.id == id } ||
-            _state.value.codexDetailLoadingId == id ||
-            id in _state.value.codexDetails) return
-        viewModelScope.launch {
-            _state.value = _state.value.copy(codexDetailLoadingId = id, codexDetailError = null)
-            try {
-                val detail = localTools.codexPluginDetail(id)
-                _state.value = _state.value.copy(
-                    codexDetails = _state.value.codexDetails + (id to detail),
-                    codexDetailLoadingId = null,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                _state.value = _state.value.copy(
-                    codexDetailLoadingId = null,
-                    codexDetailError = failure.message ?: "Codex 插件详情读取失败",
-                )
-            }
-        }
-    }
-
-    /** Explicitly approved plugin action, with the same cancelable OAuth lifecycle as manual MCP login. */
-    fun connectCodexPlugin(id: String) {
-        val plugin = _state.value.codexPlugins.firstOrNull { it.id == id } ?: return
-        if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
-            _state.value.codexDetails[id]?.mcpUrl == null) return
-        val serviceId = _state.value.codexDetails[id]?.mcpServerId ?: return
-        mcpLoginJob = viewModelScope.launch { operationGate.run {
-            _state.value = _state.value.copy(
-                loading = true, mcpLoginServerId = serviceId,
-                feedback = "请在浏览器授权 ${plugin.name}，完成后返回 777。", feedbackRes = null,
-            )
-            try {
-                val result = localTools.connectCodexPlugin(id)
-                synchronizeExtensionInventory()
-                _state.value = _state.value.copy(feedback = result)
-            } catch (cancelled: CancellationException) {
-                _state.value = _state.value.copy(feedback = "插件授权已取消")
-                throw cancelled
-            } catch (failure: Exception) {
-                _state.value = _state.value.copy(
-                    feedback = "授权连接失败：" + (failure.message ?: "请查看服务授权说明"),
-                )
-            } finally {
-                _state.value = _state.value.copy(loading = false, mcpLoginServerId = null)
-            }
-        } }
-    }
-
-    fun installCodexPluginSkill(pluginId: String, skillId: String) {
-        val plugin = _state.value.codexPlugins.firstOrNull { it.id == pluginId } ?: return
-        if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
-            _state.value.codexDetails[pluginId]?.skills?.contains(skillId) != true) return
-        launchOperation {
-            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
-            try {
-                val installed = localTools.installCodexPluginSkill(pluginId, skillId)
-                finishSkillInstallation(installed, officialPluginId = pluginId)
-                _state.value = _state.value.copy(loading = false)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                _state.value = _state.value.copy(
-                    loading = false, feedback = failure.message ?: "插件技能安装失败",
-                )
-            }
-        }
-    }
-
-    /** Codex uses the plugin bundle as the catalogue unit. Install all declared
-     * Android-compatible skills from their verified folders before OAuth setup.
-     * Repeated taps resume only missing skills; existing installations stay intact.
-     */
-    fun installCodexPlugin(pluginId: String) {
-        val plugin = _state.value.codexPlugins.firstOrNull { it.id == pluginId } ?: return
-        if (plugin.codexOnly || plugin.installPolicy == "NOT_AVAILABLE" ||
-            plugin.sourceKind != "local") return
-        val detail = _state.value.codexDetails[pluginId] ?: return
-        if (detail.skills.isEmpty()) {
-            if (detail.mcpUrl != null) connectCodexPlugin(pluginId)
-            return
-        }
-        launchOperation {
-            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
-            val installedThisTime = mutableListOf<String>()
-            try {
-                val installedBefore = localTools.installedSkills()
-                val missing = detail.skills.filterNot { id ->
-                    val folder = detail.skillDirectories[id]
-                    folder != null && codexPluginSkillInstalled(
-                        installedBefore, plugin.sourcePath, folder)
-                }
-                for (skillId in missing) {
-                    val installedId = localTools.installCodexPluginSkill(pluginId, skillId)
-                    installedThisTime += installedId
-                    _state.value = _state.value.copy(
-                        skills = localTools.installedSkills(),
-                        feedback = "正在安装 ${plugin.name}（${installedThisTime.size}/${missing.size}）",
-                    )
-                }
-                val allIds = localTools.installedSkills().filter { skill ->
-                    detail.skillDirectories.values.any { folder ->
-                        codexOfficialPluginSourceMatches(skill.sourceIdentity, plugin.sourcePath, folder)
-                    }
-                }.map { it.name }.distinct()
-                if (allIds.isEmpty()) error("插件没有可安装的 Android 技能")
-                finishSkillInstallation(
-                    installedId = allIds.last(), officialPluginId = pluginId,
-                    bundledSkillIds = allIds,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                synchronizeExtensionInventory()
-                _state.value = _state.value.copy(
-                    feedback = "插件 ${plugin.name} 安装中断："
-                        + (failure.message ?: "请重新安装")
-                        + if (installedThisTime.isNotEmpty())
-                            "；已安装 ${installedThisTime.size} 项，可再次点击继续" else "",
-                )
-            } finally {
-                _state.value = _state.value.copy(loading = false)
-            }
-        }
-    }
-
-    fun installCuratedSkill(id: String) {
-        if (id !in _state.value.curatedSkills) return
-        launchOperation {
-            _state.value = _state.value.copy(loading = true, feedback = null, feedbackRes = null)
-            try {
-                val installedId = localTools.installCuratedSkill(id)
-                finishSkillInstallation(installedId)
-                _state.value = _state.value.copy(loading = false)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _state.value = _state.value.copy(loading = false,
-                    feedback = "精选技能安装失败：" + (error.message ?: "请检查网络或技能包"))
-            }
-        }
+        val unresolved = _state.value.skills.filter { it.name == installedId }
+            .flatMap { it.requirements }.count { !it.registered }
+        _state.value = _state.value.copy(feedback = when {
+            failures.isNotEmpty() -> "技能 ${installedId} 已安装；${failures.size} 项服务授权未完成（" +
+                failures.joinToString("；") { "${it.serverId}：${it.message.take(140)}" } +
+                "），已成功的连接保留。可在详情继续"
+            unresolved != 0 -> "技能 ${installedId} 已安装，还有 ${unresolved} 项运行依赖需在详情中处理"
+            else -> "技能 ${installedId} 已安装，可直接使用"
+        })
     }
 
     /** User-selected GitHub source; no network fetch or execution occurs before installation. */
@@ -1264,19 +976,6 @@ fun ToolsScreen(
     var showToolDirectory by rememberSaveable { mutableStateOf(false) }
     var toolDirectoryQuery by rememberSaveable { mutableStateOf("") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
-    // Single page with three tabs. The registered tool catalogue is not user-facing.
-    var selectedTab by rememberSaveable(startAtPlugins, startAtSkills) {
-        mutableIntStateOf(if (startAtSkills) 1 else 0)
-    }
-    // Switching tabs must not discard the plugin/skill search and filter context.
-    val inventoryTabStates = rememberSaveableStateHolder()
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == 0 && state.codexPlugins.isEmpty() &&
-            !state.codexLoading && state.codexError == null) viewModel.refreshCodexPlugins()
-        if (selectedTab in 0..1 && state.curatedSkills.isEmpty() &&
-            !state.curatedLoading && state.curatedError == null) viewModel.refreshCuratedSkills()
-    }
-
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
             when (notice) {
@@ -1299,7 +998,7 @@ fun ToolsScreen(
                 githubToken = ""
             }
             showAgentSettings -> showAgentSettings = false
-            showConnectorSettings && selectedTab == 2 -> showConnectorSettings = false
+            showConnectorSettings -> showConnectorSettings = false
             else -> onClose()
         }
     }
@@ -1366,81 +1065,49 @@ fun ToolsScreen(
                         actionEnabled = !state.loading,
                         onAction = viewModel::refresh,
                     )
-                    CapabilityCenterTabs(selectedTab) { next ->
-                        // The ViewModel loads on entry and observes skill-file changes.
-                        // Switching tabs must not fetch every plugin, server and skill again.
-                        selectedTab = next
-                    }
                     Box(Modifier.weight(1f)) {
-                        when (selectedTab) {
-                            0, 1 -> inventoryTabStates.SaveableStateProvider(selectedTab) {
-                                PluginInventoryBrowser(
-                                    localIds = state.localPlugins,
-                                    activeToolHookIds = state.activeToolHookIds,
-                                    connectedServices = state.servers,
-                                    skills = state.skills,
-                                    presets = state.presets,
-                                    curatedSkills = state.curatedSkills,
-                                    codexPlugins = state.codexPlugins,
-                                    codexLoading = state.codexLoading,
-                                    codexError = state.codexError,
-                                    codexDetails = state.codexDetails,
-                                    codexLogos = state.codexLogos,
-                                    onRequestCodexLogo = viewModel::loadCodexPluginLogo,
-                                    codexDetailLoadingId = state.codexDetailLoadingId,
-                                    codexDetailError = state.codexDetailError,
-                                    onReadCodexPluginDetail = viewModel::loadCodexPluginDetail,
-                                    onInstallCodexPluginSkill = viewModel::installCodexPluginSkill,
-                                    onInstallCodexPlugin = viewModel::installCodexPlugin,
-                                    onConnectCodexPlugin = viewModel::connectCodexPlugin,
-                                    onRefreshCodex = { viewModel.refreshCodexPlugins(true) },
-                                    curatedLoading = state.curatedLoading,
-                                    curatedError = state.curatedError,
-                                    pendingSkillUpdates = state.pendingSkillUpdates,
-                                    upToDateSkills = state.upToDateSkills,
-                                    createdSkillId = state.createdSkillId,
-                                    skillEditor = state.skillEditor,
-                                    savedSkillId = state.savedSkillId,
-                                    skillsOnly = selectedTab == 1,
-                                    embedded = true,
-                                    loading = state.loading,
-                                    error = if (state.loadFailed)
-                                        stringResource(R.string.tools_load_failed) else null,
-                                    onRetry = viewModel::refresh,
-                                    onBack = onClose,
-                                    onManageConnections = { selectedTab = 2 },
-                                    onReturnToChat = onClose,
-                                    onUseCapability = onUseCapability,
-                                    onInstallPreset = viewModel::installPreset,
-                                    onInstallCurated = viewModel::installCuratedSkill,
-                                    onRefreshCurated = viewModel::refreshCuratedSkills,
-                                    onCreateSkill = viewModel::createSkill,
-                                    onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
-                                     onInstallGitHubSkill = viewModel::installGitHubSkill,
-                                    onConnectSkillMcp = { serverId, url ->
-                                        viewModel.loginMcp(serverId, url, "")
-                                    },
-                                    onRemoveSkill = viewModel::removeSkill,
-                                    onShareSkillPackage = viewModel::shareSkillPackage,
-                                    onCheckSkillUpdate = viewModel::checkSkillUpdate,
-                                    onUpgradeSkill = viewModel::upgradeSkill,
-                                    onRollbackSkill = viewModel::rollbackSkill,
-                                    onOpenSkillEditor = viewModel::openSkillEditor,
-                                    onCloseSkillEditor = viewModel::closeSkillEditor,
-                                    onSaveSkillDocument = viewModel::saveSkillDocument,
-                                    onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
-                                )
-                            }
-                            else -> if (!showConnectorSettings) {
-                                ConnectorInventoryBrowser(
-                                    servers = state.servers,
-                                    githubConfigured = state.githubConfigured,
-                                    loading = state.loading,
-                                    onGitHub = { showGitHubConfig = true },
-                                    onMcp = { showExternalConfig = true },
-                                    onOpenSettings = { showConnectorSettings = true },
-                                )
-                            } else Column(Modifier.fillMaxSize()) {
+                        if (!showConnectorSettings) {
+                            PluginInventoryBrowser(
+                                localIds = state.localPlugins,
+                                activeToolHookIds = state.activeToolHookIds,
+                                connectedServices = state.servers,
+                                skills = state.skills,
+                                presets = state.presets,
+                                githubConfigured = state.githubConfigured,
+                                onGitHub = { showGitHubConfig = true },
+                                onAddMcp = { showExternalConfig = true },
+                                pendingSkillUpdates = state.pendingSkillUpdates,
+                                upToDateSkills = state.upToDateSkills,
+                                createdSkillId = state.createdSkillId,
+                                skillEditor = state.skillEditor,
+                                savedSkillId = state.savedSkillId,
+                                embedded = true,
+                                loading = state.loading,
+                                error = if (state.loadFailed)
+                                    stringResource(R.string.tools_load_failed) else null,
+                                onRetry = viewModel::refresh,
+                                onBack = onClose,
+                                onManageConnections = { showConnectorSettings = true },
+                                onReturnToChat = onClose,
+                                onUseCapability = onUseCapability,
+                                onInstallPreset = viewModel::installPreset,
+                                onCreateSkill = viewModel::createSkill,
+                                onImportSkill = { skillFilePicker.launch(arrayOf("*/*")) },
+                                onInstallGitHubSkill = viewModel::installGitHubSkill,
+                                onConnectSkillMcp = { serverId, url ->
+                                    viewModel.loginMcp(serverId, url, "")
+                                },
+                                onRemoveSkill = viewModel::removeSkill,
+                                onShareSkillPackage = viewModel::shareSkillPackage,
+                                onCheckSkillUpdate = viewModel::checkSkillUpdate,
+                                onUpgradeSkill = viewModel::upgradeSkill,
+                                onRollbackSkill = viewModel::rollbackSkill,
+                                onOpenSkillEditor = viewModel::openSkillEditor,
+                                onCloseSkillEditor = viewModel::closeSkillEditor,
+                                onSaveSkillDocument = viewModel::saveSkillDocument,
+                                onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
+                            )
+                        } else Column(Modifier.fillMaxSize()) {
                                 val initialLoading = state.loading &&
                                     state.localPlugins.isEmpty() &&
                                     state.servers.isEmpty() &&
@@ -1459,7 +1126,7 @@ fun ToolsScreen(
                                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
                                     SyButton(
-                                        text = "返回连接器目录",
+                                        text = "返回能力中心",
                                         onClick = { showConnectorSettings = false },
                                         variant = SyButtonVariant.Ghost,
                                         modifier = Modifier.fillMaxWidth(),
@@ -1635,7 +1302,6 @@ fun ToolsScreen(
                                     }
                                 }
                             }
-                        }
                     }
                 }
             }
@@ -2065,36 +1731,6 @@ fun ToolsScreen(
             }
         }
     }
-}
-
-/** All three user-facing sections stay in the same screen and navigation entry. */
-@Composable
-internal fun CapabilityCenterTabs(selectedTab: Int, onSelect: (Int) -> Unit) {
-    SySegmented(
-        segments = listOf(
-            SySegment("plugins", stringResource(R.string.tools_catalog_title)),
-            SySegment("skills", stringResource(R.string.skills_title)),
-            SySegment("connectors", "连接器"),
-        ),
-        selectedKey = when (selectedTab) {
-            1 -> "skills"
-            2 -> "connectors"
-            else -> "plugins"
-        },
-        onSelect = { key ->
-            onSelect(when (key) {
-                "skills" -> 1
-                "connectors" -> 2
-                else -> 0
-            })
-        },
-        role = Role.Tab,
-        hapticOnChange = true,
-        stretch = true,
-        modifier = Modifier.fillMaxWidth()
-            .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm)
-            .testTag("capability-center-tabs"),
-    )
 }
 
 @Composable
