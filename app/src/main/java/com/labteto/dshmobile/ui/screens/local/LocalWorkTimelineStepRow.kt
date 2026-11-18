@@ -169,6 +169,8 @@ internal fun WorkTimelineStepRow(
     var detailsOpen by remember(message.id) { mutableStateOf(false) }
     val receipts = listOf(message) + groupedMessages
     val hasDetails = operationGroup || message.content.isNotBlank() || message.blocks.isNotEmpty() ||
+        message.toolCallId != null || message.toolErrorCode != null ||
+        !activity?.argumentsPreview.isNullOrBlank() ||
         groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
     val activities = receipts.mapNotNull { userFacingWorkToolAction(it.toolName) }.distinct()
     val finding = if (operationGroup) null else localWorkFindingSummary(message)
@@ -246,7 +248,7 @@ internal fun completedWorkToolPhase(
 }
 
 @Composable
-private fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String =
+internal fun workToolActionLabel(name: String?, argumentsPreview: String? = null): String =
     naturalWorkToolAction(name, argumentsPreview)
         ?: userFacingWorkToolAction(name)
         ?: stringResource(userFacingWorkToolActionRes(name)
