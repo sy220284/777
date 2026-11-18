@@ -113,9 +113,11 @@ internal fun TaskCard(
     onEdit: () -> Unit,
     onOpenSession: (String) -> Unit,
     enabled: Boolean = true,
+    onApproveBlocked: () -> Unit = {},
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var confirmDelete by remember(task.id) { mutableStateOf(false) }
+    var confirmApproval by remember(task.id) { mutableStateOf(false) }
     var actionsOpen by remember(task.id) { mutableStateOf(false) }
     val chatCharacterFallback = stringResource(R.string.tasks_chat_character_fallback)
     val backgroundTaskLabel = stringResource(R.string.tasks_background_task)
@@ -292,6 +294,18 @@ internal fun TaskCard(
             }
         }
 
+        if (task.mode == AutomationMode.WORK &&
+            task.status == AutomationStatus.BLOCKED &&
+            task.lastError?.startsWith("后台任务需要人工审批：") == true) {
+            SyButton(
+                text = stringResource(R.string.tasks_approve_resume),
+                onClick = { confirmApproval = true },
+                enabled = enabled,
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Outline,
+            )
+        }
+
         if (task.mode == AutomationMode.CHAT) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -337,6 +351,34 @@ internal fun TaskCard(
                     size = SyButtonSize.Small,
                     variant = SyButtonVariant.Outline,
                 )
+            }
+        }
+    }
+
+    if (confirmApproval) {
+        SyDialog(
+            title = stringResource(R.string.tasks_approve_resume_title),
+            onDismiss = { confirmApproval = false },
+        ) {
+            Text(
+                task.lastError.orEmpty().take(500),
+                style = DsType.std14.withReadingWeight(),
+                color = colors.textSecondary,
+            )
+            Text(
+                stringResource(R.string.tasks_approve_resume_warning),
+                style = DsType.std14.withReadingWeight(),
+                color = colors.textSecondary,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                SyButton(stringResource(R.string.common_cancel),
+                    onClick = { confirmApproval = false }, variant = SyButtonVariant.Ghost)
+                SyButton(stringResource(R.string.tasks_approve_resume),
+                    onClick = { confirmApproval = false; onApproveBlocked() },
+                    enabled = enabled, variant = SyButtonVariant.Outline)
             }
         }
     }
