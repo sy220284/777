@@ -41,8 +41,11 @@ class ExtensionMarketplaceSemanticsTest {
         assertTrue(!marketplaceTabAllows(true, false, false, false, false))
     }
 
-    @Test fun discoverIncludesBothInstalledAndInstallable() {
+    @Test fun discoverShowsOnlyUnownedEntriesByDefault() {
         assertTrue(marketplaceTabAllows(false, false, false, false, false))
-        assertTrue(marketplaceTabAllows(false, true, false, false, false))
+        assertTrue(!marketplaceTabAllows(false, true, false, false, false))
+        assertTrue(!marketplaceTabAllows(false, false, true, false, false))
+        assertTrue(!marketplaceTabAllows(false, false, false, true, false))
+        assertTrue(!marketplaceTabAllows(false, false, false, false, true))
     }
 }
