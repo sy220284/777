@@ -135,6 +135,9 @@ class LocalSessionEntryRegressionTest {
             }
         }
         compose.onNode(hasSetTextAction()).performTextInput("早期线索")
+        compose.waitUntil {
+            compose.onAllNodesWithText("存档中的早期线索").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("存档中的早期线索").performClick()
         compose.runOnIdle { assertEquals("archive-id", openedId) }
     }

@@ -247,6 +247,13 @@ internal fun PluginInventoryBrowser(
             configuredConnector = item.id == "connector:github" && githubConfigured,
         )
     }
+    val query = catalogueQuery.trim()
+    val originalSkillText = buildMap {
+        skills.forEach { put("skill:${it.name}", listOf(it.displayName.orEmpty(), it.description)) }
+        presets.filterNot { it.id in installedSkillIds }.forEach {
+            put("skill:${it.id}", listOf(it.title, it.description))
+        }
+    }
     val list = catalogue.filter { item ->
         marketplaceTabAllows(
             addedOnly = addedOnly,
@@ -256,8 +263,8 @@ internal fun PluginInventoryBrowser(
             configuredConnector = item.id == "connector:github" && githubConfigured,
         )
     }.filter { item ->
-        val query = catalogueQuery.trim()
-        listOf(item.name, item.detail, item.sourceLabel).any { it.contains(query, ignoreCase = true) }
+        (listOf(item.id, item.name, item.detail, item.sourceLabel) + originalSkillText[item.id].orEmpty())
+            .any { it.contains(query, ignoreCase = true) }
     }.sortedWith(compareBy<InventoryRow> { !addedOnly && isAdded(it) }.thenBy { it.name })
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
