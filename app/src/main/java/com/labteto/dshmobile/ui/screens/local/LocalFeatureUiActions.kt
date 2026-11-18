@@ -112,6 +112,7 @@ internal data class LocalWorkFeatureUiActions(
     val workspaceFiles: suspend () -> List<LocalWorkspaceFile>,
     val saveWorkspaceFileToDownloads: suspend (String) -> String,
     val importWorkspaceFile: (suspend (Uri) -> String)? = null,
+    val exportWorkspaceArchive: (suspend (String, Uri) -> Int)? = null,
     val publishedWorkspaceFile: suspend (String) -> com.labteto.dshmobile.uicontract.UiPublishedDownload?,
     val workspaceDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry>,
     val workspaceDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage,

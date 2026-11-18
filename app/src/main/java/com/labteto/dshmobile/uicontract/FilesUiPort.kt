@@ -26,6 +26,7 @@ interface FilesUiPort {
     suspend fun previewWorkspaceFilePage(path: String, offset: Long): LocalWorkspaceFilePreview
     suspend fun importWorkspaceFile(uri: android.net.Uri): String
     suspend fun saveWorkspaceFileToDownloads(path: String): String
+    suspend fun exportWorkspaceArchive(directory: String, destination: android.net.Uri): Int
     suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long
     suspend fun publishedWorkspaceSnapshot(path: String): UiPublishedDownload?
 

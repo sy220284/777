@@ -111,6 +111,7 @@ internal fun LocalWorkspaceFilesDialog(
     loadWorkspace: suspend () -> List<LocalWorkspaceFile>,
     saveToDownloads: suspend (String) -> String = { error("下载目录保存功能不可用") },
     importFromPhone: (suspend (android.net.Uri) -> String)? = null,
+    exportDirectoryArchive: (suspend (String, android.net.Uri) -> Int)? = null,
     loadDirectory: suspend (String) -> List<LocalWorkspaceDirectoryEntry> = { emptyList() },
     loadDirectoryPage: suspend (String, Int) -> LocalWorkspaceDirectoryPage = { path, offset ->
         if (offset == 0) LocalWorkspaceDirectoryPage(loadDirectory(path), null)
@@ -885,6 +886,16 @@ internal fun LocalWorkspaceFilesDialog(
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg),
                     )
                 }
+                if (exportDirectoryArchive != null) WorkspaceDirectoryArchiveAction(
+                    sourceDirectory = directory.takeIf {
+                        mode == LocalFilesMode.WORKSPACE && preview == null && query.isBlank() && !selecting
+                    }.orEmpty(),
+                    scopeKey = "$sessionId/$workspacePath",
+                    enabled = !loading && error == null,
+                    exportArchive = exportDirectoryArchive,
+                    onSaved = { savedLocation = it },
+                    onError = { shareError = it },
+                )
                 if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
                     Text(stringResource(R.string.local_workspace_search_scope),
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),

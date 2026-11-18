@@ -981,6 +981,32 @@ class LocalWorkspaceTest {
     }
 
     @Test
+    fun directoryArchivePreservesPathsAndContentsPastShareSelectionLimit() {
+        val folder = root.resolve("供交付").apply { mkdirs() }
+        val nested = folder.resolve("正文").apply { mkdirs() }
+        folder.resolve("空目录").mkdirs()
+        folder.resolve(".git").apply { mkdirs() }.resolve("config").writeText("内部")
+        repeat(305) { index -> nested.resolve("$index.txt").writeText("第 $index 项") }
+        val output = java.io.ByteArrayOutputStream()
+        assertEquals(305, workspace.exportDirectoryArchiveForUi("供交付", output))
+
+        val names = mutableSetOf<String>()
+        java.util.zip.ZipInputStream(output.toByteArray().inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                assertTrue(names.add(entry.name))
+                if (!entry.isDirectory) {
+                    val index = entry.name.substringAfterLast('/').substringBefore('.')
+                    assertEquals("第 $index 项", zip.readBytes().toString(Charsets.UTF_8))
+                }
+            }
+        }
+        assertTrue("空目录/" in names)
+        assertTrue("正文/304.txt" in names)
+        assertTrue(names.none { it.startsWith(".git/") })
+    }
+
+    @Test
     fun exportFileForUiRejectsSymlinkEvenWhenTargetIsInsideWorkspace() {
         root.resolve("original.txt").writeText("real-value")
         Files.createSymbolicLink(root.resolve("alias.txt").toPath(),

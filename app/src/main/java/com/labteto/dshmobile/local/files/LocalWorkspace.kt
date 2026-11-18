@@ -10,6 +10,12 @@ import java.io.FileOutputStream
 import java.io.Reader
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.nio.file.FileVisitResult
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import java.nio.file.LinkOption
 import java.util.PriorityQueue
 import java.nio.file.StandardCopyOption
@@ -877,13 +883,32 @@ class LocalWorkspace(
      * shared files, session metadata, or an external symlink target.
      */
     fun exportFileForUi(relativePath: String, output: java.io.OutputStream): Long {
+        val source = checkedUiExportSource(relativePath)
+        require(source.isFile) { "工作区文件不存在：$relativePath" }
+        var total = 0L
+        java.nio.channels.Channels.newInputStream(Files.newByteChannel(
+            source.toPath(), setOf(java.nio.file.StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS),
+        )).use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                if (Thread.currentThread().isInterrupted) throw InterruptedException()
+                val count = input.read(buffer)
+                if (count < 0) break
+                output.write(buffer, 0, count)
+                total += count
+            }
+        }
+        return total
+    }
+
+    private fun checkedUiExportSource(relativePath: String): File {
         require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) {
             "只能导出工作区内的相对文件路径"
         }
         val source = File(canonicalRoot, relativePath)
         val canonical = source.canonicalFile
         require(canonical.path.startsWith(canonicalRoot.path + File.separator) &&
-            canonical.isFile) { "拒绝导出工作区外文件或不存在的文件" }
+            canonical.exists()) { "拒绝导出工作区外文件或不存在的文件" }
 
         // Reject symlinked paths even if the final target remains inside the workspace.
         val relative = canonicalRoot.toPath().relativize(source.toPath().normalize())
@@ -893,20 +918,51 @@ class LocalWorkspace(
             require(!Files.isSymbolicLink(current)) { "拒绝通过符号链接导出文件" }
         }
 
-        var total = 0L
-        java.nio.channels.Channels.newInputStream(Files.newByteChannel(
-            source.toPath(), setOf(java.nio.file.StandardOpenOption.READ,
-                java.nio.file.LinkOption.NOFOLLOW_LINKS),
-        )).use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                output.write(buffer, 0, count)
-                total += count
-            }
+        return source
+    }
+
+    /** One ZIP for a user-selected directory; its internal paths are rooted at that directory. */
+    internal fun exportDirectoryArchiveForUi(relativePath: String, output: java.io.OutputStream): Int {
+        val internalNames = setOf(".adsh", ".dsh", ".git")
+        val segments = relativePath.split('/')
+        require('\\' !in relativePath && segments.all { it.isNotBlank() && it !in setOf(".", "..") }) {
+            "请选择工作区内的子目录"
         }
-        return total
+        require(segments.none { it in internalNames }) { "无法导出应用内部目录" }
+        val source = checkedUiExportSource(relativePath)
+        require(source.isDirectory) { "工作区目录不存在：$relativePath" }
+        var files = 0
+        fun entryName(path: Path): String {
+            if (Thread.currentThread().isInterrupted) throw InterruptedException()
+            val relative = path.toFile().relativeTo(source).invariantSeparatorsPath
+            require('\\' !in relative && relative.split('/').none { it == "." || it == ".." }) {
+                "压缩包条目路径无效"
+            }
+            return relative
+        }
+        ZipOutputStream(output).use { zip ->
+            Files.walkFileTree(source.toPath(), object : SimpleFileVisitor<Path>() {
+                override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    if (dir == source.toPath()) return FileVisitResult.CONTINUE
+                    if (dir.fileName.toString() in internalNames) return FileVisitResult.SKIP_SUBTREE
+                    zip.putNextEntry(ZipEntry(entryName(dir) + "/"))
+                    zip.closeEntry()
+                    return FileVisitResult.CONTINUE
+                }
+
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    val relative = entryName(file)
+                    if (file.fileName.toString() in internalNames) return FileVisitResult.CONTINUE
+                    require(attrs.isRegularFile) { "无法打包特殊文件或符号链接：$relative" }
+                    zip.putNextEntry(ZipEntry(relative))
+                    exportFileForUi("$relativePath/$relative", zip)
+                    zip.closeEntry()
+                    files++
+                    return FileVisitResult.CONTINUE
+                }
+            })
+        }
+        return files
     }
 
     /**

@@ -581,6 +581,7 @@ fun LocalHarnessScreen(
             viewModel.saveWorkspaceFileToDownloadsForSession(shell.sessionId, path)
         },
         importWorkspaceFile = viewModel::importWorkspaceFile,
+        exportWorkspaceArchive = viewModel::exportWorkspaceArchive,
         publishedWorkspaceFile = { path ->
             viewModel.publishedWorkspaceFileForSession(shell.sessionId, path)
         },

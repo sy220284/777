@@ -433,6 +433,9 @@ class LocalHarnessViewModel @Inject constructor(
         return securityReviewFacade.approve(sessionId, repository, review, diff)
     }
 
+    internal suspend fun exportWorkspaceArchive(directory: String, destination: Uri) =
+        filesUi.exportWorkspaceArchive(directory, destination)
+
     suspend fun importWorkspaceFile(uri: Uri): String = filesUi.importWorkspaceFile(uri)
     internal suspend fun publishedWorkspaceFile(path: String) = filesUi.publishedWorkspaceSnapshot(path)
     internal suspend fun saveWorkspaceFileToDownloads(path: String) = filesUi.saveWorkspaceFileToDownloads(path)

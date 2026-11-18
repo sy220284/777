@@ -2459,4 +2459,8 @@
     <string name="permission_setup_notification_not_granted">尚未允许发送通知</string>
     <string name="permission_setup_open_notifications">打开应用通知设置</string>
     <string name="permission_setup_enabled_count">已开启 %1$d 项 · 其余可按需开启</string>
+    <string name="local_files_zip_folder">将当前目录保存为 ZIP</string>
+    <string name="local_files_zip_complete">已保存目录 ZIP，共 %1$d 个文件，应用和 Git 内部目录已排除。</string>
+    <string name="local_files_zip_failed">目录 ZIP 保存失败</string>
+    <string name="local_files_zip_cancelled">已取消打包。如果已经开始写入，所选位置可能保留不完整的文件。</string>
 </resources>

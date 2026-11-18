@@ -332,6 +332,34 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         return locations
     }
 
+    override suspend fun exportWorkspaceArchive(directory: String, destination: android.net.Uri): Int =
+        withContext(Dispatchers.IO) {
+            require(destination.scheme == "content") { "需要选择一个文件保存位置" }
+            val staged = File.createTempFile("workspace-directory-", ".zip", context.cacheDir)
+            try {
+                resourceScheduler.withResource(HarnessResourceKind.FILE_IO, "file:export_archive",
+                    priority = HarnessResourcePriority.BACKGROUND) {
+                    kotlinx.coroutines.runInterruptible {
+                        val count = staged.outputStream().buffered().use { workspace.exportDirectoryArchiveForUi(directory, it) }
+                        context.contentResolver.openOutputStream(destination, "wt")?.buffered()?.use { output ->
+                            staged.inputStream().use { input ->
+                                val buffer = ByteArray(64 * 1024)
+                                while (true) {
+                                    if (Thread.currentThread().isInterrupted) throw InterruptedException()
+                                    val size = input.read(buffer)
+                                    if (size < 0) break
+                                    output.write(buffer, 0, size)
+                                }
+                            }
+                        } ?: error("无法打开压缩包保存位置")
+                        count
+                    }
+                }
+            } finally {
+                staged.delete()
+            }
+        }
+
     override suspend fun exportWorkspaceFile(path: String, output: java.io.OutputStream): Long =
         withContext(Dispatchers.IO) {
             val units = com.labteto.dshmobile.harness.resource.harnessFileIoUnitsForBytes(
