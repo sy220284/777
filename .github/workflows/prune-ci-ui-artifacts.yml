@@ -1,0 +1,39 @@
+name: 777 CI 截图与录屏仅保留最新版本
+
+'on':
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/prune-ci-ui-artifacts.yml'
+      - 'tools/ci/prune_ui_artifacts.py'
+      - 'tools/ci/test_prune_ui_artifacts.py'
+  workflow_run:
+    workflows:
+      - '777 聊天与工作真实设备交互回归'
+      - '777 扩展市场 Android 交互验证'
+    types: [completed]
+  workflow_dispatch:
+
+# 仅检出默认分支的受信任脚本，不执行来源不明的 PR 文件。
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: 777-ci-media-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: 测试只保留最新版的删除规则
+        run: python3 -m unittest discover -s tools/ci -p 'test_prune_ui_artifacts.py' -v
+      - name: 清理旧 CI 截图与视频 Artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/ci/prune_ui_artifacts.py --apply
