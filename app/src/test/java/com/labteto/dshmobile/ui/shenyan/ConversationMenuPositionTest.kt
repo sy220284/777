@@ -49,11 +49,11 @@ class ConversationMenuPositionTest {
 
     @Test fun rtlHeaderMenuStartsAtTheAnchorLeftEdge() {
         val result = position(
-            anchor = IntRect(170, 30, 218, 82),
+            anchor = IntRect(140, 30, 188, 82),
             finger = null,
             direction = LayoutDirection.Rtl,
         )
-        assertEquals(170, result.x)
+        assertEquals(140, result.x)
         assertEquals(94, result.y)
     }
 
