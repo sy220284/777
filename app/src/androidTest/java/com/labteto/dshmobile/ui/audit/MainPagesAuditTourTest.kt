@@ -133,6 +133,15 @@ class MainPagesAuditTourTest {
             compose.onNodeWithTag("plugin-category-list").assertDoesNotExist()
             compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
             captureUiAudit(compose, "main-skills")
+            // Secondary configuration returns through the same top-bar and system-back stack.
+            compose.onNodeWithTag("capability-settings-entry").performClick()
+            compose.onNodeWithText("高级运行配置").assertExists()
+            compose.onNodeWithText("代理执行器").assertDoesNotExist()
+            compose.onNodeWithContentDescription(text(R.string.common_back)).performClick()
+            compose.onNodeWithTag("plugin-ownership-tabs").assertExists()
+            compose.onNodeWithTag("capability-settings-entry").performClick()
+            back()
+            compose.onNodeWithTag("plugin-ownership-tabs").assertExists()
 
             compose.onNodeWithText(text(R.string.extension_discover)).performClick()
             captureUiAudit(compose, "main-tools-discover")
