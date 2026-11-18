@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -93,7 +94,7 @@ class SettingsPageAuditTest(
         if (destination == SettingsDestination.ROOT) {
             // The entry belongs to settings home and must keep the existing usage navigation intact.
             compose.onNodeWithText(modelUsageTitle).assertExists()
-            compose.onNodeWithText(modelUsageTitle).performClick()
+            compose.onNodeWithText(modelUsageTitle).performScrollTo().performClick()
             compose.waitForIdle()
             compose.onNodeWithText(compose.activity.getString(R.string.settings_page_pricing)).assertExists()
             compose.onNodeWithText(compose.activity.getString(R.string.usage_calculation_title)).assertExists()
