@@ -306,10 +306,19 @@ internal class SqliteSessionStorageManager(
                 "旧 SQLite 备份不含图片原文件；请导出完整媒体备份"
             }
             val completeStudio = validateArchiveScope(staging, names)
+            // Media Studio can hold valuable paid records even when the Session
+            // editor is empty. Its presence also requires an additive merge.
+            val mediaDatabase = context.getDatabasePath("local_media_v1.db")
+            val mediaOccupied = if (completeStudio && mediaDatabase.exists()) {
+                SQLiteDatabase.openDatabase(mediaDatabase.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                    db.rawQuery("SELECT 1 FROM media LIMIT 1", null).use { it.moveToFirst() }
+                }
+            } else false
+            val willMerge = merging || mediaOccupied
             if (completeStudio) {
                 requireNotNull(studioReceiver) { "完整备份缺少媒体工作室数据库与文件清单" }
                     .validateStaged()
-                if (!merging) LocalMediaStudioBackupInstaller(context, studioJson).validateDestination(
+                if (!willMerge) LocalMediaStudioBackupInstaller(context, studioJson).validateDestination(
                     File(staging, STUDIO_STAGE_DIR),
                 )
             } else {
@@ -331,7 +340,7 @@ internal class SqliteSessionStorageManager(
             }
             val version = if (completeStudio) "sqlite-v3-studio" else "sqlite-v2-media"
             DurableFileCommit.replace(File(staging, "READY"),
-                (if (merging) "$version-merge" else version).toByteArray())
+                (if (willMerge) "$version-merge" else version).toByteArray())
             check(staging.renameTo(pendingRoot)) { "SQLite 备份无法提交恢复计划" }
             DurableFileCommit.syncDirectory(requireNotNull(pendingRoot.parentFile))
             return sessions
