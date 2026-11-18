@@ -309,10 +309,10 @@ bootstrap
 
 最终放行规则以 [VALIDATION.md](VALIDATION.md) 及现行 GitHub Actions 工作流为准。
 
-## CI 截图、录屏与 Artifact 管理
+## CI 截图、录屏、会话测试与架构报告 Artifact 管理
 
 - Android UI 设备回归生成的截图和 MP4 录屏保存在 GitHub Actions Artifact；`app/build/` 等测试输出已由 `.gitignore` 排除，人物预置图片与应用图标是正式素材。
-- [自动清理工作流](../.github/workflows/prune-ci-ui-artifacts.yml)在聊天／工作及能力中心设备回归完成后执行。每个录屏/截图证据系列只保留最新一份，Android 36、37.0 两种系统分别保留各自最新一份；清理日志公开保留 ID、删除份数和释放字节数。
+- [自动清理工作流](../.github/workflows/prune-ci-ui-artifacts.yml)在聊天／工作、能力中心、会话存储设备实测及架构审计完成后执行。按证据系列只保留最新一份：Android 36 和 37.0 的 UI 产物分别保留、能力中心录像保留一份、`session-storage-v7-android-tests` 会话存储测试报告保留一份、`architecture3-full-callgraph` 架构审计报告保留一份；清理日志公开保留 ID、删除份数和释放字节数。
 - 清理工作流在首次并入 `main` 时立即触发一次，也允许手动触发；后续由设备测试完成事件自动触发，无需另设定时任务。当前媒体 Artifact 仍遵守最长 30 天的 GitHub Actions 保存期限。
-- [清理脚本](../tools/ci/prune_ui_artifacts.py)默认只预览，带 `--apply` 才删除。删除范围严格限定为截图/视频 Artifact；APK、工具链、架构审计和会话迁移测试等其他产物保持原有生命周期。
+- [清理脚本](../tools/ci/prune_ui_artifacts.py)默认只预览，带 `--apply` 才删除。清理范围是截图／录屏与上述两个精确命名的报告；APK、工具链及其他未列入的 Artifact 继续保持原有生命周期。会话存储报告继续受原上传工作流的 7 天有效期限制，架构审计为 30 天。
 
