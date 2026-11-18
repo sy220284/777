@@ -27,13 +27,16 @@ class LocalPdfScopedRequestAndroidTest {
         val folder = Files.createTempDirectory(cache.toPath(), "pdf-scope").toFile()
         try {
             val pdf = folder.resolve("scan.pdf")
-            PdfDocument().use { document ->
+            val document = PdfDocument()
+            try {
                 listOf(Color.RED, Color.GREEN, Color.BLUE).forEachIndexed { index, color ->
                     val page = document.startPage(PdfDocument.PageInfo.Builder(128, 128, index + 1).create())
                     page.canvas.drawColor(color)
                     document.finishPage(page)
                 }
                 pdf.outputStream().use(document::writeTo)
+            } finally {
+                document.close()
             }
             val file = LocalImportedAttachment(
                 name = pdf.name,
