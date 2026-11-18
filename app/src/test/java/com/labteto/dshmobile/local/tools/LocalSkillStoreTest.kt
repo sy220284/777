@@ -265,7 +265,8 @@ class LocalSkillStoreTest {
         workspace.write(".dsh/skills/my-owned/SKILL.md", "---\ndescription: personal\n---\n私人规则")
         store.seedOnce()
 
-        assertEquals(setOf("code-review", "imagegen"), store.presets().map { it.id }.toSet())
+        assertEquals(setOf("code-review", "imagegen", "minimax-media", "minimax-music-gen", "minimax-playlist"),
+            store.presets().map { it.id }.toSet())
         retired.forEach { id ->
             assertFalse(workspace.skills().contains(id))
             assertTrue(store.presets().none { it.id == id })
