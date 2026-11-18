@@ -359,13 +359,8 @@ internal fun PluginInventoryBrowser(
         }
     }
     selectedRow?.let { selected ->
-        // Reproject from authoritative inventory while install/OAuth updates arrive.
-        // A selected preset becomes the installed skill with the same stable ID.
-        val item = catalogue.firstOrNull { it.id == selected.id }
-            ?: if (selected.installableCurated)
-                installedSkills.firstOrNull { it.id == "skill:${selected.id.substringAfter(":")}" }
-                    ?: selected
-            else selected
+        // Reproject from the authoritative inventory after installs or connection changes.
+        val item = catalogue.firstOrNull { it.id == selected.id } ?: selected
         var requirementsExpanded by remember(item.id) { mutableStateOf(false) }
         ExtensionDetailPage(
             title = item.name,
