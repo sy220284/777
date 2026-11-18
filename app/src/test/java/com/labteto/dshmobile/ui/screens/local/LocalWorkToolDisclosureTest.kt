@@ -199,4 +199,45 @@ class LocalWorkToolDisclosureTest {
             groupedMessages = listOf(second))
         assertEquals(2, workToolDisclosureCounts(listOf(item)).total)
     }
+
+    @Test fun newestFirstListRetainsEveryOriginalReceipt() {
+        val old = LocalTranscriptItem.WorkStep(tool("old", 1))
+        val newest = LocalTranscriptItem.WorkStep(tool("new", 2))
+        val visible = visibleWorkToolOperations(listOf(old, newest), WorkToolListFilter.ALL)
+        assertEquals(listOf(newest.key, old.key), visible.map(LocalTranscriptItem::key))
+        assertEquals("new", latestWorkTool(listOf(old, newest))?.name?.let { _ ->
+            (visible.first() as LocalTranscriptItem.WorkStep).message.id
+        })
+    }
+
+    @Test fun runningAndIssueFiltersKeepNewestFirstAndNeverHideOtherReceipts() {
+        val initial = LocalTranscriptItem.WorkPendingTool(LocalToolActivityUiItem(
+            callId = "pending", name = "read", phase = LocalToolUiPhase.RUNNING,
+        ))
+        val error = LocalTranscriptItem.WorkStep(tool("failure", 2, true))
+        val settled = LocalTranscriptItem.WorkStep(tool("settled", 3))
+        val other = LocalTranscriptItem.WorkPendingTool(LocalToolActivityUiItem(
+            callId = "recent", name = "edit", phase = LocalToolUiPhase.DECLARED,
+        ))
+        val full = listOf(initial, error, settled, other)
+        assertEquals(listOf(other.key, initial.key),
+            visibleWorkToolOperations(full, WorkToolListFilter.RUNNING).map { it.key })
+        assertEquals(listOf(error.key),
+            visibleWorkToolOperations(full, WorkToolListFilter.ISSUES).map { it.key })
+        assertEquals(listOf(other.key, settled.key, error.key, initial.key),
+            visibleWorkToolOperations(full, WorkToolListFilter.ALL).map { it.key })
+        assertEquals("edit", latestRunningWorkTool(full)?.name)
+    }
+
+    @Test fun latestSummaryChangesAsPendingCallReceivesDurableReceipt() {
+        val active = LocalTranscriptItem.WorkPendingTool(LocalToolActivityUiItem(
+            callId = "same", name = "read", phase = LocalToolUiPhase.RUNNING,
+        ))
+        val done = LocalTranscriptItem.WorkStep(tool("done", 3).copy(
+            toolName = "read", toolCallId = "same",
+        ))
+        assertEquals(LocalToolUiPhase.RUNNING, latestWorkTool(listOf(active))?.phase)
+        assertEquals(LocalToolUiPhase.COMPLETED, latestWorkTool(listOf(done))?.phase)
+        assertEquals(null, latestRunningWorkTool(listOf(done)))
+    }
 }
