@@ -655,11 +655,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             appendPendingWorkToolActivities(withArtifacts, workToolActivities, state.running)
         else withArtifacts
     }
-    val groupedActivities = remember(withActivities, state.usageMode) {
-        if (state.usageMode == LocalUsageMode.WORK) groupConsecutiveWorkOperations(withActivities)
-        else withActivities
+    // Attach verified files/media to their original receipts before moving the tool rows
+    // into one per-turn disclosure. Public progress and final answers stay as separate rows.
+    val withReplyAttachments = remember(withActivities) { composeLocalReplyAttachments(withActivities) }
+    val transcriptItems = remember(withReplyAttachments, state.usageMode) {
+        if (state.usageMode == LocalUsageMode.WORK) foldWorkToolsToTurnStart(withReplyAttachments)
+        else withReplyAttachments
     }
-    val transcriptItems = remember(groupedActivities) { composeLocalReplyAttachments(groupedActivities) }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
@@ -1413,6 +1415,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             sessionId = state.sessionId,
                         )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
+                        is LocalTranscriptItem.WorkTools -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(),
+                        ) {
+                            LocalWorkToolDisclosureRow(
+                                group = transcriptItem,
+                                workspacePath = state.workspacePath,
+                            )
+                        }
                         is LocalTranscriptItem.WorkPendingTool -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(),
                         ) {
