@@ -37,6 +37,12 @@ class AppViewModel @Inject constructor(
     val updateCandidate: StateFlow<AvailableUpdate?> = _updateCandidate.asStateFlow()
     private var awaitingInstallPermission: AvailableUpdate? = null
     private var updateJob: Job? = null
+    private val _downloadingUpdate = MutableStateFlow(false)
+    val downloadingUpdate = _downloadingUpdate.asStateFlow()
+
+    fun cancelUpdateDownload() {
+        if (_downloadingUpdate.value) updateJob?.cancel()
+    }
 
     fun checkForUpdate(currentVersion: String) {
         if (updateJob?.isActive == true) return
@@ -76,6 +82,7 @@ class AppViewModel @Inject constructor(
         _updateCandidate.value = null
         awaitingInstallPermission = null
         updateJob = viewModelScope.launch {
+            _downloadingUpdate.value = true
             _updateInstallStatus.value = if (update.patchChain.isNotEmpty()) {
                 val patchBytes = update.patchChain.sumOf { it.size }
                 val mib = patchBytes.toDouble() / (1024.0 * 1024.0)
@@ -84,13 +91,21 @@ class AppViewModel @Inject constructor(
                 "发现新版本 ${update.version}，正在下载完整 APK 并校验…"
             }
             _updateInstallStatus.value = try {
-                val result = updateInstaller.downloadVerifyAndLaunch(update)
+                val result = updateInstaller.downloadVerifyAndLaunch(update) { received, total ->
+                    val mib = received / (1024.0 * 1024.0)
+                    _updateInstallStatus.value = if (total != null)
+                        "正在下载 %.1f / %.1f MiB…".format(mib, total / (1024.0 * 1024.0))
+                    else "正在下载，已接收 %.1f MiB…".format(mib)
+                }
                 if (!result.launchedInstaller) awaitingInstallPermission = update
                 result.message
             } catch (cancelled: CancellationException) {
+                _updateInstallStatus.value = "下载已取消。同一版本可继续。"
                 throw cancelled
             } catch (error: Exception) {
                 "更新失败：" + (error.message ?: error::class.java.simpleName)
+            } finally {
+                _downloadingUpdate.value = false
             }
         }
     }

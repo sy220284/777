@@ -60,7 +60,7 @@ internal class LocalQueuedUserMessageEditor(
                     block.attachmentId, block.width, block.height,
                 )
                 is LocalMessageBlock.File -> LocalImportedAttachment(
-                    block.name, block.relativePath, block.mediaType, block.bytes, block.attachmentId,
+                    block.name, block.relativePath, block.mediaType, block.bytes, block.attachmentId, pdfPages = block.pdfPages,
                 )
                 else -> null
             }

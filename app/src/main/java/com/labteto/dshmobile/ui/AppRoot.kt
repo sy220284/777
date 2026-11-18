@@ -31,6 +31,7 @@ fun AppRoot(
     }
     val updateInstallStatus by viewModel.updateInstallStatus.collectAsStateWithLifecycle()
     val updateCandidate by viewModel.updateCandidate.collectAsStateWithLifecycle()
+    val downloadingUpdate by viewModel.downloadingUpdate.collectAsStateWithLifecycle()
 
     DshTheme(
         preference = themePreference,
@@ -50,6 +51,14 @@ fun AppRoot(
             onCheckUpdate = { viewModel.checkForUpdate(BuildConfig.VERSION_NAME) },
             updateStatus = updateInstallStatus,
         )
+        if (downloadingUpdate) SyDialog(
+            title = stringResource(R.string.update_downloading_title),
+            onDismiss = viewModel::cancelUpdateDownload,
+            dismissOnScrimTap = false,
+        ) {
+            updateInstallStatus?.let { Text(it) }
+            SyButton(stringResource(R.string.common_cancel), onClick = viewModel::cancelUpdateDownload)
+        }
         updateCandidate?.let { update ->
             val isDelta = update.patchChain.isNotEmpty()
             val bytes = if (isDelta) update.patchChain.sumOf { it.size } else update.apkSize

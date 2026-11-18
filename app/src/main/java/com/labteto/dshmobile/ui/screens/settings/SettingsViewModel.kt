@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.local.model.LocalModelProbe
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -310,8 +311,8 @@ class SettingsViewModel @Inject constructor(
     }
     fun removeLocalModel(id: String) = localHarness.removeModel(id)
 
-    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null): String =
-        localHarness.testModel(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
+    suspend fun testLocalModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null, probe: LocalModelProbe = LocalModelProbe.TEXT): String =
+        localHarness.testModel(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId, probe)
 
     suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String? = null): List<String> =
         withContext(Dispatchers.IO) { localHarness.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId) }

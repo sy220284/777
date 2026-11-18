@@ -1644,6 +1644,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             attachmentImportProgress = attachmentImportProgress,
             onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
+            onSelectPdfPages = { index, pages ->
+                attachments.getOrNull(index)?.let { attachment ->
+                    attachments[index] = attachment.copy(pdfPages = pages)
+                }
+            },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
             onOpenModelPicker = {

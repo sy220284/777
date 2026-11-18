@@ -18,12 +18,14 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
         url: String,
         model: String,
         protocol: LocalModelProtocol = LocalModelPresets.protocolFor(model, url),
-    ): String = runProbe(key) {
+        probe: LocalModelProbe = LocalModelProbe.TEXT,
+    ): String = runProbe(key, probe) {
         gateway.probeApiKey(
             apiKey = key,
             baseUrl = url,
             model = model,
             protocol = protocol,
+            probe = probe,
         )
     }
 
@@ -35,6 +37,7 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
         profiles: List<LocalModelProfile>,
         readKey: suspend (String) -> String?,
         profileId: String? = null,
+        probe: LocalModelProbe = LocalModelProbe.TEXT,
     ): String {
         if (model.isBlank()) return "请选择模型"
         val draft = try {
@@ -51,7 +54,7 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
             }
             return "连接失败：${message.take(240)}"
         }
-        return test(draft.key, draft.profile.baseUrl, draft.profile.model, draft.profile.protocol)
+        return test(draft.key, draft.profile.baseUrl, draft.profile.model, draft.profile.protocol, probe)
     }
 
     suspend fun testProfile(profile: LocalModelProfile): String = runProbe {
@@ -60,10 +63,10 @@ class LocalModelConnectionTester @Inject constructor(private val gateway: LocalM
 
     private suspend fun runProbe(
         secret: String? = null,
-        block: suspend () -> Unit,
+        probe: LocalModelProbe = LocalModelProbe.TEXT,
+        block: suspend () -> LocalModelReply,
     ): String = try {
-        withTimeout(20_000L) { block() }
-        "普通对话已通过实际请求验证。工具调用与多模态能力需分别验证。"
+        probe.verify(withTimeout(20_000L) { block() })
     } catch (error: CancellationException) {
         if (error is TimeoutCancellationException) {
             AppLog.warn("ModelProbe", "failure=true operation=test_model_connection cause_type=TimeoutCancellationException")

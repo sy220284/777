@@ -48,7 +48,7 @@ class UpdateInstaller @Inject constructor(
     private val payloadTransfer = UpdatePayloadTransfer(downloadClient)
     private val maintenanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    suspend fun downloadVerifyAndLaunch(update: AvailableUpdate): UpdateInstallResult =
+    suspend fun downloadVerifyAndLaunch(update: AvailableUpdate, onProgress: (Long, Long?) -> Unit = { _, _ -> }): UpdateInstallResult =
         withContext(Dispatchers.IO) {
             currentCoroutineContext().ensureActive()
             if (!context.packageManager.canRequestPackageInstalls()) {
@@ -87,7 +87,7 @@ class UpdateInstaller @Inject constructor(
             var installerOwnsTarget = false
 
             try {
-                val usedDelta = tryDeltaUpdate(update, target, expected)
+                val usedDelta = tryDeltaUpdate(update, target, expected, onProgress)
                 if (!usedDelta) {
                     target.delete()
                     payloadTransfer.downloadFile(
@@ -97,6 +97,8 @@ class UpdateInstaller @Inject constructor(
                         expectedBytes = update.apkSize,
                         kind = "APK",
                         accept = "application/vnd.android.package-archive, application/octet-stream",
+                        expectedSha256 = expected,
+                        onProgress = onProgress,
                     )
                     val actual = sha256(target)
                     if (!actual.equals(expected, ignoreCase = true)) {
@@ -162,6 +164,7 @@ class UpdateInstaller @Inject constructor(
         update: AvailableUpdate,
         target: File,
         expectedTargetSha256: String,
+        onProgress: (Long, Long?) -> Unit,
     ): Boolean {
         if (update.patchChain.isEmpty()) return false
         val installedApk = File(context.applicationInfo.sourceDir)
@@ -191,6 +194,8 @@ class UpdateInstaller @Inject constructor(
                         expectedBytes = step.size,
                         kind = "增量包",
                         accept = "application/octet-stream",
+                        expectedSha256 = step.expectedSha256,
+                        onProgress = onProgress,
                     )
                     val patchSha = sha256(patchFile)
                     if (!patchSha.equals(step.expectedSha256, ignoreCase = true)) {

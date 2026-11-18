@@ -19,8 +19,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 @Singleton
 class LocalModelGateway @Inject constructor(
@@ -280,6 +278,7 @@ class LocalModelGateway @Inject constructor(
         model: String,
         baseUrl: String,
         protocol: LocalModelProtocol,
+        probe: LocalModelProbe = LocalModelProbe.TEXT,
     ): LocalModelReply {
         val preset = LocalModelPresets.find(model, baseUrl)
         val route = LocalResolvedModelRoute(
@@ -294,8 +293,8 @@ class LocalModelGateway @Inject constructor(
         )
         return completeResolved(
             route = route,
-            messages = probeMessages(),
-            tools = JsonArray(emptyList()),
+            messages = probe.messages(),
+            tools = probe.tools(),
             temperature = null,
             streaming = true,
             onDelta = {},
@@ -306,7 +305,7 @@ class LocalModelGateway @Inject constructor(
         complete(
             model = profile.model,
             baseUrl = profile.baseUrl,
-            messages = probeMessages(),
+            messages = LocalModelProbe.TEXT.messages(),
             tools = JsonArray(emptyList()),
             profile = profile,
         )
@@ -383,11 +382,6 @@ class LocalModelGateway @Inject constructor(
             onDelta = if (prepared.streaming) onDelta else { _: LocalModelDelta -> },
         ).also(::validateUsableModelReply).copy(routeIdentity = route.identity())
     }
-
-    private fun probeMessages(): List<JsonObject> = listOf(buildJsonObject {
-        put("role", "user")
-        put("content", "Reply with exactly: OK")
-    })
 }
 
 internal data class LocalPreparedModelRequest(

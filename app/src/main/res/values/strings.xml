@@ -795,7 +795,9 @@
     <string name="local_model_context_window">上下文窗口 Token</string>
     <string name="local_model_context_window_hint">仅用于未知自定义模型；留空使用安全默认值，允许 4096–16000000。</string>
     <string name="local_model_keep_key">留空会沿用此模型已保存的密钥。</string>
-    <string name="local_model_test">检测连通性</string>
+    <string name="local_model_test">检测普通对话</string>
+    <string name="local_model_test_tools">检测工具调用</string>
+    <string name="local_model_test_image">检测图片理解</string>
     <string name="local_model_testing">正在检测…</string>
     <string name="local_model_chat_endpoint">对话接口：%1$s</string>
     <string name="local_model_models_endpoint">模型列表接口：%1$s</string>
@@ -2463,4 +2465,15 @@
     <string name="local_files_zip_complete">已保存目录 ZIP，共 %1$d 个文件，应用和 Git 内部目录已排除。</string>
     <string name="local_files_zip_failed">目录 ZIP 保存失败</string>
     <string name="local_files_zip_cancelled">已取消打包。如果已经开始写入，所选位置可能保留不完整的文件。</string>
+    <string name="update_downloading_title">下载安装包</string>
+    <string name="local_group_speakers_title">选择本轮发言人</string>
+    <string name="local_group_speakers_choice">本轮发言 · %1$s</string>
+    <string name="local_group_speakers_auto">自动</string>
+    <string name="local_group_speakers_all">全员</string>
+    <string name="local_pdf_apply_pages">应用</string>
+    <string name="local_pdf_auto_pages">自动读取范围</string>
+    <string name="local_pdf_selected_pages">第 %1$s 页</string>
+    <string name="local_pdf_choose_pages">选择 PDF 页码</string>
+    <string name="local_pdf_choose_pages_hint">例如 2,4-6，最多 6 页。选页后仅发送对应页面，需要支持图片理解的模型。</string>
+    <string name="local_pdf_pages_placeholder">留空使用默认读取范围</string>
 </resources>

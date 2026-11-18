@@ -55,6 +55,10 @@ import androidx.compose.ui.unit.IntSize
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
+import com.labteto.dshmobile.local.chat.LocalGroupChatMember
+import com.labteto.dshmobile.local.presentation.composerGroupSpeakerLabel
+import com.labteto.dshmobile.local.presentation.canSelectPdfPages
+import com.labteto.dshmobile.local.presentation.composerDirectedGroupInput
 import com.labteto.dshmobile.local.presentation.isUnboundChatPersona
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.presentation.LocalReasoningControls
@@ -67,6 +71,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyGlassCard
+import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyComposerAction
 import com.labteto.dshmobile.ui.shenyan.SyComposerField
 import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
@@ -110,6 +115,7 @@ internal fun LocalConversationComposer(
     attachmentImportProgress: Pair<Int, Int>? = null,
     onInputChange: (String) -> Unit,
     onRemoveAttachment: (Int) -> Unit,
+    onSelectPdfPages: ((Int, List<Int>) -> Unit)? = null,
     onClearAttachments: () -> Unit,
     onOpenAttachmentPicker: () -> Unit,
     onOpenModelPicker: () -> Unit = {},
@@ -174,6 +180,11 @@ internal fun LocalConversationComposer(
         LocalReasoningControls.requiresBasicReasoning(activeModelProfile, state.usageMode)))
     val modelLabel = activeModelProfile?.let { it.displayName?.takeIf(String::isNotBlank) ?: it.model }
         ?: stringResource(R.string.models_title)
+    var groupSpeakerPickerOpen by remember(state.sessionId) { mutableStateOf(false) }
+    var groupAllSpeakers by remember(state.sessionId) { mutableStateOf(false) }
+    var groupRequestedSpeakerId by remember(state.sessionId) { mutableStateOf<String?>(null) }
+    val groupRoster = state.groupChat.members
+    val groupRequestedSpeaker = groupRoster.firstOrNull { it.galleryId == groupRequestedSpeakerId }
     val groupChatReady = !state.groupChat.enabled || state.groupChat.members.size >= 2
     // A chat temperature change is committed asynchronously. Do not submit the next
     // turn with the old sampling value while the new persona setting is still saving.
@@ -231,11 +242,15 @@ internal fun LocalConversationComposer(
             onSend(
                 if (state.usageMode == LocalUsageMode.WORK && state.running && steerCurrentRun) {
                     "/steer " + input
+                } else if (state.groupChat.enabled && (groupAllSpeakers || groupRequestedSpeaker != null)) {
+                    composerDirectedGroupInput(input, groupRoster, groupRequestedSpeaker)
                 } else input,
                 attachments.toList(),
             )
         }
         if (!result.accepted) return
+        groupAllSpeakers = false
+        groupRequestedSpeakerId = null
         capabilityPanel = null
         steerCurrentRun = false
         onClearTeamDispatch()
@@ -332,6 +347,26 @@ internal fun LocalConversationComposer(
         // the IME is already animating the whole surface.
         animateSize = false,
     ) {
+        if (state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled && groupChatReady) {
+            val speakerChoice = when {
+                groupAllSpeakers -> stringResource(R.string.local_group_speakers_all)
+                groupRequestedSpeaker != null -> composerGroupSpeakerLabel(groupRequestedSpeaker, groupRoster)
+                else -> stringResource(R.string.local_group_speakers_auto)
+            }
+            SyButton(
+                text = stringResource(R.string.local_group_speakers_choice, speakerChoice),
+                onClick = { groupSpeakerPickerOpen = true },
+                size = SyButtonSize.Small,
+                variant = SyButtonVariant.Ghost,
+            )
+            if (groupSpeakerPickerOpen) {
+                LocalGroupSpeakerPicker(groupRoster, onDismiss = { groupSpeakerPickerOpen = false }) { all, member ->
+                    groupAllSpeakers = all
+                    groupRequestedSpeakerId = member?.galleryId
+                    groupSpeakerPickerOpen = false
+                }
+            }
+        }
         if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
             // A compact icon-only indicator keeps team dispatch reversible without
             // repeating its name or squeezing the adjacent text into vertical glyphs.
@@ -419,6 +454,7 @@ internal fun LocalConversationComposer(
                     } else {
                         ImportedAttachmentRow(
                             attachment = attachment,
+                            onSelectPages = onSelectPdfPages?.let { selected -> { pages -> selected(index, pages) } },
                             onRemove = { onRemoveAttachment(index) },
                         )
                     }
@@ -584,7 +620,16 @@ internal fun localAttachmentDisplaySize(bytes: Long): String = when {
 private fun ImportedAttachmentRow(
     attachment: LocalImportedAttachment,
     onRemove: () -> Unit,
+    onSelectPages: ((List<Int>) -> Unit)? = null,
 ) {
+    val isPdf = attachment.canSelectPdfPages()
+    var selectPages by remember(attachment.relativePath) { mutableStateOf(false) }
+    if (selectPages && onSelectPages != null) {
+        LocalPdfPageSelectionDialog(attachment.pdfPages, onDismiss = { selectPages = false }) {
+            onSelectPages(it)
+            selectPages = false
+        }
+    }
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val kind = attachment.name.substringAfterLast('.', "").uppercase()
         .takeIf { it.length in 1..7 } ?: "文件"
@@ -614,12 +659,23 @@ private fun ImportedAttachmentRow(
                 color = colors.text,
             )
             Text(
-                "$kind · ${localAttachmentDisplaySize(attachment.bytes)}",
+                when {
+                    attachment.pdfPages.isNotEmpty() ->
+                        stringResource(R.string.local_pdf_selected_pages, attachment.pdfPages.joinToString(", "))
+                    isPdf -> stringResource(R.string.local_pdf_auto_pages)
+                    else -> "$kind · ${localAttachmentDisplaySize(attachment.bytes)}"
+                },
                 maxLines = 1,
                 style = DsType.caption11.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
+        if (isPdf && onSelectPages != null) SyIconButton(
+            icon = FeatherIcons.FileText,
+            contentDescription = stringResource(R.string.local_pdf_choose_pages),
+            onClick = { selectPages = true },
+            iconSize = 18.dp,
+        )
         SyIconButton(
             icon = FeatherIcons.X,
             contentDescription = stringResource(R.string.common_remove) + " " + attachment.name,
@@ -627,5 +683,33 @@ private fun ImportedAttachmentRow(
             iconSize = 16.dp,
             tint = colors.textSecondary,
         )
+    }
+}
+
+
+@Composable
+private fun LocalGroupSpeakerPicker(
+    roster: List<LocalGroupChatMember>,
+    onDismiss: () -> Unit,
+    onSelect: (Boolean, LocalGroupChatMember?) -> Unit,
+) {
+    SyDialog(title = stringResource(R.string.local_group_speakers_title), onDismiss = onDismiss) {
+        SyButton(
+            text = stringResource(R.string.local_group_speakers_auto),
+            onClick = { onSelect(false, null) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SyButton(
+            text = stringResource(R.string.local_group_speakers_all),
+            onClick = { onSelect(true, null) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        roster.forEach { member ->
+            SyButton(
+                text = composerGroupSpeakerLabel(member, roster),
+                onClick = { onSelect(false, member) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
