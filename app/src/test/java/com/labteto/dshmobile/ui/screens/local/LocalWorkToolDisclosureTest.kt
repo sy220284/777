@@ -139,7 +139,7 @@ class LocalWorkToolDisclosureTest {
         val displayed = foldWorkToolsToTurnStart(attached)
         assertEquals("work-tools:user", displayed[1].key)
         val file = displayed.filterIsInstance<LocalTranscriptItem.WorkArtifact>().single()
-        assertEquals("work-tool:write:declaration:20", file.attachedTo)
+        assertEquals("work-tools:user", file.attachedTo)
         assertEquals("report.md", file.artifact.reference)
     }
 
