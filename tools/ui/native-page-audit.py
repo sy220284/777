@@ -110,14 +110,29 @@ component=resolved.splitlines()[-1]
 if not component.startswith(a.package+'/'):raise RuntimeError('Installed launcher could not be resolved: '+resolved)
 adb('shell','-n','am','start','-W','--user',user,'-n',component,
  '-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER')
-end=time.monotonic()+45
-while True:
+# The release build can transition from its first-launch card while the screenshot
+# is being captured. Re-read the action after snapshotting and only tap if it still
+# exists. The conversation shell is the success condition, never the old button.
+end=time.monotonic()+60
+onboarding_shots=0
+while time.monotonic()<end:
  t=tree()
- if candidates(t,strings['shenyan_onboarding_skip']):
-  snapshot('first-launch');tap(strings['shenyan_onboarding_skip']);continue
  if candidates(t,strings['app_open_navigation']):break
- if time.monotonic()>end:raise RuntimeError('Conversation shell did not become ready')
+ matches=candidates(t,strings['shenyan_onboarding_skip'])
+ if matches:
+  snapshot('first-launch-'+str(onboarding_shots))
+  onboarding_shots+=1
+  t=tree()
+  matches=candidates(t,strings['shenyan_onboarding_skip'])
+  if len(matches)>1:raise RuntimeError('Ambiguous first-launch action')
+  if len(matches)==1:
+   x1,y1,x2,y2=matches[0]
+   adb('shell','-n','input','tap',str((x1+x2)//2),str((y1+y2)//2))
+  time.sleep(.3)
+  continue
  time.sleep(.5)
+else:
+ raise RuntimeError('Conversation shell did not become ready after first-launch navigation')
 snapshot('home-initial');drawer();tap(strings['local_usage_work']);home();snapshot('home-work')
 drawer();snapshot('sidebar-work');home()
 page('chatlist_workspace_files','workspace');page('tasks_title','tasks-work');page('tools_title','tools');page('settings_title','settings-root')
