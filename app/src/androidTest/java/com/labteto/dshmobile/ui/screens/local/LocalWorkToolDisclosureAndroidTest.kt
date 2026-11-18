@@ -178,5 +178,9 @@ class LocalWorkToolDisclosureAndroidTest {
         compose.onNodeWithTag("work-tool:t1").assertDoesNotExist()
         compose.onNodeWithTag("work-tool-list:many").performScrollToIndex(119)
         compose.onNodeWithTag("work-tool:t1").assertIsDisplayed()
+        // Reopening a disclosure starts from the newest receipt, even after deep scrolling.
+        compose.onNodeWithTag("work-tool-disclosure:many").performClick()
+        compose.onNodeWithTag("work-tool-disclosure:many").performClick()
+        compose.onNodeWithTag("work-tool:t120").assertIsDisplayed()
     }
 }
