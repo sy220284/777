@@ -53,6 +53,12 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
+private data class InventorySection(
+    val id: String,
+    val title: String,
+    val entries: List<InventoryRow>,
+)
+
 private data class InventoryRow(
     val id: String,
     val name: String,
@@ -118,6 +124,7 @@ internal fun PluginInventoryBrowser(
     var showMarketActions by remember { mutableStateOf(false) }
     var addedOnly by rememberSaveable { mutableStateOf(true) }
     var catalogueQuery by rememberSaveable { mutableStateOf("") }
+    var showOwnedInDiscover by rememberSaveable { mutableStateOf(false) }
     var selectedRow by remember { mutableStateOf<InventoryRow?>(null) }
     var showCreateSkill by remember { mutableStateOf(false) }
     var removeSkillName by remember { mutableStateOf<String?>(null) }
@@ -148,7 +155,9 @@ internal fun PluginInventoryBrowser(
         }
     }
     // The built-in skill runtime is represented by individual installed skills.
-    val local = localIds.filterNot { it == "android-local-builtins" }.sorted().map { id ->
+    // GitHub's built-in service is managed from the single canonical connector card.
+    val local = localIds.filterNot { it == "android-local-builtins" || it == "github-connector" }
+        .distinct().sorted().map { id ->
         val label = when (id) {
             "android-local-builtins" -> stringResource(R.string.skills_title)
             "android-runtime" -> stringResource(R.string.tools_capability_terminal)
@@ -171,13 +180,15 @@ internal fun PluginInventoryBrowser(
         InventoryRow("local:$id", copy.title, copy.description, connectedService = false,
             icon = copy.icon, accent = copy.accent, documentIcon = copy.documentIcon,
             sourceLabel = "777 · 随应用安装",
-            marketState = ExtensionMarketState(ExtensionMarketStatus.BUILTIN, "已内置 · 按需授权"))
+            marketState = ExtensionMarketState(
+                ExtensionMarketStatus.BUILTIN, "已内置", "调用时核验实际授权",
+            ))
     }
     val connected = connectedServices.sortedBy { it.id }.map { server ->
         val copy = extensionPresentation(server.id, server.id, "", ExtensionKind.CONNECTOR)
         InventoryRow(
             id = "service:" + server.id,
-            name = copy.title,
+            name = if (server.id.equals("github", ignoreCase = true)) "GitHub · MCP" else copy.title,
             detail = "已连接 · " + server.tools.size + " 项工具 · " + server.transport.uppercase(),
             connectedService = true,
             available = false,
@@ -254,18 +265,30 @@ internal fun PluginInventoryBrowser(
             put("skill:${it.id}", listOf(it.title, it.description))
         }
     }
-    val list = catalogue.filter { item ->
-        marketplaceTabAllows(
-            addedOnly = addedOnly,
-            installedSkill = item.installedSkill,
-            connectedService = item.connectedService,
-            localPlugin = item.id.startsWith("local:"),
-            configuredConnector = item.id == "connector:github" && githubConfigured,
-        )
-    }.filter { item ->
+    val matchesSearch: (InventoryRow) -> Boolean = { item ->
         (listOf(item.id, item.name, item.detail, item.sourceLabel) + originalSkillText[item.id].orEmpty())
             .any { it.contains(query, ignoreCase = true) }
-    }.sortedWith(compareBy<InventoryRow> { !addedOnly && isAdded(it) }.thenBy { it.name })
+    }
+    val owned = catalogue.filter(isAdded).filter(matchesSearch).sortedBy { it.name }
+    val discoverable = catalogue.filterNot(isAdded).filter(matchesSearch).sortedBy { it.name }
+    val visible = if (addedOnly) owned else discoverable
+    val isConnector: (InventoryRow) -> Boolean = {
+        it.id.startsWith("service:") || it.id.startsWith("connector:")
+    }
+    val sections = if (addedOnly) {
+        listOf(
+            InventorySection("owned-extensions", "已安装的技能与插件", visible.filterNot(isConnector)),
+            InventorySection("owned-connectors", "连接器", visible.filter(isConnector)),
+        )
+    } else {
+        listOf(
+            InventorySection("discover-extensions", "可添加的技能", visible.filterNot(isConnector)),
+            InventorySection("discover-connectors", "可连接的服务", visible.filter(isConnector)),
+        ) + if (showOwnedInDiscover) listOf(
+            InventorySection("discover-owned-extensions", "已添加的技能与插件", owned.filterNot(isConnector)),
+            InventorySection("discover-owned-connectors", "已连接或内置的服务", owned.filter(isConnector)),
+        ) else emptyList()
+    }
 
     Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -288,15 +311,40 @@ internal fun PluginInventoryBrowser(
                     Icon(FeatherIcons.MoreVertical, contentDescription = "更多操作", tint = colors.text)
                 }
             }
+            Surface(
+                onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapXs)
+                    .testTag("capability-settings-entry"),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                color = colors.materialL2,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(FeatherIcons.Sliders, contentDescription = null,
+                        tint = colors.textSecondary, modifier = Modifier.size(24.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("能力设置", style = DsType.std14Strong.withReadingWeight(),
+                            color = colors.text)
+                        Text("网络搜索、执行授权与高级配置",
+                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    }
+                    Icon(FeatherIcons.ChevronRight, contentDescription = null,
+                        tint = colors.textTertiary, modifier = Modifier.size(17.dp))
+                }
+            }
             SyTextField(
                 value = catalogueQuery,
-                onValueChange = { catalogueQuery = it },
+                onValueChange = { catalogueQuery = it.take(128) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection)
                     .testTag("plugin-inventory-search"),
                 placeholder = { Text(stringResource(R.string.tools_catalog_search)) },
                 singleLine = true,
             )
-            if (loading && list.isNotEmpty()) {
+            if (loading && visible.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.common_loading),
                     style = DsType.small13.withReadingWeight(),
@@ -306,7 +354,8 @@ internal fun PluginInventoryBrowser(
                 )
             }
             LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth()
+                    .testTag("capability-inventory-list"),
                 contentPadding = PaddingValues(
                     horizontal = SyMetric.gapSection,
                     vertical = SyMetric.gapMd,
@@ -327,25 +376,30 @@ internal fun PluginInventoryBrowser(
                         }
                     }
                 }
-                if (list.isEmpty() && error == null) {
+                if (sections.none { it.entries.isNotEmpty() } && error == null && !loading) {
                     item(key = "inventory-empty") {
-                        Column(
+                        Text(
+                            when {
+                                query.isNotEmpty() && !addedOnly && owned.isNotEmpty() &&
+                                    !showOwnedInDiscover -> "可添加项目中没有匹配项；可展开下方已添加项目"
+                                query.isNotEmpty() -> stringResource(R.string.tools_catalog_no_match)
+                                addedOnly -> "尚未添加技能、插件或连接器"
+                                else -> "暂无可添加的能力；可查看已添加的项目"
+                            },
+                            style = DsType.std14.withReadingWeight(),
+                            color = colors.textSecondary,
                             modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
-                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(
-                                if (loading) stringResource(R.string.common_loading)
-                                else if (catalogueQuery.isNotBlank()) stringResource(R.string.tools_catalog_no_match)
-                                else if (addedOnly) "尚未添加技能、插件或连接器"
-                                else "暂无可添加的能力",
-                                style = DsType.std14.withReadingWeight(),
-                                color = colors.textSecondary,
-                            )
-                                        }
+                        )
                     }
-                } else {
-                    items(list, key = { it.id }) { item ->
+                }
+                sections.filter { it.entries.isNotEmpty() }.forEach { section ->
+                    item(key = "heading:" + section.id) {
+                        Text(section.title, style = DsType.small13Strong.withReadingWeight(),
+                            color = colors.textSecondary,
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(start = 6.dp, top = SyMetric.gapSm, bottom = SyMetric.gapXs))
+                    }
+                    items(section.entries, key = { it.id }) { item ->
                         ExtensionCatalogCard(
                             id = item.id,
                             title = item.name,
@@ -353,7 +407,6 @@ internal fun PluginInventoryBrowser(
                             icon = item.icon,
                             accent = item.accent,
                             documentIcon = item.documentIcon,
-                            brandLogo = null,
                             marketState = item.marketState,
                             onOpen = {
                                 when (item.id) {
@@ -362,6 +415,17 @@ internal fun PluginInventoryBrowser(
                                     else -> selectedRow = item
                                 }
                             },
+                        )
+                    }
+                }
+                if (!addedOnly && owned.isNotEmpty()) {
+                    item(key = "discover-owned-toggle") {
+                        SyButton(
+                            text = if (showOwnedInDiscover) "收起已添加（${owned.size}）"
+                                   else "查看已添加（${owned.size}）",
+                            variant = SyButtonVariant.Ghost,
+                            onClick = { showOwnedInDiscover = !showOwnedInDiscover },
+                            modifier = Modifier.fillMaxWidth().testTag("discover-owned-toggle"),
                         )
                     }
                 }
@@ -683,13 +747,9 @@ internal fun PluginInventoryBrowser(
                 onClick = { showMarketActions = false; showCreateSkill = true },
                 modifier = Modifier.fillMaxWidth().testTag("skill-create-manual"),
             )
-            SyButton(text = "GitHub 连接器", variant = SyButtonVariant.Ghost,
-                onClick = { showMarketActions = false; onGitHub() }, modifier = Modifier.fillMaxWidth())
             SyButton(text = "添加 MCP 连接器", variant = SyButtonVariant.Ghost,
                 onClick = { showMarketActions = false; onAddMcp() },
                 modifier = Modifier.fillMaxWidth().testTag("capability-menu-add-mcp"))
-            SyButton(text = "能力与权限设置", variant = SyButtonVariant.Ghost,
-                onClick = { showMarketActions = false; onOpenSettings() }, modifier = Modifier.fillMaxWidth())
         }
     }
     if (showGitHubImport && onInstallGitHubSkill != null) {

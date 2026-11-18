@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -52,40 +53,40 @@ internal fun ExtensionCatalogCard(
         onClick = onOpen,
         enabled = enabled,
         color = colors.materialL4,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(15.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp)
-                .padding(horizontal = 10.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 66.dp)
+                .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Surface(
-                modifier = Modifier.size(48.dp).testTag("$tagPrefix-icon-$id"),
+                modifier = Modifier.size(42.dp).testTag("$tagPrefix-icon-$id"),
                 color = if (documentIcon == null && brandLogo == null)
                     accent.copy(alpha = 0.09f) else colors.materialL4,
-                shape = RoundedCornerShape(15.dp),
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     when {
                         brandLogo != null -> Image(
                             bitmap = brandLogo, contentDescription = null,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(36.dp),
                         )
                         documentIcon != null -> Image(
                             painter = painterResource(documentIcon), contentDescription = null,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(36.dp),
                         )
                         else -> Icon(
                             icon, contentDescription = null, tint = accent,
-                            modifier = Modifier.size(25.dp),
+                            modifier = Modifier.size(23.dp),
                         )
                     }
                 }
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     title,
@@ -98,7 +99,7 @@ internal fun ExtensionCatalogCard(
                     modifier = Modifier.testTag("$tagPrefix-detail-$id"),
                     style = DsType.small13.withReadingWeight(),
                     color = colors.textSecondary,
-                    maxLines = 2,
+                    maxLines = if (LocalDensity.current.fontScale >= 1.2f) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 marketState?.let { state ->
@@ -109,10 +110,10 @@ internal fun ExtensionCatalogCard(
                         color = when (state.status) {
                             ExtensionMarketStatus.FAILED -> colors.dangerInk
                             ExtensionMarketStatus.NEEDS_SETUP,
-                            ExtensionMarketStatus.UNSUPPORTED -> colors.warningInk
-                            ExtensionMarketStatus.INSTALLED,
-                            ExtensionMarketStatus.BUILTIN,
-                            ExtensionMarketStatus.REGISTERED -> colors.successInk
+                            ExtensionMarketStatus.UNSUPPORTED,
+                            ExtensionMarketStatus.REGISTERED -> colors.warningInk
+                            ExtensionMarketStatus.INSTALLED -> colors.successInk
+                            ExtensionMarketStatus.BUILTIN -> colors.textSecondary
                             ExtensionMarketStatus.INSTALLABLE,
                             ExtensionMarketStatus.MANUAL_ONLY,
                             ExtensionMarketStatus.CONNECTING -> colors.textSecondary
