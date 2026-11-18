@@ -80,12 +80,30 @@ internal class SqliteCrossDeviceMerge(
         }
     private fun newId(domain: String, source: String, id: String) =
         UUID.nameUUIDFromBytes("777-import:$domain:$source:$id".toByteArray()).toString()
-    private fun rewriteJson(value: String, mapping: Map<String,String>): String {
-        if (mapping.isEmpty()) return value
+    /** Change reference fields only. Literal dialogue, tool output, prompts and
+     * other user-authored text remain byte-for-byte equal to the imported source.
+     */
+    private fun rewriteJson(value: String, sessions: Map<String,String>,
+        media: Map<String,String>, files: Map<String,String>): String {
+        if (sessions.isEmpty() && media.isEmpty() && files.isEmpty()) return value
+        val identityKeys = setOf(
+            "id", "sessionId", "session_id", "sourceSessionId", "targetSessionId",
+            "parentSessionId", "parent_session_id", "lineageId", "lineage_id",
+        )
         fun rewrite(node: JsonElement): JsonElement = when(node) {
-            is JsonObject -> JsonObject(node.mapValues { (_,v) -> rewrite(v) })
+            is JsonObject -> JsonObject(node.mapValues { (key, item) ->
+                if (item is JsonPrimitive && item.isString) {
+                    val next = when {
+                        key == "fileName" -> files[item.content]
+                        key == "id" -> media[item.content] ?: sessions[item.content]
+                        key in identityKeys -> sessions[item.content]
+                        else -> null
+                    }
+                    if (next != null) JsonPrimitive(next) else item
+                } else rewrite(item)
+            })
             is JsonArray -> JsonArray(node.map(::rewrite))
-            is JsonPrimitive -> if (node.isString) JsonPrimitive(mapping[node.content] ?: node.content) else node
+            is JsonPrimitive -> node
         }
         return json.encodeToString(JsonElement.serializer(),rewrite(json.parseToJsonElement(value)))
     }
@@ -106,7 +124,7 @@ internal class SqliteCrossDeviceMerge(
                     sourceTables.all { it in tables(db) }) {
                     "备份数据表不兼容或包含未受支持的记录：${sourceTables - (order.toSet() + global)}"
                 }
-                val mapping = sessions + media + fileNames
+                // Identity maps are scoped by domain and field to preserve user text.
                 db.beginTransaction()
                 try {
                     order.filter(sourceTables::contains).forEach { table ->
@@ -122,7 +140,7 @@ internal class SqliteCrossDeviceMerge(
                                         else -> {
                                             val text = rows.getString(i)
                                             val changed = when {
-                                                col == "payload" -> rewriteJson(text,mapping)
+                                                col == "payload" -> rewriteJson(text,sessions,media,fileNames)
                                                 col == "id" && table in setOf("session_snapshots","session_summaries") ->
                                                     sessions[text] ?: text
                                                 col == "id" && table=="media" ->
