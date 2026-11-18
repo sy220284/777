@@ -231,6 +231,7 @@ class HarnessAutomationWorker(
                     started = started,
                     manualExecutionId = manualExecutionId,
                     run = run,
+                    approvalResume = approvalResume,
                 )
                 LocalAutomationRunStatus.BLOCKED -> settlement.settleBlocked(
                     id = id,
