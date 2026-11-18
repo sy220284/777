@@ -280,9 +280,10 @@ internal class LocalSkillStore(
                 Files.delete(baseline)
                 // Preserve other documents, attachments and edits without keeping
                 // an extra retired-skill archive or active SKILL.md.
-                Files.newDirectoryStream(directory).use { rest ->
-                    if (!rest.iterator().hasNext()) Files.delete(directory)
+                val isEmpty = Files.newDirectoryStream(directory).use { rest ->
+                    !rest.iterator().hasNext()
                 }
+                if (isEmpty) Files.delete(directory)
                 removed.add(name)
             }
         }
