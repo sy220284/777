@@ -69,6 +69,8 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithText("发现").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertDoesNotExist()
+        compose.onNodeWithTag("discover-owned-toggle").performClick()
         val matching = compose.onAllNodesWithTag("plugin-inventory-card-skill:research-check")
             .fetchSemanticsNodes()
         org.junit.Assert.assertEquals(1, matching.size)
@@ -93,6 +95,62 @@ class PluginInventoryBrowserRegressionTest {
         compose.runOnIdle { assertEquals(1, githubOpened) }
         compose.onNodeWithTag("plugin-inventory-card-connector:add-mcp").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, mcpOpened) }
+    }
+
+    @Test fun discoverPrioritizesInstallableOptionsAndCanRevealExistingItems() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-runtime"),
+                    githubConfigured = true,
+                    presets = listOf(LocalPresetSkillUiEntry(
+                        "research-check", "资料研究与核实", "查证材料", false,
+                    )),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithText("发现").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-connector:github").assertDoesNotExist()
+        compose.onNodeWithTag("discover-owned-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertExists()
+        compose.onNodeWithTag("plugin-inventory-card-connector:github").assertExists()
+    }
+
+    @Test fun builtinGitHubPluginAndConnectionBecomeOneManagementCard() {
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("github-connector"),
+                    githubConfigured = true,
+                    onGitHub = { opened++ },
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-local:github-connector").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-connector:github").performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+    }
+
+    @Test fun capabilitySettingsUsesOneVisibleEntryInsteadOfOverflowDuplication() {
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    onOpenSettings = { opened++ },
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("capability-settings-entry").performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+        compose.onNodeWithTag("plugin-inventory-more").performClick()
+        compose.onNodeWithText("能力与权限设置").assertDoesNotExist()
     }
 
     @Test fun configuredGitHubAppearsInAddedViewAndUsesRealAction() {
