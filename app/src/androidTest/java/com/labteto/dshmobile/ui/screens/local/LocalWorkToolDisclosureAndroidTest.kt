@@ -90,7 +90,7 @@ class LocalWorkToolDisclosureAndroidTest {
         }
         compose.onNodeWithText("执行中 1").assertIsDisplayed()
         compose.onNodeWithTag("work-tool-disclosure:turn").performClick()
-        compose.onNodeWithText("读取文件").assertIsDisplayed()
+        compose.onNodeWithText("读取文件内容").assertIsDisplayed()
 
         compose.runOnIdle {
             operations.value = listOf(LocalTranscriptItem.WorkStep(
