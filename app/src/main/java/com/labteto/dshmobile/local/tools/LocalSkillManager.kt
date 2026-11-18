@@ -24,11 +24,6 @@ internal data class LocalPresetSkill(
 )
 
 internal object LocalPresetSkillCatalog {
-    /** Historical presets removed from the active directory on upgrade; user edits are archived. */
-    val retiredIds = setOf(
-        "document-summary", "data-insights", "translation-localization",
-        "writing-polish", "bug-investigation", "longform-outline", "research-check",
-    )
     private val triggers = mapOf(
         "code-review" to "代码审查、PR 和回归风险",
         "imagegen" to "图像生成、图片编辑、参考图及 UI 素材创作",
@@ -228,7 +223,7 @@ internal class LocalSkillStore(
     }
 
     /** First launch only: users removing a bundled skill must not see it reappear on restart. */
-    fun seedOnce() {
+    fun seedOnce(): Set<String> {
         if (!File(workspace.path, seedMarker).exists()) {
             LocalPresetSkillCatalog.entries.filterNot { it.id in bundledIds }.forEach { preset ->
                 if (!workspace.skills().contains(preset.id)) install(preset.id)
@@ -249,39 +244,50 @@ internal class LocalSkillStore(
         }
         migrateMiniMaxMobileSkills()
         archiveRetiredMiniMaxAdaptations()
-        archiveRetiredGeneralPresets()
+        val uninstalled = removeUnlistedBundledSkills()
         refreshInstalledBuiltIns()
+        return uninstalled
     }
 
     /**
-     * Retire the seven historical general presets once per device, preserving original
-     * SKILL.md, user edits and accompanying files. The marker is committed last so an
-     * interrupted migration can finish on the next startup.
+     * Drop obsolete untouched app-bundled SKILL.md files without a historical ID
+     * registry. The existing bundled fingerprint is the source of provenance:
+     * imported skills and locally edited instructions remain user-owned.
+     * Other files in the directory are left in place, but are no longer invocable.
      */
-    private fun archiveRetiredGeneralPresets() {
-        val marker = File(skillsDir, ".general-presets-retired-v1")
-        if (marker.exists()) return
-        val archive = File(workspace.path, ".dsh/retired-skills/general-presets-v1")
-        for (id in LocalPresetSkillCatalog.retiredIds) {
-            val source = File(skillsDir, id)
-            if (Files.notExists(source.toPath(), LinkOption.NOFOLLOW_LINKS)) continue
-            require(Files.isDirectory(source.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-                source.canonicalFile.parentFile == skillsDir.canonicalFile) {
-                "旧技能目录不可安全归档：$id"
+    private fun removeUnlistedBundledSkills(): Set<String> {
+        val root = skillsDir.toPath()
+        if (Files.notExists(root, LinkOption.NOFOLLOW_LINKS)) return emptySet()
+        val currentIds = LocalPresetSkillCatalog.entries.mapTo(hashSetOf()) { it.id }
+        val removed = linkedSetOf<String>()
+        Files.newDirectoryStream(root).use { candidates ->
+            for (directory in candidates) {
+                if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) continue
+                val name = directory.fileName.toString()
+                if (name in currentIds || !LOCAL_SKILL_ID_PATTERN.matches(name)) continue
+                val baseline = directory.resolve(".bundled-baseline-sha256")
+                val document = directory.resolve("SKILL.md")
+                if (!Files.isRegularFile(baseline, LinkOption.NOFOLLOW_LINKS) ||
+                    !Files.isRegularFile(document, LinkOption.NOFOLLOW_LINKS)
+                ) continue
+                val recorded = Files.readString(baseline).trim()
+                require(Regex("[0-9a-f]{64}").matches(recorded)) {
+                    "已安装技能来源标记无效：$name"
+                }
+                // A user-modified rule remains an explicit, locally owned skill.
+                if (skillFingerprint(workspace.readSkill(name)) != recorded) continue
+                Files.delete(document)
+                Files.delete(baseline)
+                // Preserve other documents, attachments and edits without keeping
+                // an extra retired-skill archive or active SKILL.md.
+                val isEmpty = Files.newDirectoryStream(directory).use { rest ->
+                    !rest.iterator().hasNext()
+                }
+                if (isEmpty) Files.delete(directory)
+                removed.add(name)
             }
-            // A previously uninstalled skill may have remaining user attachments,
-            // even though SKILL.md was removed. Archive these too.
-            if (Files.exists(File(source, "SKILL.md").toPath(), LinkOption.NOFOLLOW_LINKS)) {
-                requireInstalled(id)
-            }
-            val destination = File(archive, id)
-            require(Files.notExists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
-                "旧技能归档位置已存在且源目录尚未迁移：$id"
-            }
-            require(archive.isDirectory || archive.mkdirs()) { "无法创建旧技能归档目录" }
-            Files.move(source.toPath(), destination.toPath())
         }
-        workspace.write(".dsh/skills/.general-presets-retired-v1", "done\n")
+        return removed
     }
 
     /** Retire unavailable hosts and upgrade only untouched bundled instructions. */
@@ -471,13 +477,11 @@ internal class LocalSkillManager @Inject constructor(
     }
     fun initializeDefaults() {
         LocalSkillPackageUpdater(storageWorkspace).recoverInterruptedTransactions()
-        store.seedOnce()
-        // Persistent composer pins must not break the first Work turn after migration.
-        // Keep pins for any same-ID skill that the user later installs explicitly.
-        val active = store.installed().mapTo(hashSetOf()) { it.name }
+        val removed = store.seedOnce()
+        // Drop only pinned invocations actually removed during this startup.
+        // Explicitly authored skills and unrelated disconnected pins are preserved.
         pinnedInvocations.current().filter {
-            it.kind == LocalPinnedInvocation.Kind.SKILL &&
-                it.id in LocalPresetSkillCatalog.retiredIds && it.id !in active
+            it.kind == LocalPinnedInvocation.Kind.SKILL && it.id in removed
         }.forEach { pinnedInvocations.remove(it) }
     }
     fun installed(): List<LocalInstalledSkill> = store.installed()
