@@ -478,7 +478,7 @@ internal class LocalSkillManager @Inject constructor(
         pinnedInvocations.current().filter {
             it.kind == LocalPinnedInvocation.Kind.SKILL &&
                 it.id in LocalPresetSkillCatalog.retiredIds && it.id !in active
-        }.forEach(pinnedInvocations::remove)
+        }.forEach { pinnedInvocations.remove(it) }
     }
     fun installed(): List<LocalInstalledSkill> = store.installed()
 
