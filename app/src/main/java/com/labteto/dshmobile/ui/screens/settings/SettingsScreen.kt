@@ -569,6 +569,13 @@ fun SettingsScreen(
                                 onClick = { openPage(SettingsDestination.MODEL_PERFORMANCE) },
                                 compact = true,
                             )
+                            AppSettingsDivider()
+                            AppSettingsRow(
+                                icon = SyEntryIcons.Usage,
+                                title = stringResource(settingsPageEntry(SettingsDestination.MODEL_USAGE)!!.titleRes),
+                                onClick = { openPage(SettingsDestination.MODEL_USAGE) },
+                                compact = true,
+                            )
                         }
                         AppSettingsMenuGroup(stringResource(R.string.settings_group_memory_data)) {
                             AppSettingsRow(icon = SyEntryIcons.Memory,
@@ -864,9 +871,6 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             icon = FeatherIcons.Plus,
                         )
-                        AppSettingsRow(icon = SyEntryIcons.Account,
-                            title = stringResource(R.string.settings_page_model_usage),
-                            onClick = { openPage(SettingsDestination.MODEL_USAGE) })
                         LocalModelSettingsCard(
                             local = localHarness,
                             viewModel = viewModel,

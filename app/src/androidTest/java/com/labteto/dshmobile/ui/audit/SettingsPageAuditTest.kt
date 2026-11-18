@@ -89,6 +89,22 @@ class SettingsPageAuditTest(
         compose.onNodeWithContentDescription(compose.activity.getString(R.string.common_back))
             .assertExists()
         captureScrollableUiAudit(compose, "settings-${destination.name}-${theme.name}-$fontScale-$width", "settings-audit-frame")
+        val modelUsageTitle = compose.activity.getString(R.string.settings_page_model_usage)
+        if (destination == SettingsDestination.ROOT) {
+            // The entry belongs to settings home and must keep the existing usage navigation intact.
+            compose.onNodeWithText(modelUsageTitle).assertExists()
+            compose.onNodeWithText(modelUsageTitle).performClick()
+            compose.waitForIdle()
+            compose.onNodeWithText(compose.activity.getString(R.string.settings_page_pricing)).assertExists()
+            compose.onNodeWithText(compose.activity.getString(R.string.usage_calculation_title)).assertExists()
+            compose.onNodeWithContentDescription(compose.activity.getString(R.string.common_back)).performClick()
+            compose.waitForIdle()
+            compose.onNodeWithText(modelUsageTitle).assertExists()
+        }
+        if (destination == SettingsDestination.MODELS) {
+            // Model configuration is focused on model management and image processing.
+            compose.onNodeWithText(modelUsageTitle).assertDoesNotExist()
+        }
         if (destination == SettingsDestination.PRICING) {
             val prices = compose.onAllNodes(SemanticsMatcher("complete numeric prices") { node ->
                 node.config.getOrNull(SemanticsProperties.Text)?.any {
