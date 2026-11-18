@@ -23,10 +23,10 @@ class LocalSkillStoreTest {
     fun bundledSkillsAreRealInvocableInstructions() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
         val all = store.presets().filterNot { it.id in LocalMiniMaxSkillCatalog.entries.map { item -> item.id } }
-        assertEquals(9, all.size)
+        assertEquals(2, all.size)
         assertTrue(all.all { it.installed })
-        assertEquals(9, all.map { it.id }.distinct().size)
-        assertEquals(9, store.installed().size)
+        assertEquals(2, all.map { it.id }.distinct().size)
+        assertEquals(2, store.installed().size)
         for (preset in all) {
             val content = workspace.readModelSkill(preset.id)
             assertTrue(content.contains("description:"))
@@ -37,14 +37,14 @@ class LocalSkillStoreTest {
     @Test
     fun removingPresetSurvivesRestartAndCanBeReinstalled() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
-        store.remove("research-check")
-        assertFalse(store.presets().first { it.id == "research-check" }.installed)
-        assertFalse(workspace.modelSkillCatalog().contains("research-check"))
+        store.remove("code-review")
+        assertFalse(store.presets().first { it.id == "code-review" }.installed)
+        assertFalse(workspace.modelSkillCatalog().contains("code-review"))
         store.seedOnce()
-        assertFalse(store.presets().first { it.id == "research-check" }.installed)
-        store.install("research-check")
-        assertTrue(store.presets().first { it.id == "research-check" }.installed)
-        assertThrows(IllegalArgumentException::class.java) { store.install("research-check") }
+        assertFalse(store.presets().first { it.id == "code-review" }.installed)
+        store.install("code-review")
+        assertTrue(store.presets().first { it.id == "code-review" }.installed)
+        assertThrows(IllegalArgumentException::class.java) { store.install("code-review") }
     }
 
     @Test
@@ -132,23 +132,23 @@ class LocalSkillStoreTest {
     @Test
     fun damagedLargePresetRetainsExactBackupBeforeRepair() = inWorkspace { store, _, root ->
         store.seedOnce()
-        val original = root.resolve(".dsh/skills/writing-polish/SKILL.md")
+        val original = root.resolve(".dsh/skills/imagegen/SKILL.md")
         val damaged = "broken\n".repeat(19_000)
         original.writeText(damaged)
         store.seedOnce()
-        assertEquals(damaged, root.resolve(".dsh/skills/writing-polish/SKILL.pre-repair.md").readText())
-        assertTrue(store.readDocument("writing-polish").contains("用途："))
+        assertEquals(damaged, root.resolve(".dsh/skills/imagegen/SKILL.pre-repair.md").readText())
+        assertTrue(store.readDocument("imagegen").contains("用途："))
     }
 
     @Test
     fun customizedOfficialPresetsStayEditedWhileRemovedOnesStayRemoved() = inWorkspace { store, workspace, _ ->
         store.seedOnce()
         store.updateDocument("code-review", store.readDocument("code-review") + "\n用户自定义后续规则\n")
-        store.remove("research-check")
+        store.remove("imagegen")
         store.seedOnce()
         assertTrue(store.readDocument("code-review").contains("用户自定义后续规则"))
         assertTrue(store.readDocument("code-review").contains("用途："))
-        assertFalse(workspace.skills().contains("research-check"))
+        assertFalse(workspace.skills().contains("imagegen"))
     }
 
 
@@ -175,8 +175,8 @@ class LocalSkillStoreTest {
 
     @Test
     fun presetTitleWorksForHistoricalInstalledDocumentWithoutNewField() = inWorkspace { store, workspace, _ ->
-        workspace.write(".dsh/skills/data-insights/SKILL.md", "---\ndescription: analyze\n---\n# data-insights\nAnalyze")
-        assertEquals("数据分析", store.installed().first { it.name == "data-insights" }.displayName)
+        workspace.write(".dsh/skills/code-review/SKILL.md", "---\ndescription: review\n---\n# code-review\nReview")
+        assertEquals("代码审查", store.installed().first { it.name == "code-review" }.displayName)
     }
     @Test fun validLongSkillPreservesTailAcrossUiModelAndSelectedTurn() = inWorkspace { store, workspace, _ ->
         val body = "x\n".repeat(900) + "禁止删除原始文件"
@@ -225,30 +225,89 @@ class LocalSkillStoreTest {
 
     @Test fun oversizedOfficialSkillIsRepairedFromBundledVersion() = inWorkspace { store, workspace, root ->
         store.seedOnce()
-        val bad = root.resolve(".dsh/skills/writing-polish/SKILL.md")
+        val bad = root.resolve(".dsh/skills/imagegen/SKILL.md")
         bad.writeText("x".repeat(128 * 1024 + 1))
         store.seedOnce()
         assertTrue(workspace.modelSkillCatalog().contains("code-review"))
-        assertTrue(workspace.modelSkillCatalog().contains("writing-polish"))
-        assertTrue(store.installed().single { it.name == "writing-polish" }.modelInvocable)
-        assertTrue(workspace.readSkill("writing-polish").contains("用途："))
+        assertTrue(workspace.modelSkillCatalog().contains("imagegen"))
+        assertTrue(store.installed().single { it.name == "imagegen" }.modelInvocable)
+        assertTrue(workspace.readSkill("imagegen").contains("用途："))
     }
 
     @Test fun validCustomizedBundledSkillBeyond128KbIsNotReplaced() = inWorkspace { store, workspace, root ->
         store.seedOnce()
-        val modified = store.readDocument("writing-polish") + "\n" + "用户扩展规则。".repeat(20_000)
-        val file = root.resolve(".dsh/skills/writing-polish/SKILL.md")
+        val modified = store.readDocument("imagegen") + "\n" + "用户扩展规则。".repeat(20_000)
+        val file = root.resolve(".dsh/skills/imagegen/SKILL.md")
         file.writeText(modified)
         assertTrue(file.length() > 128L * 1024)
         store.seedOnce()
-        assertEquals(modified, workspace.readSkill("writing-polish"))
-        assertEquals(modified, store.readDocument("writing-polish"))
-        store.setModelInvocable("writing-polish", false)
-        assertTrue(!workspace.skillMetadata("writing-polish").modelInvocable)
-        assertTrue(store.readDocument("writing-polish").contains("用户扩展规则"))
-        store.setModelInvocable("writing-polish", true)
-        assertTrue(workspace.skillMetadata("writing-polish").modelInvocable)
-        assertTrue(store.readDocument("writing-polish").length > 128 * 1024)
+        assertEquals(modified, workspace.readSkill("imagegen"))
+        assertEquals(modified, store.readDocument("imagegen"))
+        store.setModelInvocable("imagegen", false)
+        assertTrue(!workspace.skillMetadata("imagegen").modelInvocable)
+        assertTrue(store.readDocument("imagegen").contains("用户扩展规则"))
+        store.setModelInvocable("imagegen", true)
+        assertTrue(workspace.skillMetadata("imagegen").modelInvocable)
+        assertTrue(store.readDocument("imagegen").length > 128 * 1024)
+    }
+
+
+    @Test fun sevenRetiredPresetsAreArchivedWithEveryUserFile() = inWorkspace { store, workspace, root ->
+        val retired = setOf(
+            "document-summary", "data-insights", "translation-localization",
+            "writing-polish", "bug-investigation", "longform-outline", "research-check",
+        )
+        assertEquals(retired, LocalPresetSkillCatalog.retiredIds)
+        retired.forEach { id ->
+            workspace.write(".dsh/skills/$id/SKILL.md", "用户维护的原始内容 $id\n")
+        }
+        workspace.write(".dsh/skills/writing-polish/user-notes.md", "独立的个人补充文件")
+        workspace.write(".dsh/skills/my-owned/SKILL.md", "---\ndescription: personal\n---\n私人规则")
+        store.seedOnce()
+
+        assertEquals(setOf("code-review", "imagegen"), store.presets().map { it.id }.toSet())
+        retired.forEach { id ->
+            assertFalse(workspace.skills().contains(id))
+            assertTrue(store.presets().none { it.id == id })
+            assertEquals("用户维护的原始内容 $id\n",
+                root.resolve(".dsh/retired-skills/general-presets-v1/$id/SKILL.md").readText())
+        }
+        assertEquals("独立的个人补充文件",
+            root.resolve(".dsh/retired-skills/general-presets-v1/writing-polish/user-notes.md").readText())
+        assertTrue(workspace.skills().contains("my-owned"))
+        assertTrue(workspace.skills().contains("code-review"))
+        assertTrue(workspace.skills().contains("imagegen"))
+        assertTrue(root.resolve(".dsh/skills/.general-presets-retired-v1").isFile)
+        assertThrows(IllegalArgumentException::class.java) { store.install("research-check") }
+        store.seedOnce()
+        assertTrue(root.resolve(".dsh/retired-skills/general-presets-v1/longform-outline/SKILL.md").isFile)
+    }
+
+    @Test fun retiredSkillAttachmentsWithoutInstructionArePreserved() = inWorkspace { store, workspace, root ->
+        workspace.write(".dsh/skills/writing-polish/notes.txt", "删除技能后残留的用户资料")
+        store.seedOnce()
+        assertEquals("删除技能后残留的用户资料",
+            root.resolve(".dsh/retired-skills/general-presets-v1/writing-polish/notes.txt").readText())
+        assertFalse(root.resolve(".dsh/skills/writing-polish").exists())
+    }
+
+    @Test fun retiredSkillMigrationCanRetryAfterArchiveCollision() = inWorkspace { store, workspace, root ->
+        workspace.write(".dsh/skills/document-summary/SKILL.md", "待迁移的文档技能")
+        workspace.write(".dsh/skills/writing-polish/SKILL.md", "待迁移的写作技能")
+        workspace.write(".dsh/retired-skills/general-presets-v1/writing-polish/SKILL.md", "原有归档，不能覆盖")
+        assertThrows(IllegalArgumentException::class.java) { store.seedOnce() }
+        assertFalse(root.resolve(".dsh/skills/.general-presets-retired-v1").exists())
+        assertTrue(root.resolve(".dsh/skills/writing-polish/SKILL.md").isFile)
+        assertEquals("原有归档，不能覆盖",
+            root.resolve(".dsh/retired-skills/general-presets-v1/writing-polish/SKILL.md").readText())
+        val archive = root.resolve(".dsh/retired-skills/general-presets-v1")
+        Files.move(archive.resolve("writing-polish"), archive.resolve("writing-polish-earlier"))
+        store.seedOnce()
+        assertEquals("待迁移的写作技能",
+            archive.resolve("writing-polish/SKILL.md").readText())
+        assertEquals("原有归档，不能覆盖",
+            archive.resolve("writing-polish-earlier/SKILL.md").readText())
+        assertTrue(root.resolve(".dsh/skills/.general-presets-retired-v1").isFile)
     }
 
     @Test fun manuallyCreatedSkillSupportsLongInstructions() = inWorkspace { store, workspace, _ ->
