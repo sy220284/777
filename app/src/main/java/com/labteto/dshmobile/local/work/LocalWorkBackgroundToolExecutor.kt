@@ -129,7 +129,7 @@ internal class LocalWorkBackgroundToolExecutor(
                     localWorkFileSha256(java.io.File(sessionStorage.files.workspace.path), path)?.let { path to it }
                 }.toMap()
             },
-            approval = { call, tool, _ ->
+            approval = { call, tool, summary ->
                 val approvalMode = approvalPreferences.currentMode()
                 if (shouldAutoApproveTool(approvalMode, tool)) {
                     sessionStorage.eventLogs.get(sessionId).append("approval/auto", buildJsonObject {
@@ -139,15 +139,17 @@ internal class LocalWorkBackgroundToolExecutor(
                     })
                     true
                 } else {
-                    val reason = "后台任务需要人工审批：" + tool.name
-                    onApprovalBlocked(reason)
+                    val reason = "后台任务需要人工审批：" + tool.name + "；" + summary.take(240)
                     sessionStorage.eventLogs.get(sessionId).append("approval/blocked", buildJsonObject {
                         put("tool", call.name)
                         put("access", tool.access.name.lowercase())
                         put("mode", "automation-noninteractive")
                         put("call_id", call.id)
                         put("root_call_id", original.id)
+                        put("arguments", call.arguments)
+                        put("summary", summary.take(2_000))
                     })
+                    onApprovalBlocked(reason)
                     false
                 }
             },
@@ -160,6 +162,37 @@ internal class LocalWorkBackgroundToolExecutor(
         } else {
             result
         }
+    }
+
+    /** Execute only the exact call authorized by the user. The caller owns a
+     * durable start/finish ledger and refuses to repeat uncertain side effects.
+     * This is a single-call grant; it never changes the global approval policy.
+     */
+    internal suspend fun executeApprovedAutomationTool(
+        call: LocalToolCall,
+        sessionId: String,
+    ): AgentToolResult {
+        val canonical = call.copy(name = LocalToolPolicy.canonical(call.name))
+        val result = tools.execution.executeScoped(
+            original = canonical,
+            sessionId = sessionId,
+            allowMutation = true,
+            planModeEnabled = false,
+            executionAttributes = mapOf("approval_resume" to "explicit-single-call"),
+            approval = { normalized, _, _ ->
+                normalized.id == canonical.id && normalized.name == canonical.name &&
+                    normalized.arguments == canonical.arguments
+            },
+        )
+        // Tool output remains available from its durable store even if it cannot
+        // fit safely into one event/log/model message.
+        return if (result.content.length > MAX_EVENT_CHARS) {
+            check(tools.toolOutputStore.store(sessionId, canonical.id, result.content) != null) {
+                "批准工具结果过长且持久化失败，停止后台续跑"
+            }
+            result.copy(content = "批准工具的完整结果已保存；通过 tool_output_read 使用 call_id=" +
+                canonical.id + " 分段读取。")
+        } else result
     }
 
     private fun automationToolFailure(
