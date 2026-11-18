@@ -47,12 +47,16 @@ internal object LocalTaskCapabilityReadinessProjector {
             webNegations.none(normalized::contains)
         val asksMcp = normalized.contains("mcp") || normalized.contains("工具服务器")
         val asksPlugins = normalized.contains("插件") || normalized.contains("plugin")
-        val deniesAccessibility = listOf(
-            "不要自动点击", "不需要无障碍", "不要操作设备", "禁止操控手机", "不操控手机",
+        // A prohibition of one action (e.g. clicking) does not prohibit a different
+        // registered read-only action (e.g. reading the accessibility tree).
+        val deniesDeviceAccess = listOf(
+            "不需要无障碍", "不要操作设备", "禁止操控手机", "不操控手机",
         ).any(normalized::contains)
-        val asksAccessibility = !deniesAccessibility &&
+        val asksClick = normalized.contains("自动点击") && !normalized.contains("不要自动点击")
+        val asksAccessibility = !deniesDeviceAccess &&
             (ToolDeviceRequirement.ACCESSIBILITY in requiredDeviceCapabilities ||
-                listOf("无障碍", "操控手机", "手机自动操作", "自动点击", "设备操作").any(normalized::contains))
+                asksClick ||
+                listOf("无障碍", "操控手机", "手机自动操作", "设备操作", "界面树").any(normalized::contains))
         val asksScreenCapture =
             listOf("共享屏幕", "分享屏幕", "屏幕共享", "屏幕录制", "录制屏幕", "录屏", "捕获屏幕")
                 .any(normalized::contains) &&
