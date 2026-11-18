@@ -307,4 +307,12 @@ bootstrap
 
 组件 Artifact 保留 30 天。工具链相关文件每次合并到 `main` 都会自动重新生成全部组件；默认分支每月 **1 日和 20 日**额外定时刷新，防止长期无变更时 Artifact 过期。
 
-最终放行规则仍以 [VALIDATION.md](VALIDATION.md) 和当前 `.github/workflows/ci.yml` 为准。
+最终放行规则以 [VALIDATION.md](VALIDATION.md) 及现行 GitHub Actions 工作流为准。
+
+## CI 截图、录屏与 Artifact 管理
+
+- Android UI 设备回归生成的截图和 MP4 录屏保存在 GitHub Actions Artifact；`app/build/` 等测试输出已由 `.gitignore` 排除，人物预置图片与应用图标是正式素材。
+- [自动清理工作流](../.github/workflows/prune-ci-ui-artifacts.yml)在聊天／工作及能力中心设备回归完成后执行。每个录屏/截图证据系列只保留最新一份，Android 36、37.0 两种系统分别保留各自最新一份；清理日志公开保留 ID、删除份数和释放字节数。
+- 清理工作流在首次并入 `main` 时立即触发一次，也允许手动触发；后续由设备测试完成事件自动触发，无需另设定时任务。当前媒体 Artifact 仍遵守最长 30 天的 GitHub Actions 保存期限。
+- [清理脚本](../tools/ci/prune_ui_artifacts.py)默认只预览，带 `--apply` 才删除。删除范围严格限定为截图/视频 Artifact；APK、工具链、架构审计和会话迁移测试等其他产物保持原有生命周期。
+
