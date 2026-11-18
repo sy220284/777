@@ -1,6 +1,5 @@
 package com.labteto.dshmobile.ui.screens.tools
 
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,11 +13,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.ThemePreference
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,7 +34,7 @@ class PluginInventoryBrowserRegressionTest {
                 PluginInventoryBrowser(
                     localIds = listOf("android-runtime"),
                     skills = listOf(LocalSkillUiEntry("report", "Build a report", true)),
-                    connectedServices = listOf(UiMcpServerSnapshot(
+                    connectedServices = listOf(UiUiMcpServerSnapshot(
                         id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
                         tools = listOf("search"),
                     )),
@@ -116,7 +115,7 @@ class PluginInventoryBrowserRegressionTest {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
                     skills = listOf(LocalSkillUiEntry("manual-review", "Only on user request", false)),
-                    connectedServices = listOf(UiMcpServerSnapshot(
+                    connectedServices = listOf(UiUiMcpServerSnapshot(
                         id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
                         tools = listOf("search"),
                     )),
@@ -159,7 +158,7 @@ class PluginInventoryBrowserRegressionTest {
             DshTheme {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
-                    connectedServices = listOf(McpServerSnapshot(
+                    connectedServices = listOf(UiMcpServerSnapshot(
                         id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
                         tools = listOf("search"),
                     )),
@@ -603,7 +602,7 @@ class PluginInventoryBrowserRegressionTest {
             type = "mcp", value = "figma", description = "设计服务",
             registered = false, transport = "http", url = "https://mcp.figma.com/mcp",
         )
-        val known = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
+        val known = com.labteto.dshmobile.uicontract.UiUiMcpServerSnapshot(
             "figma", "http", "https://mcp.figma.com/mcp", emptyList(),
         )
         compose.setContent {
