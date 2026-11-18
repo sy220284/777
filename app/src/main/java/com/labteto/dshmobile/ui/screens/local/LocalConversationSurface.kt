@@ -659,11 +659,28 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             appendPendingWorkToolActivities(withArtifacts, workToolActivities, state.running)
         else withArtifacts
     }
-    val groupedActivities = remember(withActivities, state.usageMode) {
-        if (state.usageMode == LocalUsageMode.WORK) groupConsecutiveWorkOperations(withActivities)
-        else withActivities
+    // Attach verified files/media to their original receipts before moving the tool rows
+    // into one per-turn disclosure. Public progress and final answers stay as separate rows.
+    val withReplyAttachments = remember(withActivities) { composeLocalReplyAttachments(withActivities) }
+    val transcriptItems = remember(withReplyAttachments, state.usageMode) {
+        if (state.usageMode == LocalUsageMode.WORK) foldWorkToolsToTurnStart(withReplyAttachments)
+        else withReplyAttachments
     }
-    val transcriptItems = remember(groupedActivities) { composeLocalReplyAttachments(groupedActivities) }
+    // The running-status strip follows the current user turn only, not a prior turn's
+    // still-cached tool receipts. The tool events remain the single source of truth.
+    val currentWorkDisclosure = remember(transcriptItems, transcriptMessages, state.usageMode) {
+        val currentUserTurn = transcriptMessages.lastOrNull { it.role == "user" }?.id
+        if (state.usageMode == LocalUsageMode.WORK && currentUserTurn != null)
+            transcriptItems.filterIsInstance<LocalTranscriptItem.WorkTools>()
+                .lastOrNull { it.turnId == currentUserTurn }
+        else null
+    }
+    val currentRunningTool = remember(currentWorkDisclosure?.operations) {
+        currentWorkDisclosure?.operations?.let(::latestRunningWorkTool)
+    }
+    val currentRunningCount = remember(currentWorkDisclosure?.operations) {
+        currentWorkDisclosure?.operations?.let(::workToolDisclosureCounts)?.running ?: 0
+    }
     val hasOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
         transcriptHistory.hasMore
     val loadingOlderTranscript = transcriptHistory.sessionId == state.sessionId &&
@@ -1419,6 +1436,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             sessionId = state.sessionId,
                         )
                         is LocalTranscriptItem.Thinking -> ChatThinkingRow(transcriptItem.messages)
+                        is LocalTranscriptItem.WorkTools -> Box(
+                            modifier = Modifier.fillMaxWidth().animateItem(),
+                        ) {
+                            LocalWorkToolDisclosureRow(
+                                group = transcriptItem,
+                                workspacePath = state.workspacePath,
+                            )
+                        }
                         is LocalTranscriptItem.WorkPendingTool -> Box(
                             modifier = Modifier.fillMaxWidth().animateItem(),
                         ) {
@@ -1605,6 +1630,40 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                     }
                 }
+            }
+        }
+
+        if (state.usageMode == LocalUsageMode.WORK && state.running &&
+            currentRunningCount > 0 && currentRunningTool != null
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
+                    .heightIn(min = SyMetric.touch),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = FeatherIcons.Clock,
+                    contentDescription = null,
+                    tint = colors.successInk,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    "正在执行 · " + workToolActionLabel(
+                        currentRunningTool.name, currentRunningTool.argumentsPreview,
+                    ),
+                    modifier = Modifier.weight(1f),
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${currentRunningCount} 项进行中",
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.successInk,
+                )
             }
         }
 
