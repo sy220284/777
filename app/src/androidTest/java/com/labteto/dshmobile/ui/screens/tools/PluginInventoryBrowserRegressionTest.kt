@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.tools
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -51,6 +52,26 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
         compose.onNodeWithTag("plugin-category-list").assertDoesNotExist()
         compose.onNodeWithTag("capability-center-tabs").assertDoesNotExist()
+    }
+
+    @Test fun stalePresetInstallFlagNeverDuplicatesAnAlreadyInstalledSkill() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    skills = listOf(LocalSkillUiEntry("research-check", "已安装的资料研究", true)),
+                    // Directory refresh may briefly lag behind the installed skills snapshot.
+                    presets = listOf(LocalPresetSkillUiEntry(
+                        "research-check", "资料研究与核实", "查证材料", false,
+                    )),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithText("发现").performClick()
+        val matching = compose.onAllNodesWithTag("plugin-inventory-card-skill:research-check")
+            .fetchSemanticsNodes()
+        org.junit.Assert.assertEquals(1, matching.size)
     }
 
     @Test fun discoverIncludesAvailableSkillAndBothConnectorOptions() {
