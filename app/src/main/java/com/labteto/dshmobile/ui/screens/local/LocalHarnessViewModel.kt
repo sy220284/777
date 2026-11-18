@@ -576,6 +576,9 @@ class LocalHarnessViewModel @Inject constructor(
     internal suspend fun loadWorkHandoffReferences(sessionId: String, ids: Set<String>) =
         sessionUi.handoffMessagesById(sessionId, ids)
 
+    internal suspend fun saveWorkHandoffDocument(sourceSessionId: String, document: String) =
+        filesUi.saveWorkHandoffDocument(sourceSessionId, document)
+
     internal fun workHandoffSummary(): String = runtime.session.currentHandoffSummary()
     internal fun createWorkContinuation(sourceSessionId: String, summary: String): Boolean {
         if (state.value.sessionId != sourceSessionId || state.value.usageMode != LocalUsageMode.CHAT) return false
