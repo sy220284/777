@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "snapshot_date": "2026-11-18",
+  "storage": "docs/skills",
+  "note": "只归档各上游仓库的 canonical skills/<name> 目录，以及对应 LICENSE；不包含用于其他 AI 客户端的同步镜像或仓库展示/构建文件。",
+  "skills": [
+    {
+      "name": "finesse-ui",
+      "label": "UI 设计与交互",
+      "upstream": "mouse-lin/finesse-skill",
+      "ref": "c7a91448baf6e98fecf542915cdb7e3155bddc45",
+      "upstream_path": "skills/finesse-ui",
+      "local_path": "docs/skills/finesse-ui",
+      "files": 85
+    },
+    {
+      "name": "finesse-brief",
+      "label": "工作台架构师",
+      "upstream": "mouse-lin/finesse-brief",
+      "ref": "d1f45618b605587b882a20d72eb0d8ec666990bd",
+      "upstream_path": "skills/finesse-brief",
+      "local_path": "docs/skills/finesse-brief",
+      "files": 10
+    },
+    {
+      "name": "frame-smith",
+      "label": "视频审美与动效",
+      "upstream": "mouse-lin/frame-smith",
+      "ref": "44b7e716971b46ab801f302d3ba34c5b61442e9f",
+      "upstream_path": "skills/frame-smith",
+      "local_path": "docs/skills/frame-smith",
+      "files": 16
+    },
+    {
+      "name": "finesse-term",
+      "label": "专业术语",
+      "upstream": "mouse-lin/finesse-term",
+      "ref": "e5abc56382ab0c393aa11f9d877c6db91d9956c",
+      "upstream_path": "skills/finesse-term",
+      "local_path": "docs/skills/finesse-term",
+      "files": 10
+    }
+  ]
+}
