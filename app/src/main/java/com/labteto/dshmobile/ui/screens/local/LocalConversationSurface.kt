@@ -176,6 +176,7 @@ internal class LocalConversationSurfaceArgs(
     val onRegenerate: (String) -> Boolean,
     val onGenerateReplySuggestions: suspend () -> Boolean,
     val onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)?,
+    val searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
     val onLoadOlderTranscript: suspend (String) -> Result<Int>,
     val onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     val onStop: () -> Unit,
@@ -243,6 +244,7 @@ internal fun LocalConversationSurface(
     onRegenerate: (String) -> Boolean,
     onGenerateReplySuggestions: suspend () -> Boolean,
     onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)? = null,
+    searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
     onLoadOlderTranscript: suspend (String) -> Result<Int>,
     onImportAttachment: suspend (android.net.Uri) -> LocalImportedAttachment,
     onStop: () -> Unit,
@@ -308,6 +310,7 @@ internal fun LocalConversationSurface(
         onRegenerate = onRegenerate,
         onGenerateReplySuggestions = onGenerateReplySuggestions,
         onSampleSession = onSampleSession,
+        searchTranscript = searchTranscript,
         onLoadOlderTranscript = onLoadOlderTranscript,
         onImportAttachment = onImportAttachment,
         onStop = onStop,
@@ -365,7 +368,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val streamingState = args.streamingState
     val gallery = args.gallery
     val transcriptHistory = args.transcriptHistory
-    val transcriptJumpTarget = args.transcriptJumpTarget
+    var searchJumpTarget by remember(state.sessionId) { mutableStateOf<LocalTranscriptJumpTarget?>(null) }
+    val transcriptJumpTarget = searchJumpTarget ?: args.transcriptJumpTarget
     val onTranscriptJumpConsumed = args.onTranscriptJumpConsumed
     val modeIntro = args.modeIntro
     val onConfigure = args.onConfigure
@@ -684,6 +688,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val transcriptHistoryError = transcriptHistory.error
         ?.takeIf { transcriptHistory.sessionId == state.sessionId }
     val showTranscriptPagingRow = transcriptHistoryError != null || hasOlderTranscript
+    val planReview = state.pendingQuestion
+        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
+        ?.let(::localPlanReviewOf)
     // A diary source may be in cold historical pages. Advance one durable page at a time
     // until the message is present, then scroll to the exact LazyColumn row.
     val locatingDiarySource = transcriptJumpTarget?.sessionId == state.sessionId &&
@@ -699,23 +706,21 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         when {
             messageIndex >= 0 -> {
                 val leading = listOf(mediaPage.unavailable, mediaPage.hasMore,
-                    showTranscriptPagingRow, false, false, false).count { it }
-                // Empty-state rows and the plan review card cannot coexist with found messages.
+                    showTranscriptPagingRow, planReview != null).count { it }
+                // Empty-state rows cannot coexist with found messages.
                 listState.scrollToItem(leading + messageIndex)
                 transcriptInitialPositionReady = true
-                onTranscriptJumpConsumed(target)
+                if (searchJumpTarget == target) searchJumpTarget = null else onTranscriptJumpConsumed(target)
             }
             loadingOlderTranscript -> Unit
             hasOlderTranscript && transcriptHistoryError == null -> {
-                val result = onLoadOlderTranscript(state.sessionId)
-                if (result.isFailure || result.getOrNull() == 0) {
-                    transcriptInitialPositionReady = true
-                    onTranscriptJumpConsumed(target)
-                }
+                // Paging changes the keys of this effect. Its own job must finish before
+                // the next transcript projection can advance the requested jump.
+                scope.launch { onLoadOlderTranscript(state.sessionId) }
             }
             else -> {
                 transcriptInitialPositionReady = true
-                onTranscriptJumpConsumed(target)
+                if (searchJumpTarget == target) searchJumpTarget = null else onTranscriptJumpConsumed(target)
             }
         }
     }
@@ -733,9 +738,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val showEmptyGroupSetup = transcriptItems.isEmpty() &&
         state.usageMode == LocalUsageMode.CHAT && state.groupChat.enabled &&
         state.groupChat.members.size < 2
-    val planReview = state.pendingQuestion
-        ?.takeIf { state.usageMode == LocalUsageMode.WORK }
-        ?.let(::localPlanReviewOf)
     val showStreamingTail = shouldShowWorkStreamingTail(
         running = state.running,
         usageMode = state.usageMode,
@@ -1014,6 +1016,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onTogglePin = onTogglePinSession,
                             onRenameSession = { renameSessionOpen = true },
                             onDeleteSession = onDeleteSession,
+                            onSearchMessages = if (state.sessionId.isNotBlank() && !state.loading) {
+                                { loadedSearchState.open = true }
+                            } else null,
                             onOpenSample = onSampleSession?.takeIf {
                                 state.configured && !state.running && !state.loading && state.messages.isNotEmpty()
                             }?.let { { showSessionSample = true } },
@@ -1044,14 +1049,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             onDeleteSession = onDeleteSession,
                             onOpenWorkEvidence = workActions?.let { { showWorkEvidence = true } },
                             onOpenDocuments = if (state.sessionId.isNotBlank() && !state.loading) onOpenNativeDocuments else null,
+                            onSearchMessages = if (state.sessionId.isNotBlank() && !state.loading) {
+                                { loadedSearchState.open = true }
+                            } else null,
                             onOpenSample = onSampleSession?.takeIf {
                                 state.configured && !state.running && !state.loading && state.messages.isNotEmpty()
                             }?.let { { showSessionSample = true } },
                         )
                     }
                 }
-                // Search lives on V6's secondary navigation row to protect
-                // the 393dp top bar from clipping current persona/session actions.
                 // 隐藏大卡片后仍可从顶部直接查看，不占用聊天记录和输入区。
                 if (state.usageMode == LocalUsageMode.WORK &&
                     teamCardDismissed && state.team.visible) {
@@ -1697,6 +1703,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             attachmentImportProgress = attachmentImportProgress,
             onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
+            onSelectPdfPages = { index, pages ->
+                attachments.getOrNull(index)?.let { attachment ->
+                    attachments[index] = attachment.copy(pdfPages = pages)
+                }
+            },
             onClearAttachments = attachments::clear,
             onOpenAttachmentPicker = { showAttachmentPicker = true },
             onOpenModelPicker = {
@@ -1792,12 +1803,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     V6LoadedConversationSearchHost(
         controller = loadedSearchState,
         transcript = transcriptItems,
-        listState = listState,
-        leadingRows = listOf(
-            mediaPage.unavailable, mediaPage.hasMore, showTranscriptPagingRow,
-            showEmptyGuide, showEmptyGroupSetup, planReview != null,
-        ).count { it },
-        visible = state.usageMode == LocalUsageMode.CHAT,
+        sessionId = state.sessionId,
+        search = args.searchTranscript,
+        onSelectMessage = { messageId -> searchJumpTarget = LocalTranscriptJumpTarget(state.sessionId, messageId) },
+        visible = state.sessionId.isNotBlank(),
         onSearchAll = onOpenGlobalSearch,
     )
     state.pendingApproval
@@ -2112,7 +2121,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ) {
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,
-                preferredProfileId = activeModelProfile?.id,
                 sessionId = state.sessionId,
                 viewModel = mediaStudioViewModel,
                 onDelivered = { showMediaStudio = false },

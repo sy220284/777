@@ -169,4 +169,89 @@ class TokenUsageDatabaseAndroidTest {
         assertTrue(database.append(record("new")).inserted)
     }
 
+
+    @Test fun versionOneLedgerUpgradesWithExactModelValuesAndNoLostRecords() {
+        database.close()
+        context.deleteDatabase(name)
+        val old = context.openOrCreateDatabase(name, android.content.Context.MODE_PRIVATE, null)
+        old.execSQL("CREATE TABLE records (id TEXT PRIMARY KEY, timestamp INTEGER NOT NULL, payload TEXT NOT NULL)")
+        old.execSQL("CREATE INDEX record_time ON records(timestamp)")
+        old.execSQL("CREATE TABLE metadata (id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
+        val original = record("from-v1").copy(model = "MiniMax-M3")
+        old.execSQL(
+            "INSERT INTO records (id, timestamp, payload) VALUES (?, ?, ?)",
+            arrayOf<Any>(original.requestId, original.timestamp, json.encodeToString(TokenUsageRecord.serializer(), original)),
+        )
+        old.setVersion(1)
+        old.close()
+
+        database = TokenUsageDatabase(context, json, name)
+        val page = database.historyPage("MiniMax-M3", null, null, 20)
+        assertEquals(listOf("from-v1"), page.records.map(TokenUsageRecord::requestId))
+        assertEquals(1, page.totalMatching)
+        assertNull(page.nextCursor)
+        assertEquals(2, database.readableDatabase.version)
+        assertEquals("MiniMax-M3", database.recordById("from-v1")?.model)
+        database.close()
+        database = TokenUsageDatabase(context, json, name)
+        assertEquals(1, database.historyPage("MiniMax-M3", null, null, 20).totalMatching)
+    }
+
+    @Test fun indexedPaginationAtTenThousandRecordsUsesOneStableCount() {
+        val db = database.writableDatabase
+        val now = System.currentTimeMillis()
+        val total = 9_900
+        val matches = 6_600
+        db.beginTransaction()
+        try {
+            val insert = db.compileStatement(
+                "INSERT INTO records (id, timestamp, model, payload) VALUES (?, ?, ?, ?)",
+            )
+            repeat(total) { n ->
+                val item = record("stress-${n.toString().padStart(5, '0')}", now - (n / 4) * 1_000L)
+                    .copy(model = if (n % 3 == 0) "deepseek-chat" else "MiniMax-M3")
+                insert.clearBindings()
+                insert.bindString(1, item.requestId)
+                insert.bindLong(2, item.timestamp)
+                insert.bindString(3, item.model)
+                insert.bindString(4, json.encodeToString(TokenUsageRecord.serializer(), item))
+                insert.executeInsert()
+            }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        val queryPlan = db.rawQuery(
+            "EXPLAIN QUERY PLAN SELECT payload FROM records WHERE model = ? AND (timestamp, id) < (?, ?) ORDER BY timestamp DESC, id DESC LIMIT 101",
+            arrayOf("MiniMax-M3", now.toString(), "stress-99999"),
+        ).use { rows -> buildString {
+            while (rows.moveToNext()) append(rows.getString(3))
+        } }
+        assertTrue("Missing index: $queryPlan", queryPlan.contains("record_model_time"))
+        val started = android.os.SystemClock.elapsedRealtimeNanos()
+        val seen = HashSet<String>()
+        var cursor: String? = null
+        var pages = 0
+        do {
+            val page = database.historyPage("MiniMax-M3", null, cursor, 100)
+            assertEquals(matches, page.totalMatching)
+            assertTrue(page.records.size <= 100)
+            page.records.forEach { assertTrue("Duplicated row: ${it.requestId}", seen.add(it.requestId)) }
+            cursor = page.nextCursor
+            pages++
+            assertTrue("Cursor did not finish", pages <= 100)
+        } while (cursor != null)
+        val millis = (android.os.SystemClock.elapsedRealtimeNanos() - started) / 1_000_000
+        android.util.Log.i("TokenUsageHistoryPerf", "rows=$total matches=$matches pages=$pages duration_ms=$millis")
+        assertEquals(matches, seen.size)
+        assertEquals(66, pages)
+        // Wide emulator tolerance; the query plan assertion enforces indexed access.
+        assertTrue("Indexed paging exceeded 30s: ${millis}ms", millis < 30_000)
+
+        val first = database.historyPage("MiniMax-M3", now - 1_000L, null, 1)
+        assertEquals(5, first.totalMatching)
+        assertNotNull(first.nextCursor)
+        assertTrue(runCatching {
+            database.historyPage("deepseek-chat", now - 1_000L, first.nextCursor, 1)
+        }.isFailure)
+        assertEquals(5, database.historyPage("MiniMax-M3", now - 1_000L, first.nextCursor, 1).totalMatching)
+    }
 }

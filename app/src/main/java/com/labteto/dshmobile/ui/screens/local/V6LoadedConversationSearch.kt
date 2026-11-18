@@ -7,7 +7,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
@@ -31,6 +30,10 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.DsType
 import com.shenyan.designsystem.components.SyCategoryRow
 import com.shenyan.designsystem.components.SyTextField
+import com.labteto.dshmobile.uicontract.UiMessageSearchCursor
+import com.labteto.dshmobile.uicontract.UiMessageSearchReceipt
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import kotlinx.coroutines.delay
 
 /** Design 33 phone search: results are exactly the dialogue rows already loaded in this session.
  * A message ID and its transcript index stay together; hidden reasoning and tool text never leak
@@ -62,12 +65,21 @@ internal fun v6SearchLoadedConversation(
         results += V6LoadedMessageSearchHit(
             messageId = message.id,
             transcriptIndex = index,
-            excerpt = body.replace(Regex("\\s+"), " ").take(150),
+            excerpt = messageSearchExcerpt(body, needle),
             fromUser = message.role == "user",
         )
         if (results.size >= limit) break
     }
     return results
+}
+
+private fun messageSearchExcerpt(body: String, query: String): String {
+    val match = body.indexOf(query, ignoreCase = true).coerceAtLeast(0)
+    val start = (match - 50).coerceAtLeast(0)
+    val end = minOf(body.length, maxOf(start + 150, match + query.length))
+    return (if (start > 0) "…" else "") +
+        body.substring(start, end).replace(Regex("\\s+"), " ") +
+        if (end < body.length) "…" else ""
 }
 
 @Composable
@@ -76,13 +88,44 @@ internal fun V6LoadedConversationSearchSheet(
     onSelect: (V6LoadedMessageSearchHit) -> Unit,
     onDismiss: () -> Unit,
     onSearchAll: () -> Unit = {},
+    search: (suspend (String, UiMessageSearchCursor?) -> UiMessageSearchReceipt)? = null,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val results = remember(query, transcript) { v6SearchLoadedConversation(transcript, query) }
+    val localHits = remember(query, transcript) {
+        v6SearchLoadedConversation(transcript, query, limit = transcript.size)
+    }
+    var archiveHits by remember(query) { mutableStateOf(emptyList<V6LoadedMessageSearchHit>()) }
+    var next by remember(query) { mutableStateOf<UiMessageSearchCursor?>(null) }
+    var request by remember(query) { mutableStateOf(0) }
+    var searching by remember(query) { mutableStateOf(search != null && query.isNotBlank()) }
+    var error by remember(query) { mutableStateOf<String?>(null) }
+    val results = (localHits + archiveHits).distinctBy(V6LoadedMessageSearchHit::messageId)
+    LaunchedEffect(query, request) {
+        if (search == null || query.isBlank()) return@LaunchedEffect
+        if (request == 0) delay(250)
+        searching = true
+        val from = if (error == null) next else null
+        error = null
+        when (val receipt = search(query, from)) {
+            is UiMessageSearchReceipt.Available -> {
+                val result = receipt.result
+                val hits = result.page.messages.asReversed()
+                    .filter { it.id in result.hitIds }
+                    .map { message ->
+                        V6LoadedMessageSearchHit(message.id, -1,
+                            messageSearchExcerpt(message.text, query.trim()), message.role == UiMessageRole.USER)
+                    }
+                archiveHits = if (from == null) hits else archiveHits + hits
+                next = result.nextCursor
+            }
+            is UiMessageSearchReceipt.Failed -> error = receipt.message.orEmpty()
+        }
+        searching = false
+    }
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyResponsiveSheet(
         title = stringResource(R.string.sy_v6_search_messages),
-        subtitle = stringResource(R.string.sy_v6_search_loaded_scope),
+        subtitle = stringResource(if (search == null) R.string.sy_v6_search_loaded_scope else R.string.sy_v6_search_archive_scope),
         onDismiss = onDismiss,
     ) {
         SyTextField(
@@ -102,12 +145,12 @@ internal fun V6LoadedConversationSearchSheet(
                 style = DsType.small13,
                 color = colors.textSecondary,
             )
-            results.isEmpty() -> Text(
+            results.isEmpty() && !searching && error == null -> Text(
                 stringResource(R.string.sy_v6_search_no_messages),
                 style = DsType.small13,
                 color = colors.textSecondary,
             )
-            else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+            results.isNotEmpty() -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                 items(results, key = V6LoadedMessageSearchHit::messageId) { hit ->
                     SyCategoryRow(
                         icon = if (hit.fromUser) SyEntryIcons.Persona else SyEntryIcons.ChatStyle,
@@ -119,6 +162,14 @@ internal fun V6LoadedConversationSearchSheet(
                 }
             }
         }
+        if (searching) Text(stringResource(R.string.common_loading), style = DsType.small13)
+        error?.let { Text(it.ifBlank { stringResource(R.string.sy_v6_search_archive_error) }, style = DsType.small13) }
+        if (!searching && (next != null || error != null)) SyButton(
+            text = stringResource(if (error != null) R.string.common_retry else R.string.sy_v6_search_older),
+            onClick = { request++ },
+            modifier = Modifier.fillMaxWidth(),
+            variant = SyButtonVariant.Ghost,
+        )
         SyButton(
             text = stringResource(R.string.sy_v6_search_all),
             onClick = onSearchAll,
@@ -135,7 +186,6 @@ internal fun V6LoadedConversationSearchSheet(
  */
 internal class V6LoadedConversationSearchState {
     var open by mutableStateOf(false)
-    var targetMessageId by mutableStateOf<String?>(null)
 }
 
 @Composable
@@ -146,28 +196,21 @@ internal fun rememberV6LoadedConversationSearchState(sessionId: String): V6Loade
 internal fun V6LoadedConversationSearchHost(
     controller: V6LoadedConversationSearchState,
     transcript: List<LocalTranscriptItem>,
-    listState: LazyListState,
-    leadingRows: Int,
+    sessionId: String,
+    search: suspend (String, String, UiMessageSearchCursor?) -> UiMessageSearchReceipt,
+    onSelectMessage: (String) -> Unit,
     visible: Boolean,
     onSearchAll: () -> Unit,
 ) {
-    // The search result holds a message ID, never an index from an outdated projection.
-    LaunchedEffect(controller.targetMessageId, transcript, leadingRows) {
-        val messageId = controller.targetMessageId ?: return@LaunchedEffect
-        val index = transcript.indexOfFirst {
-            it is LocalTranscriptItem.Message && it.message.id == messageId
-        }
-        if (index >= 0) listState.scrollToItem(leadingRows + index)
-        controller.targetMessageId = null
-    }
     if (controller.open && visible) {
         V6LoadedConversationSearchSheet(
             transcript = transcript,
             onSelect = { hit ->
                 controller.open = false
-                controller.targetMessageId = hit.messageId
+                onSelectMessage(hit.messageId)
             },
             onDismiss = { controller.open = false },
+            search = { query, cursor -> search(sessionId, query, cursor) },
             onSearchAll = {
                 controller.open = false
                 onSearchAll()

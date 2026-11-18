@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local
 
+import com.labteto.dshmobile.local.model.LocalModelProbe
 import com.labteto.dshmobile.local.persistence.LocalHarnessPreferences
 import android.content.Context
 import com.labteto.dshmobile.local.model.boundProfile
@@ -199,7 +200,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
         withContext(Dispatchers.IO) { transactions.recover(); startup.prepare(model, baseUrl) }
     }
 
-    internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null): String {
+    internal suspend fun test(apiKey: String, model: String, baseUrl: String, protocol: LocalModelProtocol? = null, profileId: String? = null, credentialSourceProfileId: String? = null, probe: LocalModelProbe = LocalModelProbe.TEXT): String {
         if (model.isBlank()) return "请选择模型"
         val saved = profiles.read()
         val sourceKey = if (apiKey.isBlank() && profileId == null) {
@@ -214,7 +215,7 @@ class LocalModelConfigurationCoordinator @Inject internal constructor(
             }
         } else null
         return tester.testStoredRoute(apiKey.ifBlank { sourceKey.orEmpty() }, model.trim(),
-            baseUrl, protocol, saved, apiKeys::getFor, profileId)
+            baseUrl, protocol, saved, apiKeys::getFor, profileId, probe)
     }
 
     /** User-initiated catalog lookup from the settings editor, including unsaved API drafts. */

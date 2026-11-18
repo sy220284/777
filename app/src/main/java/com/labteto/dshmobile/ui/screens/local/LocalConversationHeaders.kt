@@ -59,6 +59,7 @@ internal fun ChatSurfaceHeader(
     onRenameSession: () -> Unit,
     onDeleteSession: () -> Unit,
     onOpenSample: (() -> Unit)? = null,
+    onSearchMessages: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
@@ -153,6 +154,7 @@ internal fun ChatSurfaceHeader(
             onRename = onRenameSession,
             onDelete = onDeleteSession,
             onOpenSample = onOpenSample,
+            onSearchMessages = onSearchMessages,
         )
     }
 }
@@ -169,6 +171,7 @@ internal fun WorkSurfaceHeader(
     onOpenWorkEvidence: (() -> Unit)? = null,
     onOpenDocuments: (() -> Unit)? = null,
     onOpenSample: (() -> Unit)? = null,
+    onSearchMessages: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
@@ -214,6 +217,7 @@ internal fun WorkSurfaceHeader(
             onOpenWorkEvidence = onOpenWorkEvidence,
             onOpenDocuments = onOpenDocuments,
             onOpenSample = onOpenSample,
+            onSearchMessages = onSearchMessages,
         )
     }
 }

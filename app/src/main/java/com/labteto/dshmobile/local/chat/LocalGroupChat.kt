@@ -61,6 +61,26 @@ internal const val GROUP_CHAT_SILENT_TOKEN = "__GROUP_CHAT_SILENT__"
 internal const val MAX_GROUP_CHAT_RESPONDERS_PER_TURN = 2
 internal const val MAX_GROUP_CHAT_EXPLICIT_RESPONDERS_PER_TURN = MAX_GROUP_CHAT_MEMBERS
 
+private const val GROUP_ALL_SPEAKERS_DIRECTIVE = "【本轮发言：全员】"
+
+internal fun groupSpeakerLabel(member: LocalGroupChatMember, roster: List<LocalGroupChatMember>): String {
+    val name = member.displayName.lineSequence().joinToString(" ").trim()
+    if (roster.count { it.displayName.lineSequence().joinToString(" ").trim() == name } < 2) return name
+    return "$name（${member.galleryId}）"
+}
+
+internal fun groupSpeechDirectedInput(
+    input: String,
+    roster: List<LocalGroupChatMember>,
+    member: LocalGroupChatMember?,
+): String {
+    val directive = if (member == null) GROUP_ALL_SPEAKERS_DIRECTIVE else groupMemberSpeechDirective(member, roster)
+    return "$directive\n$input"
+}
+
+private fun groupMemberSpeechDirective(member: LocalGroupChatMember, roster: List<LocalGroupChatMember>): String =
+    "【本轮发言：@${groupSpeakerLabel(member, roster)}】"
+
 /** Only an explicit request to hear everybody expands past the normal reply budget. */
 private val GROUP_CHAT_EVERYONE_CUES = listOf(
     "每个人都说", "每个人都回答", "所有人都说", "所有人都回答",
@@ -148,6 +168,7 @@ internal fun groupMemberMemoryQuery(
 
 internal fun groupMemberMayStaySilent(input: String, member: LocalGroupChatMember, index: Int): Boolean =
     index > 0 &&
+        input.lineSequence().firstOrNull() != GROUP_ALL_SPEAKERS_DIRECTIVE &&
         GROUP_CHAT_EVERYONE_CUES.none(input::contains) &&
         groupChatMentionedMembers(input, listOf(member)).isEmpty()
 
@@ -158,6 +179,10 @@ internal fun groupChatResponders(
 ): List<LocalGroupChatMember> {
     if (members.isEmpty()) return emptyList()
     val distinct = members.distinctBy(LocalGroupChatMember::galleryId)
+    val firstLine = input.lineSequence().firstOrNull()
+    if (firstLine == GROUP_ALL_SPEAKERS_DIRECTIVE) return distinct.take(MAX_GROUP_CHAT_MEMBERS)
+    distinct.firstOrNull { firstLine == groupMemberSpeechDirective(it, distinct) }
+        ?.let { return listOf(it) }
     // When the user clearly requests each participant, honor the actual 2–6 person
     // roster; the normal one/two speaker budget still applies to casual group chat.
     if (GROUP_CHAT_EVERYONE_CUES.any(input::contains)) {

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot
 import com.labteto.dshmobile.local.presentation.LocalSkillUiEntry
@@ -18,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.theme.ThemePreference
@@ -29,7 +32,7 @@ import org.junit.Test
 class PluginInventoryBrowserRegressionTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun defaultShowsInstalledPluginSkillAndConnectorTogetherWithoutCategoriesOrSearch() {
+    @Test fun defaultShowsInstalledPluginSkillAndConnectorTogetherWithLocalSearch() {
         compose.setContent {
             DshTheme {
                 PluginInventoryBrowser(
@@ -49,7 +52,10 @@ class PluginInventoryBrowserRegressionTest {
         compose.onNodeWithTag("plugin-inventory-card-skill:report").assertIsDisplayed()
         compose.onNodeWithTag("plugin-inventory-card-service:local-mcp").assertIsDisplayed()
         compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertDoesNotExist()
-        compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-search").performTextInput("Build a report")
+        compose.onNodeWithTag("plugin-inventory-card-skill:report").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-service:local-mcp").assertDoesNotExist()
         compose.onNodeWithTag("plugin-category-list").assertDoesNotExist()
         compose.onNodeWithTag("capability-center-tabs").assertDoesNotExist()
     }
@@ -69,6 +75,8 @@ class PluginInventoryBrowserRegressionTest {
             }
         }
         compose.onNodeWithText("发现").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertDoesNotExist()
+        compose.onNodeWithTag("discover-owned-toggle").performClick()
         val matching = compose.onAllNodesWithTag("plugin-inventory-card-skill:research-check")
             .fetchSemanticsNodes()
         org.junit.Assert.assertEquals(1, matching.size)
@@ -93,6 +101,66 @@ class PluginInventoryBrowserRegressionTest {
         compose.runOnIdle { assertEquals(1, githubOpened) }
         compose.onNodeWithTag("plugin-inventory-card-connector:add-mcp").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, mcpOpened) }
+    }
+
+    @Test fun discoverPrioritizesInstallableOptionsAndCanRevealExistingItems() {
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("android-runtime"),
+                    githubConfigured = true,
+                    presets = listOf(LocalPresetSkillUiEntry(
+                        "research-check", "资料研究与核实", "查证材料", false,
+                    )),
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithText("发现").performClick()
+        compose.onNodeWithTag("plugin-inventory-card-skill:research-check").assertIsDisplayed()
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-connector:github").assertDoesNotExist()
+        compose.onNodeWithTag("discover-owned-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("capability-inventory-list")
+            .performScrollToNode(hasTestTag("plugin-inventory-card-local:android-runtime"))
+        compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertExists()
+        compose.onNodeWithTag("capability-inventory-list")
+            .performScrollToNode(hasTestTag("plugin-inventory-card-connector:github"))
+        compose.onNodeWithTag("plugin-inventory-card-connector:github").assertExists()
+    }
+
+    @Test fun builtinGitHubPluginAndConnectionBecomeOneManagementCard() {
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = listOf("github-connector"),
+                    githubConfigured = true,
+                    onGitHub = { opened++ },
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("plugin-inventory-card-local:github-connector").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-card-connector:github").performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+    }
+
+    @Test fun capabilitySettingsUsesOneVisibleEntryInsteadOfOverflowDuplication() {
+        var opened = 0
+        compose.setContent {
+            DshTheme {
+                PluginInventoryBrowser(
+                    localIds = emptyList(),
+                    onOpenSettings = { opened++ },
+                    onBack = {}, onManageConnections = {}, onReturnToChat = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("capability-settings-entry").performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+        compose.onNodeWithTag("plugin-inventory-more").performClick()
+        compose.onNodeWithText("能力与权限设置").assertDoesNotExist()
     }
 
     @Test fun configuredGitHubAppearsInAddedViewAndUsesRealAction() {
@@ -491,7 +559,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
-        compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
+        compose.onNodeWithTag("plugin-inventory-search").assertIsDisplayed()
         compose.onNodeWithText("插件").assertDoesNotExist()
         compose.onNodeWithTag("plugin-inventory-card-local:android-runtime").assertIsDisplayed()
     }

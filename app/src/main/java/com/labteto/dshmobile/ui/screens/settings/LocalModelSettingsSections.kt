@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.labteto.dshmobile.local.model.LocalModelProbe
 import com.shenyan.designsystem.foundation.SyMetric
 
 
@@ -606,35 +607,42 @@ internal fun LocalModelSettingsCard(
                 }
                 testStatus?.let { Text(it, style = DsType.small13.withReadingWeight(),
                     color = if (it.startsWith("连接成功")) colors.textSecondary else colors.dangerInk) }
-                SyButton(stringResource(if (testing) R.string.local_model_testing else R.string.local_model_test),
-                    onClick = {
-                        testing = true
-                        testStatus = null
-                        val testedModel = model
-                        val testedUrl = baseUrl
-                        val testedKey = apiKey
-                        val testedProtocol = protocol
-                        val testedProfileId = editingProfileId
-                        val testedCredentialSourceProfileId = credentialSourceProfileId
-                        val testedGeneration = editorGeneration
-                        // A connection probe verifies inference only; do not also call /models.
-                        // Model catalog discovery has its own explicit action and error state.
-                        scope.launch {
-                            try {
-                                val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId, testedCredentialSourceProfileId)
-                                if (showEditor && editorGeneration == testedGeneration) testStatus = result
-                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                throw cancelled
-                            } catch (error: Exception) {
-                                if (showEditor && editorGeneration == testedGeneration) {
-                                    testStatus = catalogTestFailureFormat.format(error.message ?: catalogUnavailable)
+                if (testing) Text(stringResource(R.string.local_model_testing))
+                listOf(
+                    LocalModelProbe.TEXT to R.string.local_model_test,
+                    LocalModelProbe.TOOL to R.string.local_model_test_tools,
+                    LocalModelProbe.IMAGE to R.string.local_model_test_image,
+                ).forEach { (probe, label) ->
+                    SyButton(stringResource(label),
+                        onClick = {
+                            testing = true
+                            testStatus = null
+                            val testedModel = model
+                            val testedUrl = baseUrl
+                            val testedKey = apiKey
+                            val testedProtocol = protocol
+                            val testedProfileId = editingProfileId
+                            val testedCredentialSourceProfileId = credentialSourceProfileId
+                            val testedGeneration = editorGeneration
+                            // A connection probe verifies inference only; do not also call /models.
+                            // Model catalog discovery has its own explicit action and error state.
+                            scope.launch {
+                                try {
+                                    val result = viewModel.testLocalModel(testedKey, testedModel, testedUrl, testedProtocol, testedProfileId, testedCredentialSourceProfileId, probe)
+                                    if (showEditor && editorGeneration == testedGeneration) testStatus = result
+                                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                    throw cancelled
+                                } catch (error: Exception) {
+                                    if (showEditor && editorGeneration == testedGeneration) {
+                                        testStatus = catalogTestFailureFormat.format(error.message ?: catalogUnavailable)
+                                    }
+                                } finally {
+                                    testing = false
                                 }
-                            } finally {
-                                testing = false
                             }
-                        }
-                    }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                        }, enabled = !testing && model.isNotBlank() && baseUrl.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                }
 
             }
         }

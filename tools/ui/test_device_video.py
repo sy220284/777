@@ -78,12 +78,30 @@ class VideoTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
             rec=self.setup_recorder(root,seconds=30)
-            rec.start()
-            time.sleep(1.2)
-            receipt=rec.stop()
-            self.assertGreaterEqual(len(receipt['clips']),2)
-            self.assertTrue(all((root/'videos'/x['file']).exists() for x in receipt['clips']))
-            self.assertEqual(json.loads((root/'videos'/'manifest.json').read_text())['name'],'main-tour')
+            # Keep the third segment running after two genuine rollovers.
+            # An arbitrary 1.2 s sleep can land inside process startup and
+            # interrupt Python before its SIGINT handler has been installed.
+            os.environ['FAKE_ADB_DELAY_CLIP'] = '3'
+            try:
+                rec.start()
+                marker=root/'remote'/'delayed-clip-started'
+                remote_pid=root/'remote'/'pid'
+                deadline=time.monotonic()+6
+                while time.monotonic()<deadline:
+                    if marker.exists() and remote_pid.exists() and (
+                        remote_pid.stat().st_mtime_ns > marker.stat().st_mtime_ns
+                    ):
+                        break
+                    time.sleep(.025)
+                self.assertTrue(marker.exists(), 'Third screenrecord segment should start')
+                self.assertTrue(remote_pid.exists(), 'Third screenrecord should be recording')
+                self.assertGreater(remote_pid.stat().st_mtime_ns, marker.stat().st_mtime_ns)
+                receipt=rec.stop()
+                self.assertGreaterEqual(len(receipt['clips']),3)
+                self.assertTrue(all((root/'videos'/x['file']).exists() for x in receipt['clips']))
+                self.assertEqual(json.loads((root/'videos'/'manifest.json').read_text())['name'],'main-tour')
+            finally:
+                os.environ.pop('FAKE_ADB_DELAY_CLIP', None)
 
 
     def test_stopping_during_rollover_waits_for_remote_recorder(self):

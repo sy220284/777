@@ -2,7 +2,7 @@
 """Run native UI checks and preserve playable videos of every interaction journey."""
 from html import escape
 from pathlib import Path
-import hashlib,json,re,shutil,subprocess,sys,urllib.request
+import hashlib,json,os,re,shutil,subprocess,sys,urllib.request
 from device_video import DeviceVideoRecorder
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -92,6 +92,8 @@ release=OUT/'baseline-release.apk'
 def baseline():
  api='https://api.github.com/repos/sy220284/777/releases/latest'
  headers={'Accept':'application/vnd.github+json','User-Agent':'777-native-ui-audit'}
+ token=os.environ.get('GITHUB_TOKEN','').strip()
+ if token:headers['Authorization']='Bearer '+token
  try:
   with urllib.request.urlopen(urllib.request.Request(api,headers=headers),timeout=30) as response:
    info=json.load(response)

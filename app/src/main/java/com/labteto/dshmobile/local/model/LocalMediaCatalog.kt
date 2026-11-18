@@ -65,18 +65,11 @@ data class LocalMediaRevisionDraft(
  * A creative model is distinct from the conversation model bound to the same account key.
  */
 object LocalMediaCatalog {
-    /** Only offers with an implemented API route qualify; never silently retry paid tasks. */
-    fun selectOffer(
-        offers: List<LocalMediaOffer>,
-        kind: LocalMediaKind,
-        preferredProfileId: String?,
-        manualOfferId: String? = null,
-    ): LocalMediaOffer? {
+    /** A saved route is strict. With several eligible routes, a paid action needs a user choice. */
+    fun selectOffer(offers: List<LocalMediaOffer>, kind: LocalMediaKind, preferredOfferId: String?): LocalMediaOffer? {
         val available = offers.filter { it.kind == kind }
-        // Manual selection is strict. Removing an account must never silently charge another.
-        if (manualOfferId != null) return available.firstOrNull { it.id == manualOfferId }
-        return available.firstOrNull { preferredProfileId != null && it.profile.id == preferredProfileId }
-            ?: available.firstOrNull()
+        return if (preferredOfferId == null) available.singleOrNull()
+            else available.firstOrNull { it.id == preferredOfferId }
     }
 
     fun offers(profiles: List<LocalModelProfile>): List<LocalMediaOffer> =

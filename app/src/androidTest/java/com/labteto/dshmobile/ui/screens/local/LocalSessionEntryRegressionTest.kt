@@ -7,6 +7,13 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasSetTextAction
+import com.labteto.dshmobile.uicontract.UiMessagePage
+import com.labteto.dshmobile.uicontract.UiMessageRole
+import com.labteto.dshmobile.uicontract.UiMessageSearchPage
+import com.labteto.dshmobile.uicontract.UiMessageSearchReceipt
+import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.theme.DshTheme
@@ -106,4 +113,33 @@ class LocalSessionEntryRegressionTest {
         compose.onNodeWithText(ctx.getString(R.string.sy_v6_search_all)).performClick()
         compose.runOnIdle { assertEquals(1, searchedAll) }
     }
+
+    @Test fun conversationSearchFindsArchivedMessageOutsideLoadedRows() {
+        var openedId: String? = null
+        compose.setContent {
+            DshTheme {
+                V6LoadedConversationSearchSheet(
+                    transcript = emptyList(),
+                    onSelect = { openedId = it.messageId },
+                    onDismiss = {},
+                    search = { query, _ ->
+                        val message = UiMessageSnapshot("archive-id", UiMessageRole.USER, "存档中的早期线索", 1L)
+                        UiMessageSearchReceipt.Available(UiMessageSearchPage(
+                            UiMessagePage(listOf(message), nextCursor = null),
+                            hitIds = if (message.text.contains(query)) setOf(message.id) else emptySet(),
+                            scannedMessages = 1L,
+                            nextCursor = null,
+                        ))
+                    },
+                )
+            }
+        }
+        compose.onNode(hasSetTextAction()).performTextInput("早期线索")
+        compose.waitUntil {
+            compose.onAllNodesWithText("存档中的早期线索").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("存档中的早期线索").performClick()
+        compose.runOnIdle { assertEquals("archive-id", openedId) }
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.local.presentation
 
+import com.labteto.dshmobile.local.model.LocalModelProbe
 import com.labteto.dshmobile.local.LocalWebProvider
 import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
@@ -75,7 +76,8 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun queryMiniMaxQuota(profile: LocalModelProfile): MiniMaxProviderUsage = miniMaxQuota.query(profile)
     override fun selectModel(id: String) = modelRuntime.selectModel(id)
     override fun removeModel(id: String) = modelRuntime.removeModel(id)
-    override suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol?, profileId: String?, credentialSourceProfileId: String?) = modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId)
+    override suspend fun testModel(apiKey: String, model: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol?, profileId: String?, credentialSourceProfileId: String?, probe: LocalModelProbe) =
+        modelRuntime.testConfiguration(apiKey, model, baseUrl, protocol, profileId, credentialSourceProfileId, probe)
     override suspend fun discoverApiModels(apiKey: String, baseUrl: String, protocol: com.labteto.dshmobile.local.model.LocalModelProtocol, credentialSourceProfileId: String?): List<String> = modelRuntime.discoverApiModels(apiKey, baseUrl, protocol, credentialSourceProfileId)
     override fun configureImageInputMode(mode: LocalImageInputMode) = modelSettings.configureImageInputMode(mode)
     override fun configureRuntimeLimits(main: Int, subagent: Int, attempts: Int, workerProfileId: String?) =

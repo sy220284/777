@@ -89,6 +89,42 @@ class UpdatePayloadTransferTest {
     }
 
     @Test
+    fun resumesOnlyTheValidatedRemainderAfterAnInterruptedRead() = runBlocking {
+        val root = Files.createTempDirectory("update-resume").toFile()
+        val target = root.resolve("updates/app.apk")
+        val requests = AtomicInteger()
+        val etag = "\"revision\""
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            val response = Response.Builder().request(request).protocol(Protocol.HTTP_1_1)
+                .message("test").header("ETag", etag)
+            if (requests.incrementAndGet() == 1) {
+                val partial = Buffer().writeUtf8("ap")
+                response.code(200).body(object : ResponseBody() {
+                    override fun contentType(): MediaType? = null
+                    override fun contentLength() = 3L
+                    override fun source() = partial
+                }).build()
+            } else {
+                assertEquals("bytes=2-", request.header("Range"))
+                assertEquals(etag, request.header("If-Range"))
+                response.code(206).header("Content-Range", "bytes 2-2/3")
+                    .body("k".toResponseBody()).build()
+            }
+        }.build()
+        try {
+            UpdatePayloadTransfer(client).downloadFile(
+                "http://example.com/apk", target, 1024, 3, "APK", "*/*", "a".repeat(64),
+            )
+            assertEquals("apk", target.readText())
+            assertEquals(2, requests.get())
+            assertTrue(root.walk().none { it.name.endsWith(".part") || it.name.endsWith(".etag") })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun updateCheckCancellationDoesNotFallBackToOtherEndpoints() = runBlocking {
         val entered = CountDownLatch(1)
         val requests = AtomicInteger()

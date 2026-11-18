@@ -793,6 +793,17 @@ internal class LocalSubagentRunner(
                                 put("arguments", event.call.arguments)
                                 put("execution_started", false)
                             })
+                            if (runKind == LocalAgentRunKind.AUTOMATION) {
+                                // Durable pre-execution model history allows an explicitly
+                                // approved blocked tool to resume this SAME model step.
+                                // Capture it before any tool side effect or approval decision.
+                                eventLog().append("automation/approval-step", buildJsonObject {
+                                    put("agent_id", subagentId)
+                                    put("call_id", event.call.id)
+                                    put("step", absoluteStep)
+                                    put("history", JsonArray(durableModelHistorySnapshot(history.snapshot())))
+                                })
+                            }
                         }
                         is AgentEvent.ToolFinished -> {
                             val absoluteStep = addSubagentSteps(recoveredBaseStep, event.step)

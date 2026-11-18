@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.intOrNull
 
 /** The durable Session event discriminators are shared facts: Agent writes queue
  * payloads, while Session owns their exact wire identity for replay and paging.
@@ -87,6 +88,7 @@ private fun encodeTranscriptBlocks(blocks: List<LocalMessageBlock>): JsonArray =
                 put("name", JsonPrimitive(block.name))
                 put("bytes", JsonPrimitive(block.bytes))
                 block.attachmentId?.let { put("attachment_id", JsonPrimitive(it)) }
+                if (block.pdfPages.isNotEmpty()) put("pdf_pages", JsonArray(block.pdfPages.map { JsonPrimitive(it) }))
                 put("source", JsonPrimitive(block.source.name.lowercase()))
             })
             is LocalMessageBlock.Unknown -> block.payload
@@ -130,6 +132,9 @@ private fun decodeTranscriptBlocks(value: JsonArray?): List<LocalMessageBlock>? 
                 bytes = long("bytes") ?: return null,
                 attachmentId = string("attachment_id"),
                 source = source,
+                pdfPages = (item["pdf_pages"] as? JsonArray)?.map {
+                    (it as? JsonPrimitive)?.intOrNull ?: return null
+                }.orEmpty(),
             )
             else -> blocks += LocalMessageBlock.Unknown(
                 kind = kind,
