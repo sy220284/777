@@ -332,6 +332,31 @@ class LocalSessionFilesRuntime @Inject internal constructor(
         return locations
     }
 
+    override suspend fun saveWorkHandoffDocument(sourceSessionId: String, document: String): String =
+        withContext(Dispatchers.IO) {
+            require(sourceSessionId.isNotBlank() && document.isNotBlank()) { "交接原文为空" }
+            val parsed = kotlinx.serialization.json.Json.decodeFromString(
+                WorkHandoffDocument.serializer(), document,
+            )
+            require(parsed.version == 1 && parsed.sourceSessionId == sourceSessionId &&
+                parsed.messages.isNotEmpty() && parsed.messages.all {
+                    it.messageId.isNotBlank() && it.role in setOf("user", "assistant")
+                }) { "交接原文与来源会话不匹配" }
+            val checksum = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(document.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val path = "工作交接/所选消息全文-$checksum.json"
+            val expected = "sha256:$checksum"
+            val existing = workspace.fileVersion(path)
+            if (existing.revision == "absent") {
+                val saved = workspace.writeIfVersion(path, "absent", document)
+                check(saved.revision == expected) { "交接原文保存后校验失败" }
+            } else {
+                check(existing.revision == expected) { "交接原文文件已被更改，请重新保存" }
+            }
+            path
+        }
+
     override suspend fun exportWorkspaceArchive(directory: String, destination: android.net.Uri): Int =
         withContext(Dispatchers.IO) {
             require(destination.scheme == "content") { "需要选择一个文件保存位置" }
