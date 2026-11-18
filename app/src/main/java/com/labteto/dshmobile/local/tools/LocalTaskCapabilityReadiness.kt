@@ -47,17 +47,23 @@ internal object LocalTaskCapabilityReadinessProjector {
             webNegations.none(normalized::contains)
         val asksMcp = normalized.contains("mcp") || normalized.contains("工具服务器")
         val asksPlugins = normalized.contains("插件") || normalized.contains("plugin")
-        val asksAccessibility = ToolDeviceRequirement.ACCESSIBILITY in requiredDeviceCapabilities ||
-            (listOf("无障碍", "操控手机", "手机自动操作", "自动点击", "设备操作").any(normalized::contains) &&
-                listOf("不要自动点击", "不需要无障碍", "不要操作设备", "禁止操控手机").none(normalized::contains))
+        val deniesAccessibility = listOf(
+            "不要自动点击", "不需要无障碍", "不要操作设备", "禁止操控手机", "不操控手机",
+        ).any(normalized::contains)
+        val asksAccessibility = !deniesAccessibility &&
+            (ToolDeviceRequirement.ACCESSIBILITY in requiredDeviceCapabilities ||
+                listOf("无障碍", "操控手机", "手机自动操作", "自动点击", "设备操作").any(normalized::contains))
         val asksScreenCapture =
             listOf("共享屏幕", "分享屏幕", "屏幕共享", "屏幕录制", "录制屏幕", "录屏", "捕获屏幕")
                 .any(normalized::contains) &&
                 listOf("不用共享屏幕", "无需共享屏幕", "不要共享屏幕", "不录屏", "无需录屏")
                     .none(normalized::contains)
-        val asksNotificationAccess = ToolDeviceRequirement.NOTIFICATION_ACCESS in requiredDeviceCapabilities ||
-            (listOf("读取通知", "监听通知", "通知监听", "通知访问").any(normalized::contains) &&
-                listOf("不读取通知", "不要读取通知", "不需要通知访问").none(normalized::contains))
+        val deniesNotificationAccess = listOf(
+            "不读取通知", "不要读取通知", "不需要通知访问", "不监听通知",
+        ).any(normalized::contains)
+        val asksNotificationAccess = !deniesNotificationAccess &&
+            (ToolDeviceRequirement.NOTIFICATION_ACCESS in requiredDeviceCapabilities ||
+                listOf("读取通知", "监听通知", "通知监听", "通知访问").any(normalized::contains))
         return buildList {
             // Work requires a configured model, but configuration alone does not prove connectivity.
             if (showModelStatus) {
