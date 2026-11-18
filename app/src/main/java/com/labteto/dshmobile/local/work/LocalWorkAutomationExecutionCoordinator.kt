@@ -243,6 +243,12 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (blocked: LocalHarnessBlockedException) {
+            val detail = blocked.message ?: "后台审批续跑需要核对工具执行结果"
+            return@withOwner LocalWorkAutomationResult(
+                sessionId = sessionId, output = detail,
+                status = LocalWorkAutomationStatus.BLOCKED, detail = detail,
+            )
         } catch (error: Exception) {
             AppLog.warn("WorkAutomation", "failure=true operation=run_scheduled_work " +
                 "session_id=${sessionId.take(80)} cause_type=${error.javaClass.simpleName}")
