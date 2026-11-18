@@ -98,7 +98,13 @@ internal class WorkAutomationApprovalResumeLedger private constructor(
         val blocked = latestBlocked(eventLog) ?: return false
         val step = stepFor(eventLog,blocked) ?: return false
         val latest = eventLog.latest("approval/resume-authorized")
-        if (latest != null && latest.sequence > blocked.sequence) return false
+        if (latest != null && latest.sequence > blocked.sequence) {
+            // A WorkManager enqueue may fail after authorization was committed.
+            // Let the user resubmit the SAME authorization until execution starts,
+            // without silently broadening the grant or creating a second approval.
+            return authorized(sessionId) != null &&
+                eventOf(eventLog,"approval/resume-execution-started",blocked.sequence) == null
+        }
         val finished = eventLog.latest("approval/resume-finalized")
         if (finished != null && finished.sequence > blocked.sequence) return false
         val previousExecution = eventLog.latestMatching(
