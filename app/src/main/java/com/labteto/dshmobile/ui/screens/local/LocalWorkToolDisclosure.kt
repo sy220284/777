@@ -121,18 +121,20 @@ internal fun LocalWorkToolDisclosureRow(
                 tint = colors.textSecondary,
                 modifier = Modifier.size(18.dp),
             )
-            Text(
-                "工具执行记录 · ${counts.total} 项",
-                modifier = Modifier.weight(1f),
-                style = DsType.small13.withReadingWeight(),
-                color = colors.textSecondary,
-            )
-            Text(
-                counts.summary,
-                style = DsType.small13.withReadingWeight(),
-                color = if (counts.failed > 0) colors.dangerInk
-                    else if (counts.uncertain > 0) colors.warningInk else colors.textTertiary,
-            )
+            // Two reading lines keep long error/running summaries legible at 320dp.
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "工具执行记录 · ${counts.total} 项",
+                    style = DsType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+                Text(
+                    counts.summary,
+                    style = DsType.small13.withReadingWeight(),
+                    color = if (counts.failed > 0) colors.dangerInk
+                        else if (counts.uncertain > 0) colors.warningInk else colors.textTertiary,
+                )
+            }
         }
         if (expanded) {
             Column(
