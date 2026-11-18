@@ -96,4 +96,87 @@ class LocalWorkToolDisclosureAndroidTest {
         compose.onNodeWithTag("work-tool:same").assertIsDisplayed()
         compose.onNodeWithText("当前已经完成第一阶段。").assertIsDisplayed()
     }
+
+    @Test fun newestOperationIsFirstAndCollapsedHeadlineUpdatesWhileRunning() {
+        val operations = mutableStateOf<List<LocalTranscriptItem>>(
+            listOf(LocalTranscriptItem.WorkPendingTool(LocalToolActivityUiItem(
+                callId = "old", name = "read", phase = LocalToolUiPhase.RUNNING,
+                declaredSequence = 1,
+            )))
+        )
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                Column(Modifier.width(320.dp)) {
+                    LocalWorkToolDisclosureRow(
+                        LocalTranscriptItem.WorkTools("live", operations.value),
+                        workspacePath = "",
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("最新：读取文件 · 执行中").assertIsDisplayed()
+        compose.runOnIdle {
+            operations.value = listOf(
+                LocalTranscriptItem.WorkStep(LocalHarnessMessage(
+                    "old", "tool", "旧操作完成", createdAt = 1,
+                    toolName = "read", toolCallId = "old", toolIsError = false,
+                )),
+                LocalTranscriptItem.WorkStep(LocalHarnessMessage(
+                    "new", "tool", "新操作完成", createdAt = 2,
+                    toolName = "edit", toolCallId = "new", toolIsError = false,
+                )),
+            )
+        }
+        compose.onNodeWithText("最新：修改文件 · 已完成").assertIsDisplayed()
+        compose.onNodeWithTag("work-tool-disclosure:live").performClick()
+        val newY = compose.onNodeWithTag("work-tool:new")
+            .fetchSemanticsNode().boundsInRoot.top
+        val oldY = compose.onNodeWithTag("work-tool:old")
+            .fetchSemanticsNode().boundsInRoot.top
+        assertTrue("展开后的最新操作应在最上方", newY < oldY)
+    }
+
+    @Test fun emptyToolResultStillOpensDeclaredArguments() {
+        val receipt = LocalHarnessMessage(
+            "empty", "tool", "", createdAt = 4,
+            toolName = "read", toolCallId = "empty", toolIsError = false,
+        )
+        val declared = LocalToolActivityUiItem(
+            callId = "empty", name = "read", phase = LocalToolUiPhase.COMPLETED,
+            argumentsPreview = """{"path":"notes.md"}""",
+        )
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                Column(Modifier.width(320.dp)) {
+                    WorkTimelineStepRow(receipt, activity = declared)
+                }
+            }
+        }
+        compose.onNodeWithTag("work-tool:empty").performClick()
+        compose.onNodeWithText("""{"path":"notes.md"}""").assertIsDisplayed()
+    }
+
+    @Test fun longWorkHistoryIsVirtualizedAndCanReachOldestReceipt() {
+        val operations = (1..120).map { n ->
+            LocalTranscriptItem.WorkStep(LocalHarnessMessage(
+                "t$n", "tool", "结果 $n", createdAt = n.toLong(),
+                toolName = "read", toolCallId = "t$n", toolIsError = false,
+            ))
+        }
+        compose.setContent {
+            DshTheme(preference = ThemePreference.LIGHT) {
+                Column(Modifier.width(320.dp)) {
+                    LocalWorkToolDisclosureRow(
+                        LocalTranscriptItem.WorkTools("many", operations),
+                        workspacePath = "",
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("work-tool-disclosure:many").performClick()
+        compose.onNodeWithTag("work-tool:t120").assertIsDisplayed()
+        compose.onNodeWithTag("work-tool:t1").assertDoesNotExist()
+        compose.onNodeWithTag("work-tool-list:many").performScrollToIndex(119)
+        compose.onNodeWithTag("work-tool:t1").assertIsDisplayed()
+    }
 }
