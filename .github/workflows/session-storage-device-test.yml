@@ -7,6 +7,8 @@ name: 本地会话存储 Android 迁移实测
       - 'app/src/main/java/com/labteto/dshmobile/local/LocalRequestEvidenceSurfaceMemo.kt'
       - 'app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt'
       - 'app/src/main/java/com/labteto/dshmobile/local/session/**'
+      - 'app/src/main/java/com/labteto/dshmobile/local/usage/**'
+      - 'app/src/androidTest/java/com/labteto/dshmobile/local/usage/**'
       - 'app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt'
       - 'app/src/androidTest/java/com/labteto/dshmobile/local/session/**'
       - '.github/workflows/session-storage-device-test.yml'
@@ -51,7 +53,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest,com.labteto.dshmobile.local.session.LocalLegacySqliteMigrationAndroidTest,com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalogAndroidTest,com.labteto.dshmobile.local.session.SqliteImageAttachmentGcAndroidTest,com.labteto.dshmobile.local.session.SqliteStorageArchiveAndroidTest --stacktrace --console=plain
+          script: ./gradlew --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest,com.labteto.dshmobile.local.session.LocalLegacySqliteMigrationAndroidTest,com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalogAndroidTest,com.labteto.dshmobile.local.session.SqliteImageAttachmentGcAndroidTest,com.labteto.dshmobile.local.session.SqliteStorageArchiveAndroidTest,com.labteto.dshmobile.local.usage.TokenUsageDatabaseAndroidTest --stacktrace --console=plain
       - name: 失败时输出真实断言
         if: failure()
         run: |
