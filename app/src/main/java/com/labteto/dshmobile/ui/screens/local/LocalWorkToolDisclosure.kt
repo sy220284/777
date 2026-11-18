@@ -3,6 +3,8 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.presentation.LocalToolUiPhase
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -144,6 +147,7 @@ internal fun visibleWorkToolOperations(
  * LazyColumn. Newest-first ordering and the live summary share the same event projection.
  * Nothing is truncated or replayed, and older rows remain reachable via virtual scrolling.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LocalWorkToolDisclosureRow(
     group: LocalTranscriptItem.WorkTools,
@@ -239,9 +243,14 @@ internal fun LocalWorkToolDisclosureRow(
                 modifier = Modifier.fillMaxWidth().padding(start = SyMetric.gapMd),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+                ) {
                     SyButton(
                         text = "全部",
+                        modifier = Modifier.testTag("work-tool-filter:all")
+                            .semantics { selected = filter == WorkToolListFilter.ALL },
                         onClick = { filter = WorkToolListFilter.ALL },
                         size = SyButtonSize.Small,
                         variant = if (filter == WorkToolListFilter.ALL)
@@ -250,6 +259,8 @@ internal fun LocalWorkToolDisclosureRow(
                     if (counts.running > 0 || filter == WorkToolListFilter.RUNNING) {
                         SyButton(
                             text = "执行中 ${counts.running}",
+                            modifier = Modifier.testTag("work-tool-filter:running")
+                                .semantics { selected = filter == WorkToolListFilter.RUNNING },
                             onClick = { filter = WorkToolListFilter.RUNNING },
                             size = SyButtonSize.Small,
                             variant = if (filter == WorkToolListFilter.RUNNING)
@@ -259,6 +270,8 @@ internal fun LocalWorkToolDisclosureRow(
                     if (issues > 0 || filter == WorkToolListFilter.ISSUES) {
                         SyButton(
                             text = "异常 $issues",
+                            modifier = Modifier.testTag("work-tool-filter:issues")
+                                .semantics { selected = filter == WorkToolListFilter.ISSUES },
                             onClick = { filter = WorkToolListFilter.ISSUES },
                             size = SyButtonSize.Small,
                             variant = if (filter == WorkToolListFilter.ISSUES)
