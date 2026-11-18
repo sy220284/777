@@ -215,6 +215,27 @@ internal class SqliteCrossDeviceMerge(
             }
         }
     }
+    private fun renameCopiedStudioReferences(database: File, files: Map<String,String>) {
+        if (files.isEmpty()) return
+        SQLiteDatabase.openDatabase(database.path,null,SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.beginTransaction()
+            try {
+                db.rawQuery("SELECT id,payload FROM media",null).use { rows ->
+                    while(rows.moveToNext()) {
+                        val id=rows.getString(0)
+                        val old=rows.getString(1)
+                        val rewritten=rewriteJson(old,emptyMap(),emptyMap(),files)
+                        if (rewritten!=old) {
+                            check(db.update("media",ContentValues().apply {
+                                put("payload",rewritten)
+                            },"id=?",arrayOf(id))==1) { "媒体引用重映射失败：$id" }
+                        }
+                    }
+                }
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+        }
+    }
     private fun createPlan(
         pending: File, snapshot: File, events: File, studio: File, full: Boolean,
     ): Plan {
@@ -275,7 +296,9 @@ internal class SqliteCrossDeviceMerge(
                 if(originalStudio=="absent") importedStudio.copyTo(mergedStudio)
                 else copyLive(studio,mergedStudio)
                 fileNames=studioFileNames(stageStudio)
-                if(originalStudio!="absent") {
+                if(originalStudio=="absent") {
+                    renameCopiedStudioReferences(mergedStudio,fileNames)
+                } else {
                     val localMedia=ids(mergedStudio,"media","id")
                     val importedMedia=ids(importedStudio,"media","id")
                     val aliases=localMedia.intersect(importedMedia).associateWith {
