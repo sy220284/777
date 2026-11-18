@@ -47,6 +47,7 @@ internal class SqliteCrossDeviceMerge(
     // Device-scoped migration cursors must stay local; backfill resets below.
     private val eventSingletons = setOf(
         "session_request_migration", "local_asset_backfill_progress", "session_legacy_adoption",
+        "android_metadata",
     )
     private fun digest(file: File): String {
         if (!Files.exists(file.toPath(), LinkOption.NOFOLLOW_LINKS)) return "absent"
@@ -122,7 +123,7 @@ internal class SqliteCrossDeviceMerge(
                                             val text = rows.getString(i)
                                             val changed = when {
                                                 col == "payload" -> rewriteJson(text,mapping)
-                                                col == "id" && table=="session_snapshots" ->
+                                                col == "id" && table in setOf("session_snapshots","session_summaries") ->
                                                     sessions[text] ?: text
                                                 col == "id" && table=="media" ->
                                                     media[text] ?: text
@@ -239,7 +240,7 @@ internal class SqliteCrossDeviceMerge(
             require(mapping.values.none { it in localIds || it in sourceIds } &&
                 mapping.values.size==mapping.values.toSet().size) { "导入会话身份重映射冲突" }
             if(snapshotBefore!="absent") mergeDatabase(mergedSnap,importedSnap,snapshotTables,
-                emptySet(),mapping)
+                setOf("android_metadata"),mapping)
             if(eventsBefore!="absent") mergeDatabase(mergedEvents,importedEvents,eventTables,
                 eventSingletons,mapping)
             var originalStudio:String?=null
@@ -260,13 +261,13 @@ internal class SqliteCrossDeviceMerge(
                     val localMedia=ids(mergedStudio,"media","id")
                     val importedMedia=ids(importedStudio,"media","id")
                     val aliases=localMedia.intersect(importedMedia).associateWith {
-                        newId("media",sourceStudio,it)
+                        newId("media",requireNotNull(sourceStudio),it)
                     }
                     require(aliases.values.none { it in localMedia || it in importedMedia }) {
                         "媒体身份重映射冲突"
                     }
                     mergeDatabase(mergedStudio,importedStudio,listOf("metadata","media"),
-                        emptySet(),mapping,aliases,fileNames)
+                        setOf("android_metadata"),mapping,aliases,fileNames)
                 }
                 mergedStudioHash=digest(mergedStudio)
             }
@@ -284,6 +285,25 @@ internal class SqliteCrossDeviceMerge(
             folder.deleteRecursively()
             throw error
         }
+    }
+    /** No Session owner may be running at this process-start restore boundary.
+     * Settle a stopped SQLite WAL before hashing, otherwise the backup might omit
+     * committed rows or a stale sidecar might be replayed onto a new main file.
+     */
+    private fun settleWal(file: File) {
+        if (!file.exists()) return
+        if (!File(file.path+"-wal").exists() && !File(file.path+"-shm").exists()) return
+        SQLiteDatabase.openDatabase(file.path,null,SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)",null).use {
+                check(it.moveToFirst() && it.getInt(0)==0) { "本地数据库仍被其他写入者占用" }
+            }
+            db.rawQuery("PRAGMA journal_mode=DELETE",null).use {
+                check(it.moveToFirst() && it.getString(0).equals("delete",true)) {
+                    "数据库 WAL 未完成结算"
+                }
+            }
+        }
+        check(!File(file.path+"-wal").exists()) { "数据库 WAL 结算后仍存在，暂停合并" }
     }
     private fun verifyDestination(file:File,before:String,after:String) {
         check(digest(file) in setOf(before,after)) {
@@ -337,6 +357,11 @@ internal class SqliteCrossDeviceMerge(
     }
     fun apply(pending:File,snapshot:File,events:File,full:Boolean):Int {
         val studio=context.getDatabasePath("local_media_v1.db")
+        // At startup, settle only stopped-process WAL files before any restored
+        // database replaces its durable main file.
+        settleWal(snapshot)
+        settleWal(events)
+        if(full) settleWal(studio)
         val plan=createPlan(pending,snapshot,events,studio,full)
         val folder=File(pending,".merge-plan")
         val snapMerged=File(folder,"snap.sqlite")
