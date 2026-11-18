@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -967,6 +968,7 @@ fun ToolsScreen(
     var showMcpStdio by rememberSaveable { mutableStateOf(false) }
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
+    val catalogueStateHolder = rememberSaveableStateHolder()
     var showConnectorSettings by rememberSaveable { mutableStateOf(false) }
     var showAdvancedConfiguration by rememberSaveable { mutableStateOf(false) }
     var showToolDirectory by rememberSaveable { mutableStateOf(false) }
@@ -1068,6 +1070,7 @@ fun ToolsScreen(
                     )
                     Box(Modifier.weight(1f)) {
                         if (!showConnectorSettings) {
+                            catalogueStateHolder.SaveableStateProvider("capability-catalogue") {
                             PluginInventoryBrowser(
                                 localIds = state.localPlugins,
                                 connectedServices = state.servers,
@@ -1108,6 +1111,7 @@ fun ToolsScreen(
                                 onSaveSkillDocument = viewModel::saveSkillDocument,
                                 onSetSkillModelInvocable = viewModel::setSkillModelInvocable,
                             )
+                            }
                         } else Column(Modifier.fillMaxSize()) {
                                 Column(
                                     modifier = Modifier
