@@ -969,6 +969,7 @@ fun ToolsScreen(
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     var showConnectorSettings by rememberSaveable { mutableStateOf(false) }
+    var showAdvancedConfiguration by rememberSaveable { mutableStateOf(false) }
     var showToolDirectory by rememberSaveable { mutableStateOf(false) }
     var toolDirectoryQuery by rememberSaveable { mutableStateOf("") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
@@ -1053,13 +1054,18 @@ fun ToolsScreen(
             Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                     SyTopBar(
-                        title = stringResource(R.string.tools_title),
-                        onBack = onClose,
+                        title = stringResource(
+                            if (showConnectorSettings) R.string.cap_center_settings_group
+                            else R.string.tools_title,
+                        ),
+                        onBack = {
+                            if (showConnectorSettings) showConnectorSettings = false else onClose()
+                        },
                         backContentDescription = stringResource(R.string.common_back),
-                        actionIcon = FeatherIcons.RefreshCw,
+                        actionIcon = if (showConnectorSettings) null else FeatherIcons.RefreshCw,
                         actionContentDescription = stringResource(R.string.tools_refresh),
-                        actionEnabled = !state.loading,
-                        onAction = viewModel::refresh,
+                        actionEnabled = !state.loading && !showConnectorSettings,
+                        onAction = if (showConnectorSettings) null else viewModel::refresh,
                     )
                     Box(Modifier.weight(1f)) {
                         if (!showConnectorSettings) {
@@ -1121,82 +1127,9 @@ fun ToolsScreen(
                                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapLg),
                                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
-                                    SyButton(
-                                        text = "返回能力中心",
-                                        onClick = { showConnectorSettings = false },
-                                        variant = SyButtonVariant.Ghost,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    AgentBackendSettings(viewModel)
-                                    SyButton(
-                                        text = if (showToolDirectory) "收起实时工具目录" else "查看实时工具目录",
-                                        onClick = { showToolDirectory = !showToolDirectory },
-                                        variant = SyButtonVariant.Ghost,
-                                        modifier = Modifier.fillMaxWidth().testTag("tool-directory-toggle"),
-                                    )
-                                    if (showToolDirectory) {
-                                        SySearchField(
-                                            value = toolDirectoryQuery,
-                                            onValueChange = { toolDirectoryQuery = it },
-                                            placeholder = "按工具名称或能力搜索",
-                                            modifier = Modifier.fillMaxWidth().testTag("tool-directory-search"),
-                                        )
-                                        val queryResult by produceState<
-                                            Result<List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot>>?
-                                        >(
-                                            initialValue = null,
-                                            showToolDirectory, toolDirectoryQuery, capabilityRevision,
-                                            state.localPlugins, state.servers, state.skills,
-                                        ) {
-                                            if (showToolDirectory) {
-                                                delay(120)
-                                                try {
-                                                    val matches = withContext(Dispatchers.Default) {
-                                                        viewModel.discoverCapabilities(toolDirectoryQuery)
-                                                    }
-                                                    value = Result.success(matches)
-                                                } catch (cancelled: CancellationException) {
-                                                    throw cancelled
-                                                } catch (failure: Exception) {
-                                                    value = Result.failure(failure)
-                                                }
-                                            }
-                                        }
-                                        val discovered = queryResult?.getOrNull().orEmpty()
-                                        queryResult?.exceptionOrNull()?.let { failure ->
-                                            Text(
-                                                "工具目录读取失败：" + (failure.message ?: "请重试"),
-                                                style = DsType.caption11.withReadingWeight(),
-                                                color = colors.dangerInk,
-                                            )
-                                        }
-                                        Text(
-                                            if (queryResult == null) "正在匹配已注册工具…"
-                                            else "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",
-                                            style = DsType.caption11.withReadingWeight(),
-                                            color = colors.textSecondary,
-                                        )
-                                        LazyColumn(
-                                            modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp)
-                                                .testTag("tool-directory-results"),
-                                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                                        ) {
-                                            items(discovered, key = { it.name }) { capability ->
-                                                ToolCapabilityRow(
-                                                    title = capability.name,
-                                                    status = capability.family + " · " + capability.access,
-                                                    state = StateDotState.Idle,
-                                                    icon = SyEntryIcons.Tools,
-                                                    onClick = onUseCapability?.let { handoff -> {
-                                                        handoff("请使用 " + capability.name + " 工具完成当前工作，核验调用与执行回执。")
-                                                    } },
-                                                )
-                                            }
-                                        }
-                                    }
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                                         Text(
-                                            stringResource(R.string.cap_center_settings_group),
+                                            "常用能力",
                                             style = DsType.std14Strong.withReadingWeight(),
                                             color = colors.textSecondary,
                                         )
@@ -1262,6 +1195,15 @@ fun ToolsScreen(
                                                 )
                                             },
                                         )
+                                        if (autoApprovalEnabled) {
+                                            Text(
+                                                "自动审批已开启：文件修改、命令执行和设备操作等高风险请求可能无需逐次确认。",
+                                                style = DsType.caption11.withReadingWeight(),
+                                                color = colors.warningInk,
+                                                modifier = Modifier.padding(horizontal = SyMetric.gapMd)
+                                                    .testTag("auto-approval-warning"),
+                                            )
+                                        }
                                         ToolCapabilityRow(
                                             icon = SyEntryIcons.Advanced,
                                             title = stringResource(R.string.advanced_agent_settings),
@@ -1273,28 +1215,90 @@ fun ToolsScreen(
                                     }
 
                                     Text(
-                                        stringResource(R.string.cap_center_extensions_group),
+                                        "高级配置",
                                         style = DsType.std14Strong.withReadingWeight(),
                                         color = colors.textSecondary,
                                     )
-                                    Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                                        ToolCapabilityRow(
-                                            icon = SyEntryIcons.Connections,
-                                            title = stringResource(R.string.tools_github_connector),
-                                            status = stringResource(
-                                                if (state.githubConfigured) R.string.tools_github_configured
-                                                else R.string.tools_github_unconfigured,
-                                            ),
-                                            state = if (state.githubConfigured) StateDotState.Done else StateDotState.Idle,
-                                            onClick = { showGitHubConfig = true },
-                                        )
-                                        ToolCapabilityRow(
-                                            icon = SyEntryIcons.Plugins,
-                                            title = stringResource(R.string.tools_external_services),
-                                            status = state.servers.size.toString(),
-                                            state = if (state.servers.isNotEmpty()) StateDotState.Done else StateDotState.Idle,
-                                            onClick = { showExternalConfig = true },
-                                        )
+                                    ToolCapabilityRow(
+                                        icon = SyEntryIcons.Advanced,
+                                        title = "高级运行配置",
+                                        status = if (showAdvancedConfiguration) "已展开" else "按需展开",
+                                        state = StateDotState.Idle,
+                                        onClick = { showAdvancedConfiguration = !showAdvancedConfiguration },
+                                    )
+                                    if (showAdvancedConfiguration) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
+                                            AgentBackendSettings(viewModel)
+                                            ToolCapabilityRow(
+                                                icon = SyEntryIcons.Tools,
+                                                title = "实时工具目录",
+                                                status = if (showToolDirectory) "已展开" else "查看已注册工具",
+                                                state = StateDotState.Idle,
+                                                modifier = Modifier.testTag("tool-directory-toggle"),
+                                                onClick = { showToolDirectory = !showToolDirectory },
+                                            )
+                                            if (showToolDirectory) {
+                                                SySearchField(
+                                                    value = toolDirectoryQuery,
+                                                    onValueChange = { toolDirectoryQuery = it },
+                                                    placeholder = "按工具名称或能力搜索",
+                                                    modifier = Modifier.fillMaxWidth().testTag("tool-directory-search"),
+                                                )
+                                                val queryResult by produceState<
+                                                    Result<List<com.labteto.dshmobile.uicontract.UiToolCapabilitySnapshot>>?
+                                                >(
+                                                    initialValue = null,
+                                                    showToolDirectory, toolDirectoryQuery, capabilityRevision,
+                                                    state.localPlugins, state.servers, state.skills,
+                                                ) {
+                                                    if (showToolDirectory) {
+                                                        delay(120)
+                                                        try {
+                                                            val matches = withContext(Dispatchers.Default) {
+                                                                viewModel.discoverCapabilities(toolDirectoryQuery)
+                                                            }
+                                                            value = Result.success(matches)
+                                                        } catch (cancelled: CancellationException) {
+                                                            throw cancelled
+                                                        } catch (failure: Exception) {
+                                                            value = Result.failure(failure)
+                                                        }
+                                                    }
+                                                }
+                                                val discovered = queryResult?.getOrNull().orEmpty()
+                                                queryResult?.exceptionOrNull()?.let { failure ->
+                                                    Text(
+                                                        "工具目录读取失败：" + (failure.message ?: "请重试"),
+                                                        style = DsType.caption11.withReadingWeight(),
+                                                        color = colors.dangerInk,
+                                                    )
+                                                }
+                                                Text(
+                                                    if (queryResult == null) "正在匹配已注册工具…"
+                                                    else "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",
+                                                    style = DsType.caption11.withReadingWeight(),
+                                                    color = colors.textSecondary,
+                                                )
+                                                LazyColumn(
+                                                    modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp)
+                                                        .testTag("tool-directory-results"),
+                                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                                                ) {
+                                                    items(discovered, key = { it.name }) { capability ->
+                                                        ToolCapabilityRow(
+                                                            title = capability.name,
+                                                            status = capability.family + " · " + capability.access,
+                                                            state = StateDotState.Idle,
+                                                            icon = SyEntryIcons.Tools,
+                                                            onClick = onUseCapability?.let { handoff -> {
+                                                                handoff("请使用 " + capability.name + " 工具完成当前工作，核验调用与执行回执。")
+                                                            } },
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                        }
                                     }
                                 }
                             }
@@ -1737,10 +1741,11 @@ private fun ToolCapabilityRow(
     icon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         onClick = { onClick?.invoke() },
         enabled = onClick != null,
         shape = DsShapes.row,
