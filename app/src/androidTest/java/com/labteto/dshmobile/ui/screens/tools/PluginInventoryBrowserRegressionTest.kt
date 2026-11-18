@@ -34,7 +34,7 @@ class PluginInventoryBrowserRegressionTest {
                 PluginInventoryBrowser(
                     localIds = listOf("android-runtime"),
                     skills = listOf(LocalSkillUiEntry("report", "Build a report", true)),
-                    connectedServices = listOf(UiUiMcpServerSnapshot(
+                    connectedServices = listOf(UiMcpServerSnapshot(
                         id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
                         tools = listOf("search"),
                     )),
@@ -115,7 +115,7 @@ class PluginInventoryBrowserRegressionTest {
                 PluginInventoryBrowser(
                     localIds = emptyList(),
                     skills = listOf(LocalSkillUiEntry("manual-review", "Only on user request", false)),
-                    connectedServices = listOf(UiUiMcpServerSnapshot(
+                    connectedServices = listOf(UiMcpServerSnapshot(
                         id = "local-mcp", transport = "http", target = "http://127.0.0.1:4312",
                         tools = listOf("search"),
                     )),
@@ -602,7 +602,7 @@ class PluginInventoryBrowserRegressionTest {
             type = "mcp", value = "figma", description = "设计服务",
             registered = false, transport = "http", url = "https://mcp.figma.com/mcp",
         )
-        val known = com.labteto.dshmobile.uicontract.UiUiMcpServerSnapshot(
+        val known = com.labteto.dshmobile.uicontract.UiMcpServerSnapshot(
             "figma", "http", "https://mcp.figma.com/mcp", emptyList(),
         )
         compose.setContent {
