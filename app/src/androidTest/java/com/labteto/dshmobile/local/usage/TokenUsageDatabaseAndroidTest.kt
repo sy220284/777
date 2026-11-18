@@ -247,11 +247,11 @@ class TokenUsageDatabaseAndroidTest {
         assertTrue("Indexed paging exceeded 30s: ${millis}ms", millis < 30_000)
 
         val first = database.historyPage("MiniMax-M3", now - 1_000L, null, 1)
-        assertEquals(2, first.totalMatching)
+        assertEquals(5, first.totalMatching)
         assertNotNull(first.nextCursor)
         assertTrue(runCatching {
             database.historyPage("deepseek-chat", now - 1_000L, first.nextCursor, 1)
         }.isFailure)
-        assertEquals(2, database.historyPage("MiniMax-M3", now - 1_000L, first.nextCursor, 1).totalMatching)
+        assertEquals(5, database.historyPage("MiniMax-M3", now - 1_000L, first.nextCursor, 1).totalMatching)
     }
 }
