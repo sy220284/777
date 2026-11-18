@@ -49,7 +49,7 @@ internal fun LocalWorkCapabilitySheet(
     onPromptChange: (String) -> Unit = {},
     onSummaryChange: (String) -> Unit = {},
     capabilities: List<LocalTaskCapabilityReadiness> = emptyList(),
-    onConfigureCapabilities: (() -> Unit)? = null,
+    onConfigureCapabilities: ((LocalTaskCapabilityKind) -> Unit)? = null,
     onRefreshCapabilities: (() -> Unit)? = null,
     onConfigureModel: (() -> Unit)? = null,
     onConfigureDevice: (() -> Unit)? = null,
@@ -193,21 +193,20 @@ internal fun LocalWorkCapabilitySheet(
                 Text(stringResource(R.string.work_capability_readiness_row,
                     stringResource(name), statusLabel),
                     style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
-            }
-            if (onConfigureCapabilities != null && capabilities.any {
-                    it.kind != LocalTaskCapabilityKind.MODEL &&
-                        it.kind != LocalTaskCapabilityKind.ACCESSIBILITY &&
-                        it.kind != LocalTaskCapabilityKind.NOTIFICATION_ACCESS &&
-                        it.kind != LocalTaskCapabilityKind.SCREEN_CAPTURE &&
-                        it.state != LocalTaskCapabilityState.CONFIGURED
-                }) {
-                SyButton(
-                    text = stringResource(R.string.work_capability_configure),
-                    onClick = onConfigureCapabilities,
-                    enabled = !switching,
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = SyButtonVariant.Ghost,
-                )
+                if (onConfigureCapabilities != null && item.state != LocalTaskCapabilityState.CONFIGURED &&
+                    (item.kind == LocalTaskCapabilityKind.GITHUB ||
+                        item.kind == LocalTaskCapabilityKind.MCP ||
+                        item.kind == LocalTaskCapabilityKind.PLUGINS ||
+                        item.kind == LocalTaskCapabilityKind.WEB_SEARCH)
+                ) {
+                    SyButton(
+                        text = stringResource(R.string.work_capability_configure_item, stringResource(name)),
+                        onClick = { onConfigureCapabilities(item.kind) },
+                        enabled = !switching,
+                        modifier = Modifier.fillMaxWidth(),
+                        variant = SyButtonVariant.Ghost,
+                    )
+                }
             }
             if (onConfigureModel != null && capabilities.any {
                     it.kind == LocalTaskCapabilityKind.MODEL &&

@@ -891,11 +891,12 @@ class ToolsViewModel @Inject constructor(
 
 }
 
+internal enum class CapabilityDestination { OVERVIEW, SKILLS, PLUGINS, GITHUB, MCP, SETTINGS }
+
 @Composable
-fun ToolsScreen(
+internal fun ToolsScreen(
     onClose: () -> Unit,
-    startAtPlugins: Boolean = false,
-    startAtSkills: Boolean = false,
+    destination: CapabilityDestination = CapabilityDestination.OVERVIEW,
     onUseCapability: ((String) -> Unit)? = null,
     onOpenSettings: (SettingsDestination) -> Unit = {},
     handleRootSystemBack: Boolean = true,
@@ -960,20 +961,24 @@ fun ToolsScreen(
     var stdioCommand by remember { mutableStateOf("") }
     var stdioWorkingDirectory by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
-    var showGitHubConfig by remember { mutableStateOf(false) }
+    var showGitHubConfig by remember(destination) { mutableStateOf(destination == CapabilityDestination.GITHUB) }
     var editGitHubCredentials by remember { mutableStateOf(false) }
     var showGitHubBrowser by remember { mutableStateOf(false) }
-    var showExternalConfig by remember { mutableStateOf(false) }
+    var showExternalConfig by remember(destination) { mutableStateOf(destination == CapabilityDestination.MCP) }
     var showMcpAdvanced by rememberSaveable { mutableStateOf(false) }
     var showMcpStdio by rememberSaveable { mutableStateOf(false) }
     var expandedMcpServer by remember { mutableStateOf<String?>(null) }
     var showAgentSettings by remember { mutableStateOf(false) }
     val catalogueStateHolder = rememberSaveableStateHolder()
-    var showCapabilitySettings by rememberSaveable { mutableStateOf(false) }
+    var showCapabilitySettings by rememberSaveable(destination) { mutableStateOf(destination == CapabilityDestination.SETTINGS) }
     var showAdvancedConfiguration by rememberSaveable { mutableStateOf(false) }
     var showToolDirectory by rememberSaveable { mutableStateOf(false) }
     var toolDirectoryQuery by rememberSaveable { mutableStateOf("") }
     var confirmClearGitHub by remember { mutableStateOf(false) }
+    val closeCapabilitySettings = {
+        if (destination == CapabilityDestination.SETTINGS) onClose()
+        else showCapabilitySettings = false
+    }
     val noticeMessage = state.notice?.let { notice ->
         stringResource(
             when (notice) {
@@ -996,7 +1001,7 @@ fun ToolsScreen(
                 githubToken = ""
             }
             showAgentSettings -> showAgentSettings = false
-            showCapabilitySettings -> showCapabilitySettings = false
+            showCapabilitySettings -> closeCapabilitySettings()
             else -> onClose()
         }
     }
@@ -1060,7 +1065,7 @@ fun ToolsScreen(
                             else R.string.tools_title,
                         ),
                         onBack = {
-                            if (showCapabilitySettings) showCapabilitySettings = false else onClose()
+                            if (showCapabilitySettings) closeCapabilitySettings() else onClose()
                         },
                         backContentDescription = stringResource(R.string.common_back),
                         actionIcon = if (showCapabilitySettings) null else FeatherIcons.RefreshCw,
@@ -1072,6 +1077,7 @@ fun ToolsScreen(
                         if (!showCapabilitySettings) {
                             catalogueStateHolder.SaveableStateProvider("capability-catalogue") {
                             PluginInventoryBrowser(
+                                destination = destination,
                                 localIds = state.localPlugins,
                                 connectedServices = state.servers,
                                 skills = state.skills,

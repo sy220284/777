@@ -29,6 +29,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class TasksNotice { CANCELLED, MISSING, RUN_STARTED, RUN_FAILED, PAUSED, RESUMED, OPERATION_FAILED, OPERATION_REJECTED }
+enum class TaskManagementAction(val success: TasksNotice) {
+    DELETE(TasksNotice.CANCELLED),
+    PAUSE(TasksNotice.PAUSED),
+    RESUME(TasksNotice.RESUMED),
+    RUN_NOW(TasksNotice.RUN_STARTED),
+    APPROVE(TasksNotice.RUN_STARTED),
+}
 enum class PlannerUiError { SESSION_CHANGED, SAVE_FAILED, PLAN_FAILED }
 internal enum class AutomationCadence { ONCE, DAILY, WEEKLY, MONTHLY, CUSTOM }
 
@@ -41,6 +48,8 @@ data class TasksUiState(
     val saveRevision: Long = 0L,
     val busyIds: Set<String> = emptySet(),
     val loading: Boolean = false,
+    val listLoadFailed: Boolean = false,
+    val failedAction: TaskManagementAction? = null,
     val managementFailed: Boolean = false,
     val managementError: String? = null,
     val savingEditor: Boolean = false,
@@ -73,31 +82,29 @@ class TasksViewModel @Inject constructor(
         mutableState.update { it.copy(loading = true) }
         try {
             val snapshot = withContext(Dispatchers.IO) { automation.snapshot() }
-            mutableState.update { it.copy(tasks = snapshot.tasks, loading = false,
-                managementFailed = false, managementError = null) }
+            mutableState.update { it.copy(tasks = snapshot.tasks, loading = false, listLoadFailed = false) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
             AppLog.failure("TaskScheduling", "refresh_tasks", failure)
-            mutableState.update { it.copy(loading = false, managementFailed = true,
-                managementError = failure.message) }
+            mutableState.update { it.copy(loading = false, listLoadFailed = true) }
         }
         observeTasks()
     }
 
-    fun cancel(id: String) = manage(id, TasksNotice.CANCELLED) { AutomationUiCommand.Delete(id) }
-    fun pause(id: String) = manage(id, TasksNotice.PAUSED) { AutomationUiCommand.Pause(id) }
-    fun resume(id: String) = manage(id, TasksNotice.RESUMED) { AutomationUiCommand.Resume(id) }
-    fun runNow(id: String) = manage(id, TasksNotice.RUN_STARTED) { AutomationUiCommand.RunNow(id) }
-    fun approveBlocked(id: String) = manage(id, TasksNotice.RUN_STARTED) {
+    fun cancel(id: String) = manage(id, TaskManagementAction.DELETE) { AutomationUiCommand.Delete(id) }
+    fun pause(id: String) = manage(id, TaskManagementAction.PAUSE) { AutomationUiCommand.Pause(id) }
+    fun resume(id: String) = manage(id, TaskManagementAction.RESUME) { AutomationUiCommand.Resume(id) }
+    fun runNow(id: String) = manage(id, TaskManagementAction.RUN_NOW) { AutomationUiCommand.RunNow(id) }
+    fun approveBlocked(id: String) = manage(id, TaskManagementAction.APPROVE) {
         val generation = mutableState.value.tasks.firstOrNull { it.id == id }
             ?.scheduleGeneration ?: -1L
         AutomationUiCommand.ApproveBlocked(id, generation)
     }
 
-    private fun manage(id: String, success: TasksNotice, command: () -> AutomationUiCommand) {
+    private fun manage(id: String, action: TaskManagementAction, command: () -> AutomationUiCommand) {
         if (id in mutableState.value.busyIds) return
-        mutableState.update { it.copy(busyIds = it.busyIds + id, notice = null, managementError = null) }
+        mutableState.update { it.copy(busyIds = it.busyIds + id, notice = null, managementFailed = false, managementError = null, failedAction = null) }
         viewModelScope.launch {
             try {
                 val result = runTaskManagementOperation({ automation.submit(command()) }, {
@@ -107,8 +114,9 @@ class TasksViewModel @Inject constructor(
                     tasks = result.tasks ?: it.tasks,
                     managementFailed = result.failed,
                     managementError = result.failureMessage,
+                    failedAction = action.takeIf { result.failed || !result.accepted },
                     notice = when {
-                        result.accepted -> success
+                        result.accepted -> action.success
                         result.failed -> TasksNotice.OPERATION_FAILED
                         else -> TasksNotice.OPERATION_REJECTED
                     },
@@ -130,8 +138,7 @@ class TasksViewModel @Inject constructor(
                 throw cancelled
             } catch (failure: Exception) {
                 AppLog.failure("TaskScheduling", "observe_tasks", failure)
-                mutableState.update { it.copy(managementFailed = true, loading = false,
-                    managementError = failure.message) }
+                mutableState.update { it.copy(listLoadFailed = true, loading = false) }
             }
         }
     }
@@ -154,7 +161,7 @@ class TasksViewModel @Inject constructor(
             mutableState.value.tasks.firstOrNull { it.id == id && it.mode == AutomationMode.WORK }
                 ?.scheduleGeneration
         }
-        mutableState.update { it.copy(savingEditor = true, managementError = null) }
+        mutableState.update { it.copy(savingEditor = true, managementFailed = false, managementError = null, failedAction = null) }
         viewModelScope.launch {
             try {
                 val result = runTaskManagementOperation(
@@ -202,7 +209,7 @@ class TasksViewModel @Inject constructor(
         onComplete: (Boolean) -> Unit,
     ) {
         if (task.id in mutableState.value.busyIds) return
-        mutableState.update { it.copy(busyIds = it.busyIds + task.id, managementError = null) }
+        mutableState.update { it.copy(busyIds = it.busyIds + task.id, managementFailed = false, managementError = null, failedAction = null) }
         viewModelScope.launch {
             try {
                 val result = runTaskManagementOperation(

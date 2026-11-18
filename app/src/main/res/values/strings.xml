@@ -2482,4 +2482,15 @@
     <string name="tasks_approve_resume">审批并继续</string>
     <string name="tasks_approve_resume_title">确认本次工具操作</string>
     <string name="tasks_approve_resume_warning">确认后仅批准本次显示的操作，执行记录将保留。运行中断时会先核对已执行结果，避免重复操作。</string>
+    <string name="work_open_execution_record">查看执行记录</string>
+    <string name="tasks_list_load_failed">无法读取任务列表</string>
+    <string name="tasks_refresh_list">刷新任务列表</string>
+    <string name="capability_filter_skills">技能 · 查看全部能力</string>
+    <string name="capability_filter_plugins">插件 · 查看全部能力</string>
+    <string name="capability_filter_connectors">连接器 · 查看全部能力</string>
+    <string name="capability_filter_empty">当前分类暂无项目</string>
+    <string name="work_capability_configure_item">配置 %1$s</string>
+    <string name="tasks_verify_then_retry">请先刷新列表核对任务状态，再从任务详情重新操作。</string>
+    <string name="tasks_run_now_action">立即运行</string>
+    <string name="tasks_named_action_not_confirmed">未确认操作结果：%1$s</string>
 </resources>

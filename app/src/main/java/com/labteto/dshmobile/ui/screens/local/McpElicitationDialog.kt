@@ -89,6 +89,8 @@ internal fun McpElicitationDialog(
     SyResponsiveSheet(
         title = "MCP 工具请求确认",
         onDismiss = onDismiss,
+        dismissEnabled = false,
+        showDragHandle = false,
         scrollable = true,
         seamlessBackground = true,
     ) {

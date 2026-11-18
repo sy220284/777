@@ -181,7 +181,11 @@ internal fun WorkSurfaceHeader(
         Column(
             modifier = Modifier.weight(1f).heightIn(min = SyMetric.touch)
                 .testTag("work-status-summary")
-                .then(if (onOpenWorkEvidence != null) Modifier.clickable(role = Role.Button, onClick = onOpenWorkEvidence) else Modifier)
+                .then(if (onOpenWorkEvidence != null) Modifier.clickable(
+                    role = Role.Button,
+                    onClickLabel = stringResource(R.string.work_open_execution_record),
+                    onClick = onOpenWorkEvidence,
+                ) else Modifier)
                 .padding(horizontal = SyMetric.gapMd),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
@@ -192,15 +196,25 @@ internal fun WorkSurfaceHeader(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                statusText,
-                style = DsType.caption11.withReadingWeight(),
-                color = if (statusText.startsWith("执行异常") ||
-                    statusText.startsWith("执行状态读取异常") ||
-                    statusText.startsWith("任务步骤失败")) colors.dangerInk else colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+            ) {
+                Text(
+                    statusText,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = DsType.small13.withReadingWeight(),
+                    color = if (statusText.startsWith("执行异常") ||
+                        statusText.startsWith("执行状态读取异常") ||
+                        statusText.startsWith("任务步骤失败")) colors.dangerInk else colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (onOpenWorkEvidence != null) {
+                    Icon(FeatherIcons.ChevronRight, contentDescription = null,
+                        modifier = Modifier.size(16.dp), tint = colors.textSecondary)
+                }
+            }
         }
         SyIconButton(
             icon = SyEntryIcons.NewSession,

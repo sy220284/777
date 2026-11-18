@@ -23,6 +23,7 @@ CLASSES=[
  'com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest',
+ 'com.labteto.dshmobile.ui.screens.local.LocalWorkToolDisclosureAndroidTest',
  'com.labteto.dshmobile.ui.screens.settings.PermissionSetupFlowAndroidTest',
  'com.labteto.dshmobile.notify.NotificationRoutingAndroidTest',
 ]
