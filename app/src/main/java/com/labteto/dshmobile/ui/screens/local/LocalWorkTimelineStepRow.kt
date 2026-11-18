@@ -171,20 +171,9 @@ internal fun WorkTimelineStepRow(
     val hasDetails = operationGroup || message.content.isNotBlank() || message.blocks.isNotEmpty() ||
         groupedMessages.any { it.content.isNotBlank() || it.blocks.isNotEmpty() }
     val activities = receipts.mapNotNull { userFacingWorkToolAction(it.toolName) }.distinct()
-    val isFinding = !operationGroup && message.toolName == "work_finding" &&
-        phase == LocalToolUiPhase.COMPLETED
-    val findingText = if (isFinding && message.content.contains("；发现="))
-        message.content.substringAfter("；发现=").substringBefore("；来源回执=").trim().take(280)
-    else ""
-    val findingStatus = if (isFinding && message.content.contains("状态="))
-        message.content.substringAfter("状态=").substringBefore("；")
-    else ""
-    val findingLabel = when (findingStatus) {
-        "supported" -> "调查线索 · 有来源支持"
-        "rejected" -> "调查修正 · 已排除假说"
-        "hypothesis" -> "发现新线索 · 待核查"
-        else -> if (isFinding) "调查发现已整理" else null
-    }
+    val finding = if (operationGroup) null else localWorkFindingSummary(message)
+    val findingText = finding?.text.orEmpty()
+    val findingLabel = finding?.label
     val groupLabel = if (operationGroup) {
         val summary = activities.take(2).joinToString("、").ifBlank { "工具操作" }
         "$summary · 已完成 ${receipts.size} 项"
