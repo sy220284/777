@@ -143,6 +143,14 @@ class MainPagesAuditTourTest {
             back()
             compose.onNodeWithTag("plugin-ownership-tabs").assertExists()
 
+            // The discover tab survives a round trip to capability settings.
+            compose.onNodeWithText(text(R.string.extension_discover)).performClick()
+            compose.onNodeWithText("可连接的服务").assertExists()
+            compose.onNodeWithTag("capability-settings-entry").performClick()
+            compose.onNodeWithContentDescription(text(R.string.common_back)).performClick()
+            compose.onNodeWithText("可连接的服务").assertExists()
+            compose.onNodeWithText(text(R.string.extension_added)).performClick()
+
             compose.onNodeWithText(text(R.string.extension_discover)).performClick()
             captureUiAudit(compose, "main-tools-discover")
             // Connector actions still live on this page's management sheet.
