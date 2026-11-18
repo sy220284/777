@@ -75,7 +75,7 @@
 | `TOOLS` | TOOLS | 能力中心/技能/插件与工具连接；技能、插件的状态/操作要如实展示 |
 | `SETTINGS` | SETTINGS | 设置首页分组和内部 SettingsDestination 导航；外观、模型、用量、记忆、权限、通知、诊断等不另增一级路由 |
 
-设置二级页由 `SettingsScreen.kt#SettingsDestination` 定义：`ROOT, SESSION, APPEARANCE, CHAT, ACCOUNT, MODELS, MODEL_PERFORMANCE, MODEL_USAGE, MINIMAX_QUOTA, PRICING, USAGE, USAGE_LOG, USAGE_DETAIL, MEMORY, MEMORY_SETTINGS, MEMORY_MANAGEMENT, PERMISSIONS, NOTIFICATIONS, ADVANCED, SESSION_STORAGE, DIAGNOSTICS`。**检查更新是设置页的直接操作，不另画“检查更新页面”**；模型数量显示在列表标题内，而不是 ChatGPT 连接测试上方新增小胶囊。消耗入口仍可由侧栏/设置到达，但聊天输入区不再提供“管理使用额度”快捷入口或套餐状态提示。
+设置二级页由 `SettingsScreen.kt#SettingsDestination` 定义：`ROOT, SESSION, APPEARANCE, CHAT, ACCOUNT, MODELS, MODEL_PERFORMANCE, MODEL_USAGE, MINIMAX_QUOTA, PRICING, USAGE, USAGE_LOG, USAGE_DETAIL, MEMORY, MEMORY_SETTINGS, MEMORY_MANAGEMENT, PERMISSIONS, NOTIFICATIONS, ADVANCED, SESSION_STORAGE, DIAGNOSTICS`。**检查更新是设置页的直接操作，不另画“检查更新页面”**；模型数量显示在列表标题内，而不是 ChatGPT 连接测试上方新增小胶囊。“模型价格与消耗”入口位于设置首页“模型与账户”分组，模型管理页不再重复展示；消耗详情仍可由侧栏/设置到达，但聊天输入区不再提供“管理使用额度”快捷入口或套餐状态提示。
 
 **侧栏与导航**：主界面顶部菜单开启单列侧栏，抽屉背景与主场景全高连续，内容让开系统安全区。侧栏搜索支持会话/人物/任务/工作文件的当前可检索内容；当前聊天/工作切换不能无故重置已打开的真实子页面。会话行不提供左滑删除，统一由长按菜单执行重命名、多选、置顶和删除（删除仍需确认）；返回需依实际页面栈恢复，不能把系统边缘返回手势占用为“打开侧栏”。通用顶栏不绘制整块额外不透明背板，避免顶/底割裂。
 
