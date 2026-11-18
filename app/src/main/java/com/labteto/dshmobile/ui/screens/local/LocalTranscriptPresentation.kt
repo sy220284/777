@@ -147,9 +147,23 @@ internal fun foldWorkToolsToTurnStart(items: List<LocalTranscriptItem>): List<Lo
                 turnId = item.message.id
                 headerIndex = result.size
             }
-            item is LocalTranscriptItem.WorkPendingTool ||
-                item is LocalTranscriptItem.WorkStep && item.message.role == "tool" ->
+            item is LocalTranscriptItem.WorkPendingTool -> operations += item
+            item is LocalTranscriptItem.WorkStep && item.message.role == "tool" -> {
                 operations += item
+                // work_finding formerly displayed its evidence summary below the tool row.
+                // Keep that public finding in the chronological narrative when hiding
+                // the receipt; it is a derived UI row, never another stored event.
+                localWorkFindingSummary(item.message)?.takeIf { it.text.isNotBlank() }?.let { finding ->
+                    result += LocalTranscriptItem.WorkStep(
+                        LocalHarnessMessage(
+                            id = "work-finding:${item.message.id}",
+                            role = "progress",
+                            content = "${finding.label}\n\n${finding.text}",
+                            createdAt = item.message.createdAt,
+                        ),
+                    )
+                }
+            }
             else -> result += item
         }
     }
