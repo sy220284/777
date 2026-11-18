@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sy220284/777/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/sy220284/777/ci.yml?branch=main&style=flat-square"></a>
+  <a href="https://github.com/sy220284/777/actions/workflows/runtime-user-journey.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/sy220284/777/runtime-user-journey.yml?branch=main&style=flat-square"></a>
   <a href="https://github.com/sy220284/777/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/sy220284/777?style=flat-square"></a>
   <img alt="Android 16+" src="https://img.shields.io/badge/Android-16%2B-3DDC84?style=flat-square">
   <img alt="arm64-v8a" src="https://img.shields.io/badge/ABI-arm64--v8a-6E4C9B?style=flat-square">

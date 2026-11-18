@@ -1,6 +1,6 @@
 # 777 V6.3 · 已实现交互与组件契约
 
-> **事实基线**：主线 `02544aa4b8d96fbd0e0aac5d7bf1a3e9f581df6a`（2026-11-13）。本文记录已合并 Compose 中值得继承的交互及其实现细节；下一轮视觉目标见 [V6.4 设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。本轮只修订文档。
+> **事实基线**：本文件记录 2026-11-13 已合并 Compose 的可继承交互契约；最新主线为 `5fbfb372`（2026-11-18）。能力中心调整见 [当前规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)中的 PR #950 候选条目，旧版单页布局和对应验证记录不能覆盖新实现。未来目标见 [V6.4 规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。
 
 ## 1. 事实与设计职责
 

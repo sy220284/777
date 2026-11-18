@@ -5,7 +5,7 @@
 ## 777
 
 ```text
-App baseline: `.github/release-version` 为唯一事实源（当前 0.12.0-777.215）
+App baseline: `.github/release-version`（构建与发行读取该文件；本文不复制固定版本号）
 minSdk: 36
 targetSdk: 36
 compileSdk: 37

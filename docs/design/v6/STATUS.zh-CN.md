@@ -1,6 +1,13 @@
 # V6 · 当前实现与设计状态
 
-> **2026-11-16 复核基线** main `73d86a8db525d22336c8ff45fbc7bdd1d2f4f9c9` + PR #926 界面改进（最终增量已完成源码审阅，按用户要求停止编译构建）。这是视觉/业务行为复核台账，而不是历史 38 张示例卡片的浏览器通过计数。下一轮尚未实现的目标见 [V6.4 设计规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。参照 [现行规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)、[页面清单](current-ui.json) 和 [手机设计投影](mobile/app.html)。
+> **2026-11-18 文档同步基线** main `5fbfb372`，能力中心变更为开放中的 [PR #950](https://github.com/sy220284/777/pull/950)。以下 PR #926 的实机记录仅证明对应旧提交，不推定 #950 已通过设备验收。当前入口以 Compose、[页面清单](current-ui.json) 和 [设计源](mobile/index.html)共同复查。后续视觉目标见 [V6.4 规范](V6.4-VISUAL-MATERIAL-GUIDELINES.zh-CN.md)。
+
+## 2026-11-18 能力中心与设计源同步（PR #950，待合并）
+
+- 统一能力中心目录：只保留「已添加／发现」，默认已添加；发现按已安装项目优先排列。
+- 在原生实现候选分支移除类型分类、用途分类、目录搜索框及 Codex 官方插件和精选技能的网络市场入口；已安装技能、手动 GitHub 来源和 MCP 连接仍由原运行时管理。
+- 更新 [机器页面清单](current-ui.json)、[可编辑 JS](mobile/v6.js)和[独立离线稿](mobile/app.html)，后者由同一源码重建。
+- **验收边界**：设计源校验仅证明文档交付一致；Android 构建、JVM、UI 及安装/授权恢复实测以 PR #950 同 SHA 结果为准。
 
 ## 2026-11-16 手机阅读与操作空间优化（PR #926）
 
@@ -58,7 +65,7 @@
 | PERSONA_GALLERY / DIARY | 人物选择、详情编辑、群聊、日记与返回 | `PersonaGalleryOverviewV3`、`CharacterDiaryScreen` | 待实测 |
 | WORKSPACE | 列表/目录/预览、打开文件与回到会话成果 | `LocalWorkspaceFilesDialog` | 待实测 |
 | TASKS | 空列表/创建/编辑/真实执行状态 | `TasksScreen` | 待实测 |
-| TOOLS | 技能/插件列表与说明、搜索、安装更新、错误/无数据/安全确认，320dp 与放大字体 | `ToolsScreen`；#711 已合并，待视觉复查 | 待实测 |
+| TOOLS | 已添加／发现统一目录、技能/插件/MCP 详情、安装授权、异常和恢复，320dp 与放大字体；无分类和目录搜索 | `ToolsScreen`；#950 候选实现 | #950 待设备验收 |
 | SETTINGS | 21 项设置内部导航与来源恢复；模型、账号、消耗、记忆、权限、通知、诊断 | `SettingsScreen` | 待实测 |
 | 外观全局 | 三主题、壁纸/纯色、环境光/对比/透明度滑块、无白底弹层、系统减少动效 | `ShenyanFoundation`、`ShenyanMaterialColor`、`AppearanceSettingsComponents` | 待实测 |
 | 搜索/媒体/系统弹层 | 单列菜单、四项加号入口、焦点、权限、文件选择、取消/错误/结果不明 | 对应 Feature UI / Host | 待实测 |
