@@ -360,11 +360,11 @@
     <string name="presets_system">内置</string>
     <string name="presets_user">自定义</string>
     <string name="settings_title">设置</string>
-    <string name="tools_catalog_title">插件</string>
+    <string name="tools_catalog_title">能力中心</string>
     <string name="tools_catalog_search">搜索插件</string>
     <string name="tools_catalog_installed">已安装</string>
     <string name="tools_catalog_connections">服务扩展</string>
-    <string name="tools_catalog_empty">当前列表中暂无可用的插件</string>
+    <string name="tools_catalog_empty">暂无可添加的能力</string>
     <string name="tools_catalog_no_matches">没有找到匹配的技能或插件</string>
     <string name="tools_catalog_details">查看</string>
     <string name="tools_catalog_return_chat">返回对话</string>
@@ -1764,7 +1764,7 @@
     <string name="app_open_navigation">打开侧栏</string>
     <string name="tasks_details">任务详情</string>
     <string name="tasks_actions">任务操作</string>
-    <string name="skills_catalog_empty">暂无已安装技能</string>
+    <string name="skills_catalog_empty">尚未添加技能、插件或连接器</string>
     <string name="skills_manual_only">已关闭自动调用，你仍可主动选择使用。</string>
     <string name="work_capability_title">在工作模式中使用</string>
     <string name="work_capability_hint">插件、技能和联网搜索通过工作模式执行。原聊天与草稿会保留，切换后请在输入框补充需求并发送。</string>

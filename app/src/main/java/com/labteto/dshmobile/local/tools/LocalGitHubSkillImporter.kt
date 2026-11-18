@@ -31,12 +31,6 @@ import kotlinx.serialization.json.contentOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** Fixed upstream path; the ZIP importer still validates every downloaded file. */
-internal fun curatedGitHubSkillUrl(id: String): String {
-    require(id.matches(Regex("[a-z][a-z0-9-]{1,47}"))) { "官方技能标识格式无效" }
-    return "https://github.com/openai/skills/tree/main/skills/.curated/$id"
-}
-
 internal data class PublicGitHubSkillLocation(
     val owner: String, val repository: String, val ref: String, val directory: String,
 ) {
@@ -255,38 +249,6 @@ internal class LocalGitHubSkillImporter @Inject constructor(
 
     fun installedSourceLink(id: String): String? =
         skills.githubSourceEvidence(id)?.let(::parseGitHubSkillSourceLink)
-
-    /** Listing is read-only. If the public REST quota is exhausted, enumerate the pinned ZIP. */
-    suspend fun curatedSkills(): List<String> = withContext(Dispatchers.IO) {
-        val official = PublicGitHubSkillLocation(
-            owner = "openai", repository = "skills", ref = "main", directory = "skills/.curated")
-        try {
-            (get(official.directory, official) as? JsonArray).orEmpty().mapNotNull {
-                val entry = it.jsonObject
-                if (entry["type"]?.jsonPrimitive?.contentOrNull != "dir") null
-                else entry["name"]?.jsonPrimitive?.contentOrNull
-            }.sorted()
-        } catch (failure: GitHubSkillApiException) {
-            if (failure.status != 403 && failure.status != 429) throw failure
-            val pinned = resolveCommit(official)
-            useSnapshot(official, pinned) { stream ->
-                val names = linkedSetOf<String>()
-                ZipInputStream(stream.buffered()).use { zip ->
-                    while (true) {
-                        val entry = zip.nextEntry ?: break
-                        val path = entry.name.substringAfter('/', "")
-                        val relative = path.removePrefix("skills/.curated/")
-                        if (path.startsWith("skills/.curated/") &&
-                            relative.contains('/') && relative.substringBefore('/').isNotBlank()) {
-                            names += relative.substringBefore('/')
-                        }
-                        zip.closeEntry()
-                    }
-                }
-                names.sorted()
-            }
-        }
-    }
 
     private suspend fun installPinned(
         source: PublicGitHubSkillLocation, commit: String, replaceId: String?,

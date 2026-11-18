@@ -1,0 +1,28 @@
+name: 文档与设计源一致性
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'tools/audit/check-docs.py'
+      - '.github/workflows/docs-consistency.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'tools/audit/check-docs.py'
+      - '.github/workflows/docs-consistency.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 检查文档相对链接与能力中心页面
+        run: python3 tools/audit/check-docs.py
+      - name: 检查 V6 离线设计稿与编辑源一致
+        run: python3 docs/design/v6/build-standalone.py --check
+      - name: 检查 V6 图标资产
+        run: python3 docs/design/v6/audit-all-icons.py

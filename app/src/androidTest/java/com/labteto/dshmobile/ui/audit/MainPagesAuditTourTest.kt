@@ -127,10 +127,20 @@ class MainPagesAuditTourTest {
             captureUiAudit(compose, "main-task-editor-closed")
         }
         page(R.string.tools_title, "main-tools") {
-            compose.onNodeWithText(text(R.string.skills_title)).performClick()
+            // One capability directory replaces the former plugin/skill/connector tabs.
+            // Verify the default installed view and that the retired controls are absent.
+            compose.onNodeWithTag("plugin-ownership-tabs").assertExists()
+            compose.onNodeWithTag("plugin-category-list").assertDoesNotExist()
+            compose.onNodeWithTag("plugin-inventory-search").assertDoesNotExist()
             captureUiAudit(compose, "main-skills")
-            compose.onNodeWithText("连接器").performClick()
+
+            compose.onNodeWithText(text(R.string.extension_discover)).performClick()
+            captureUiAudit(compose, "main-tools-discover")
+            // Connector actions still live on this page's management sheet.
+            compose.onNodeWithTag("plugin-inventory-more").performClick()
+            compose.onNodeWithTag("capability-menu-add-mcp").assertExists()
             captureUiAudit(compose, "main-connectors")
+            back()
         }
         page(R.string.settings_title, "main-settings") {
             compose.onNode(hasText(text(R.string.settings_page_models)) and hasClickAction()).performScrollTo().performClick()

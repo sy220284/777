@@ -4,7 +4,7 @@ import com.labteto.dshmobile.uicontract.UiSkillRequirement
 import com.labteto.dshmobile.uicontract.UiToolConnection
 import com.labteto.dshmobile.uicontract.UiToolRegistration
 
-/** Codex-style separation: installed, configured and runtime-ready are different facts. */
+/** Installation, configuration, and runtime readiness have distinct states. */
 internal enum class ExtensionMarketStatus {
     INSTALLABLE, INSTALLED, MANUAL_ONLY, NEEDS_SETUP, BUILTIN, REGISTERED, CONNECTING, FAILED, UNSUPPORTED
 }
@@ -74,39 +74,11 @@ internal fun skillMcpHttpsEndpoint(requirement: UiSkillRequirement): String? {
     return url
 }
 
-/** Filtering is based on actual installation/source, never on translated display labels. */
+/** A single directory uses verified installation state for both views. */
 internal fun marketplaceTabAllows(
     addedOnly: Boolean,
-    skillsOnly: Boolean,
     installedSkill: Boolean,
-    installable: Boolean,
     connectedService: Boolean,
     localPlugin: Boolean,
-    group: ExtensionGroup,
-    selectedGroup: ExtensionGroup? = null,
-): Boolean {
-    val owned = installedSkill || (!skillsOnly && (localPlugin || connectedService))
-    val discoverable = owned || installable
-    return (if (addedOnly) owned else discoverable) && (selectedGroup == null || group == selectedGroup)
-}
-
-/** Use importer-validated immutable source identity for every official plugin ownership check. */
-internal fun codexOfficialPluginSourceMatches(
-    source: com.labteto.dshmobile.uicontract.UiSkillSourceIdentity?,
-    pluginRoot: String,
-    skillDirectory: String? = null,
-): Boolean {
-    if (source == null || !source.owner.equals("openai", ignoreCase = true) ||
-        !source.repository.equals("plugins", ignoreCase = true) ||
-        !source.commit.matches(Regex("[0-9a-f]{40}"))) return false
-    return if (skillDirectory == null) source.directory.startsWith("$pluginRoot/")
-        else source.directory == "$pluginRoot/$skillDirectory"
-}
-
-internal fun codexPluginSkillInstalled(
-    skills: List<com.labteto.dshmobile.uicontract.UiSkillSnapshot>,
-    pluginRoot: String,
-    skillDirectory: String,
-): Boolean = skills.any { skill ->
-    codexOfficialPluginSourceMatches(skill.sourceIdentity, pluginRoot, skillDirectory)
-}
+    configuredConnector: Boolean,
+): Boolean = !addedOnly || installedSkill || connectedService || localPlugin || configuredConnector

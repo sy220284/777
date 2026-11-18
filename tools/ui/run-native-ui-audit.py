@@ -2,7 +2,7 @@
 """Run native UI checks and preserve playable videos of every interaction journey."""
 from html import escape
 from pathlib import Path
-import hashlib,json,re,subprocess,sys,urllib.request
+import hashlib,json,re,shutil,subprocess,sys,urllib.request
 from device_video import DeviceVideoRecorder
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -85,14 +85,42 @@ def export_components():
  return checked(['adb','pull','/sdcard/Android/data/com.sy220284.dshmobile.debug/files/ui-audit/.',str(OUT/'components')])
 phase('export-native-component-images',export_components)
 
-release=OUT/'777.400.apk'
+# The repository retains only its latest three formal releases. Resolve and verify the
+# published baseline at run time instead of pinning an asset that will be deleted.
+release=OUT/'baseline-release.apk'
 def baseline():
- url='https://github.com/sy220284/777/releases/download/v0.12.0-777.400/app-release.apk'
- urllib.request.urlretrieve(url,release)
- digest='94305fa7bfcb3ff8ea456c3bc7dbf7c89163bcc55e5101b0e9e6ae0b0e4dc2a7'
- if hashlib.sha256(release.read_bytes()).hexdigest()!=digest:raise RuntimeError('Official release checksum mismatch')
+ api='https://api.github.com/repos/sy220284/777/releases/latest'
+ headers={'Accept':'application/vnd.github+json','User-Agent':'777-native-ui-audit'}
  try:
-  return checked(['python3','tools/ui/native-page-audit.py','--apk',str(release),'--package','com.sy220284.dshmobile','--expected-sha256',digest,'--output',str(OUT/'baseline')],timeout=420)
+  with urllib.request.urlopen(urllib.request.Request(api,headers=headers),timeout=30) as response:
+   info=json.load(response)
+  tag=info.get('tag_name','')
+  if not re.fullmatch(r'v\d+\.\d+\.\d+-777\.\d+',tag):
+   raise RuntimeError('Latest release has an unexpected tag: '+str(tag))
+  assets=[asset for asset in info.get('assets',[]) if asset.get('name')=='app-release.apk']
+  if len(assets)!=1:raise RuntimeError('Latest formal release must have exactly one release APK')
+  asset=assets[0]
+  url=asset.get('browser_download_url','')
+  expected_url=f'https://github.com/sy220284/777/releases/download/{tag}/app-release.apk'
+  if url!=expected_url:raise RuntimeError('Release APK URL does not match the verified repository/tag')
+  published_digest=asset.get('digest','')
+  if not isinstance(published_digest,str) or not re.fullmatch(r'sha256:[0-9a-f]{64}',published_digest):
+   raise RuntimeError('Release APK has no valid published SHA-256 digest')
+  size=asset.get('size')
+  if not isinstance(size,int) or size<1000000:
+   raise RuntimeError('Release APK metadata has an invalid file size')
+  with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'777-native-ui-audit'}),timeout=180) as response:
+   with release.open('wb') as output:shutil.copyfileobj(response,output,length=1024*1024)
+  if release.stat().st_size!=size:raise RuntimeError('Release APK size differs from published asset metadata')
+  digest=published_digest.removeprefix('sha256:')
+  if hashlib.sha256(release.read_bytes()).hexdigest()!=digest:
+   raise RuntimeError('Release APK SHA-256 differs from published asset metadata')
+  evidence={'tag':tag,'apk_sha256':digest,'size':size,'asset_url':url}
+  (OUT/'baseline-release.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2),encoding='utf-8')
+  print('Verified published baseline:',json.dumps(evidence,ensure_ascii=False),flush=True)
+  return checked(['python3','tools/ui/native-page-audit.py','--apk',str(release),
+   '--package','com.sy220284.dshmobile','--expected-sha256',digest,
+   '--output',str(OUT/'baseline')],timeout=420)
  finally:
   release.unlink(missing_ok=True)
 phase('installed-release-page-tour',baseline,record=True)
