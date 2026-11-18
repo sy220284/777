@@ -213,7 +213,14 @@ internal fun WorkTimelineStepRow(
                     variant = SyButtonVariant.Ghost)
             }) {
             Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
-            message.toolErrorCode?.let { Text(it, style = DsType.small13.withReadingWeight()) }
+            message.toolCallId?.let { Text("调用标识：$it", style = DsType.small13.withReadingWeight()) }
+            activity?.argumentsPreview?.takeIf(String::isNotBlank)?.let { preview ->
+                Text("调用参数", style = DsType.small13.withReadingWeight())
+                SelectionContainer {
+                    Text(preview, style = DsType.std14.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                }
+            }
             receipts.forEachIndexed { index, receipt ->
                 if (operationGroup || repeatCount > 1) {
                     Text(if (operationGroup) "第 ${index + 1} 项 · " +
@@ -221,12 +228,18 @@ internal fun WorkTimelineStepRow(
                         else "第 ${index + 1} 次检查",
                         style = DsType.small13.withReadingWeight())
                 }
+                receipt.toolErrorCode?.let { code ->
+                    Text("错误代码：$code", style = DsType.small13.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
+                }
                 receipt.blocks.filterIsInstance<com.labteto.dshmobile.local.session.LocalMessageBlock.Image>().forEach { image ->
                     LocalTranscriptImage(image, workspacePath)
                 }
-                SelectionContainer {
-                    Text(receipt.content, style = DsType.std14.withReadingWeight(),
-                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                if (receipt.content.isNotBlank()) {
+                    SelectionContainer {
+                        Text(receipt.content, style = DsType.std14.withReadingWeight(),
+                            color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                    }
                 }
             }
         }
@@ -315,7 +328,7 @@ private fun WorkToolStatusRow(
                 Text(status, style = DsType.small13.withReadingWeight(), color = tint)
             }
         }
-        if (labelOverride != null && onClick != null) {
+        if (onClick != null) {
             Icon(imageVector = FeatherIcons.ChevronRight, contentDescription = "展开操作明细",
                 tint = colors.textSecondary, modifier = Modifier.size(16.dp))
         }
@@ -325,7 +338,29 @@ private fun WorkToolStatusRow(
 @Composable
 internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentation.LocalToolActivityUiItem) {
     if (activity.phase !in setOf(LocalToolUiPhase.DECLARED, LocalToolUiPhase.RUNNING)) return
-    WorkToolStatusRow(activity.name, activity.phase, argumentsPreview = activity.argumentsPreview)
+    var detailsOpen by remember(activity.executionId, activity.declaredSequence, activity.callId) {
+        mutableStateOf(false)
+    }
+    WorkToolStatusRow(activity.name, activity.phase, argumentsPreview = activity.argumentsPreview,
+        onClick = { detailsOpen = true })
+    if (detailsOpen) {
+        SyResponsiveSheet(title = "执行中 · 工具调用", onDismiss = { detailsOpen = false },
+            scrollable = true, seamlessBackground = false,
+            trailing = {
+                SyButton("关闭", onClick = { detailsOpen = false }, size = SyButtonSize.Small,
+                    variant = SyButtonVariant.Ghost)
+            }) {
+            Text(workToolPhaseText(activity.phase), style = DsType.std14Strong.withReadingWeight())
+            Text("调用标识：${activity.callId}", style = DsType.small13.withReadingWeight())
+            activity.argumentsPreview?.takeIf(String::isNotBlank)?.let { preview ->
+                Text("调用参数", style = DsType.small13.withReadingWeight())
+                SelectionContainer {
+                    Text(preview, style = DsType.std14.withReadingWeight(),
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+                }
+            }
+        }
+    }
 }
 
 @Composable
