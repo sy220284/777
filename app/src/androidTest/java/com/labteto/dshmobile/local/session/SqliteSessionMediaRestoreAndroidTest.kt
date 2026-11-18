@@ -69,6 +69,45 @@ class SqliteSessionMediaRestoreAndroidTest {
         }
     }
 
+    @Test fun backupRejectsAnExistingDifferentAttachmentBeforeCreatingRestorePlan() {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(base.cacheDir, "backup-conflict-" + UUID.randomUUID()).apply { mkdirs() }
+        try {
+            val source = isolatedContext(base, File(root, "source").apply { mkdirs() })
+            val destination = isolatedContext(base, File(root, "destination").apply { mkdirs() })
+            val relative = "local-harness/workspace/.dsh/attachments/shared.png"
+            val incoming = File(source.filesDir, relative).apply {
+                check(parentFile!!.mkdirs())
+                writeText("backup contents")
+            }
+            val existing = File(destination.filesDir, relative).apply {
+                check(parentFile!!.mkdirs())
+                writeText("local contents")
+            }
+            val archive = ByteArrayOutputStream()
+            SqliteSessionSnapshotStore(source, Json).use { snapshots ->
+                SqliteSessionEventDatabase(source, Json).use { events ->
+                    SqliteSessionStorageManager(source, snapshots, events).exportAll(archive)
+                }
+            }
+            SqliteSessionSnapshotStore(destination, Json).use { snapshots ->
+                SqliteSessionEventDatabase(destination, Json).use { events ->
+                    val manager = SqliteSessionStorageManager(destination, snapshots, events)
+                    val failure = org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+                        manager.stageRestore(archive.toByteArray())
+                    }
+                    assertTrue(failure.message.orEmpty().contains("shared.png"))
+                    assertTrue(!manager.status().pendingRestore)
+                    assertEquals("local contents", existing.readText())
+
+                    existing.writeBytes(incoming.readBytes())
+                    assertEquals(0, manager.stageRestore(archive.toByteArray()))
+                    assertTrue(manager.status().pendingRestore)
+                }
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun backupStagesAndRestoresBothDatabasesAndOriginalImage() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val unique = UUID.randomUUID().toString().replace("-", "")

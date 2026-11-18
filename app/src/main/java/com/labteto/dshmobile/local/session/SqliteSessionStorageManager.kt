@@ -315,6 +315,7 @@ internal class SqliteSessionStorageManager(
                 require(studioReceiver == null) { "会话备份范围声明不包含媒体工作室，但归档含媒体数据" }
             }
             mediaBackup.validateStaged(staging, names)
+            mediaBackup.validateDestination(staging)
             validateTables(File(staging, SNAPSHOT_ENTRY), "session_snapshots")
             validateTables(File(staging, EVENT_ENTRY), "session_events")
             validateSnapshotEventCursors(
@@ -408,6 +409,7 @@ internal class SqliteSessionStorageManager(
             )
         }
         mediaBackup.validateStaged(pendingRoot, mediaNames)
+        mediaBackup.validateDestination(pendingRoot)
         // Durable fence: never allow UI cancellation after any installed media/DB bytes.
         val installing = File(pendingRoot, "INSTALLING")
         DurableFileCommit.replace(installing, byteArrayOf(1))

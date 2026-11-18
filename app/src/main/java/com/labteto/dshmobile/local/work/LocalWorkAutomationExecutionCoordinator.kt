@@ -131,12 +131,12 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
             })
         }
 
-        var blockedReason: String? = null
+        val blockedReason = java.util.concurrent.atomic.AtomicReference<String?>()
         val runner = work.automationRunner(
             sessionId = sessionId,
             boundState = boundState,
             onApprovalBlocked = { reason ->
-                if (blockedReason == null) blockedReason = reason
+                blockedReason.compareAndSet(null, reason)
             },
         )
 
@@ -155,6 +155,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                                 historyMode = LocalSubagentHistoryMode.ISOLATED,
                             ),
                         ),
+                        executionFence = { blockedReason.get()?.let { throw CancellationException(it) } },
                     )
                 }
                 recoveredProfile?.let { profile ->
@@ -162,7 +163,7 @@ internal class LocalWorkAutomationExecutionCoordinator @javax.inject.Inject cons
                 } ?: execute()
             }
 
-            blockedReason?.let { reason ->
+            blockedReason.get()?.let { reason ->
                 persistTranscript(
                     session = session,
                     messages = listOf(userMessage),

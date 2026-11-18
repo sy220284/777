@@ -65,9 +65,16 @@ internal class LocalWorkBackgroundToolExecutor(
             put("execution_started", false)
             put("automation", true)
         })
+        var stoppedAtApproval: String? = null
         val result = try {
             executeUtility(normalized, sessionId, memoryTools, enabledOptionalTools)
-                ?: executeAutomationRegistered(normalized, allowMutation, sessionId, goalId?.let { (it as? JsonPrimitive)?.contentOrNull }, artifactPaths, onApprovalBlocked)
+                ?: executeAutomationRegistered(
+                    normalized, allowMutation, sessionId,
+                    goalId?.let { (it as? JsonPrimitive)?.contentOrNull }, artifactPaths,
+                ) { reason ->
+                    stoppedAtApproval = reason
+                    onApprovalBlocked(reason)
+                }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -99,6 +106,7 @@ internal class LocalWorkBackgroundToolExecutor(
             result.recoveryHint?.let { put("recovery_hint", it) }
             put("automation", true)
         })
+        stoppedAtApproval?.let { throw CancellationException(it) }
         return result
     }
 
@@ -137,6 +145,8 @@ internal class LocalWorkBackgroundToolExecutor(
                         put("tool", call.name)
                         put("access", tool.access.name.lowercase())
                         put("mode", "automation-noninteractive")
+                        put("call_id", call.id)
+                        put("root_call_id", original.id)
                     })
                     false
                 }
@@ -144,7 +154,7 @@ internal class LocalWorkBackgroundToolExecutor(
         )
         return if (result.isError) {
             result.copy(
-                recoveryHint = "后台任务不能弹出人工审批；可在工作模式中打开该任务继续处理。" +
+                recoveryHint = "后台任务因等待人工审批已停止；在对应会话可查看已完成步骤和被拦下的操作。" +
                     result.recoveryHint?.let { " " + it }.orEmpty(),
             )
         } else {
