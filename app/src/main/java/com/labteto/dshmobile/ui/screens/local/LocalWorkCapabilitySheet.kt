@@ -41,6 +41,10 @@ internal fun LocalWorkCapabilitySheet(
     onMessageSearchChange: (String) -> Unit = {},
     hasEarlierMessages: Boolean = false,
     loadingEarlierMessages: Boolean = false,
+    archivedMatches: List<LocalHarnessMessage> = emptyList(),
+    archiveSearchError: String? = null,
+    archiveSearching: Boolean = false,
+    onLoadMoreArchive: (() -> Unit)? = null,
     onLoadEarlierMessages: (() -> Unit)? = null,
     onPromptChange: (String) -> Unit = {},
     onSummaryChange: (String) -> Unit = {},
@@ -88,10 +92,10 @@ internal fun LocalWorkCapabilitySheet(
             maxLines = 6,
         )
         Text(stringResource(R.string.work_handoff_scope), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
-        if (selectableMessages.isNotEmpty() || hasEarlierMessages) {
+        if (selectableMessages.isNotEmpty() || hasEarlierMessages || messageSearch.isNotBlank()) {
             Text(stringResource(R.string.work_handoff_select_messages),
                 style = DsType.std14.withReadingWeight(), color = colors.text)
-            if (selectableMessages.size > 12 || hasEarlierMessages) {
+            if (selectableMessages.size > 12 || hasEarlierMessages || messageSearch.isNotBlank()) {
                 SyTextField(
                     value = messageSearch, onValueChange = onMessageSearchChange,
                     placeholder = { Text(stringResource(R.string.work_handoff_search_messages)) },
@@ -99,10 +103,13 @@ internal fun LocalWorkCapabilitySheet(
                     enabled = !switching, singleLine = true,
                 )
             }
-            val visible = visibleWorkHandoffMessages(
-                selectableMessages, messageSearch, selectedMessageIds,
-            )
-            if (visible.isEmpty() && messageSearch.isNotBlank()) {
+            val recent = visibleWorkHandoffMessages(selectableMessages, messageSearch, selectedMessageIds)
+            val visible = (recent + archivedMatches).distinctBy(LocalHarnessMessage::id)
+            if (selectedMessageIds.isNotEmpty()) {
+                Text(stringResource(R.string.work_handoff_selected_count, selectedMessageIds.size),
+                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+            }
+            if (visible.isEmpty() && messageSearch.isNotBlank() && !archiveSearching && archiveSearchError == null && onLoadMoreArchive == null) {
                 Text(stringResource(R.string.work_handoff_no_matches),
                     style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
             }
@@ -130,7 +137,17 @@ internal fun LocalWorkCapabilitySheet(
                         style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
                 }
             }
-            if (hasEarlierMessages && onLoadEarlierMessages != null) {
+            if (messageSearch.isNotBlank()) {
+                if (archiveSearching) Text(stringResource(R.string.common_loading))
+                archiveSearchError?.let { Text(it, color = colors.dangerInk) }
+                if (onLoadMoreArchive != null) SyButton(
+                    text = stringResource(if (archiveSearchError == null) R.string.sy_v6_search_older else R.string.common_retry),
+                    onClick = onLoadMoreArchive,
+                    enabled = !switching && !archiveSearching,
+                    variant = SyButtonVariant.Ghost,
+                )
+            }
+            if (hasEarlierMessages && messageSearch.isBlank() && onLoadEarlierMessages != null) {
                 SyButton(
                     text = stringResource(R.string.work_handoff_load_older),
                     onClick = onLoadEarlierMessages,

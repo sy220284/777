@@ -253,6 +253,7 @@ fun LocalHarnessScreen(
     var workHandoffSummary by rememberSaveable { mutableStateOf("") }
     var workHandoffMessageIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var workHandoffSearch by rememberSaveable { mutableStateOf("") }
+    var workHandoffSubmitting by remember { mutableStateOf(false) }
     var workCapabilityConfirmed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityFailed by rememberSaveable { mutableStateOf(false) }
     var workCapabilityOpenVersion by remember { mutableIntStateOf(0) }
@@ -1165,19 +1166,29 @@ fun LocalHarnessScreen(
     }
 
     if (pendingWorkCapability != null && !workCapabilityConfiguring) {
-        val handoffMessages = if (workHandoffSourceSessionId == shell.sessionId &&
+        val handoffQuery = workHandoffSearch.trim()
+        val handoffSource = workHandoffSourceSessionId
+        val visibleSession = shell.sessionId
+        val archive = rememberWorkHandoffArchive(
+            sourceSessionId = handoffSource,
+            query = handoffQuery,
+            enabled = handoffSource == visibleSession,
+            search = viewModel::searchWorkHandoff,
+        )
+        val loadedMessages = if (workHandoffSourceSessionId == shell.sessionId &&
             transcriptHistory.sessionId == shell.sessionId
         ) workHandoffDialogueCandidates(transcriptHistory.olderMessages, chatSurface.messages)
         else if (workHandoffSourceSessionId == shell.sessionId)
             workHandoffDialogueCandidates(emptyList(), chatSurface.messages)
         else emptyList()
         LocalWorkCapabilitySheet(
-            switching = workCapabilityConfirmed,
+            switching = workCapabilityConfirmed || workHandoffSubmitting,
             failed = workCapabilityFailed,
             enabled = !shell.loading && localHarnessModeSwitchEnabled(shell.usageMode, shell.running),
             prompt = pendingWorkCapability.orEmpty(),
             summary = workHandoffSummary,
-            selectableMessages = handoffMessages,
+            selectableMessages = loadedMessages,
+            archivedMatches = archive.matches,
             selectedMessageIds = workHandoffMessageIds,
             onSelectedMessageIdsChange = { workHandoffMessageIds = it },
             messageSearch = workHandoffSearch,
@@ -1185,6 +1196,9 @@ fun LocalHarnessScreen(
             hasEarlierMessages = workHandoffSourceSessionId == shell.sessionId &&
                 transcriptHistory.sessionId == shell.sessionId && transcriptHistory.hasMore,
             loadingEarlierMessages = transcriptHistory.loading,
+            archiveSearchError = archive.error,
+            archiveSearching = archive.loading,
+            onLoadMoreArchive = archive.loadMore,
             onLoadEarlierMessages = {
                 if (workHandoffSourceSessionId == shell.sessionId) {
                     scope.launch { viewModel.loadOlderTranscript(workHandoffSourceSessionId) }
@@ -1221,14 +1235,34 @@ fun LocalHarnessScreen(
             },
             onContinue = {
                 workCapabilityFailed = false
-                workCapabilityConfirmed = viewModel.createWorkContinuation(
-                    workHandoffSourceSessionId,
-                    workHandoffSummaryWithSelectedMessages(
-                        workHandoffSummary, workHandoffSourceSessionId, handoffMessages, workHandoffMessageIds,
-                    ),
-                )
-                if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
-                else workCapabilityFailed = true
+                workHandoffSubmitting = true
+                val ids = workHandoffMessageIds.toList()
+                val summary = workHandoffSummary
+                scope.launch {
+                    try {
+                        val live = chatSurface.messages
+                        val liveIds = live.mapTo(hashSetOf()) { it.id }
+                        val archived = viewModel.loadWorkHandoffReferences(handoffSource, ids.toSet() - liveIds)
+                        val candidates = workHandoffDialogueCandidates(archived, live)
+                        check(ids.all { selected -> candidates.any { it.id == selected } }) {
+                            "所选消息已变化，请重新选择"
+                        }
+                        workCapabilityConfirmed = viewModel.createWorkContinuation(
+                            handoffSource,
+                            workHandoffSummaryWithSelectedMessages(summary, handoffSource, candidates, ids),
+                        )
+                        if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
+                        else workCapabilityFailed = true
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        workCapabilityFailed = true
+                        android.widget.Toast.makeText(context, error.message ?: "无法读取所选消息",
+                            android.widget.Toast.LENGTH_SHORT).show()
+                    } finally {
+                        workHandoffSubmitting = false
+                    }
+                }
             },
             onDismiss = {
                 pendingWorkCapability = null

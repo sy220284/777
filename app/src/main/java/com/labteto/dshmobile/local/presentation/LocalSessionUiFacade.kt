@@ -5,6 +5,8 @@ import com.labteto.dshmobile.local.model.LocalConversationSampleResult
 import com.labteto.dshmobile.local.session.LocalSessionReadRuntime
 import com.labteto.dshmobile.local.session.LocalTranscriptPageCursor
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
+import com.labteto.dshmobile.local.session.matchesWorkHandoffQuery
+import com.labteto.dshmobile.local.session.workHandoffVisibleMessage
 import com.labteto.dshmobile.uicontract.UiTranscriptCursor
 import com.labteto.dshmobile.uicontract.UiMessagePage
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
@@ -77,6 +79,51 @@ class LocalSessionUiFacade @Inject constructor(
             com.labteto.dshmobile.observability.AppLog.warn("SessionSearch", "failure=true operation=search_session_history cause_type=${error.javaClass.simpleName}")
             UiMessageSearchReceipt.Failed(error.message)
         }
+    }
+
+    internal data class HandoffSearchPage(
+        val matches: List<LocalHarnessMessage>,
+        val next: UiMessageSearchCursor?,
+    )
+
+    internal suspend fun searchHandoffMessages(
+        sessionId: String, query: String, cursor: UiMessageSearchCursor?,
+    ): HandoffSearchPage = withContext(Dispatchers.IO) {
+        val term = query.trim()
+        require(term.isNotEmpty()) { "请输入搜索关键词" }
+        val captured = cursor?.let { it as? SearchCursor ?: error("搜索标识已失效") }
+        require(captured == null || (captured.sessionId == sessionId && captured.query == term)) {
+            "会话或关键词已变化，请重新搜索"
+        }
+        var continuation = captured?.continuation
+        var matches: List<LocalHarnessMessage>
+        do {
+            coroutineContext.ensureActive()
+            val (messages, next) = rawTranscriptPage(sessionId, continuation, 30)
+            matches = messages.mapNotNull(LocalHarnessMessage::workHandoffVisibleMessage)
+                .filter { it.matchesWorkHandoffQuery(term) }
+            continuation = next
+        } while (matches.isEmpty() && continuation != null)
+        HandoffSearchPage(matches, continuation?.let { SearchCursor(sessionId, term, it) })
+    }
+
+    internal suspend fun handoffMessagesById(
+        sessionId: String, ids: Set<String>,
+    ): List<LocalHarnessMessage> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+        val selected = LinkedHashMap<String, LocalHarnessMessage>()
+        var cursor: UiTranscriptCursor? = null
+        do {
+            coroutineContext.ensureActive()
+            val (messages, next) = rawTranscriptPage(sessionId, cursor, 100)
+            for (message in messages) {
+                if (message.id in ids && message.id !in selected) {
+                    message.workHandoffVisibleMessage()?.let { selected[it.id] = it }
+                }
+            }
+            cursor = next
+        } while (cursor != null && selected.size < ids.size)
+        selected.values.toList()
     }
 
     private suspend fun rawTranscriptPage(sessionId: String, cursor: UiTranscriptCursor?, limit: Int): Pair<List<LocalHarnessMessage>, UiTranscriptCursor?> = withContext(Dispatchers.IO) {

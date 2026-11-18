@@ -49,6 +49,19 @@ class LocalWorkHandoffMaterialsTest {
     }
 
     @Test
+    fun chosenDialogueStaysVisibleWhenQueryChangesAndPrivateReasoningIsRemoved() {
+        val candidates = workHandoffDialogueCandidates(
+            listOf(row("older", "assistant", "<think>内部推理</think>可引用材料"),
+                row("newer", "user", "新查找目标")),
+            emptyList(),
+        )
+        assertEquals(listOf("older", "newer"),
+            visibleWorkHandoffMessages(candidates, "新查找", listOf("older")).map { it.id })
+        assertFalse(candidates.first().matchesWorkHandoffQuery("内部推理"))
+        assertTrue(candidates.first().matchesWorkHandoffQuery("可引用"))
+    }
+
+    @Test
     fun selectedMediaOnlyMessageKeepsVerifiedWorkspaceReferenceWithoutCopyingBytes() {
         val hash = "a".repeat(64)
         val media = LocalHarnessMessage(

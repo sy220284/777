@@ -6,6 +6,8 @@ import java.io.OutputStream
 import java.io.DataInputStream
 import java.io.IOException
 import java.net.URI
+import java.net.URLDecoder
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import java.util.zip.ZipInputStream
@@ -35,32 +37,52 @@ internal data class PublicGitHubSkillLocation(
     val owner: String, val repository: String, val ref: String, val directory: String,
 ) {
     companion object {
-        fun parse(link: String): PublicGitHubSkillLocation {
+        fun parse(link: String, advertisedRefs: Set<String> = emptySet()): PublicGitHubSkillLocation {
             val input = link.trim()
             val url = URI(if (input.startsWith("github.com/", ignoreCase = true)) "https://$input" else input)
             require(url.scheme.equals("https", true) && url.host.equals("github.com", true) &&
                 url.userInfo == null && url.port == -1 && url.rawQuery == null && url.rawFragment == null) {
                 "请输入 GitHub 网站的技能目录地址"
             }
-            val parts = url.path.split('/').filter(String::isNotBlank)
+            val parts = url.rawPath.trim('/').split('/').map {
+                URLDecoder.decode(it.replace("+", "%2B"), Charsets.UTF_8.name())
+            }
             require(parts.size >= 5 && parts[2] in setOf("tree", "blob")) {
                 "地址格式：github.com/owner/repo/tree/branch/skills/name"
             }
             val owner = parts[0]
             val repo = parts[1].removeSuffix(".git")
-            val ref = parts[3]
-            val directory = parts.drop(4).joinToString("/").removeSuffix("/SKILL.md")
+            val route = parts.drop(3)
+            require(route.drop(1).all(::validGitHubSkillPathSegment)) { "技能目录路径无效" }
+            val revisionParts = if ('/' in route.first() || route.first().matches(Regex("[0-9a-fA-F]{40}"))) {
+                1
+            } else {
+                (route.lastIndex downTo 1).firstOrNull { size ->
+                    val candidate = route.take(size).joinToString("/")
+                    candidate in advertisedRefs
+                } ?: 1
+            }
+            val ref = route.take(revisionParts).joinToString("/")
+            val directory = route.drop(revisionParts).joinToString("/").removeSuffix("/SKILL.md")
             val ownerPattern = Regex("[A-Za-z0-9-]{1,39}")
             val repoPattern = Regex("[A-Za-z0-9_.-]{1,100}")
             require(ownerPattern.matches(owner) && repoPattern.matches(repo) &&
-                repo != "." && repo != ".." && Regex("[A-Za-z0-9._-]{1,100}").matches(ref) &&
-                directory.isNotBlank() && directory.split('/').all {
-                    it.matches(Regex("[A-Za-z0-9._-]{1,100}")) && it != "." && it != ".."
-                }) { "技能仓库路径或分支无效" }
+                repo != "." && repo != ".." && validGitHubSkillRef(ref) &&
+                directory.isNotBlank() && directory.split('/').all(::validGitHubSkillPathSegment)) { "技能仓库路径或分支无效" }
             return PublicGitHubSkillLocation(owner, repo, ref, directory)
         }
     }
 }
+
+private val gitHubSkillSegment = Regex("[A-Za-z0-9._-]{1,100}")
+private fun validGitHubSkillPathSegment(value: String): Boolean =
+    gitHubSkillSegment.matches(value) && value != "." && value != ".."
+
+private fun validGitHubSkillRef(value: String): Boolean =
+    value.length in 1..255 && value.split('/').all { segment ->
+        validGitHubSkillPathSegment(segment) && !segment.startsWith('.') &&
+            !segment.endsWith('.') && !segment.endsWith(".lock") && ".." !in segment
+    }
 
 /** GitHub's directory listing is metadata, never permission to walk outside the chosen folder. */
 internal fun requireGitHubSkillChildPath(parent: String, name: String, advertisedPath: String): String {
@@ -106,7 +128,7 @@ internal fun parseGitHubSkillSourceLink(document: String): String {
     require(owner.matches(Regex("[A-Za-z0-9-]{1,39}")) &&
         repository.matches(Regex("[A-Za-z0-9_.-]{1,100}")) &&
         repository !in setOf(".", "..") &&
-        ref.matches(Regex("[A-Za-z0-9._-]{1,100}")) &&
+        validGitHubSkillRef(ref) &&
         commit.matches(Regex("[0-9a-f]{40}")) &&
         directory.isNotBlank() && directory.split('/').all {
             it.matches(Regex("[A-Za-z0-9._-]{1,100}")) && it !in setOf(".", "..")
@@ -121,8 +143,8 @@ internal fun parseGitHubSkillUpdateSource(document: String): Pair<PublicGitHubSk
     parseGitHubSkillSourceLink(document)
     val fields = Json.parseToJsonElement(document).jsonObject
     fun value(key: String) = fields.getValue(key).jsonPrimitive.content
-    val source = PublicGitHubSkillLocation.parse(
-        "https://github.com/${value("owner")}/${value("repository")}/tree/${value("source_ref")}/${value("directory")}",
+    val source = PublicGitHubSkillLocation(
+        value("owner"), value("repository"), value("source_ref"), value("directory"),
     )
     return source to value("commit")
 }
@@ -133,7 +155,15 @@ internal fun parseGitHubSkillUpdateSource(document: String): Pair<PublicGitHubSk
  * subject to the GitHub REST API's unauthenticated request quota.
  */
 internal fun advertisedGitCommit(advertisement: InputStream, ref: String): String {
-    require(ref.matches(Regex("[A-Za-z0-9._-]{1,100}"))) { "GitHub 分支或标签无效" }
+    require(validGitHubSkillRef(ref)) { "GitHub 分支或标签无效" }
+    return advertisedRevision(advertisedGitRefs(advertisement), ref)
+        ?: throw IOException("GitHub 未找到分支或标签：$ref")
+}
+
+private fun advertisedRevision(refs: Map<String, String>, ref: String): String? =
+    refs["refs/heads/$ref"] ?: refs["refs/tags/$ref^{}"] ?: refs["refs/tags/$ref"]
+
+private fun advertisedGitRefs(advertisement: InputStream): Map<String, String> {
     val matches = mutableMapOf<String, String>()
     DataInputStream(advertisement).use { input ->
         while (true) {
@@ -155,9 +185,7 @@ internal fun advertisedGitCommit(advertisement: InputStream, ref: String): Strin
             }
         }
     }
-    return matches["refs/heads/$ref"] ?: matches["refs/tags/$ref^{}"]
-        ?: matches["refs/tags/$ref"]
-        ?: throw IOException("GitHub 未找到分支或标签：$ref")
+    return matches
 }
 
 /** Select only the requested subtree from a public immutable repository snapshot. */
@@ -215,8 +243,28 @@ internal class LocalGitHubSkillImporter @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     suspend fun install(link: String): String = withContext(Dispatchers.IO) {
-        val source = PublicGitHubSkillLocation.parse(link)
-        installPinned(source, resolveCommit(source), null)
+        val initial = PublicGitHubSkillLocation.parse(link)
+        if (initial.ref.matches(Regex("[0-9a-fA-F]{40}"))) {
+            return@withContext installPinned(initial, initial.ref.lowercase(), null)
+        }
+        val refs = try {
+            fetchAdvertisedRefs(initial)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            return@withContext installPinned(initial, resolveAuthenticatedCommit(initial, failure), null)
+        }
+        val revisions = refs.keys.mapNotNull { key ->
+            when {
+                key.startsWith("refs/heads/") -> key.removePrefix("refs/heads/")
+                key.startsWith("refs/tags/") -> key.removePrefix("refs/tags/").removeSuffix("^{}")
+                else -> null
+            }
+        }.toSet()
+        val source = PublicGitHubSkillLocation.parse(link, revisions)
+        val commit = advertisedRevision(refs, source.ref)
+            ?: resolveAuthenticatedCommit(source, IOException("GitHub 未找到分支或标签：${source.ref}"))
+        installPinned(source, commit, null)
     }
 
     suspend fun availableUpdate(id: String): String? = withContext(Dispatchers.IO) {
@@ -311,34 +359,43 @@ internal class LocalGitHubSkillImporter @Inject constructor(
 
     private suspend fun resolveCommit(source: PublicGitHubSkillLocation): String {
         if (source.ref.matches(Regex("[0-9a-fA-F]{40}"))) return source.ref.lowercase()
+        return try {
+            advertisedRevision(fetchAdvertisedRefs(source), source.ref)
+                ?: throw IOException("GitHub 未找到分支或标签：${source.ref}")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            resolveAuthenticatedCommit(source, failure)
+        }
+    }
+
+    private suspend fun fetchAdvertisedRefs(source: PublicGitHubSkillLocation): Map<String, String> {
         val request = Request.Builder()
             .url("https://github.com/${source.owner}/${source.repository}.git/info/refs?service=git-upload-pack")
             .header("Accept", "application/x-git-upload-pack-advertisement").get().build()
-        try {
-            return http.newCall(request).execute().use { response ->
-                require(response.isSuccessful) {
-                    "GitHub 公开版本查询失败（HTTP ${response.code}）"
-                }
-                val body = response.body ?: throw IOException("GitHub 未返回公开版本信息")
-                advertisedGitCommit(body.byteStream(), source.ref)
-            }
-        } catch (publicError: Exception) {
-            if (publicError is CancellationException) throw publicError
-            val token = credentials.get()?.takeIf(String::isNotBlank)
-                ?: throw IOException("GitHub 公开仓库连接失败，请检查网络或在工具设置中连接 GitHub 账户", publicError)
-            val url = "https://api.github.com/repos/${source.owner}/${source.repository}/commits/${source.ref}"
-            val api = Request.Builder().url(url)
-                .header("Accept", "application/vnd.github+json")
-                .header("Authorization", "Bearer $token").get().build()
-            return http.newCall(api).execute().use { response ->
-                require(response.isSuccessful) {
-                    "GitHub 版本查询失败（HTTP ${response.code}），请检查账户权限"
-                }
-                val data = response.body?.string() ?: throw IOException("GitHub 没有返回版本信息")
-                val sha = json.parseToJsonElement(data).jsonObject.string("sha")
-                require(sha.matches(Regex("[0-9a-fA-F]{40}"))) { "GitHub 返回的提交编号无效" }
-                sha.lowercase()
-            }
+        return withCancellableHttpResponse(http.newCall(request)) { response ->
+            require(response.isSuccessful) { "GitHub 公开版本查询失败（HTTP ${response.code}）" }
+            val body = response.body ?: throw IOException("GitHub 未返回公开版本信息")
+            advertisedGitRefs(body.byteStream())
+        }
+    }
+
+    private suspend fun resolveAuthenticatedCommit(
+        source: PublicGitHubSkillLocation, publicError: Exception,
+    ): String {
+        val token = credentials.get()?.takeIf(String::isNotBlank)
+            ?: throw IOException("GitHub 公开仓库连接失败：${publicError.message.orEmpty()}", publicError)
+        val url = "https://api.github.com/repos/${source.owner}/${source.repository}/commits".toHttpUrl()
+            .newBuilder().addPathSegment(source.ref).build()
+        val api = Request.Builder().url(url)
+            .header("Accept", "application/vnd.github+json")
+            .header("Authorization", "Bearer $token").get().build()
+        return withCancellableHttpResponse(http.newCall(api)) { response ->
+            require(response.isSuccessful) { "GitHub 版本查询失败（HTTP ${response.code}），请检查账户权限" }
+            val data = response.body?.string() ?: throw IOException("GitHub 没有返回版本信息")
+            val sha = json.parseToJsonElement(data).jsonObject.string("sha")
+            require(sha.matches(Regex("[0-9a-fA-F]{40}"))) { "GitHub 返回的提交编号无效" }
+            sha.lowercase()
         }
     }
 

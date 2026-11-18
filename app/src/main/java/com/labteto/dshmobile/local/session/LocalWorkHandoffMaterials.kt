@@ -44,6 +44,19 @@ private fun LocalHarnessMessage.handoffSafeMedia(): List<WorkHandoffMedia> =
         )
     }.distinctBy(WorkHandoffMedia::path).take(6)
 
+internal fun LocalHarnessMessage.workHandoffVisibleMessage(): LocalHarnessMessage? {
+    if (id.isBlank() || toolName != null || proactive) return null
+    val text = when (role) {
+        "user" -> com.labteto.dshmobile.local.presentation.editableChatUserText(this)
+        "assistant" -> com.labteto.dshmobile.local.model.visibleAssistantText(content)
+        else -> return null
+    }
+    return copy(content = text).takeIf { text.isNotBlank() || it.handoffAttachmentNames().isNotEmpty() }
+}
+
+internal fun LocalHarnessMessage.matchesWorkHandoffQuery(term: String): Boolean =
+    content.contains(term, ignoreCase = true) || handoffAttachmentNames().any { it.contains(term, ignoreCase = true) }
+
 /** Only public dialogue selected by the user may be passed into Work. */
 internal fun workHandoffDialogueCandidates(
     older: List<LocalHarnessMessage>,
@@ -51,13 +64,7 @@ internal fun workHandoffDialogueCandidates(
 ): List<LocalHarnessMessage> {
     val recent = LinkedHashMap<String, LocalHarnessMessage>()
     (older + live).forEach { message ->
-        if (message.id.isNotBlank() &&
-            (message.content.isNotBlank() || message.handoffAttachmentNames().isNotEmpty()) &&
-            message.toolName == null && !message.proactive &&
-            (message.role == "user" || message.role == "assistant")
-        ) {
-            recent[message.id] = message
-        }
+        message.workHandoffVisibleMessage()?.let { visible -> recent[visible.id] = visible }
     }
     return recent.values.toList()
 }
@@ -74,11 +81,8 @@ internal fun visibleWorkHandoffMessages(
         val recent = messages.takeLast(12).mapTo(hashSetOf(), LocalHarnessMessage::id)
         messages.filter { it.id in selected || it.id in recent }
     } else {
-        messages.filter { message ->
-            message.content.contains(term, ignoreCase = true) ||
-                message.handoffAttachmentNames().any { it.contains(term, ignoreCase = true) }
-        }
-            .takeLast(30)
+        val matching = messages.filter { it.matchesWorkHandoffQuery(term) }.takeLast(30)
+        (messages.filter { it.id in selected } + matching).distinctBy(LocalHarnessMessage::id)
     }
 }
 

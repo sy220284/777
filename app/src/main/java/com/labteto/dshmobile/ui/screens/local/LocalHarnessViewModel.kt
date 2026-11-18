@@ -566,6 +566,13 @@ class LocalHarnessViewModel @Inject constructor(
             LocalUsageMode.WORK -> runtime.work.stop()
         }
     }
+    internal suspend fun searchWorkHandoff(
+        sessionId: String, query: String, cursor: com.labteto.dshmobile.uicontract.UiMessageSearchCursor?,
+    ) = sessionUi.searchHandoffMessages(sessionId, query, cursor)
+
+    internal suspend fun loadWorkHandoffReferences(sessionId: String, ids: Set<String>) =
+        sessionUi.handoffMessagesById(sessionId, ids)
+
     internal fun workHandoffSummary(): String = runtime.session.currentHandoffSummary()
     internal fun createWorkContinuation(sourceSessionId: String, summary: String): Boolean {
         if (state.value.sessionId != sourceSessionId || state.value.usageMode != LocalUsageMode.CHAT) return false
