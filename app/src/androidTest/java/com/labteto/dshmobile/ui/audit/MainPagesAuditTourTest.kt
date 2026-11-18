@@ -138,7 +138,7 @@ class MainPagesAuditTourTest {
             captureUiAudit(compose, "main-tools-discover")
             // Connector actions still live on this page's management sheet.
             compose.onNodeWithTag("plugin-inventory-more").performClick()
-            compose.onNodeWithText("添加 MCP 连接器").assertExists()
+            compose.onNodeWithTag("capability-menu-add-mcp").assertExists()
             captureUiAudit(compose, "main-connectors")
             back()
         }
