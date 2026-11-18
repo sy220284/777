@@ -7,6 +7,11 @@ name: 777 CI 截图与录屏仅保留最新版本
       - '.github/workflows/prune-ci-ui-artifacts.yml'
       - 'tools/ci/prune_ui_artifacts.py'
       - 'tools/ci/test_prune_ui_artifacts.py'
+  pull_request:
+    paths:
+      - '.github/workflows/prune-ci-ui-artifacts.yml'
+      - 'tools/ci/prune_ui_artifacts.py'
+      - 'tools/ci/test_prune_ui_artifacts.py'
   workflow_run:
     workflows:
       - '777 聊天与工作真实设备交互回归'
@@ -17,15 +22,26 @@ name: 777 CI 截图与录屏仅保留最新版本
 # 仅检出默认分支的受信任脚本，不执行来源不明的 PR 文件。
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: 777-ci-media-prune
   cancel-in-progress: false
 
 jobs:
-  prune:
+  verify:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: CI 媒体清理规则单元测试
+        run: python3 -m unittest discover -s tools/ci -p 'test_prune_ui_artifacts.py' -v
+
+  prune:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
