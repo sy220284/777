@@ -28,7 +28,6 @@ class LocalToolsUiFacade @Inject internal constructor(
     private val skillManager: com.labteto.dshmobile.local.tools.LocalSkillManager,
     private val agentBackends: com.labteto.dshmobile.local.agent.LocalAgentBackendRuntime,
     private val gitHubSkillImporter: com.labteto.dshmobile.local.tools.LocalGitHubSkillImporter,
-    private val codexOfficialPlugins: com.labteto.dshmobile.local.tools.CodexOfficialPluginCatalog,
     private val gitHubBrowser: com.labteto.dshmobile.local.tools.LocalGitHubCredentialManager,
     private val mcpCredentials: com.labteto.dshmobile.local.tools.LocalMcpCredentialStore,
     private val mcpOAuth: com.labteto.dshmobile.local.tools.LocalMcpOAuthCoordinator,
@@ -272,46 +271,6 @@ class LocalToolsUiFacade @Inject internal constructor(
     override suspend fun presetSkills() = tools.presetSkills().map {
         com.labteto.dshmobile.uicontract.UiPresetSkillSnapshot(it.id, it.title, it.description, it.installed)
     }
-    override suspend fun curatedGitHubSkills() = gitHubSkillImporter.curatedSkills()
-    override suspend fun codexOfficialPlugins(forceRefetch: Boolean) =
-        codexOfficialPlugins.list(forceRefetch).map { item ->
-        com.labteto.dshmobile.uicontract.UiCodexPluginSnapshot(
-            item.id, item.name, item.category, item.sourcePath,
-            item.installPolicy, item.authPolicy, item.codexOnly,
-            item.sourceKind, item.sourceUrl,
-        )
-    }
-    /** Publisher-provided plugin logo, loaded through the catalog owner. */
-    override suspend fun codexPluginLogo(id: String): ByteArray? = codexOfficialPlugins.officialLogo(id)
-
-    override suspend fun codexPluginDetail(id: String):
-        com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot {
-        val info = codexOfficialPlugins.detail(id)
-        val remote = if (info.hasMcp) codexOfficialPlugins.mcpEndpoint(id) else null
-        return com.labteto.dshmobile.uicontract.UiCodexPluginDetailSnapshot(
-            id, info.displayName, info.description, info.developerName, info.version,
-            if (info.hasSkills) codexOfficialPlugins.pluginSkills(id) else emptyList(),
-            info.hasMcp, info.hasApp, info.hasHooks,
-            remote?.serverId, remote?.url,
-            if (info.hasSkills) codexOfficialPlugins.pluginSkillLocations(id) else emptyMap(),
-            info.samplePrompts,
-        )
-    }
-    override suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String =
-        codexOfficialPlugins.installPluginSkill(pluginId, skillId)
-    override suspend fun connectCodexPlugin(id: String): String {
-        val entry = codexOfficialPlugins.list().firstOrNull { it.id == id }
-            ?: error("Codex 官方目录中没有该插件")
-        require(entry.offeredOnAndroid) { "该插件不支持在 777 中连接" }
-        val endpoint = codexOfficialPlugins.mcpEndpoint(id)
-            ?: error("该插件没有可在 Android 使用的 HTTPS MCP 服务，请查看官方能力说明")
-        loginMcp(endpoint.serverId, endpoint.url, endpoint.clientId)
-        return "已完成 MCP 授权并连接：${endpoint.serverId}"
-    }
-    /** The feature owns source validation; UI passes only the name from a visible catalog row. */
-    override suspend fun installCuratedSkill(id: String) = gitHubSkillImporter.install(
-        com.labteto.dshmobile.local.tools.curatedGitHubSkillUrl(id),
-    )
     override suspend fun installGitHubSkill(link: String) = gitHubSkillImporter.install(link)
     override suspend fun installPreset(id: String) = tools.installPreset(id)
     override suspend fun createSkill(id: String, displayName: String, description: String, instructions: String) =

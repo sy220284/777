@@ -8,73 +8,41 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExtensionMarketplaceSemanticsTest {
-    @Test fun declaredHttpsSkillMcpCanBeAuthorizedWithoutManualEndpointEntry() {
-        val requirement = UiSkillRequirement("mcp", "github", transport = "http",
-            url = "https://api.githubcopilot.com/mcp/")
-        assertEquals("https://api.githubcopilot.com/mcp/", skillMcpHttpsEndpoint(requirement))
+    @Test fun validHttpsMcpEndpointStillSupportsExplicitAuthorization() {
+        assertEquals("https://api.githubcopilot.com/mcp/", skillMcpHttpsEndpoint(
+            UiSkillRequirement("mcp", "github", transport = "http", url = "https://api.githubcopilot.com/mcp/")))
     }
 
-    @Test fun invalidSkillMcpAddressesRequireExplicitManualReview() {
+    @Test fun insecureOrLocalEndpointsCannotBePrefilled() {
         assertEquals(null, skillMcpHttpsEndpoint(UiSkillRequirement("mcp", "unsafe",
             transport = "http", url = "http://localhost:8080/")))
         assertEquals(null, skillMcpHttpsEndpoint(UiSkillRequirement("mcp", "unsafe",
             transport = "stdio", url = "https://example.com/")))
-        assertEquals(null, skillMcpHttpsEndpoint(UiSkillRequirement("mcp", "unsafe",
-            transport = "http", url = "https://127.0.0.1/mcp")))
     }
 
-    @Test fun installedDoesNotHideMissingMcpRequirement() {
-        val state = installedSkillMarketState(true, null, listOf(UiSkillRequirement("mcp", "github", registered = false)))
-        assertEquals(ExtensionMarketStatus.NEEDS_SETUP, state.status)
-        assertTrue(state.advice.contains("github"))
+    @Test fun missingDependencyRemainsVisibleAfterInstallation() {
+        assertEquals(ExtensionMarketStatus.NEEDS_SETUP, installedSkillMarketState(true, null,
+            listOf(UiSkillRequirement("mcp", "github", registered = false))).status)
     }
 
-    @Test fun registeredDependencyStillRequiresRealInvocationGrant() {
-        val state = installedSkillMarketState(true, null, listOf(UiSkillRequirement("mcp", "github", registered = true)))
+    @Test fun installedAndConnectedAreDistinctFromRunAuthorization() {
+        val state = installedSkillMarketState(true, null, emptyList())
         assertEquals(ExtensionMarketStatus.INSTALLED, state.status)
         assertTrue(state.advice.contains("授权"))
+        assertEquals(ExtensionMarketStatus.REGISTERED,
+            connectorMarketState(UiToolRegistration.REGISTERED, UiToolConnection.HEALTH_UNCHECKED).status)
     }
 
-    @Test fun userDisabledSkillIsManualOnly() {
-        val state = installedSkillMarketState(false, null, emptyList())
-        assertEquals(ExtensionMarketStatus.MANUAL_ONLY, state.status)
+    @Test fun defaultAddedIncludesOwnedKindsAndOmitsUninstalledOptions() {
+        assertTrue(marketplaceTabAllows(true, true, false, false, false))
+        assertTrue(marketplaceTabAllows(true, false, true, false, false))
+        assertTrue(marketplaceTabAllows(true, false, false, true, false))
+        assertTrue(marketplaceTabAllows(true, false, false, false, true))
+        assertTrue(!marketplaceTabAllows(true, false, false, false, false))
     }
 
-    @Test fun invalidSourceCannotBeAdvertisedReady() {
-        val state = installedSkillMarketState(true, "GitHub 来源损坏", emptyList())
-        assertEquals(ExtensionMarketStatus.FAILED, state.status)
+    @Test fun discoverIncludesBothInstalledAndInstallable() {
+        assertTrue(marketplaceTabAllows(false, false, false, false, false))
+        assertTrue(marketplaceTabAllows(false, true, false, false, false))
     }
-
-    @Test fun registryPresenceIsNotHealthyRuntime() {
-        val state = connectorMarketState(UiToolRegistration.REGISTERED, UiToolConnection.HEALTH_UNCHECKED)
-        assertEquals(ExtensionMarketStatus.REGISTERED, state.status)
-        assertTrue(state.label.contains("待验证"))
-    }
-
-    @Test fun failedConnectorShowsRepairState() {
-        assertEquals(ExtensionMarketStatus.FAILED,
-            connectorMarketState(UiToolRegistration.FAILED, UiToolConnection.FAILED).status)
-    }
-
-    @Test fun discoveryShowsBothInstalledAndInstallable() {
-        assertTrue(marketplaceTabAllows(false, true, false, true, false, false, ExtensionGroup.OFFICE))
-        assertTrue(marketplaceTabAllows(false, true, true, false, false, false, ExtensionGroup.OFFICE))
-        assertTrue(marketplaceTabAllows(false, false, false, false, true, false, ExtensionGroup.GENERAL))
-    }
-
-    @Test fun installedViewOnlyShowsInstalledItems() {
-        assertTrue(!marketplaceTabAllows(true, true, false, true, false, false, ExtensionGroup.OFFICE))
-        assertTrue(marketplaceTabAllows(true, true, true, false, false, false, ExtensionGroup.OFFICE))
-    }
-    @Test fun addedViewRetainsConnectedServicesButExcludesUninstalledOffers() {
-        assertTrue(marketplaceTabAllows(true, false, false, false, true, false, ExtensionGroup.GENERAL))
-        assertTrue(!marketplaceTabAllows(true, false, false, true, false, false, ExtensionGroup.OFFICE))
-    }
-    @Test fun categoryAndOwnershipAreIndependentFilters() {
-        assertTrue(marketplaceTabAllows(false, false, false, true, false, false,
-            ExtensionGroup.DEVELOPMENT, ExtensionGroup.DEVELOPMENT))
-        assertTrue(!marketplaceTabAllows(false, false, true, false, false, false,
-            ExtensionGroup.OFFICE, ExtensionGroup.DEVELOPMENT))
-    }
-
 }

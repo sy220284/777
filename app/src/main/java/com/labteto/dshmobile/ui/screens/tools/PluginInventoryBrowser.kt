@@ -81,24 +81,6 @@ private data class InventoryRow(
     val requirements: List<com.labteto.dshmobile.uicontract.UiSkillRequirement> = emptyList(),
 )
 
-/** Match visible skill names first, then identifiers, then explanatory descriptions. */
-internal fun inventorySearchScore(query: String, name: String, id: String, detail: String): Int? {
-    val term = query.trim().lowercase()
-    if (term.isEmpty()) return 0
-    val title = name.lowercase()
-    val key = id.lowercase()
-    val body = detail.lowercase()
-    return when {
-        title == term || key == term -> 600
-        title.startsWith(term) -> 500
-        key.startsWith(term) -> 450
-        title.contains(term) -> 350
-        key.contains(term) -> 300
-        body.contains(term) -> 120
-        else -> null
-    }
-}
-
 /** Browses real installed/connected plugin inventory; does not advertise unsupported storefront apps. */
 @Composable
 internal fun PluginInventoryBrowser(

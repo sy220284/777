@@ -91,19 +91,6 @@ data class UiSkillSnapshot(val name: String, val description: String, val modelI
     val rollbackAvailable: Boolean = false, val requirements: List<UiSkillRequirement> = emptyList(),
     val sourceIdentity: UiSkillSourceIdentity? = null)
 data class UiPresetSkillSnapshot(val id: String, val title: String, val description: String, val installed: Boolean)
-data class UiCodexPluginDetailSnapshot(
-    val id: String, val displayName: String, val description: String,
-    val developerName: String, val version: String,
-    val skills: List<String>, val hasMcp: Boolean, val hasApp: Boolean, val hasHooks: Boolean,
-    val mcpServerId: String? = null, val mcpUrl: String? = null,
-    val skillDirectories: Map<String, String> = emptyMap(),
-    val samplePrompts: List<String> = emptyList(),
-)
-data class UiCodexPluginSnapshot(
-    val id: String, val name: String, val category: String, val sourcePath: String,
-    val installPolicy: String, val authPolicy: String, val codexOnly: Boolean,
-    val sourceKind: String = "local", val sourceUrl: String? = null,
-)
 /** Read-only repository metadata; writable operations remain in the GitHub plugin approval path. */
 data class UiGitHubRepo(val fullName: String, val description: String, val privateRepo: Boolean,
     val defaultBranch: String)
@@ -137,11 +124,6 @@ interface ToolsUiPort {
     suspend fun installedSkills(): List<UiSkillSnapshot>
     suspend fun presetSkills(): List<UiPresetSkillSnapshot>
     suspend fun readSkillDocument(id: String): String
-    suspend fun curatedGitHubSkills(): List<String>
-    suspend fun codexOfficialPlugins(forceRefetch: Boolean = false): List<UiCodexPluginSnapshot>
-    suspend fun codexPluginDetail(id: String): UiCodexPluginDetailSnapshot
-    suspend fun installCodexPluginSkill(pluginId: String, skillId: String): String
-    suspend fun connectCodexPlugin(id: String): String
     suspend fun githubRepositories(): List<UiGitHubRepo>
     suspend fun githubEntries(repoFullName: String, directory: String): List<UiGitHubEntry>
 
@@ -177,8 +159,6 @@ interface ToolsManagementUiPort : ToolsUiPort {
     suspend fun checkSkillUpdate(id: String): String?
     suspend fun upgradeSkill(id: String, revision: String): String
     suspend fun rollbackSkill(id: String): String
-    suspend fun codexPluginLogo(id: String): ByteArray?
-    suspend fun installCuratedSkill(id: String): String
     suspend fun importSkillStream(filename: String, input: java.io.InputStream): String
     suspend fun exportSkillPackageToFile(id: String, destination: java.io.File)
     suspend fun connectHttpWithCredential(serverId: String, endpoint: String, bearer: String): String
