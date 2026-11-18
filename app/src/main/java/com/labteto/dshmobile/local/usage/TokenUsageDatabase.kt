@@ -118,7 +118,7 @@ internal class TokenUsageDatabase(
     }
 
     fun retainedRecords(): List<TokenUsageRecord> = readableDatabase.rawQuery(
-        "SELECT payload FROM records ORDER BY timestamp, rowid", null,
+        "SELECT payload FROM records ORDER BY timestamp ASC, id ASC", null,
     ).use { cursor ->
         buildList {
             while (cursor.moveToNext()) add(json.decodeFromString(TokenUsageRecord.serializer(), cursor.getString(0)))
@@ -252,7 +252,7 @@ internal class TokenUsageDatabase(
         val cutoff = System.currentTimeMillis() - RETENTION_MILLIS
         var removed = db.delete("records", "timestamp < ?", arrayOf(cutoff.toString())) > 0
         if (DatabaseUtils.queryNumEntries(db, "records") > MAX_RECORDS) {
-            db.execSQL("DELETE FROM records WHERE rowid NOT IN (SELECT rowid FROM records ORDER BY timestamp DESC, rowid DESC LIMIT $RETAIN_AFTER_PRUNE)")
+            db.execSQL("DELETE FROM records WHERE rowid NOT IN (SELECT rowid FROM records ORDER BY timestamp DESC, id DESC LIMIT $RETAIN_AFTER_PRUNE)")
             removed = true
         }
         return removed
