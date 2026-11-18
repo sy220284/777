@@ -390,8 +390,8 @@ internal fun PluginInventoryBrowser(
                         canInspectSkill -> "检查连接"
                         needsOtherSkillSetup -> "查看待处理依赖"
                         item.installedSkill && item.requirements.all { it.registered } -> "使用"
-                        onUseCapability != null && item.available -> "使用"
                         item.connectedService -> "管理连接"
+                        onUseCapability != null && item.available -> "使用"
                         else -> "返回对话"
                     },
                     modifier = Modifier.fillMaxWidth().testTag("plugin-detail-primary-action"),
@@ -405,11 +405,11 @@ internal fun PluginInventoryBrowser(
                             canConnectSkill -> requireNotNull(endpoint).let { (serverId, url) ->
                                 onConnectSkillMcp?.invoke(serverId, url)
                             }
+                            item.connectedService -> { selectedRow = null; onManageConnections() }
                             onUseCapability != null && item.available -> {
                                 selectedRow = null
                                 onUseCapability(usePrompt)
                             }
-                            item.connectedService -> { selectedRow = null; onManageConnections() }
                             else -> { selectedRow = null; onReturnToChat() }
                         }
                     },
