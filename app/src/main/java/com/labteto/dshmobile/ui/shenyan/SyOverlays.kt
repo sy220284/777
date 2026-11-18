@@ -375,8 +375,9 @@ fun SyConversationActionPopup(
     }
     val duration = SyMotion.duration(SyMotion.dialogMs,
         LocalSyReduceMotion.current, LocalSyMotionTempo.current)
-    val maxWidth = (LocalConfiguration.current.screenWidthDp.dp - 24.dp)
-        .coerceAtMost(292.dp)
+    val configuration = LocalConfiguration.current
+    val maxWidth = (configuration.screenWidthDp.dp - 24.dp).coerceAtMost(292.dp)
+    val maxHeight = (configuration.screenHeightDp.dp * .72f).coerceAtLeast(180.dp)
     Popup(
         popupPositionProvider = positionProvider,
         onDismissRequest = onDismiss,
@@ -405,7 +406,9 @@ fun SyConversationActionPopup(
                 border = BorderStroke(1.dp, palette.border.copy(alpha = .72f)),
                 shadowElevation = 18.dp,
             ) {
-                Column(Modifier.padding(6.dp)) {
+                Column(Modifier.heightIn(max = maxHeight)
+                    .verticalScroll(rememberScrollState())
+                    .padding(6.dp)) {
                     items.forEachIndexed { index, item ->
                         if ((primaryActionCount > 0 && index == primaryActionCount) ||
                             (item.danger && index > 0)) {
