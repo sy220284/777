@@ -396,6 +396,10 @@ class HarnessAutomationScheduler @Inject constructor(
 
     fun runTaskNow(id: String, approvalResume: Boolean = false): Boolean {
         val task = store.get(id) ?: return false
+        // Blocked Work may contain a side-effectful tool; ordinary "Run now"
+        // would start the prompt from the beginning and could repeat that effect.
+        if (task.mode == AutomationMode.WORK && task.status == AutomationStatus.BLOCKED &&
+            !approvalResume) return false
         if (approvalResume && (task.mode != AutomationMode.WORK ||
             task.status != AutomationStatus.BLOCKED || task.workSessionId.isNullOrBlank())) return false
         val request = OneTimeWorkRequestBuilder<HarnessAutomationWorker>()
