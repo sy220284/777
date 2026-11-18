@@ -125,7 +125,17 @@ internal fun foldWorkToolsToTurnStart(items: List<LocalTranscriptItem>): List<Lo
     var headerIndex = 0
     fun flush() {
         if (operations.isNotEmpty()) {
-            result.add(headerIndex, LocalTranscriptItem.WorkTools(turnId, operations.toList()))
+            val disclosure = LocalTranscriptItem.WorkTools(turnId, operations.toList())
+            // File cards originally attach to an individual tool row. Retarget their
+            // presentation owner to the disclosure that now represents those tools.
+            val hiddenToolKeys = operations.mapTo(hashSetOf()) { it.key }
+            for (index in headerIndex until result.size) {
+                val item = result[index]
+                if (item is LocalTranscriptItem.WorkArtifact && item.attachedTo in hiddenToolKeys) {
+                    result[index] = item.copy(attachedTo = disclosure.key)
+                }
+            }
+            result.add(headerIndex, disclosure)
             operations.clear()
         }
     }
