@@ -93,6 +93,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.workHandoffDialogueCandidates
 import com.labteto.dshmobile.local.session.workHandoffSummaryWithSelectedMessages
+import com.labteto.dshmobile.local.session.workHandoffFullDocument
 import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.shenyan.SyButton
@@ -1248,9 +1249,16 @@ fun LocalHarnessScreen(
                         check(ids.all { selected -> candidates.any { it.id == selected } }) {
                             "所选消息已变化，请重新选择"
                         }
+                        val documentPath = if (ids.isEmpty()) null else {
+                            val fullText = workHandoffFullDocument(handoffSource, candidates, ids)
+                            viewModel.saveWorkHandoffDocument(handoffSource, fullText)
+                        }
                         workCapabilityConfirmed = viewModel.createWorkContinuation(
                             handoffSource,
-                            workHandoffSummaryWithSelectedMessages(summary, handoffSource, candidates, ids),
+                            workHandoffSummaryWithSelectedMessages(
+                                summary, handoffSource, candidates, ids,
+                                fullTextReference = documentPath,
+                            ),
                         )
                         if (workCapabilityConfirmed) pendingUsageMode = LocalUsageMode.WORK
                         else workCapabilityFailed = true
