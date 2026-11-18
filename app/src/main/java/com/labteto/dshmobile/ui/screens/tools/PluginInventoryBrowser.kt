@@ -334,7 +334,8 @@ internal fun PluginInventoryBrowser(
                 )
             }
             LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth()
+                    .testTag("capability-inventory-list"),
                 contentPadding = PaddingValues(
                     horizontal = SyMetric.gapSection,
                     vertical = SyMetric.gapMd,
