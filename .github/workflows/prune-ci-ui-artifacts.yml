@@ -1,4 +1,4 @@
-name: 777 CI 截图与录屏仅保留最新版本
+name: 777 CI 测试证据只保留最新版
 
 'on':
   push:
@@ -16,6 +16,8 @@ name: 777 CI 截图与录屏仅保留最新版本
     workflows:
       - '777 聊天与工作真实设备交互回归'
       - '777 扩展市场 Android 交互验证'
+      - '本地会话存储 Android 迁移实测'
+      - '777 架构 3.0 全仓调用关系审计'
     types: [completed]
   workflow_dispatch:
 
@@ -33,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: CI 媒体清理规则单元测试
+      - name: CI 证据保留规则单元测试
         run: python3 -m unittest discover -s tools/ci -p 'test_prune_ui_artifacts.py' -v
 
   prune:
@@ -49,7 +51,7 @@ jobs:
           persist-credentials: false
       - name: 测试只保留最新版的删除规则
         run: python3 -m unittest discover -s tools/ci -p 'test_prune_ui_artifacts.py' -v
-      - name: 清理旧 CI 截图与视频 Artifact
+      - name: 清理旧 CI 截图、视频及指定测试报告 Artifact
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 tools/ci/prune_ui_artifacts.py --apply

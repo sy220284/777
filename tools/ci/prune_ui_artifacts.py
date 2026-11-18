@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""每个 CI 录屏/截图系列仅保留最新的一份 Artifact。"""
+"""每个 CI 媒体与指定测试报告系列仅保留最新的一份 Artifact。"""
 import argparse
 from collections import defaultdict
 import json
@@ -15,6 +15,11 @@ MEDIA_NAME = re.compile(
     r"screen[-_]?captures?|ui[-_]?audit)(?:$|[-_\s])",
     re.IGNORECASE,
 )
+# 精确匹配现行上传契约。工具链、发行包、其他测试报告不参与清理。
+REPORT_SERIES = frozenset((
+    "session-storage-v7-android-tests",
+    "architecture3-full-callgraph",
+))
 RUN_SUFFIX = re.compile(
     r"(?:[-_]run[-_]?\d{6,}|[-_]sha[-_]?[0-9a-f]{12,40}|"
     r"[-_][0-9a-f]{16,40}|[-_]20\d{6}(?:T\d{6}Z)?)$",
@@ -25,12 +30,14 @@ RUN_SUFFIX = re.compile(
 def artifact_series(name):
     if not isinstance(name, str) or name.startswith("777-toolchain-"):
         return None
+    series = RUN_SUFFIX.sub("", name)
+    if series in REPORT_SERIES:
+        return series
     if not MEDIA_NAME.search(name):
         return None
-    name = RUN_SUFFIX.sub("", name)
-    if name == "777-ui-videos-and-results-37":
-        name += ".0"
-    return name
+    if series == "777-ui-videos-and-results-37":
+        series += ".0"
+    return series
 
 
 def plan_cleanup(artifacts):
@@ -116,10 +123,10 @@ def main(argv=None, api=None):
             freed += int(item.get("size_in_bytes") or 0)
         print(f"{'删除' if args.apply else '预览删除'} {item['name']} id={item['id']}", flush=True)
     report = (
-        "## 777 CI 截图与录屏 Artifact 清理\n\n"
+        "## 777 CI 截图、录屏与报告 Artifact 清理\n\n"
         f"- 模式：{'实际删除' if args.apply else '仅预览'}\n"
         f"- 总 Artifact：{len(existing)}\n"
-        f"- 最新保留：{len(kept)} 份（每个媒体系列一份）\n"
+        f"- 最新保留：{len(kept)} 份（每个受管证据系列一份）\n"
         f"- 旧版待/已删除：{len(outdated)} 份\n"
         f"- 实际释放：{freed:,} 字节\n\n"
         + "\n".join(f"- 保留 {name}: ID {a['id']}" for name, a in kept.items()) + "\n"
