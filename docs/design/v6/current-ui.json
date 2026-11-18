@@ -1,9 +1,9 @@
 {
   "schema": "777.v6.current-ui/1",
-  "baselineCommit": "be89abc08d8049062b6299db645691d6793dacf9",
-  "asOf": "2026-11-17",
+  "baselineCommit": "5fbfb372096abfd106b5aab4c545473f8a9e9cf1",
+  "asOf": "2026-11-18",
   "platform": "Android mobile",
-  "sourceOfTruth": "Android Compose；DSH 参考体验优化基于 main@be89abc，验证状态以当前分支检查为准",
+  "sourceOfTruth": "Android Compose main@5fbfb372；能力中心以 PR #950 候选分支为设计投影，设备验收待核",
   "routes": [
     {
       "id": "HOME",
@@ -77,11 +77,10 @@
       "label": "工具与技能",
       "source": "app/src/main/java/com/labteto/dshmobile/ui/screens/tools/ToolsScreen.kt",
       "entries": [
-        "能力中心",
-        "技能",
-        "插件",
-        "GitHub",
-        "外部连接"
+        "能力中心：已添加／发现（默认已添加，发现页先列已安装）",
+        "本机插件、技能、MCP 与 GitHub 连接同页展示",
+        "详情、安装、授权、升级与移除沿用原运行时",
+        "无类型分类、用途分类与目录搜索"
       ]
     },
     {
