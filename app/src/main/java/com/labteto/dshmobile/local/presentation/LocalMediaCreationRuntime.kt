@@ -62,9 +62,16 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     private val store: LocalMediaStore,
     private val credentialResolver: LocalModelCredentialResolver,
     private val modelGateway: com.labteto.dshmobile.local.model.LocalModelGateway,
+    private val videoTracking: LocalMediaVideoTrackingScheduler,
 ) : MediaUiPort {
     companion object { const val PAGE_SIZE = LocalMediaStore.PAGE_SIZE }
     override val pageSize: Int get() = PAGE_SIZE
+    internal val mediaRoutes get() = store.mediaRoutes
+
+    internal suspend fun setMediaRoute(kind: LocalMediaKind, offer: LocalMediaOffer?) = withContext(Dispatchers.IO) {
+        if (offer != null) validate(offer, kind)
+        store.setMediaRoute(kind, offer?.id)
+    }
     suspend fun matchesOriginalCredential(draft: LocalMediaRevisionDraft, offer: LocalMediaOffer): Boolean =
         draft.originalOffer(listOf(offer)) != null &&
             draft.matchesOriginalCredential(credentialResolver.mediaCredentialSignature(offer.profile))
@@ -217,6 +224,7 @@ class LocalMediaCreationRuntime @Inject internal constructor(
             store.remove(id)
             api.forgetGeneratedVideoProgress(id)
         }
+        videoTracking.cancel(id)
     }
     suspend fun removeMediaFamily(id: String) {
         synchronized(downloads) { downloads[id] }?.cancelAndJoin()
@@ -226,13 +234,16 @@ class LocalMediaCreationRuntime @Inject internal constructor(
     suspend fun retryStorage() {
         withContext(Dispatchers.IO) { store.retryStorage() }
         videoPollSignal.trySend(Unit)
+        recoverVideoTracking()
     }
 
     init {
         scope.launch {
+            store.loadMediaRoutes()
             store.initialize()
             store.cleanupDeleted()
             videoPollSignal.trySend(Unit)
+            recoverVideoTracking()
             // Recovered downloads are processed incrementally, not launched as an unbounded batch.
             for (task in store.videosNeedingDelivery()) {
                 try { retryVideoSave(task.id) }
@@ -254,6 +265,42 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 }
             }
         }
+    }
+
+    private suspend fun recoverVideoTracking() {
+        val pending = withContext(Dispatchers.IO) { store.pollableVideos() + store.videosNeedingDelivery() }
+        pending.filter { it.credentialSignature != null }.forEach { enqueueVideoTracking(it.id) }
+    }
+
+    private suspend fun enqueueVideoTracking(id: String) {
+        try {
+            videoTracking.track(id)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            AppLog.warn("MediaCreation", "enqueue_video_tracking", failure)
+        }
+    }
+
+    /** True means no more background work is needed or an original credential must be restored. */
+    internal suspend fun trackAcceptedVideo(id: String): Boolean = withContext(Dispatchers.IO) {
+        val active = setOf(LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING)
+        val task = videoPollMutex.withLock {
+            val current = store.video(id) ?: return@withContext true
+            if (current.phase in active) {
+                val offer = LocalMediaCatalog.offers(modelGateway.configuredProfiles())
+                    .firstOrNull { current.belongsTo(it) }
+                if (offer == null || !hasMatchingCredential(offer, current.credentialSignature)) {
+                    return@withContext true
+                }
+                refreshVideoLocked(offer, id)
+            }
+            store.video(id) ?: return@withContext true
+        }
+        if (task.phase == LocalMediaVideoPhase.SUCCEEDED && store.file(task.fileName) == null) {
+            retryVideoSave(id)
+        }
+        task.phase !in active
     }
 
     private suspend fun pollActiveVideos() {
@@ -394,7 +441,11 @@ class LocalMediaCreationRuntime @Inject internal constructor(
                 videoPollSignal.trySend(Unit)
             } catch (cancelled: CancellationException) {
                 videoSubmissionFailure(task.id, cancelled, requestStarted); throw cancelled
-            } catch (failure: Exception) { videoSubmissionFailure(task.id, failure, requestStarted) }
+            } catch (failure: Exception) {
+                videoSubmissionFailure(task.id, failure, requestStarted)
+                return@launch
+            }
+            enqueueVideoTracking(task.id)
         }
         return task
     }

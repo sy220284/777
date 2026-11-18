@@ -78,7 +78,6 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun LocalMediaStudioSheetContent(
     profiles: List<LocalModelProfile>,
-    preferredProfileId: String?,
     sessionId: String,
     onInsertTranscript: (String) -> Unit,
     onDelivered: () -> Unit = {},
@@ -97,6 +96,7 @@ internal fun LocalMediaStudioSheetContent(
     val videoTasks = archive.videos
     val generatedResults = archive.results
     val storageError by viewModel.storageError.collectAsStateWithLifecycle()
+    val mediaRoutes by viewModel.mediaRoutes.collectAsStateWithLifecycle()
     var showHistory by remember { mutableStateOf(false) }
     var showArchive by rememberSaveable { mutableStateOf(false) }
     var archiveRevision by rememberSaveable { mutableStateOf<LocalMediaRevisionDraft?>(null) }
@@ -105,6 +105,8 @@ internal fun LocalMediaStudioSheetContent(
     var videoRefreshBusy by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     var historyError by remember { mutableStateOf<String?>(null) }
+    var routeSaveError by remember { mutableStateOf<String?>(null) }
+    var savingRoute by remember { mutableStateOf(false) }
     var mode by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.kind?.name ?: initialKind.name) }
     val kind = LocalMediaKind.valueOf(mode)
     val matchingRevision = activeRevision?.forKind(kind)
@@ -126,8 +128,9 @@ internal fun LocalMediaStudioSheetContent(
     val selected = if (matchingRevision != null) {
         if (chosenId.isBlank()) originalOffer?.takeIf { originalAccountVerified == true }
         else available.firstOrNull { it.id == chosenId }
-    } else LocalMediaCatalog.selectOffer(models, kind, preferredProfileId, chosenId.takeIf(String::isNotBlank))
-    val manualRouteActive = chosenId.isNotBlank() && selected?.id == chosenId
+    } else mediaRoutes?.let { LocalMediaCatalog.selectOffer(models, kind, it[kind]) }
+    val manualRouteActive = if (matchingRevision != null) chosenId.isNotBlank()
+        else selected != null && selected.id == mediaRoutes?.get(kind)
     val activeOfferId by rememberUpdatedState(selected?.id)
     var showModelChoices by remember { mutableStateOf(false) }
     var prompt by rememberSaveable(activeRevision?.originId) { mutableStateOf(activeRevision?.prompt ?: initialPrompt) }
@@ -160,7 +163,7 @@ internal fun LocalMediaStudioSheetContent(
     val credentialChangedText = stringResource(R.string.media_recreate_credential_changed)
 
     fun submit(offer: LocalMediaOffer, action: suspend () -> Unit) {
-        if (busy) return
+        if (busy || savingRoute) return
         // Reserve the UI operation synchronously so two rapid taps cannot queue two paid POSTs.
         busy = true
         error = null
@@ -180,6 +183,28 @@ internal fun LocalMediaStudioSheetContent(
                 if (originId == activeOfferId) error = failure.message ?: ""
             } finally {
                 busy = false
+            }
+        }
+    }
+
+    fun selectMediaRoute(offer: LocalMediaOffer?) {
+        if (busy || savingRoute) return
+        showModelChoices = false
+        routeSaveError = null
+        if (matchingRevision != null) {
+            chosenId = offer?.id.orEmpty()
+            return
+        }
+        savingRoute = true
+        scope.launch {
+            try {
+                viewModel.setMediaRoute(kind, offer)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                routeSaveError = failure.message
+            } finally {
+                savingRoute = false
             }
         }
     }
@@ -208,18 +233,29 @@ internal fun LocalMediaStudioSheetContent(
             tag = "mediaDesignSection", enabled = !busy,
         )
 
-        if (selected == null) {
-            com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image,
-                if (matchingRevision != null) stringResource(R.string.media_recreate_route_missing)
-                else stringResource(R.string.media_studio_no_model), body = "")
+        routeSaveError?.let { Text(it, color = colors.dangerInk) }
+        if (mediaRoutes == null && matchingRevision == null) {
+            Text(stringResource(R.string.common_loading), color = colors.textSecondary)
+        } else if (selected == null) {
+            val savedRouteMissing = mediaRoutes?.get(kind) != null
+            val title = when {
+                matchingRevision != null -> R.string.media_recreate_route_missing
+                savedRouteMissing -> R.string.media_route_saved_missing
+                available.isNotEmpty() -> R.string.media_route_choose_account
+                else -> R.string.media_studio_no_model
+            }
+            com.shenyan.designsystem.components.SyEmptyState(FeatherIcons.Image, stringResource(title), body = "")
             if (available.isNotEmpty()) {
-                Text(stringResource(R.string.media_recreate_change_account_notice), color = colors.textSecondary,
-                    style = DsType.caption11.withReadingWeight())
+                Text(stringResource(
+                    if (matchingRevision != null) R.string.media_recreate_change_account_notice
+                    else R.string.media_route_permission_notice
+                ), color = colors.textSecondary, style = DsType.caption11.withReadingWeight())
                 available.forEach { option ->
                     SyButton(
                         text = "${option.label} · ${option.profile.displayName ?: option.profile.model}",
                         size = SyButtonSize.Small, variant = SyButtonVariant.Ghost,
-                        onClick = { chosenId = option.id },
+                        onClick = { selectMediaRoute(option) },
+                        enabled = !busy && !savingRoute,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -248,15 +284,12 @@ internal fun LocalMediaStudioSheetContent(
                     tint = colors.textSecondary,
                 )
             }
-            if (!manualRouteActive && preferredProfileId != null && selected.profile.id != preferredProfileId) {
-                Text(
-                    text = stringResource(R.string.media_route_account_fallback,
-                        selected.profile.displayName ?: selected.profile.model),
-                    style = DsType.caption11.withReadingWeight(),
-                    color = colors.textSecondary,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            Text(
+                stringResource(R.string.media_route_selected_account,
+                    selected.profile.displayName ?: selected.profile.model),
+                style = DsType.caption11.withReadingWeight(),
+                color = colors.textSecondary,
+            )
             if (showModelChoices) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(152.dp),
@@ -264,7 +297,8 @@ internal fun LocalMediaStudioSheetContent(
                 ) {
                     item(key = "auto") {
                         SyButton(text = stringResource(R.string.media_route_auto),
-                            onClick = { chosenId = ""; showModelChoices = false },
+                            onClick = { selectMediaRoute(null) },
+                            enabled = !savingRoute,
                             size = SyButtonSize.Small,
                             variant = if (!manualRouteActive) SyButtonVariant.Primary else SyButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth())
@@ -275,8 +309,8 @@ internal fun LocalMediaStudioSheetContent(
                                 R.string.media_studio_selected_model, option.label,
                                 option.profile.displayName ?: option.profile.model,
                             ),
-                            onClick = { chosenId = option.id; showModelChoices = false },
-                            enabled = !busy,
+                            onClick = { selectMediaRoute(option) },
+                            enabled = !busy && !savingRoute,
                             size = SyButtonSize.Small,
                             variant = if (selected.id == option.id) SyButtonVariant.Primary else SyButtonVariant.Ghost,
                             modifier = Modifier.fillMaxWidth(),

@@ -2062,7 +2062,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ) {
             LocalMediaStudioSheetContent(
                 profiles = state.modelProfiles,
-                preferredProfileId = activeModelProfile?.id,
                 sessionId = state.sessionId,
                 viewModel = mediaStudioViewModel,
                 onDelivered = { showMediaStudio = false },
