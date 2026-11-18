@@ -63,6 +63,8 @@ jobs:
           test -e /dev/kvm
           sudo chmod 666 /dev/kvm
       - name: 模拟器执行聊天输入、工作进度、团队交互和授权引导回归
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.android.api }}
