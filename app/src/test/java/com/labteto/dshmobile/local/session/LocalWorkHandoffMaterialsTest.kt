@@ -118,7 +118,7 @@ class LocalWorkHandoffMaterialsTest {
 
     @Test
     fun longSelectedMessagePreservesFullTextInStructuredLocalHandoff() {
-        val fullText = ("第一段。\\n第二段里的词语和标点！\\n").repeat(350)
+        val fullText = ("第一段。\n第二段里的词语和标点！\n").repeat(350)
         val chosen = listOf(
             row("long-1", "user", fullText),
             row("hidden", "tool", "内部工具结果", tool = "read"),
