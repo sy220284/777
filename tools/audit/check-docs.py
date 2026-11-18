@@ -5,20 +5,19 @@ import re
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[2]
-CURRENT = (
-    "README.md",
-    "docs/README.md",
-    "docs/UI-UX.zh-CN.md",
-    "docs/design/mobile-ui.md",
-    "docs/design/v6/README.zh-CN.md",
-    "docs/design/v6/STATUS.zh-CN.md",
-    "docs/design/v6/V6-CURRENT-IMPLEMENTATION.zh-CN.md",
-    "docs/design/v6/V6-IMPLEMENTED-INTERACTION-CONTRACT.zh-CN.md",
+CURRENT = sorted(
+    {*(ROOT.glob("*.md")),
+     *(ROOT / "docs").rglob("*.md"),
+     *(ROOT / "app/src/main/assets").rglob("*.md"),
+     *(ROOT / "tools").rglob("README.md"),
+     ROOT / "harness/README.md"}
 )
 LINK = re.compile(r"!?\[[^\]]+\]\(([^)]+)\)")
 errors = []
-for relative in CURRENT:
-    source = ROOT / relative
+for source in CURRENT:
+    if not source.is_file():
+        continue
+    relative = source.relative_to(ROOT).as_posix()
     text = source.read_text(encoding="utf-8")
     for raw in LINK.findall(text):
         target = raw.strip().split(" ", 1)[0].strip("<>")
@@ -44,9 +43,17 @@ for expected in ("['installed','已添加']", "['discover','发现']"):
 for retired_file in (
     "docs/audits/pr895-capability-current-20261114.md",
     "docs/design/777-extension-market-v24-codex-20261114.md",
+    "docs/design/v6/V6.5-UI-UX-VIDEO-REMEDIATION-20261116.md",
 ):
     if (ROOT / retired_file).exists():
         errors.append(f"历史文件仍在当前文档目录: {retired_file}")
+
+for path in (
+    ROOT / "docs/design/v6/STATUS.zh-CN.md",
+    ROOT / "docs/design/v6/V6-CURRENT-IMPLEMENTATION.zh-CN.md",
+):
+    if "## 历史附录：2026-10-15" in path.read_text(encoding="utf-8"):
+        errors.append(f"{path.relative_to(ROOT)}: 旧审计附录重新进入当前规范")
 
 if errors:
     raise SystemExit("\n".join(errors))
