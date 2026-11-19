@@ -86,20 +86,38 @@ def home():
   return not drawer_visible(t) and bool(candidates(t,strings['app_open_navigation']))
  t=tree()
  if is_conversation(t):return
- # Back is asynchronous: wait for the observed navigation state after each key event.
- # Never declare success until the actual conversation controls are visible.
+ # A sidebar destination can be a top-level Android screen. Prefer in-app
+ # navigation; Back may intentionally finish the activity and show the launcher.
  for _ in range(4):
-  adb('shell','-n','input','keyevent','4')
-  deadline=time.monotonic()+3
+  if drawer_visible(t):
+   tap(strings['local_usage_work'])
+  elif candidates(t,strings['app_open_navigation']):
+   drawer()
+   tap(strings['local_usage_work'])
+  else:
+   adb('shell','-n','input','keyevent','4')
+  deadline=time.monotonic()+4
   while time.monotonic()<deadline:
    t=tree()
    if is_conversation(t):return
+   if not any(n.get('package')==a.package for n in t.iter('node')):
+    # A root-level Back may finish the app. Record the actual transition,
+    # then launch the same verified APK to continue the page-coverage audit.
+    print('Back returned to Android launcher; reopen verified application',flush=True)
+    adb('shell','-n','am','start','-W','--user',user,'-n',component,
+     '-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER')
+    ready_until=time.monotonic()+20
+    while time.monotonic()<ready_until:
+     t=tree()
+     if is_conversation(t):return
+     time.sleep(.35)
+    break
    time.sleep(.25)
- # Preserve the actual UI hierarchy on failure, instead of hiding a navigation defect.
+ # Keep the native hierarchy when returning to conversation genuinely fails.
  ET.ElementTree(t).write(out/'home-return-failure.xml',encoding='utf-8')
  visible=[n.get('text') or n.get('content-desc') for n in t.iter('node')
   if n.get('text') or n.get('content-desc')]
- raise RuntimeError('Could not return to conversation after 4 verified Back events; visible controls: '+repr(visible[:35]))
+ raise RuntimeError('Could not return to conversation via app navigation or relaunch; visible controls: '+repr(visible[:35]))
 
 def page(resource,name):
  drawer();tap(strings[resource]);snapshot(name);home()
