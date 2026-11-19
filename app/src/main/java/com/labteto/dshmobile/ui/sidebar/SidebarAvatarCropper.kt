@@ -32,7 +32,7 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -95,14 +95,14 @@ internal fun SidebarAvatarCropper(
 
         Text(
             text = stringResource(R.string.sidebar_avatar_crop_gesture_hint),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             modifier = Modifier.fillMaxWidth(),
         )
 
         Text(
             text = stringResource(R.string.sidebar_avatar_crop_zoom),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
         )
         SySlider(
@@ -123,7 +123,7 @@ internal fun SidebarAvatarCropper(
         error?.let {
             Text(
                 text = it,
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                 modifier = Modifier.fillMaxWidth(),
             )

@@ -49,7 +49,7 @@ import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -355,10 +355,10 @@ internal fun PluginInventoryBrowser(
                     Icon(FeatherIcons.Sliders, contentDescription = null,
                         tint = colors.textSecondary, modifier = Modifier.size(24.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("能力设置", style = DsType.std14Strong.withReadingWeight(),
+                        Text("能力设置", style = SyType.std14Strong.withReadingWeight(),
                             color = colors.text)
                         Text("网络搜索、执行授权与高级配置",
-                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                     }
                     Icon(FeatherIcons.ChevronRight, contentDescription = null,
                         tint = colors.textTertiary, modifier = Modifier.size(17.dp))
@@ -375,7 +375,7 @@ internal fun PluginInventoryBrowser(
             if (loading && visible.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.common_loading),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textTertiary,
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
@@ -397,7 +397,7 @@ internal fun PluginInventoryBrowser(
                             verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text(error, style = DsType.std14.withReadingWeight(), color = colors.dangerInk)
+                            Text(error, style = SyType.std14.withReadingWeight(), color = colors.dangerInk)
                             if (onRetry != null) {
                                 SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
                             }
@@ -415,7 +415,7 @@ internal fun PluginInventoryBrowser(
                                 addedOnly -> "尚未添加技能、插件或连接器"
                                 else -> "暂无可添加的能力；可查看已添加的项目"
                             },
-                            style = DsType.std14.withReadingWeight(),
+                            style = SyType.std14.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
                         )
@@ -423,7 +423,7 @@ internal fun PluginInventoryBrowser(
                 }
                 sections.filter { it.entries.isNotEmpty() }.forEach { section ->
                     item(key = "heading:" + section.id) {
-                        Text(section.title, style = DsType.small13Strong.withReadingWeight(),
+                        Text(section.title, style = SyType.small13Strong.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.fillMaxWidth()
                                 .padding(start = 6.dp, top = SyMetric.gapSm, bottom = SyMetric.gapXs))
@@ -543,19 +543,19 @@ internal fun PluginInventoryBrowser(
                 }
                 Column(Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.detail, style = DsType.std14.withReadingWeight(),
+                    Text(item.detail, style = SyType.std14.withReadingWeight(),
                         color = colors.textSecondary)
                 }
             }
             if (item.sourceLabel.isNotBlank()) {
-                Text(item.sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                Text(item.sourceLabel, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
             }
-            Text(item.marketState.label, style = DsType.small13Strong.withReadingWeight(),
+            Text(item.marketState.label, style = SyType.small13Strong.withReadingWeight(),
                 color = if (item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
                     ExtensionMarketStatus.FAILED, ExtensionMarketStatus.UNSUPPORTED))
                     colors.warningInk else colors.successInk)
             if (item.marketState.advice.isNotBlank() && item.requirements.isEmpty()) {
-                Text(item.marketState.advice, style = DsType.small13.withReadingWeight(),
+                Text(item.marketState.advice, style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary)
             }
             if (item.requirements.isNotEmpty()) {
@@ -569,7 +569,7 @@ internal fun PluginInventoryBrowser(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
                         Text("运行依赖 · ${item.requirements.size} 项",
-                            style = DsType.std14Strong, color = colors.text)
+                            style = SyType.std14Strong, color = colors.text)
                         Icon(FeatherIcons.ChevronDown, contentDescription = "展开运行依赖",
                             tint = colors.textSecondary)
                     }
@@ -578,7 +578,7 @@ internal fun PluginInventoryBrowser(
                     item.requirements.forEach { requirement ->
                         Text(
                             "${if (requirement.registered) "已就绪" else if (requirement.type.equals("mcp", true)) "待连接或检查" else "待配置"} · ${requirement.description.ifBlank { requirement.value }}",
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = if (requirement.registered) colors.successInk else colors.warningInk,
                         )
                         val endpoint = if (!requirement.registered)
@@ -610,19 +610,19 @@ internal fun PluginInventoryBrowser(
                     }
                     if (item.requirements.any { !it.registered && skillMcpHttpsEndpoint(it) == null }) {
                         Text("部分依赖没有公开连接地址，可在连接器中查看本机可用的服务。",
-                            style = DsType.small13, color = colors.textSecondary)
+                            style = SyType.small13, color = colors.textSecondary)
                         SyButton(text = "查看连接器", variant = SyButtonVariant.Ghost,
                             onClick = { selectedRow = null; onManageConnections() })
                     }
                 }
             }
             if (item.installedSkill && !item.modelInvocable) {
-                Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.textTertiary)
+                Text(stringResource(R.string.skills_manual_only), style = SyType.small13.withReadingWeight(), color = colors.textTertiary)
             }
             item.sourceWarning?.let { warning ->
                 Text(
                     warning,
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                     modifier = Modifier.testTag("skill-source-warning"),
                 )
@@ -630,7 +630,7 @@ internal fun PluginInventoryBrowser(
             if (item.installedSkill && item.sourceUrl != null) {
                 Text(
                     "已固定 GitHub 来源版本：${item.sourceUrl.substringAfter("/tree/").substringBefore('/').take(12)}",
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 if (onCheckSkillUpdate != null) {
@@ -646,7 +646,7 @@ internal fun PluginInventoryBrowser(
                     if (revision != null && onUpgradeSkill != null) {
                         Text(
                             "发现新版本：${revision.take(12)}",
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("skill-update-available"),
                         )
@@ -663,7 +663,7 @@ internal fun PluginInventoryBrowser(
                     } else if (skillId in upToDateSkills) {
                         Text(
                             "当前已是最新版本",
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("skill-update-current"),
                         )
@@ -728,7 +728,7 @@ internal fun PluginInventoryBrowser(
                 ) {
                     Text(
                         stringResource(R.string.skills_auto_invocation),
-                        style = DsType.std14.withReadingWeight(),
+                        style = SyType.std14.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                     SySwitchControl(
@@ -888,7 +888,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 "将升级 $id 到版本 ${revision.take(12)}。安装前会验证新包，并保存当前完整技能作为上一版本；如果修改过本地规则，可通过“恢复上一版本”找回。",
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary,
             )
         }
     }
@@ -910,7 +910,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 "将 $id 恢复为上次升级前的完整技能内容。当前版本会保留，可再次恢复回来。",
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary,
             )
         }
     }
@@ -932,7 +932,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 "将导出 SKILL.md 及技能目录下的全部附属资料，请先确认其中没有需要保密的内容。",
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
@@ -955,7 +955,7 @@ internal fun PluginInventoryBrowser(
             },
         ) {
             Text(stringResource(R.string.skills_remove_message, id),
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
         }
     }
 
@@ -979,7 +979,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 stringResource(R.string.skills_edit_hint),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
             SyTextField(

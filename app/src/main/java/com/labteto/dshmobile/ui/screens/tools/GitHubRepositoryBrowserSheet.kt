@@ -20,7 +20,7 @@ import com.labteto.dshmobile.uicontract.UiGitHubRepo
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.shenyan.designsystem.foundation.LocalSyColors
 
 /** Read-only links: a file always opens on github.com; writes still require Work approval. */
@@ -105,7 +105,7 @@ internal fun GitHubRepositoryBrowserSheet(
                         enabled = !state.loading,
                     )
                     if (repo.description.isNotBlank()) {
-                        Text(repo.description, style = DsType.small13, color = colors.textSecondary,
+                        Text(repo.description, style = SyType.small13, color = colors.textSecondary,
                             modifier = Modifier.padding(horizontal = 8.dp))
                     }
                 }

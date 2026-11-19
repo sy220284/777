@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 
@@ -91,13 +91,13 @@ internal fun ExtensionCatalogCard(
                 Text(
                     title,
                     modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-title-$id"),
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 Text(
                     description,
                     modifier = Modifier.testTag("$tagPrefix-detail-$id"),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                     maxLines = if (LocalDensity.current.fontScale >= 1.2f) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
@@ -106,7 +106,7 @@ internal fun ExtensionCatalogCard(
                     Text(
                         state.label,
                         modifier = Modifier.testTag("$tagPrefix-status-$id"),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = when (state.status) {
                             ExtensionMarketStatus.FAILED -> colors.dangerInk
                             ExtensionMarketStatus.NEEDS_SETUP,

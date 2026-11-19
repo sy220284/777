@@ -87,8 +87,8 @@ import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.screens.settings.SettingsViewModel
 import com.labteto.dshmobile.ui.screens.settings.LocalAgentSettingsCard
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -1129,12 +1129,12 @@ internal fun ToolsScreen(
                                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
                                         Text(
                                             "常用能力",
-                                            style = DsType.std14Strong.withReadingWeight(),
+                                            style = SyType.std14Strong.withReadingWeight(),
                                             color = colors.textSecondary,
                                         )
                                         Text(
                                             stringResource(R.string.cap_center_settings_group_hint),
-                                            style = DsType.small13.withReadingWeight(),
+                                            style = SyType.small13.withReadingWeight(),
                                             color = colors.textSecondary,
                                         )
                                     }
@@ -1171,7 +1171,7 @@ internal fun ToolsScreen(
                                         )
                                         Text(
                                             stringResource(R.string.tools_deepseek_search_hint),
-                                            style = DsType.caption11.withReadingWeight(),
+                                            style = SyType.caption11.withReadingWeight(),
                                             color = colors.textSecondary,
                                             modifier = Modifier.padding(horizontal = SyMetric.gapSm),
                                         )
@@ -1197,7 +1197,7 @@ internal fun ToolsScreen(
                                         if (autoApprovalEnabled) {
                                             Text(
                                                 "自动审批已开启：文件修改、命令执行和设备操作等高风险请求可能无需逐次确认。",
-                                                style = DsType.caption11.withReadingWeight(),
+                                                style = SyType.caption11.withReadingWeight(),
                                                 color = colors.warningInk,
                                                 modifier = Modifier.padding(horizontal = SyMetric.gapMd)
                                                     .testTag("auto-approval-warning"),
@@ -1215,7 +1215,7 @@ internal fun ToolsScreen(
 
                                     Text(
                                         "高级配置",
-                                        style = DsType.std14Strong.withReadingWeight(),
+                                        style = SyType.std14Strong.withReadingWeight(),
                                         color = colors.textSecondary,
                                     )
                                     ToolCapabilityRow(
@@ -1268,14 +1268,14 @@ internal fun ToolsScreen(
                                                 queryResult?.exceptionOrNull()?.let { failure ->
                                                     Text(
                                                         "工具目录读取失败：" + (failure.message ?: "请重试"),
-                                                        style = DsType.caption11.withReadingWeight(),
+                                                        style = SyType.caption11.withReadingWeight(),
                                                         color = colors.dangerInk,
                                                     )
                                                 }
                                                 Text(
                                                     if (queryResult == null) "正在匹配已注册工具…"
                                                     else "当前匹配 " + discovered.size + " 项注册工具；执行仍按运行时授权",
-                                                    style = DsType.caption11.withReadingWeight(),
+                                                    style = SyType.caption11.withReadingWeight(),
                                                     color = colors.textSecondary,
                                                 )
                                                 LazyColumn(
@@ -1338,12 +1338,12 @@ internal fun ToolsScreen(
         ) {
             Text(
                 stringResource(R.string.tools_github_capabilities),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Text(
                 stringResource(R.string.tools_github_write_approval),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
             if (state.githubConfigured) {
@@ -1363,7 +1363,7 @@ internal fun ToolsScreen(
             if (state.githubConfigured && !editGitHubCredentials) {
                 Text(
                     "GitHub 已连接。需要更新或撤销凭据时再展开操作。",
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 SyButton(
@@ -1388,7 +1388,7 @@ internal fun ToolsScreen(
                 enabled = !state.loading,
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                shape = DsShapes.row,
+                shape = SyShapes.row,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1433,7 +1433,7 @@ internal fun ToolsScreen(
             if (state.servers.isEmpty()) {
                 Text(
                     stringResource(R.string.tools_no_services),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textTertiary,
                 )
             } else {
@@ -1449,7 +1449,7 @@ internal fun ToolsScreen(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 server.id,
-                                style = DsType.std14Strong.withReadingWeight(),
+                                style = SyType.std14Strong.withReadingWeight(),
                                 color = colors.text,
                             )
                             Text(
@@ -1458,7 +1458,7 @@ internal fun ToolsScreen(
                                     server.transport.uppercase(),
                                     server.tools.size,
                                 ),
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                                 color = colors.textTertiary,
                             )
                         }
@@ -1485,7 +1485,7 @@ internal fun ToolsScreen(
                                     append("\n未注册工具 ").append(name).append("：").append(reason)
                                 }
                             },
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.padding(bottom = SyMetric.gapMd),
                         )
@@ -1500,7 +1500,7 @@ internal fun ToolsScreen(
                 label = { Text(stringResource(R.string.tools_server_name)) },
                 enabled = !state.loading,
                 singleLine = true,
-                shape = DsShapes.row,
+                shape = SyShapes.row,
             )
             SyTextField(
                 value = endpoint,
@@ -1510,12 +1510,12 @@ internal fun ToolsScreen(
                 supportingText = { Text(stringResource(R.string.tools_endpoint_hint)) },
                 enabled = !state.loading,
                 singleLine = true,
-                shape = DsShapes.row,
+                shape = SyShapes.row,
             )
             if (eligibleForLocalNetworkPermission && !localNetworkPermissionGranted) {
                 Text(
                     "Android 17：如私有域名实际连接局域网，可先授权「附近设备」。",
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 SyButton(
@@ -1527,7 +1527,7 @@ internal fun ToolsScreen(
                 )
             }
             localNetworkPermissionFeedback?.let { message ->
-                Text(message, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                Text(message, style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
             }
             SyButton(
                 text = if (showMcpAdvanced) "收起高级连接选项" else "高级连接选项",
@@ -1542,7 +1542,7 @@ internal fun ToolsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("OAuth Client ID（可选）") },
                 supportingText = { Text("可填写预注册 ID 或客户端元数据 HTTPS 地址；留空尝试服务支持的自动注册。") },
-                enabled = !state.loading, singleLine = true, shape = DsShapes.row,
+                enabled = !state.loading, singleLine = true, shape = SyShapes.row,
             )
             }
             SyButton(
@@ -1588,7 +1588,7 @@ internal fun ToolsScreen(
                 enabled = !state.loading,
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                shape = DsShapes.row,
+                shape = SyShapes.row,
             )
             }
             SyButton(
@@ -1622,7 +1622,7 @@ internal fun ToolsScreen(
             if (showMcpStdio) {
             Text(
                 stringResource(R.string.tools_stdio_title),
-                style = DsType.std14Strong.withReadingWeight(),
+                style = SyType.std14Strong.withReadingWeight(),
                 color = colors.text,
             )
             SyTextField(
@@ -1634,7 +1634,7 @@ internal fun ToolsScreen(
                 enabled = !state.loading,
                 minLines = 2,
                 maxLines = 6,
-                shape = DsShapes.row,
+                shape = SyShapes.row,
             )
             SyTextField(
                 value = stdioWorkingDirectory,
@@ -1644,7 +1644,7 @@ internal fun ToolsScreen(
                 supportingText = { Text(stringResource(R.string.tools_stdio_working_directory_hint)) },
                 enabled = !state.loading,
                 singleLine = true,
-                shape = DsShapes.row,
+                shape = SyShapes.row,
             )
             val stdioArgs = stdioCommand.lineSequence()
                 .map(String::trim)
@@ -1677,7 +1677,7 @@ internal fun ToolsScreen(
         ) {
             Text(
                 stringResource(R.string.cap_center_auto_approval_confirm_body),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -1705,7 +1705,7 @@ internal fun ToolsScreen(
         ) {
             Text(
                 stringResource(R.string.tools_github_clear_confirm_body),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Row(
@@ -1747,7 +1747,7 @@ private fun ToolCapabilityRow(
         modifier = modifier.fillMaxWidth(),
         onClick = { onClick?.invoke() },
         enabled = onClick != null,
-        shape = DsShapes.row,
+        shape = SyShapes.row,
         color = colors.materialL2,
     ) {
         Row(
@@ -1774,7 +1774,7 @@ private fun ToolCapabilityRow(
                         Text(
                             title,
                             modifier = Modifier.weight(1f),
-                            style = DsType.std14Strong.withReadingWeight(),
+                            style = SyType.std14Strong.withReadingWeight(),
                             color = colors.text,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -1807,7 +1807,7 @@ private fun ToolCapabilityStatus(status: String, state: StateDotState) {
         StateDot(state, size = 7.dp)
         Text(
             status,
-            style = DsType.xsmall12.withReadingWeight(),
+            style = SyType.xsmall12.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

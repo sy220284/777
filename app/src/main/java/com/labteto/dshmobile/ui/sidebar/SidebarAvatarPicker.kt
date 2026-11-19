@@ -60,8 +60,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.rememberSidebarAvatarStore
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -245,14 +245,14 @@ private fun SidebarAvatarSheet(
         error?.let {
             Text(
                 text = it,
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.dangerInk,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapXs),
             )
         }
         Text(
             text = stringResource(R.string.sidebar_avatar_presets),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = colors.textSecondary,
             modifier = Modifier.padding(top = SyMetric.gapSm),
         )
@@ -268,7 +268,7 @@ private fun SidebarAvatarSheet(
                 Surface(
                     onClick = { onPreset(preset) },
                     enabled = !busy,
-                    shape = DsShapes.block,
+                    shape = SyShapes.block,
                     color = if (isSelected) colors.lilac.copy(alpha = .18f) else colors.materialL1,
                     border = BorderStroke(
                         if (isSelected) 2.dp else 1.dp,
@@ -292,7 +292,7 @@ private fun SidebarAvatarSheet(
                         }
                         Text(
                             text = preset.persona.name,
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -369,7 +369,7 @@ internal fun SidebarAvatarImage(
         ) {
             Text(
                 text = stringResource(R.string.sidebar_avatar_default_mark),
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
             )
         }

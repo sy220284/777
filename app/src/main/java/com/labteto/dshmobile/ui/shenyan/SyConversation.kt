@@ -54,7 +54,7 @@ import com.shenyan.designsystem.foundation.SyMotion
 import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 const val SY_COMPOSER_FIELD_TAG = "ds-composer-field"
@@ -76,7 +76,7 @@ fun SyUserBubble(text: String, modifier: Modifier = Modifier) {
     val edge = if (wallpaper.hasImage) {
         if (wallpaper.darkTheme) Color.White.copy(alpha = .28f) else Color.Black.copy(alpha = .24f)
     } else p.border
-    com.shenyan.designsystem.components.SyUserBubble(text, modifier, fill, edge, DsType.chatBody.withReadingWeight())
+    com.shenyan.designsystem.components.SyUserBubble(text, modifier, fill, edge, SyType.chatBody.withReadingWeight())
 }
 
 /**
