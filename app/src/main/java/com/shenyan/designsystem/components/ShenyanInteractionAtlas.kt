@@ -91,6 +91,7 @@ fun SyActionSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    confirmDestructive: Boolean = true,
 ) {
     val palette = LocalSyColors.current
     var destructiveChoice by remember { mutableStateOf<SyActionEntry?>(null) }
@@ -105,7 +106,7 @@ fun SyActionSheet(
         entries.forEach { entry ->
             SyMaterialSurface(
                 onClick = {
-                    if (entry.destructive) destructiveChoice = entry
+                    if (entry.destructive && confirmDestructive) destructiveChoice = entry
                     else { onDismiss(); onChoose(entry.id) }
                 },
                 enabled = entry.enabled,
@@ -469,39 +470,71 @@ fun SyMultiSelectSheet(
     selectedIds: Set<String>,
     onConfirm: (Set<String>) -> Unit,
     onDismiss: () -> Unit,
+    enabled: Boolean = true,
+    minSelected: Int = 0,
+    maxSelected: Int = Int.MAX_VALUE,
+    confirmLabel: String = "应用",
+    header: (@Composable (Set<String>) -> Unit)? = null,
+    summary: (@Composable (Set<String>) -> Unit)? = null,
+    itemContent: (@Composable (SyOption, Boolean) -> Unit)? = null,
 ) {
     val palette = LocalSyColors.current
-    // Transactional selection: cancel/back dismisses without changing the caller's data.
+    // Draft is retained even while search filters options; dismissal never writes to feature data.
     var draft by remember(selectedIds) { mutableStateOf(selectedIds) }
     SyModalSheet(
-        onDismiss = onDismiss, title = title, scrollable = true,
+        onDismiss = onDismiss, title = title,
         footer = {
-            Row(Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            summary?.invoke(draft)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SyButton("取消", onDismiss, modifier = Modifier.weight(1f),
                     style = SyButtonStyle.SECONDARY)
-                SyButton("应用（${draft.size}）", { onConfirm(draft) },
+                SyButton(confirmLabel, { onConfirm(draft) },
+                    enabled = enabled && draft.size in minSelected..maxSelected,
                     modifier = Modifier.weight(1f))
             }
         },
     ) {
-        options.forEach { option ->
-            SyMaterialSurface(
-                onClick = {
-                    draft = if (option.id in draft) draft - option.id else draft + option.id
-                },
-                enabled = option.enabled,
-                modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
-                shape = RoundedCornerShape(SyMetric.radiusControl),
-                tier = SyMaterialTier.L2_BAR,
+        header?.invoke(draft)
+        if (options.isEmpty()) {
+            Text("暂无可选项", color = palette.textSecondary,
+                style = MaterialTheme.typography.bodySmall)
+        } else {
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)
+                    .testTag("sy-multi-select-list"),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text(option.label, color = palette.text,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge)
-                    SyCheckboxControl(checked = option.id in draft,
-                        onCheckedChange = null, enabled = option.enabled)
+                items(options.size, key = { index -> options[index].id }) { index ->
+                    val option = options[index]
+                    val checked = option.id in draft
+                    val canToggle = enabled && option.enabled &&
+                        (checked || draft.size < maxSelected)
+                    SyMaterialSurface(
+                        onClick = {
+                            draft = if (checked) draft - option.id else draft + option.id
+                        },
+                        enabled = canToggle,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
+                            .testTag("sy-multi-option:" + option.id),
+                        shape = RoundedCornerShape(SyMetric.radiusControl),
+                        tier = SyMaterialTier.L2_BAR,
+                        tint = if (checked) palette.selected else Color.Unspecified,
+                    ) {
+                        Row(Modifier.fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (itemContent != null) {
+                                Box(Modifier.weight(1f)) { itemContent(option, checked) }
+                            } else {
+                                Text(option.label, color = palette.text,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge)
+                            }
+                            SyCheckboxControl(checked = checked,
+                                onCheckedChange = null, enabled = canToggle)
+                        }
+                    }
                 }
             }
         }
