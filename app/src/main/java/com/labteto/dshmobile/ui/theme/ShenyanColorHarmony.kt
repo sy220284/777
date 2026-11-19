@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.theme
 
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import com.shenyan.designsystem.foundation.SyColors
 
 /**
@@ -35,11 +36,15 @@ internal fun SyHostColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = fal
         labelSecondary = p.textSecondary,
         labelTertiary = p.textTertiary,
         sidebar = bar,
-        sidebarNavActive = if (p.text.luminance() < .5f) p.selected else card,
-        sidebarNavAccent = p.selected,
+        sidebarNavActive = if (p.text.luminance() < .5f)
+            if (preserveAccent) accentTertiary.compositeOver(p.canvas) else p.selected
+            else card,
+        sidebarNavAccent = if (preserveAccent) accentTertiary.compositeOver(p.canvas) else p.selected,
         sidebarNavHover = if (p.text.luminance() < .5f) p.text.copy(alpha = .04f).compositeOver(bar) else card,
         composerCard = bar,
-        userBubble = if (p.text.luminance() < .5f) p.selected else card,
+        userBubble = if (p.text.luminance() < .5f)
+            if (preserveAccent) accentTertiary.compositeOver(p.canvas) else p.selected
+            else card,
         userBubbleHighlight = overlay,
         tipSurface = card,
     )
@@ -48,9 +53,20 @@ internal fun SyHostColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = fal
 /** Project the saved accent into the canonical controls as well as legacy page consumers.
  * Material tiers and semantic status colours still belong to the V6 palette.
  */
-internal fun SyColors.withV6Accent(source: SyHostColors): SyColors = copy(
-    primary = source.accent,
-    primaryPressed = source.accentHover.compositeOver(source.bgBase),
-    onPrimary = source.onAccent,
-    selected = source.accentTertiary.compositeOver(source.bgBase),
-)
+internal fun SyColors.withV6Accent(source: SyHostColors): SyColors {
+    val accent = source.accent.copy(alpha = 1f)
+    // Neutral reading canvases remain classic white/matte. Selection, subtle optical edge
+    // and the sheen move together so accent families read as one coordinated system.
+    val edge = lerp(border.copy(alpha = 1f), accent,
+        if (text.luminance() < .5f) .12f else .20f).copy(alpha = border.alpha)
+    val sheen = lerp(materialSheen.copy(alpha = 1f), accent, .06f)
+        .copy(alpha = materialSheen.alpha)
+    return copy(
+        primary = accent,
+        primaryPressed = source.accentHover.compositeOver(source.bgBase),
+        onPrimary = source.onAccent,
+        selected = source.accentTertiary.compositeOver(source.bgBase),
+        border = edge,
+        materialSheen = sheen,
+    )
+}

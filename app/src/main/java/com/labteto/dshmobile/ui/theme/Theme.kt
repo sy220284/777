@@ -236,9 +236,14 @@ internal fun resolveV6ThemePalette(
     else com.shenyan.designsystem.foundation.ShenyanPalettes.light
     val palette = AccentPalettes.of(accentKey)
     val defaultAccent = palette.key == AccentPalettes.DEFAULT.key
-    val page = (if (defaultAccent) base else base.withAccent(palette, dark))
+    val rawPage = (if (defaultAccent) base else base.withAccent(palette, dark))
         .harmonizeV6(canonical, preserveAccent = !defaultAccent)
-    val controls = if (defaultAccent) canonical else canonical.withV6Accent(page)
+    val controls = if (defaultAccent) canonical else canonical.withV6Accent(rawPage)
+    val page = if (defaultAccent) rawPage else rawPage.copy(
+        borderL1 = controls.border.copy(alpha = controls.border.alpha * .55f),
+        borderL2 = controls.border.copy(alpha = controls.border.alpha * .75f),
+        borderL3 = controls.border,
+    )
     return V6ThemeProjection(dark, page, controls, defaultAccent)
 }
 

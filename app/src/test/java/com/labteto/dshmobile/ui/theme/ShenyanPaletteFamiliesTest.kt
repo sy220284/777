@@ -32,6 +32,25 @@ class ShenyanPaletteFamiliesTest {
         }
     }
 
+    @Test fun accentsCoordinateEdgesAndSelectionWithoutChangingElegantWhiteOrMatteCanvas() {
+        val defaultLight = resolveV6ThemePalette(ThemePreference.LIGHT, null, false)
+        val defaultMatte = resolveV6ThemePalette(ThemePreference.MATTE_BLACK, null, false)
+        for (accent in AccentPalettes.ALL.drop(1)) {
+            val light = resolveV6ThemePalette(ThemePreference.LIGHT, accent.key, false)
+            val matte = resolveV6ThemePalette(ThemePreference.MATTE_BLACK, accent.key, false)
+            assertEquals(defaultLight.controls.canvas, light.controls.canvas)
+            assertEquals(defaultMatte.controls.canvas, matte.controls.canvas)
+            assertEquals(defaultLight.controls.materialL5, light.controls.materialL5)
+            assertEquals(defaultMatte.controls.materialL5, matte.controls.materialL5)
+            assertEquals(light.controls.border, light.page.borderL3)
+            assertEquals(matte.controls.border, matte.page.borderL3)
+            assertTrue("Selected surface is themed: ${accent.key}",
+                light.controls.selected != defaultLight.controls.selected)
+            assertTrue("Optical edge is themed: ${accent.key}",
+                light.controls.border != defaultLight.controls.border)
+        }
+    }
+
     @Test fun formerBlueAndPurpleOptionsResolveToCoherentSupportedFamilies() {
         assertEquals("forest", AccentPalettes.of("default_blue").key)
         assertEquals("graphite", AccentPalettes.of("dailan").key)
