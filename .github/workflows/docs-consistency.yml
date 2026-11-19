@@ -6,6 +6,9 @@ on:
       - 'docs/**'
       - 'README.md'
       - 'tools/audit/check-docs.py'
+      - '.github/scripts/check-ui-design-system-boundaries.py'
+      - 'app/src/main/java/com/shenyan/designsystem/**'
+      - 'app/src/main/java/com/labteto/dshmobile/ui/**'
       - '.github/workflows/docs-consistency.yml'
   push:
     branches: [main]
@@ -13,6 +16,9 @@ on:
       - 'docs/**'
       - 'README.md'
       - 'tools/audit/check-docs.py'
+      - '.github/scripts/check-ui-design-system-boundaries.py'
+      - 'app/src/main/java/com/shenyan/designsystem/**'
+      - 'app/src/main/java/com/labteto/dshmobile/ui/**'
       - '.github/workflows/docs-consistency.yml'
 
 jobs:
@@ -26,3 +32,5 @@ jobs:
         run: python3 docs/design/v6/build-standalone.py --check
       - name: 检查 V6 图标资产
         run: python3 docs/design/v6/audit-all-icons.py
+      - name: 检查原生组件接入与双主题材质
+        run: python3 .github/scripts/check-ui-design-system-boundaries.py

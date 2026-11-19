@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,12 +25,9 @@ import androidx.compose.ui.unit.IntSize
 import kotlin.math.max
 import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -44,17 +40,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.isSpecified
-import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.shenyan.designsystem.foundation.*
 
 /**
- * Five-tier material grammar. Alpha, border, rim highlight and elevation are native and real.
- * Compose cannot blur *already-drawn sibling content* with Modifier.blur: it blurs its own layer.
- * For true backdrop blur, caller may supply a spatially aligned `backdrop` composable. It is
- * drawn behind the fill, and only that backdrop is blurred. Never blur foreground text.
- * On old devices or when no backdrop is supplied use a clean semantic surface fallback.
+ * Five material tiers share the same scene. Optical chrome refracts a distinct backing;
+ * foreground text sits above it. Flat surfaces keep their readable material fill.
  */
 enum class SyMaterialTier { L1_SECTION, L2_BAR, L3_CARD, L4_OVERLAY, L5_SOLID }
 
@@ -152,24 +144,6 @@ fun SyMaterialSurface(
         reduceTransparency = LocalSyReduceTransparency.current,
         nestedDepth = nested, hasBackdrop = scene != null || backdrop != null || liveBacking != null,
     )
-    var touchOrigin by remember(interaction) { mutableStateOf<Offset?>(null) }
-    if (optics.glass && onClick != null) {
-        LaunchedEffect(interaction) {
-            // Only interactive glass observes press location; this does not claim the gesture.
-            interaction.interactions.collect { event ->
-                if (event is PressInteraction.Press) touchOrigin = event.pressPosition
-            }
-        }
-    }
-    val pressLight = if (optics.glass && onClick != null) {
-        val animated by animateFloatAsState(
-            targetValue = if (pressed && enabled && !LocalSyReduceMotion.current) 1f else 0f,
-            animationSpec = tween(SyMotion.duration(SyMotion.interactionColorMs,
-                LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
-            label = "glassTouchReflection",
-        )
-        animated
-    } else 0f
     // One GPU lens for anchored chrome and overlays; list cards retain their
     // inexpensive rim unless they explicitly own a live underlay.
     val refract = optics.glass && syShouldRefract(resolved, nested, backdrop != null)
@@ -182,36 +156,31 @@ fun SyMaterialSurface(
             LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
         label = "liquidLensPressure",
     )
-    val blurRadius = optics.blur
-    val elevation = optics.elevation
-    val rim = if (optics.glass) BorderStroke(1.dp, Brush.linearGradient(
-        listOf(
-            c.text.copy(alpha = .095f * optics.reflection),
-            c.materialSheen.copy(alpha = .88f * optics.reflection),
-            c.text.copy(alpha = .11f * optics.reflection),
-            c.materialSheen.copy(alpha = .60f * optics.reflection),
-            c.text.copy(alpha = .13f * optics.reflection),
-        ),
-    )) else BorderStroke(1.dp, c.border)
+    val surfaceBorder = when {
+        refract -> null
+        optics.glass -> BorderStroke(1.dp, c.border.copy(alpha = c.border.alpha * .38f))
+        else -> border ?: BorderStroke(1.dp, c.border)
+    }
     @Composable fun Interior() {
         Box(Modifier.clip(shape)) {
-            // The same source can be live content supplied by the caller or the root
-            // aligned wallpaper. Both are sampled on the GPU and remain current while
-            // the scene or the glass moves. No sibling bitmap capture is assumed.
-            val sampled = if (refract || (blurRadius > 0.dp && nested == 0)) {
-                backdrop ?: liveBacking?.let { captured ->
+            val sampled = if (refract) {
+                backdrop ?: if (liveBacking != null || scene != null) {
                     @Composable {
-                        SyPaintLiveGlassBacking(captured, materialOrigin, Modifier.fillMaxSize())
+                        // The captured transcript has transparent gaps. Include the same
+                        // aligned scene below it so those gaps never refract as black.
+                        if (scene != null) SyPaintAlignedScene(scene, materialOrigin)
+                        else Box(Modifier.fillMaxSize().background(c.canvas))
+                        if (liveBacking != null) {
+                            SyPaintLiveGlassBacking(liveBacking, materialOrigin, Modifier.fillMaxSize())
+                        }
                     }
-                } ?: scene?.let { sample ->
-                    @Composable { SyPaintAlignedScene(sample, materialOrigin) }
-                }
+                } else null
             } else null
             if (sampled != null && refract) {
                 SyLiquidRefractionLayer(
                     modifier = Modifier.matchParentSize(),
                     shape = shape,
-                    fill = fill,
+                    fill = syLiquidTint(fill, tint),
                     tier = resolved,
                     reflection = optics.reflection,
                     touchPoint = lensPoint,
@@ -220,54 +189,10 @@ fun SyMaterialSurface(
                     backdrop = sampled,
                 )
             } else {
-                if (blurRadius > 0.dp && nested == 0 && sampled != null) {
-                    Box(Modifier.matchParentSize().blur(blurRadius, BlurredEdgeTreatment.Unbounded)) {
-                        sampled()
-                    }
-                }
                 Box(Modifier.matchParentSize().background(fill))
             }
-            if (tint.isSpecified) Box(Modifier.matchParentSize().background(tint.copy(alpha = tint.alpha.coerceAtMost(.22f))))
-            if (optics.glass) {
-                // Reflected light belongs beneath content: the reading text stays crisp.
-                // The reactive pool follows PressInteraction without owning touch gestures.
-                Canvas(Modifier.matchParentSize()) {
-                    val extent = max(size.width, size.height).coerceAtLeast(1f)
-                    drawRect(Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = .17f * optics.reflection),
-                            c.primary.copy(alpha = .035f * optics.reflection),
-                            Color.Transparent,
-                        ),
-                        start = Offset.Zero,
-                        end = Offset(size.width * .82f, size.height * .88f),
-                    ))
-                    if (pressLight > 0f) {
-                        val point = touchOrigin ?: Offset(size.width * .5f, size.height * .5f)
-                        val centre = Offset(point.x.coerceIn(0f, size.width),
-                            point.y.coerceIn(0f, size.height))
-                        val radius = extent * .67f
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = .23f * pressLight * optics.reflection),
-                                    c.primary.copy(alpha = .075f * pressLight * optics.reflection),
-                                    Color.Transparent,
-                                ),
-                                center = centre, radius = radius,
-                            ),
-                            radius = radius, center = centre,
-                        )
-                    }
-                    if (resolved == SyMaterialTier.L2_BAR || resolved == SyMaterialTier.L4_OVERLAY) {
-                        drawLine(
-                            color = c.text.copy(alpha = .040f * optics.reflection),
-                            start = Offset(size.width * .05f, size.height - .75.dp.toPx()),
-                            end = Offset(size.width * .95f, size.height - .75.dp.toPx()),
-                            strokeWidth = .75.dp.toPx(),
-                        )
-                    }
-                }
+            if (!refract && tint.isSpecified) {
+                Box(Modifier.matchParentSize().background(tint.copy(alpha = tint.alpha.coerceAtMost(.22f))))
             }
             CompositionLocalProvider(LocalSyGlassDepth provides (nested + 1)) {
                 content()
@@ -302,15 +227,17 @@ fun SyMaterialSurface(
         val next = IntOffset(point.x.roundToInt() + windowOnScreen[0], point.y.roundToInt() + windowOnScreen[1])
         if (materialOrigin != next) materialOrigin = next
         if (materialSize != coordinates.size) materialSize = coordinates.size
-    }.graphicsLayer { scaleX = press; scaleY = press }.shadow(shadowElevation ?: elevation, shape).clip(shape)
+    }.graphicsLayer { scaleX = press; scaleY = press }
+        .then(if (optics.glass) Modifier else Modifier.shadow(shadowElevation ?: optics.elevation, shape))
+        .clip(shape)
     if (onClick != null) {
         Surface(onClick = onClick, enabled = enabled, interactionSource = interaction, modifier = outer, color = Color.Transparent, shape = shape,
             contentColor = contentColor, tonalElevation = tonalElevation,
-            border = border ?: rim) { Interior() }
+            border = surfaceBorder) { Interior() }
     } else {
         Surface(modifier = outer, color = Color.Transparent, shape = shape,
             contentColor = contentColor, tonalElevation = tonalElevation,
-            border = border ?: rim) { Interior() }
+            border = surfaceBorder) { Interior() }
     }
 }
 

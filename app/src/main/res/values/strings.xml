@@ -1283,7 +1283,7 @@
 <string name="tasks_chat_window_end_value">窗口结束 %1$s</string>
 <string name="tasks_chat_silence_hours">沉默阈值（小时）</string>
 <string name="tasks_chat_silence_hours_hint">用户连续这么久没有发言后才允许主动联系，至少 1 小时。</string>
-<string name="tasks_first_run_value">首次执行：%1$s</string>
+<string name="tasks_first_run_label">首次执行</string>
 <string name="tasks_custom_hours">重复间隔（小时）</string>
 <string name="tasks_custom_hours_hint">自定义周期至少 1 小时</string>
 <string name="tasks_every_hours">每 %1$d 小时</string>
@@ -1523,6 +1523,8 @@
 <string name="usage_range_7">7天</string>
 <string name="usage_range_30">30天</string>
 <string name="usage_range_90">90天</string>
+    <string name="usage_range_custom">选择日期范围</string>
+    <string name="usage_range_custom_value">%1$s 至 %2$s</string>
 <string name="usage_avg_sent">平均发送一条</string>
 <string name="usage_avg_received">平均收到一条</string>
 <string name="usage_avg_background">后台附加 / 回合</string>

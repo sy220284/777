@@ -90,16 +90,16 @@ internal object SyLiquidShader {
             );
             float2 spread = normal * chromaPx * rim;
 
+            half4 centerSample = source.eval(samplePoint);
             half3 refracted;
             if (chromaPx > 0.01) {
                 half4 redSample = source.eval(clamp(samplePoint + spread,
                     float2(0.75), resolution - float2(0.75)));
-                half4 greenSample = source.eval(samplePoint);
                 half4 blueSample = source.eval(clamp(samplePoint - spread,
                     float2(0.75), resolution - float2(0.75)));
-                refracted = half3(redSample.r, greenSample.g, blueSample.b);
+                refracted = half3(redSample.r, centerSample.g, blueSample.b);
             } else {
-                refracted = source.eval(samplePoint).rgb;
+                refracted = centerSample.rgb;
             }
             if (blurPx > 0.05) {
                 float2 horizontal = float2(blurPx, 0.0);
@@ -114,26 +114,20 @@ internal object SyLiquidShader {
                     source.eval(clamp(samplePoint - vertical,
                         float2(0.75), resolution - float2(0.75))).rgb
                 ) * half(0.25);
-                refracted = mix(refracted, soft, half(0.22 + 0.15 * rim));
+                refracted = mix(refracted, soft, half(0.08 + 0.10 * rim));
             }
 
-            // Preserve the solid center for readable foreground ink; reduce
-            // veil selectively at the edge so the actual bending stays visible.
             float tintAlpha = glassTint.a * (1.0 - clarity * rim);
-            half3 finalColor = mix(refracted, glassTint.rgb, half(tintAlpha));
-            // Fresnel-style edge highlight and underside shadow reveal curved thickness.
-            float edgeHighlight = pow(rim, 2.6) * reflection;
-            float lightDirection = 0.52 - 0.48 * normal.x - 0.42 * normal.y;
-            half3 light = half3(1.0, 0.99, 0.97);
-            finalColor = mix(finalColor, light,
-                half(clamp(edgeHighlight * max(lightDirection, 0.0) * 0.45, 0.0, 0.58)));
-            finalColor *= half(1.0 - edgeHighlight *
-                max(normal.x * 0.46 + normal.y * 0.32, 0.0) * 0.13);
+            half3 colour = mix(refracted, glassTint.rgb, half(tintAlpha));
+            half alpha = mix(centerSample.a, half(1.0), half(tintAlpha));
+            // A single, directional highlight hugs the inner edge. There is
+            // no simulated underside shadow, stroke or full-surface glare.
+            float glint = pow(rim, 4.0) * reflection *
+                max(dot(normal, float2(-0.71, -0.71)), 0.0) * 0.15;
+            colour = mix(colour, half3(alpha), half(glint));
 
-            // A live optical edge is a shaped surface. Transparent pixels outside
-            // the deformed lens show the unchanged original underlay beneath.
-            float coverage = 1.0 - smoothstep(-1.2, 1.2, deformedDistance);
-            return half4(finalColor * half(coverage), half(coverage));
+            float coverage = 1.0 - smoothstep(-1.0, 0.7, deformedDistance);
+            return half4(min(colour, half3(alpha)), alpha) * half(coverage);
         }
     """
 }
@@ -146,7 +140,7 @@ internal fun syShouldRefract(
     (nestedDepth == 0 || explicitBackdrop) &&
         (tier == SyMaterialTier.L2_BAR || tier == SyMaterialTier.L4_OVERLAY || explicitBackdrop)
 
-/** The input is rendered live every draw; shader and RenderEffect are cached per surface. */
+/** The input is rendered live each draw. Uniforms are updated with the layer properties. */
 @Composable
 internal fun SyLiquidRefractionLayer(
     modifier: Modifier,
@@ -161,10 +155,6 @@ internal fun SyLiquidRefractionLayer(
 ) {
     val density = LocalDensity.current
     val shader = remember { RuntimeShader(SyLiquidShader.PROGRAM) }
-    val effect = remember(shader) {
-        RenderEffect.createRuntimeShaderEffect(shader, SyLiquidShader.INPUT)
-            .asComposeRenderEffect()
-    }
     // The RenderEffect input must be the pixels of THIS graphicsLayer.
     // Previous code recorded the backdrop into a separate GPU layer and
     // tried to draw that layer through an unrelated Canvas: the explicit
@@ -192,8 +182,8 @@ internal fun SyLiquidRefractionLayer(
         // Optical curvature belongs to a slim physical rim, not 20% of
         // the item height. Keep edge highlights delicate on small list rows.
         val shortSide = min(width, height)
-        val physicalBend = with(density) { 4.dp.toPx() }
-        val physicalEdge = with(density) { 6.dp.toPx() }
+        val physicalBend = with(density) { 3.dp.toPx() }
+        val physicalEdge = with(density) { 3.5.dp.toPx() }
         shader.setFloatUniform("bendPx", min(shortSide * .07f, physicalBend))
         shader.setFloatUniform("edgePx", min(shortSide * .065f, physicalEdge))
         shader.setFloatUniform("reflection", reflection.coerceIn(0f, 1f))
@@ -203,7 +193,7 @@ internal fun SyLiquidRefractionLayer(
         val highCost = width * height > 430_000f
         shader.setFloatUniform("blurPx",
             if (highCost) 0f else min(shortSide * .026f,
-                with(density) { if (tier == SyMaterialTier.L4_OVERLAY) 2.4.dp.toPx() else 1.6.dp.toPx() }))
+                with(density) { if (tier == SyMaterialTier.L4_OVERLAY) 1.4.dp.toPx() else 1.dp.toPx() }))
         shader.setFloatUniform("chromaPx",
             if (highCost) 0f else min(shortSide * .003f,
                 with(density) { .8.dp.toPx() }))
@@ -213,7 +203,9 @@ internal fun SyLiquidRefractionLayer(
             else -> .40f
         })
         shader.setColorUniform("glassTint", fill.toArgb())
-        renderEffect = effect
+        // Apply the effect after setting its complete set of uniforms.
+        renderEffect = RenderEffect.createRuntimeShaderEffect(shader, SyLiquidShader.INPUT)
+            .asComposeRenderEffect()
     }.clearAndSetSemantics {}) {
         // This is a visual-only sampling copy; accessible content and controls
         // remain in the actual underlay or foreground, not the optical texture.

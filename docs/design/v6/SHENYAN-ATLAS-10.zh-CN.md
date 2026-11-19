@@ -80,6 +80,7 @@
 ## 真实业务接入与原生验收
 
 - 十类图集采用原生 Compose 组件；聊天、工作、任务、工具、人物、文件、设置和首次引导共享视觉语法。业务页面需要保留原来的保存、删除确认、权限与恢复逻辑。
-- `ShenyanAtlasVisualCaptureTest` 在 Android 模拟器上生成 **38 张原生 PNG**：十个图集分类 × 典雅白/磨砂黑两主题共 20 张，以及九套强调色 × 两主题共 18 张；截屏前核实目标标签存在、控件可点击且相应状态已稳定。执行入口为 `tools/ui/run-native-ui-audit.py`，证据随 `777-ui-videos-and-results-*` 工件保存。
+- `ShenyanAtlasVisualCaptureTest` 在 Android 模拟器计划生成 **50 张原生 PNG**：双主题十类图集 20 张、九套强调色 18 张、四种已打开的弹层 8 张，以及玻璃拖动前后 4 张。弹层截图使用设备屏幕像素，包含独立窗口和遮罩。执行入口为 `tools/ui/run-native-ui-audit.py`，截图、录像和测试日志随 `777-ui-videos-and-results-*` 工件保存。
+- 正式入口接住图集交互：单聊角色纠正使用真实撤销提示，工作任务首次读取使用骨架，首次执行时间与周期复用神言日期和数字控件，用量趋势接入可取消的自定义日期范围。
 - `ShenyanAtlasInteractionTest` 与真实页面回归共同检查操作。设备测试通过后还需逐张对照十张原始设计图，记录布局、颜色、玻璃材质、遮罩、动效和无障碍偏差；截图存在仅证明采集成功。
 - 生产组件门禁 `.github/scripts/check-ui-design-system-boundaries.py` 对真实业务入口进行检查，避免仅在调试图集中实现而业务页面未迁移。

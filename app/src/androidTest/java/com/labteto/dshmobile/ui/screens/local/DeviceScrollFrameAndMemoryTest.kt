@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.ui.theme.ThemePreference
+import com.labteto.dshmobile.ui.components.ConversationScrollTarget
+import com.labteto.dshmobile.ui.components.ConversationTranscriptGlass
+import com.labteto.dshmobile.ui.audit.captureUiAudit
+import androidx.compose.ui.test.onNodeWithTag
 import android.os.Build
 import android.os.Bundle
 import android.os.Debug
@@ -38,11 +43,17 @@ import org.junit.Test
 class DeviceScrollFrameAndMemoryTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun workTimelineScrollReportsFrameRateJankAndPeakPss() {
+    @Test fun workTimelineScrollReportsFrameRateJankAndPeakPss() = measureGlassScroll(chat = false)
+
+    @Test fun chatTranscriptScrollReportsFrameRateJankAndPeakPss() = measureGlassScroll(chat = true)
+
+    private fun measureGlassScroll(chat: Boolean) {
+        val scenario = if (chat) "chat" else "work"
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val rows = List(400) { index ->
             LocalHarnessMessage(
-                id = "scroll-perf-$index", role = "tool", content = "步骤 $index 已核查",
+                id = "scroll-perf-$index", role = if (chat) "assistant" else "tool",
+                content = if (chat) "对话记录 $index · 观察文字穿过镜片边缘" else "步骤 $index 已核查",
                 toolName = "mcp__github__get_pr_info", createdAt = index.toLong(),
                 toolCallId = "scroll-call-$index",
             )
@@ -51,8 +62,9 @@ class DeviceScrollFrameAndMemoryTest {
         var listBoundsOnScreen: Rect? = null
         compose.setContent {
             listState = rememberLazyListState()
-            DshTheme {
-                LazyColumn(
+            DshTheme(preference = ThemePreference.LIGHT) {
+                ConversationTranscriptGlass(target = ConversationScrollTarget.LATEST, onClick = {}) {
+                    LazyColumn(
                     Modifier.fillMaxSize()
                         .testTag("perf-real-work-timeline")
                         .onGloballyPositioned { coordinates ->
@@ -65,11 +77,25 @@ class DeviceScrollFrameAndMemoryTest {
                         },
                     state = listState,
                 ) {
-                    items(rows, key = { it.id }) { row -> WorkTimelineStepRow(row) }
+                        items(rows, key = { it.id }) { row ->
+                            if (chat) {
+                                LocalMessageRow(
+                                    message = row, chatMode = true, groupMode = false,
+                                    canEdit = false, canRegenerate = false, canSelectVariant = false,
+                                    branchInfo = null, onEdit = {}, onSelectVariant = { _, _ -> false },
+                                    onRegenerate = { false },
+                                )
+                            } else {
+                                WorkTimelineStepRow(row)
+                            }
+                        }
+                    }
                 }
             }
         }
         compose.waitForIdle()
+        compose.onNodeWithTag("sy-conversation-liquid-shortcut", useUnmergedTree = true).assertExists()
+        captureUiAudit(compose, "liquid-$scenario-before-scroll")
         val viewport = requireNotNull(listBoundsOnScreen) {
             "Work list must be laid out before injecting a real touch gesture"
         }
@@ -150,7 +176,7 @@ class DeviceScrollFrameAndMemoryTest {
             thread.join(2_000)
         }
         val frames = synchronized(metrics) { metrics.toList() }
-        assertTrue("Real scrolling never advanced the Work list: viewport=$viewport maxVisibleIndex=$maxVisibleIndex", maxVisibleIndex > 2)
+        assertTrue("Real scrolling never advanced the $scenario transcript: viewport=$viewport maxVisibleIndex=$maxVisibleIndex", maxVisibleIndex > 2)
         // Wall-clock input generates real frame opportunities. Even then an emulator can
         // drop FrameMetrics callbacks under host contention: never fabricate FPS/jank
         // from fewer than 60 real frames and 40 valid VSYNC intervals.
@@ -168,7 +194,7 @@ class DeviceScrollFrameAndMemoryTest {
             String.format(Locale.US, "%.2f", 100.0 * longFrames / frames.size)
         } else "NA"
         val output = String.format(Locale.US,
-            "ANDROID_PERF api=%d scenario=work_timeline_scroll_frames samples=%d " +
+            "ANDROID_PERF api=%d scenario=${scenario}_transcript_glass_scroll samples=%d " +
                 "refresh_hz=%.1f observed_fps_p50=%s jank_pct=%s " +
                 "sample_quality=%s gesture_source=android_instrumentation_verified_touch " +
                 "valid_vsync_intervals=%d max_visible_index=%d " +
@@ -177,9 +203,9 @@ class DeviceScrollFrameAndMemoryTest {
             if (validSample) "valid" else "insufficient", intervals.size, maxVisibleIndex,
             peakPssKb, peakJavaKb)
         instrumentation.sendStatus(2, Bundle().apply { putString("stream", output) })
-        val dir = File(instrumentation.targetContext.getExternalFilesDir(null), "work-timeline-review")
-        check(dir.isDirectory || dir.mkdirs())
-        File(dir, "scroll-memory-api${Build.VERSION.SDK_INT}.txt").writeText(output + "\n")
+        val dir = File(instrumentation.targetContext.getExternalFilesDir(null), "ui-audit").apply { mkdirs() }
+        File(dir, "liquid-$scenario-scroll-api${Build.VERSION.SDK_INT}.txt").writeText(output + "\n")
+        captureUiAudit(compose, "liquid-$scenario-after-scroll")
         assertTrue("Invalid peak PSS", peakPssKb > 0)
     }
 

@@ -188,6 +188,11 @@ REQUIRED_ATLAS_FEATURES = {
     "screens/local/LocalGeneratedMediaMessage.kt": ("SyMediaTransport", "SyMiniPlayer"),
     "screens/tasks/TaskCardComponents.kt": ("SySwipeActionRow",),
     "shenyan/SyConversation.kt": ("SyChatComposer",),
+    "screens/local/LocalConversationSurface.kt": ("SyUndoSnackbarHost", "ConversationTranscriptGlass"),
+    "components/ConversationScrollShortcut.kt": ("SyLiveGlassScene",),
+    "screens/tasks/TasksScreen.kt": ("SySkeletonCard",),
+    "screens/tasks/TaskEditorComponents.kt": ("SyDatePickerField", "SyDateCalendar", "SyNumericStepper"),
+    "screens/settings/UsageCalculationPage.kt": ("SyDateRangePickerDialog",),
 }
 REQUIRED_MATERIAL_FEATURES = {
     "screens/tools/ToolsScreen.kt": ("SyMaterialSurface",),
@@ -279,7 +284,7 @@ def read_primitive_style(css, selector, name):
         return None
     val = re.search(r"--" + re.escape(name) + r"\s*:\s*([^;]+)\s*;", m.group(1))
     return val.group(1).strip() if val else None
-for theme, selector in (("Light", ":root"), ("Dark", 'body[data-theme="dark"]'), ("Matte", 'body[data-theme="matte"]')):
+for theme, selector in (("Light", ":root"), ("Matte", 'body[data-theme="matte"]')):
     palette = re.search(r"private val " + theme + r" = SyColors\((.*?)\n\)", v6_foundation, re.S)
     if not palette:
         violations.append(f"V6 palette missing from Compose: {theme}")

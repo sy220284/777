@@ -1,12 +1,14 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
 import com.shenyan.designsystem.foundation.SyMetric
 
 
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
@@ -20,7 +22,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -159,20 +160,20 @@ internal fun UsageDayChart(
     onSelect: (Long) -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val scrollState = rememberScrollState()
+    val scrollState = rememberLazyListState()
     val maxTokens = max(1L, days.maxOfOrNull { it.second.totalTokens } ?: 1L)
-    LaunchedEffect(days.size, scrollState.maxValue) {
-        if (scrollState.maxValue > 0) scrollState.scrollTo(scrollState.maxValue)
+    LaunchedEffect(days.firstOrNull()?.first, days.lastOrNull()?.first) {
+        if (days.isNotEmpty()) {
+            scrollState.scrollToItem(days.lastIndex)
+        }
     }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(136.dp)
-            .horizontalScroll(scrollState),
+    LazyRow(
+        state = scrollState,
+        modifier = Modifier.fillMaxWidth().height(136.dp),
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         verticalAlignment = Alignment.Bottom,
     ) {
-        days.forEach { (epochDay, aggregate) ->
+        items(days, key = { it.first }) { (epochDay, aggregate) ->
             val selected = epochDay == selectedEpochDay
             val totalFraction = aggregate.totalTokens.toFloat() / maxTokens.toFloat()
             val totalHeight = 92.dp * totalFraction.coerceIn(0.04f, 1f)
@@ -538,16 +539,20 @@ internal fun dailyWindow(
     mode: LocalUsageMode,
     days: Int,
 ): List<Pair<Long, TokenUsageAggregate>> {
-    val byDay = source.associateBy(TokenUsageDailyBucket::epochDay)
     val today = LocalDate.now().toEpochDay()
-    return ((days - 1) downTo 0).map { offset ->
-        val epochDay = today - offset
+    return dailyWindow(source, mode, (today - days + 1)..today)
+}
+
+internal fun dailyWindow(
+    source: List<TokenUsageDailyBucket>,
+    mode: LocalUsageMode,
+    days: LongRange,
+): List<Pair<Long, TokenUsageAggregate>> {
+    val byDay = source.associateBy(TokenUsageDailyBucket::epochDay)
+    return days.map { epochDay ->
         epochDay to (byDay[epochDay]?.forMode(mode) ?: TokenUsageAggregate())
     }
 }
-
-internal fun todayAggregate(days: List<Pair<Long, TokenUsageAggregate>>): TokenUsageAggregate =
-    days.lastOrNull()?.second ?: TokenUsageAggregate()
 
 internal fun formatEpochDay(epochDay: Long): String =
     LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("MM/dd"))

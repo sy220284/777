@@ -12,6 +12,7 @@ CLASSES=[
  'com.shenyan.designsystem.components.ShenyanAtlasInteractionTest',
  'com.shenyan.designsystem.components.SyLiquidRefractionAndroidTest',
  'com.shenyan.designsystem.components.ShenyanAtlasVisualCaptureTest',
+ 'com.labteto.dshmobile.ui.screens.local.DeviceScrollFrameAndMemoryTest',
  'com.shenyan.designsystem.components.MobileActionReadabilityTest',
  'com.labteto.dshmobile.ui.screens.local.WorkspaceBrowseLayoutTest',
  'com.labteto.dshmobile.ui.screens.local.UiPolishInteractionRegressionTest',

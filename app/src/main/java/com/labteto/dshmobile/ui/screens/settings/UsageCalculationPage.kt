@@ -24,7 +24,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.components.SyDateRangePickerDialog
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenPromptBreakdown
@@ -70,6 +73,7 @@ import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
@@ -97,6 +101,7 @@ private enum class UsageRange(val days: Int) {
  * Provider usage is the only source for totals. Prompt composition is diagnostic only and lives in
  * request detail, so injected prompts/cache/reasoning can never be counted twice.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun UsageCalculationPage(
     usage: DeepSeekUsageSnapshot,
@@ -114,6 +119,9 @@ internal fun UsageCalculationPage(
     var modelMenuExpanded by remember { androidx.compose.runtime.mutableStateOf(false) }
     var modeIndex by rememberSaveable { mutableIntStateOf(0) }
     var rangeIndex by rememberSaveable { mutableIntStateOf(0) }
+    var customStart by rememberSaveable { mutableStateOf<Long?>(null) }
+    var customEnd by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectingRange by rememberSaveable { mutableStateOf(false) }
     var showAllGroups by rememberSaveable(modeIndex) {
         androidx.compose.runtime.mutableStateOf(false)
     }
@@ -121,9 +129,16 @@ internal fun UsageCalculationPage(
     val mode = if (modeIndex == 0) LocalUsageMode.CHAT else LocalUsageMode.WORK
     val modeAnalytics = if (mode == LocalUsageMode.CHAT) visibleAnalytics.chat else visibleAnalytics.work
     val range = UsageRange.entries[rangeIndex.coerceIn(0, UsageRange.entries.lastIndex)]
-    val days = remember(visibleAnalytics.days, mode, range) {
-        dailyWindow(visibleAnalytics.days, mode, range.days)
+    val today = LocalDate.now().toEpochDay()
+    val customRange = customStart?.let { start -> customEnd?.let { end -> start..end } }
+    val presetStart = today - range.days + 1
+    val startDay = customRange?.first ?: presetStart
+    val endDay = customRange?.last ?: today
+    val days = remember(visibleAnalytics.days, mode, startDay, endDay) {
+        dailyWindow(visibleAnalytics.days, mode, startDay..endDay)
     }
+    val todayTokens = visibleAnalytics.days.firstOrNull { it.epochDay == today }
+        ?.forMode(mode)?.totalTokens ?: 0L
     val selectedDay = days.firstOrNull { it.first == selectedEpochDay } ?: days.lastOrNull()
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val allModelsLabel = stringResource(R.string.usage_model_all)
@@ -186,7 +201,7 @@ internal fun UsageCalculationPage(
         firstLabel = stringResource(R.string.usage_calculation_total_tokens),
         firstValue = formatTokens(modeAnalytics.aggregate.totalTokens),
         secondLabel = stringResource(R.string.usage_today),
-        secondValue = formatTokens(todayAggregate(days).totalTokens),
+        secondValue = formatTokens(todayTokens),
         testTag = "usagePrimaryMetric",
     )
 
@@ -254,8 +269,51 @@ internal fun UsageCalculationPage(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 UsageRangeSelector(
-                    selectedIndex = rangeIndex,
-                    onSelect = { rangeIndex = it },
+                    selectedIndex = if (customRange == null) rangeIndex else -1,
+                    onSelect = {
+                        rangeIndex = it
+                        customStart = null
+                        customEnd = null
+                    },
+                )
+                SyButton(
+                    text = if (customRange == null) stringResource(R.string.usage_range_custom)
+                    else stringResource(
+                        R.string.usage_range_custom_value,
+                        LocalDate.ofEpochDay(startDay).toString(),
+                        LocalDate.ofEpochDay(endDay).toString(),
+                    ),
+                    onClick = { selectingRange = true },
+                    variant = SyButtonVariant.Outline,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (selectingRange) {
+                val firstAvailable = minOf(
+                    startDay, today - UsageRange.QUARTER.days + 1,
+                    visibleAnalytics.days.minOfOrNull(TokenUsageDailyBucket::epochDay) ?: today,
+                )
+                val selectableDates = remember(firstAvailable, today) {
+                    object : SelectableDates {
+                        override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                            Math.floorDiv(utcTimeMillis, 86_400_000L) in firstAvailable..today
+                    }
+                }
+                SyDateRangePickerDialog(
+                    visible = true,
+                    onDismiss = { selectingRange = false },
+                    onConfirm = { firstMillis, lastMillis ->
+                        customStart = Math.floorDiv(firstMillis, 86_400_000L)
+                        customEnd = Math.floorDiv(lastMillis, 86_400_000L)
+                        selectedEpochDay = Math.floorDiv(lastMillis, 86_400_000L)
+                        selectingRange = false
+                    },
+                    initialStartMillis = LocalDate.ofEpochDay(startDay)
+                        .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                    initialEndMillis = LocalDate.ofEpochDay(endDay)
+                        .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                    selectableDates = selectableDates,
+                    yearRange = LocalDate.ofEpochDay(firstAvailable).year..LocalDate.ofEpochDay(today).year,
                 )
             }
             UsageDayChart(

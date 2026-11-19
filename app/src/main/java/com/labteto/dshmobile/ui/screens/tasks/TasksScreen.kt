@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SySkeletonCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -271,7 +272,10 @@ private fun WorkTasksScreen(
                         state, onRefresh = { viewModel.refresh() }, showNotice = false, showLoading = false,
                     )
                     when {
-                        state.loading && state.tasks.isEmpty() -> Text(stringResource(R.string.common_loading))
+                        state.loading && state.tasks.isEmpty() && !showCreate -> {
+                            Text(stringResource(R.string.common_loading), style = SyType.small13)
+                            SySkeletonCard(Modifier.fillMaxWidth(), includeImage = false)
+                        }
                         state.listLoadFailed && state.tasks.isEmpty() && !showCreate -> Unit
                         showCreate -> TaskEditorPane(
                             state = editorState,

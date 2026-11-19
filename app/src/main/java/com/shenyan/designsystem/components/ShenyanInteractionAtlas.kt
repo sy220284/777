@@ -516,6 +516,7 @@ fun SyDatePickerField(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selectedDateMillis: Long? = null,
+    pickerContent: @Composable ((onSelect: (Long) -> Unit, onDismiss: () -> Unit) -> Unit)? = null,
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     val p = LocalSyColors.current
@@ -537,16 +538,36 @@ fun SyDatePickerField(
         }
     }
     if (open) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis)
-        DatePickerDialog(onDismissRequest = { open = false }, confirmButton = {
-            TextButton(enabled = state.selectedDateMillis != null, onClick = {
-                state.selectedDateMillis?.let(onDateSelected)
-                open = false
-            }) { Text("确定") }
-        }, dismissButton = {
-            TextButton(onClick = { open = false }) { Text("取消") }
-        }) { DatePicker(state = state) }
+        val dismiss = { open = false }
+        val select: (Long) -> Unit = { day ->
+            dismiss()
+            onDateSelected(day)
+        }
+        if (pickerContent != null) {
+            pickerContent(select, dismiss)
+        } else {
+            val state = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis)
+            DatePickerDialog(onDismissRequest = dismiss, confirmButton = {
+                TextButton(enabled = state.selectedDateMillis != null, onClick = {
+                    state.selectedDateMillis?.let(select)
+                }) { Text("确定") }
+            }, dismissButton = {
+                TextButton(onClick = dismiss) { Text("取消") }
+            }) { SyDateCalendar(state) }
+        }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SyDateCalendar(state: DatePickerState) {
+    DatePicker(
+        state = state,
+        modifier = Modifier.fillMaxWidth(),
+        title = null,
+        headline = null,
+        showModeToggle = false,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -557,11 +578,16 @@ fun SyDateRangePickerDialog(
     onConfirm: (Long, Long) -> Unit,
     initialStartMillis: Long? = null,
     initialEndMillis: Long? = null,
+    selectableDates: SelectableDates = DatePickerDefaults.AllDates,
+    yearRange: IntRange = DatePickerDefaults.YearRange,
 ) {
     if (!visible) return
     val state = rememberDateRangePickerState(
         initialSelectedStartDateMillis = initialStartMillis,
-        initialSelectedEndDateMillis = initialEndMillis)
+        initialSelectedEndDateMillis = initialEndMillis,
+        yearRange = yearRange,
+        selectableDates = selectableDates,
+    )
     DatePickerDialog(onDismissRequest = onDismiss, confirmButton = {
         TextButton(
             enabled = state.selectedStartDateMillis != null &&
@@ -589,6 +615,7 @@ fun SyNumericStepper(
     minimum: Int = Int.MIN_VALUE,
     maximum: Int = Int.MAX_VALUE,
     enabled: Boolean = true,
+    valueContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
     require(minimum <= maximum) { "最小值不得大于最大值" }
     val p = LocalSyColors.current
@@ -598,9 +625,13 @@ fun SyNumericStepper(
         SyIconButton(Icons.Default.Remove, "减少",
             onClick = { if (value > minimum) onValueChange(value - 1) },
             enabled = enabled && value > minimum)
-        Text(value.toString(), modifier = Modifier.widthIn(min = 46.dp),
-            color = p.text, style = MaterialTheme.typography.titleMedium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        if (valueContent == null) {
+            Text(value.toString(), modifier = Modifier.widthIn(min = 46.dp),
+                color = p.text, style = MaterialTheme.typography.titleMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        } else {
+            valueContent()
+        }
         SyIconButton(Icons.Default.Add, "增加",
             onClick = { if (value < maximum) onValueChange(value + 1) },
             enabled = enabled && value < maximum)

@@ -1,15 +1,16 @@
 package com.shenyan.designsystem.components
 
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.dp
+import androidx.test.espresso.Espresso
+import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import java.io.File
 import java.io.FileOutputStream
@@ -36,10 +37,14 @@ class ShenyanAtlasVisualCaptureTest {
         )
         fun capture(name: String) {
             compose.waitForIdle()
-            val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+            val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
             val target = File(dir, name + ".png")
-            val saved = FileOutputStream(target).use {
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            val saved = try {
+                FileOutputStream(target).use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                }
+            } finally {
+                bitmap.recycle()
             }
             assertTrue("Native pixel artifact must exist: " + name,
                 saved && target.length() > 5000)
@@ -50,6 +55,28 @@ class ShenyanAtlasVisualCaptureTest {
                 compose.onNodeWithText(name).performScrollTo().performClick()
                 compose.onNodeWithTag("sy-atlas-scroll").assertExists()
                 capture(modeId + "-" + (index + 1).toString().padStart(2, '0'))
+                val overlays = when (name) {
+                    "02 弹窗" -> listOf(
+                        Triple("打开普通确认", "确认保存", "dialog-open"),
+                        Triple("打开危险确认", "确认删除样例", "danger-dialog-open"),
+                    )
+                    "03 底部面板" -> listOf(
+                        Triple("打开操作面板", "更多操作", "action-sheet-open"),
+                        Triple("打开多选面板", "选择标签", "multi-select-open"),
+                    )
+                    else -> emptyList()
+                }
+                for ((trigger, title, frame) in overlays) {
+                    compose.onNodeWithText(trigger).performScrollTo().performClick()
+                    compose.onNodeWithText(title).assertExists()
+                    capture("$modeId-$frame")
+                    if (frame == "danger-dialog-open") {
+                        compose.onNodeWithText("取消").performClick()
+                    } else {
+                        Espresso.pressBack()
+                    }
+                    compose.onNodeWithText(title).assertDoesNotExist()
+                }
             }
             // Store actual native frames before and after a user drag.
             // The pixel archive is the reviewable visual evidence for finesse-ui.
@@ -70,8 +97,8 @@ class ShenyanAtlasVisualCaptureTest {
                 capture("palette-" + modeId + "-" + palette.key)
             }
         }
-        assertEquals("20 references, 18 palette samples and 4 optical interaction frames",
-            24 + AccentPalettes.ALL.size * 2,
+        assertEquals("20 references, 18 palettes, 8 open overlays and 4 optical frames",
+            (sections.size + 4 + 2 + AccentPalettes.ALL.size) * 2,
             dir.listFiles()?.count { it.extension == "png" })
     }
 }

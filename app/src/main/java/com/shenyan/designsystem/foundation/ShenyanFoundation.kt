@@ -86,10 +86,10 @@ fun syReadableInk(accent: Color, background: Color, minimumRatio: Float = 4.5f):
 
 private val Light = SyColors(
     // 典雅白：亮白画布、白色卡片与黑色文字，通过细描边区分层次。
-    canvas = Color(0xFFFCFCFB), topBar = Color.White,
+    canvas = Color(0xFFFCFCFB), topBar = Color(0xFFFFFFFF),
     materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0xC2FFFFFF),
     materialL3 = Color(0xE6FFFFFF), materialL4 = Color(0xF7FFFFFF),
-    materialL5 = Color.White, materialSheen = Color(0xB3FFFFFF),
+    materialL5 = Color(0xFFFFFFFF), materialSheen = Color(0xB3FFFFFF),
     surface = Color(0xE6FFFFFF), surfaceRaised = Color(0xC2FFFFFF), surfaceSolid = Color.White,
     border = Color(0x38777777), text = Color.Black,
     textSecondary = Color(0xFF353535), textTertiary = Color(0xFF595959),

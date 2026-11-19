@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import com.shenyan.designsystem.components.SyNumericStepper
+import com.shenyan.designsystem.components.SyDateCalendar
+import com.shenyan.designsystem.components.SyDatePickerField
 import com.shenyan.designsystem.foundation.SyMetric
 
 
@@ -13,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimeInput
 import androidx.compose.material3.rememberDatePickerState
@@ -68,7 +72,6 @@ internal fun ColumnScope.TaskEditorPane(
     var customHours by state.customHours
     var notify by state.notify
     var createError by state.createError
-    var showSchedulePicker by rememberSaveable { mutableStateOf(false) }
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     Column(
@@ -126,15 +129,17 @@ internal fun ColumnScope.TaskEditorPane(
                     createError = null
                 },
             )
-            SyButton(
-                text = stringResource(
-                    R.string.tasks_first_run_value,
-                    taskDateTime(firstRunAt),
-                ),
-                onClick = {
-                    showSchedulePicker = true
+            SyDatePickerField(
+                label = stringResource(R.string.tasks_first_run_label),
+                displayValue = taskDateTime(firstRunAt),
+                onDateSelected = {
+                    firstRunAt = it
+                    createError = null
                 },
-                variant = SyButtonVariant.Outline,
+                pickerContent = { onSelect, onDismiss ->
+                    TaskSchedulePicker(firstRunAt, onSelect, onDismiss)
+                },
+                enabled = !saving,
                 modifier = Modifier.fillMaxWidth(),
             )
             SyButton(
@@ -143,16 +148,31 @@ internal fun ColumnScope.TaskEditorPane(
                 variant = if (cadence == AutomationCadence.CUSTOM) SyButtonVariant.Outline else SyButtonVariant.Ghost,
             )
             if (cadence == AutomationCadence.CUSTOM) {
-                SyTextField(
-                    value = customHours,
+                SyNumericStepper(
+                    value = customHours.toIntOrNull() ?: 0,
                     onValueChange = {
-                        customHours = it.filter(Char::isDigit).take(5)
+                        customHours = it.toString()
                         createError = null
                     },
-                    label = { Text(stringResource(R.string.tasks_custom_hours)) },
-                    supportingText = { Text(stringResource(R.string.tasks_custom_hours_hint)) },
+                    minimum = 1,
+                    maximum = 99_999,
+                    enabled = !saving,
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    valueContent = {
+                        SyTextField(
+                            value = customHours,
+                            onValueChange = {
+                                customHours = it.filter(Char::isDigit).take(5)
+                                createError = null
+                            },
+                            label = { Text(stringResource(R.string.tasks_custom_hours)) },
+                            supportingText = { Text(stringResource(R.string.tasks_custom_hours_hint)) },
+                            modifier = Modifier.weight(1f),
+                            enabled = !saving,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                        )
+                    },
                 )
             }
         }
@@ -239,17 +259,6 @@ internal fun ColumnScope.TaskEditorPane(
 
                 )
             }
-    if (showSchedulePicker) {
-        TaskSchedulePicker(
-            initialMillis = firstRunAt,
-            onPicked = { picked ->
-                firstRunAt = picked
-                createError = null
-                showSchedulePicker = false
-            },
-            onDismiss = { showSchedulePicker = false },
-        )
-    }
 }
 
 @Composable
@@ -338,13 +347,7 @@ private fun TaskSchedulePicker(
         scrollable = true,
     ) {
         if (!choosingTime) {
-            DatePicker(
-                state = dateState,
-                modifier = Modifier.fillMaxWidth(),
-                title = null,
-                headline = null,
-                showModeToggle = false,
-            )
+            SyDateCalendar(dateState)
             SyButton(
                 text = stringResource(R.string.app_schedule_next),
                 onClick = { choosingTime = true },

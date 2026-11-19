@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.foundation.LocalSyReduceTransparency
+import com.shenyan.designsystem.foundation.LocalSyColors
+import com.shenyan.designsystem.components.SyLiveGlassScene
+import androidx.compose.foundation.layout.padding
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.AnimatedContent
@@ -90,6 +94,28 @@ fun rememberConversationScrollHint(
         }
     }
     return hint to connection
+}
+
+/** Record message pixels only while a translucent shortcut is visible. */
+@Composable
+internal fun ConversationTranscriptGlass(
+    target: ConversationScrollTarget?,
+    onClick: (ConversationScrollTarget) -> Unit,
+    transcript: @Composable () -> Unit,
+) {
+    val translucent = LocalSyColors.current.materialL3.alpha < 1f && !LocalSyReduceTransparency.current
+    SyLiveGlassScene(
+        modifier = Modifier.fillMaxSize(),
+        enabled = target != null && translucent,
+        underlay = { transcript() },
+        glass = {
+            ConversationScrollShortcut(
+                target = target,
+                onClick = onClick,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = SyMetric.gapMd),
+            )
+        },
+    )
 }
 
 /** Compact arrow-only affordance that adapts to the wallpaper under the composer area. */

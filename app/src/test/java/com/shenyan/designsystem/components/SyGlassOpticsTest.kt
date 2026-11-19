@@ -24,13 +24,11 @@ class SyGlassOpticsTest {
         val card = policy(SyMaterialTier.L3_CARD)
         val sheet = policy(SyMaterialTier.L4_OVERLAY)
         assertTrue(bar.glass)
-        assertEquals(22.dp, bar.blur)
+        assertEquals(0.dp, bar.elevation)
         assertTrue(card.glass)
-        assertEquals(0.dp, card.blur)
-        assertEquals(1.dp, card.elevation)
+        assertEquals(0.dp, card.elevation)
         assertTrue(sheet.glass)
-        assertEquals(28.dp, sheet.blur)
-        assertEquals(16.dp, sheet.elevation)
+        assertEquals(0.dp, sheet.elevation)
         assertTrue(sheet.reflection > card.reflection)
     }
 
@@ -47,12 +45,20 @@ class SyGlassOpticsTest {
         assertTrue(SyLiquidShader.PROGRAM.contains("glassTint"))
     }
 
+    @Test fun liquidVeilRetainsBackgroundAndAccentKeepsTheSameOpacity() {
+        val fill = Color(0xF7FFFFFF)
+        val clear = syLiquidTint(fill, Color.Unspecified)
+        val accented = syLiquidTint(fill, Color(0xFFAACCFF))
+        assertTrue(clear.alpha < .4f)
+        assertEquals(clear.alpha, accented.alpha, .002f)
+        assertTrue(accented.red < clear.red)
+    }
+
     @Test fun matteBlackNeverUsesGlassOptics() {
         for (tier in SyMaterialTier.entries) {
             val style = syGlassOptics(ShenyanPalettes.matte, tier,
                 Color(0xFF29292B), false, 0, true)
             assertFalse(style.glass)
-            assertEquals(0.dp, style.blur)
             assertEquals(0f, style.reflection)
         }
     }
@@ -68,7 +74,6 @@ class SyGlassOpticsTest {
         )
         for (style in cases) {
             assertFalse(style.glass)
-            assertEquals(0.dp, style.blur)
             assertEquals(0f, style.reflection)
         }
     }
@@ -88,11 +93,11 @@ class SyGlassOpticsTest {
         assertEquals(0f, rested.x, 0.001f)
     }
 
-    @Test fun nestedSurfacesKeepEdgeLightWithoutDuplicateBlur() {
+    @Test fun nestedSurfacesStayFreeOfDropShadows() {
         for (tier in listOf(SyMaterialTier.L3_CARD, SyMaterialTier.L4_OVERLAY)) {
             val style = policy(tier, nested = 1)
             assertTrue(style.glass)
-            assertEquals(0.dp, style.blur)
+            assertEquals(0.dp, style.elevation)
         }
     }
 }

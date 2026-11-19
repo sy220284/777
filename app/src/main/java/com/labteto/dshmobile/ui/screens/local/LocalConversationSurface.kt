@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyUndoSnackbarHost
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
 import com.shenyan.designsystem.foundation.SyMetric
 
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -102,7 +107,7 @@ import com.labteto.dshmobile.local.session.LocalConversationMode
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
 import com.labteto.dshmobile.local.session.LocalMessageBlock
 import com.labteto.dshmobile.local.session.visibleBlocks
-import com.labteto.dshmobile.ui.components.ConversationScrollShortcut
+import com.labteto.dshmobile.ui.components.ConversationTranscriptGlass
 import com.labteto.dshmobile.ui.components.ConversationScrollTarget
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
@@ -1085,36 +1090,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             )
         }
 
-        state.personaCorrectionNotice?.takeIf {
-            state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled
-        }?.let { notice ->
-            Column(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                ) {
-                    Text(
-                        stringResource(R.string.local_persona_correction_recorded),
-                        style = SyType.small13.withReadingWeight(),
-                        color = colors.textSecondary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    SyButton(
-                        text = stringResource(R.string.local_persona_correction_undo),
-                        onClick = {
-                            onUndoPersonaCorrection(notice.id, notice.personaId, notice.correction)
-                        },
-                        variant = SyButtonVariant.Ghost,
-                        size = SyButtonSize.Small,
-                    )
-                }
-            }
-        }
-
         if (state.usageMode == LocalUsageMode.WORK && state.deviceApprovalLease) {
             Surface(
                 color = colors.warning.copy(alpha = .18f),
@@ -1531,20 +1506,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
             }
             }
-            // Capture the actual visible message glyphs only while the shortcut is
-            // shown. Both Chat and Work use this same underlying LazyColumn.
-            // Glass stays outside the capture, so it cannot recursively refract itself.
-            com.shenyan.designsystem.components.SyLiveGlassScene(
-                modifier = Modifier.fillMaxSize(),
-                enabled = scrollHint.target != null,
-                underlay = { transcriptBody() },
-                glass = {
-            ConversationScrollShortcut(
-                target = scrollHint.target ?: ConversationScrollTarget.LATEST.takeIf {
-                    state.usageMode == LocalUsageMode.WORK && workReaderPaused.value && listState.canScrollForward
-                },
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .padding(bottom = SyMetric.gapMd),
+            val shortcutTarget = scrollHint.target ?: ConversationScrollTarget.LATEST.takeIf {
+                state.usageMode == LocalUsageMode.WORK && workReaderPaused.value && listState.canScrollForward
+            }
+            ConversationTranscriptGlass(
+                target = shortcutTarget,
+                transcript = transcriptBody,
                 onClick = { target ->
                     scrollHint.hide()
                     if (state.usageMode == LocalUsageMode.WORK) workReaderPaused.value = true
@@ -1553,21 +1520,33 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         val targetIndex = if (target == ConversationScrollTarget.START) 0
                             else listState.layoutInfo.totalItemsCount.dec().coerceAtLeast(0)
                         listState.animateScrollToItem(targetIndex)
-                        // A long final reply can fill more than one viewport: the
-                        // "latest" shortcut must reach its bottom, not its first line.
-                        if (target == ConversationScrollTarget.LATEST &&
-                            state.usageMode == LocalUsageMode.WORK
-                        ) {
+                        // A long final reply can fill more than one viewport.
+                        if (target == ConversationScrollTarget.LATEST && state.usageMode == LocalUsageMode.WORK) {
                             listState.alignWorkTimelineTailAfterScroll(targetIndex)
                             workReaderPaused.value = false
                         }
                     }
                 },
             )
-                },
-            )
         }
 
+        state.personaCorrectionNotice?.takeIf {
+            state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled
+        }?.let { notice ->
+            val host = remember(state.sessionId) { SnackbarHostState() }
+            val undo = rememberUpdatedState(onUndoPersonaCorrection)
+            val message = stringResource(R.string.local_persona_correction_recorded)
+            val undoLabel = stringResource(R.string.local_persona_correction_undo)
+            LaunchedEffect(host, notice.id, message, undoLabel) {
+                // The conversation expires the notice. The snackbar uses that same lifetime.
+                if (host.showSnackbar(message, undoLabel, duration = SnackbarDuration.Indefinite) ==
+                    SnackbarResult.ActionPerformed
+                ) {
+                    undo.value(notice.id, notice.personaId, notice.correction)
+                }
+            }
+            SyUndoSnackbarHost(host)
+        }
 
         val sendRejectMessage = sendFeedback.rejectReason
             ?.takeIf { sendFeedback.sessionId == state.sessionId }

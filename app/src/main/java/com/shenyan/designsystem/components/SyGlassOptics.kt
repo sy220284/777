@@ -2,6 +2,8 @@ package com.shenyan.designsystem.components
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.lerp
 import java.util.ArrayDeque
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -13,7 +15,6 @@ import com.shenyan.designsystem.foundation.SyColors
  */
 internal data class SyGlassOptics(
     val glass: Boolean,
-    val blur: Dp,
     val elevation: Dp,
     val reflection: Float,
 )
@@ -40,22 +41,23 @@ internal fun syGlassOptics(
         nestedDepth < 3 &&
         hasBackdrop &&
         tier in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L3_CARD, SyMaterialTier.L4_OVERLAY)
-    if (!glass) return SyGlassOptics(false, 0.dp, elevation, 0f)
+    if (!glass) return SyGlassOptics(false, elevation, 0f)
 
-    // Frequent scrolling cards intentionally avoid GPU background blur.
-    // Toolbar/sheet blur uses a single spatially aligned scene, not sibling text.
-    val blur = if (nestedDepth != 0) 0.dp else when (tier) {
-        SyMaterialTier.L2_BAR -> 22.dp
-        SyMaterialTier.L4_OVERLAY -> 28.dp
-        else -> 0.dp
-    }
     val reflection = when (tier) {
-        SyMaterialTier.L2_BAR -> .78f
-        SyMaterialTier.L3_CARD -> .38f
-        SyMaterialTier.L4_OVERLAY -> .90f
+        SyMaterialTier.L2_BAR -> .55f
+        SyMaterialTier.L3_CARD -> .42f
+        SyMaterialTier.L4_OVERLAY -> .65f
         else -> 0f
     }
-    return SyGlassOptics(true, blur, elevation, reflection)
+    return SyGlassOptics(true, 0.dp, reflection)
+}
+
+/** Optical chrome uses a thinner veil than the corresponding flat reading surface. */
+internal fun syLiquidTint(fill: Color, tint: Color): Color {
+    val clearFill = fill.copy(alpha = fill.alpha * .36f)
+    return if (tint.isSpecified) {
+        lerp(clearFill, tint.copy(alpha = clearFill.alpha), tint.alpha.coerceAtMost(.16f))
+    } else clearFill
 }
 
 /**

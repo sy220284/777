@@ -1,5 +1,7 @@
 package com.shenyan.designsystem.components
 
+import org.junit.Assert.assertEquals
+import androidx.compose.foundation.layout.offset
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import androidx.compose.foundation.background
@@ -127,6 +129,36 @@ class SyLiquidRefractionAndroidTest {
         val changedAtRim = (3 until minOf(shaped.width / 8, 35))
             .count { x -> plain[x, mid] != shaped[x, mid] }
         assertTrue("The optical rim must truly move source pixels", changedAtRim > 3)
+    }
+
+    @Test fun clearLensHasNoDarkRimOrOuterShadowOnAUniformBackdrop() {
+        val background = Color(0xFFE0EBF6)
+        var showLens by mutableStateOf(false)
+        compose.setContent {
+            ShenyanTheme {
+                Box(Modifier.size(220.dp, 150.dp).background(background).testTag("clear-lens-region")) {
+                    if (showLens) {
+                        SyMaterialSurface(
+                            modifier = Modifier.offset(24.dp, 24.dp).size(172.dp, 100.dp),
+                            tier = SyMaterialTier.L4_OVERLAY,
+                            backdrop = { Box(Modifier.fillMaxSize().background(background)) },
+                        ) {}
+                    }
+                }
+            }
+        }
+        val region = compose.onNodeWithTag("clear-lens-region")
+        val plain = region.captureToImage().toPixelMap()
+        compose.runOnIdle { showLens = true }
+        val lens = region.captureToImage().toPixelMap()
+        val y = lens.height / 2
+        assertEquals(plain[lens.width / 16, y], lens[lens.width / 16, y])
+        for (x in lens.width / 12 until lens.width * 11 / 12) {
+            assertTrue("Clear optical edge should never darken a flat source at column $x",
+                lens[x, y].red >= plain[x, y].red - .012f &&
+                    lens[x, y].green >= plain[x, y].green - .012f &&
+                    lens[x, y].blue >= plain[x, y].blue - .012f)
+        }
     }
 
     @Test fun lensSamplesLiveBackdropOnItsOwnGpuLayer() {
