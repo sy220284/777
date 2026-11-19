@@ -263,12 +263,18 @@ internal class SqliteCrossDeviceMerge(
             check(sourceSnapHash!="absent" && sourceEventHash!="absent") { "导入备份缺少 SQLite 文件" }
             val mergedSnap=File(folder,"snap.sqlite")
             val mergedEvents=File(folder,"events.sqlite")
+            // VACUUM INTO opens the source with SQLite; closing that connection
+            // can checkpoint committed WAL pages into the main DB file.
+            // Capture the durable baseline after the snapshot connections close,
+            // so the later mutation guard compares the settled bytes.
+            val snapshotAbsent=digest(snapshot)=="absent"
+            val eventsAbsent=digest(events)=="absent"
+            if(snapshotAbsent) importedSnap.copyTo(mergedSnap)
+            else copyLive(snapshot,mergedSnap)
+            if(eventsAbsent) importedEvents.copyTo(mergedEvents)
+            else copyLive(events,mergedEvents)
             val snapshotBefore=digest(snapshot)
             val eventsBefore=digest(events)
-            if(snapshotBefore=="absent") importedSnap.copyTo(mergedSnap)
-            else copyLive(snapshot,mergedSnap)
-            if(eventsBefore=="absent") importedEvents.copyTo(mergedEvents)
-            else copyLive(events,mergedEvents)
             val localIds=ids(mergedSnap,"session_snapshots","id") +
                 ids(mergedEvents,"session_event_cursors","session_id")
             val sourceIds=ids(importedSnap,"session_snapshots","id") +
@@ -291,10 +297,11 @@ internal class SqliteCrossDeviceMerge(
                 val importedStudio=File(stageStudio,"media-studio.sqlite")
                 LocalMediaStudioBackupSnapshot(context,json).validate(stageStudio)
                 sourceStudio=digest(importedStudio)
-                originalStudio=digest(studio)
+                val studioAbsent=digest(studio)=="absent"
                 val mergedStudio=File(folder,"studio.sqlite")
-                if(originalStudio=="absent") importedStudio.copyTo(mergedStudio)
+                if(studioAbsent) importedStudio.copyTo(mergedStudio)
                 else copyLive(studio,mergedStudio)
+                originalStudio=digest(studio)
                 fileNames=studioFileNames(stageStudio)
                 if(originalStudio=="absent") {
                     renameCopiedStudioReferences(mergedStudio,fileNames)
