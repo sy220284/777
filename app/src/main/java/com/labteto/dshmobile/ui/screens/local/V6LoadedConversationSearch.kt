@@ -27,7 +27,7 @@ import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.shenyan.designsystem.components.SyCategoryRow
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.uicontract.UiMessageSearchCursor
@@ -142,12 +142,12 @@ internal fun V6LoadedConversationSearchSheet(
         when {
             query.isBlank() -> Text(
                 stringResource(R.string.sy_v6_search_message_hint),
-                style = DsType.small13,
+                style = SyType.small13,
                 color = colors.textSecondary,
             )
             results.isEmpty() && !searching && error == null -> Text(
                 stringResource(R.string.sy_v6_search_no_messages),
-                style = DsType.small13,
+                style = SyType.small13,
                 color = colors.textSecondary,
             )
             results.isNotEmpty() -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
@@ -162,8 +162,8 @@ internal fun V6LoadedConversationSearchSheet(
                 }
             }
         }
-        if (searching) Text(stringResource(R.string.common_loading), style = DsType.small13)
-        error?.let { Text(it.ifBlank { stringResource(R.string.sy_v6_search_archive_error) }, style = DsType.small13) }
+        if (searching) Text(stringResource(R.string.common_loading), style = SyType.small13)
+        error?.let { Text(it.ifBlank { stringResource(R.string.sy_v6_search_archive_error) }, style = SyType.small13) }
         if (!searching && (next != null || error != null)) SyButton(
             text = stringResource(if (error != null) R.string.common_retry else R.string.sy_v6_search_older),
             onClick = { request++ },

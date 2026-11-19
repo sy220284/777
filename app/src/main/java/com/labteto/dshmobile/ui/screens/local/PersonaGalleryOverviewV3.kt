@@ -49,8 +49,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -216,7 +216,7 @@ internal fun PersonaGalleryOverviewV3(
         ) {
             Text(
                 stringResource(R.string.persona_gallery_delete_selected_body, selectedIds.size),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
             Row(
@@ -293,7 +293,7 @@ internal fun PersonaGalleryOverviewV3(
                     Column(Modifier.weight(1f)) {
                         Text(
                             currentPersona.name,
-                            style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                            style = SyType.std14Strong.withReadingWeight().copy(fontFamily = SyType.contentFont),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -303,7 +303,7 @@ internal fun PersonaGalleryOverviewV3(
                                 if (currentGalleryId == null) R.string.persona_gallery_current_unsaved
                                 else R.string.persona_gallery_current_changed,
                             ),
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                             maxLines = 1,
                         )
@@ -329,7 +329,7 @@ internal fun PersonaGalleryOverviewV3(
                 } else {
                     stringResource(R.string.persona_gallery_my_characters)
                 },
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                 modifier = Modifier.weight(1f),
             )
@@ -368,14 +368,14 @@ internal fun PersonaGalleryOverviewV3(
                     )
                 },
                 singleLine = true,
-                shape = DsShapes.block,
+                shape = SyShapes.block,
             )
         }
 
         if (managing) {
             Text(
                 stringResource(R.string.persona_gallery_manage_hint),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
         }
@@ -383,14 +383,14 @@ internal fun PersonaGalleryOverviewV3(
         errorMessage?.takeIf(String::isNotBlank)?.let {
             Text(
                 it,
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
             )
         }
         deleteError?.takeIf(String::isNotBlank)?.let {
             Text(
                 it,
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
             )
         }

@@ -28,8 +28,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySlider
 import com.shenyan.designsystem.components.SySwitchControl
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -45,12 +45,12 @@ internal fun PersonaWorldBookEditor(
     var expandedIndex by rememberSaveable(entries.firstOrNull()?.id) { mutableIntStateOf(0) }
     Text(
         stringResource(R.string.local_persona_lore_title),
-        style = DsType.base16Strong.withReadingWeight(),
+        style = SyType.base16Strong.withReadingWeight(),
         color = colors.text,
     )
     Text(
         stringResource(R.string.local_persona_lore_hint),
-        style = DsType.small13.withReadingWeight(),
+        style = SyType.small13.withReadingWeight(),
         color = colors.textSecondary,
     )
     // The reference layout has a stable entry list and a separate editing panel.
@@ -66,7 +66,7 @@ internal fun PersonaWorldBookEditor(
                 if (entries.isEmpty()) {
                     Text(
                         stringResource(R.string.local_persona_lore_empty),
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
@@ -82,14 +82,14 @@ internal fun PersonaWorldBookEditor(
                         ) {
                             Text(
                                 entry.title.ifBlank { stringResource(R.string.local_persona_lore_entry_number, index + 1) },
-                                style = DsType.small13Strong.withReadingWeight(),
+                                style = SyType.small13Strong.withReadingWeight(),
                                 color = colors.text,
                             )
                             if (entry.keywords.isNotEmpty()) {
                                 Text(
                                     stringResource(R.string.local_persona_lore_entry_keywords) + " · " +
                                         entry.keywords.take(3).joinToString(" · "),
-                                    style = DsType.caption11.withReadingWeight(),
+                                    style = SyType.caption11.withReadingWeight(),
                                     color = colors.textTertiary,
                                 )
                             }
@@ -128,7 +128,7 @@ internal fun PersonaWorldBookEditor(
                     }
                     Text(
                         stringResource(R.string.local_persona_lore_entry_number, index + 1),
-                        style = DsType.base16Strong.withReadingWeight(),
+                        style = SyType.base16Strong.withReadingWeight(),
                         color = colors.text,
                     )
                     SyTextField(
@@ -177,7 +177,7 @@ internal fun PersonaWorldBookEditor(
                         Text(
                             stringResource(R.string.local_persona_lore_always_on),
                             modifier = Modifier.weight(1f),
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = colors.text,
                         )
                         SySwitchControl(
@@ -187,7 +187,7 @@ internal fun PersonaWorldBookEditor(
                     }
                     Text(
                         stringResource(R.string.local_persona_lore_priority, entry.priority),
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                     SySlider(

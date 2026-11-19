@@ -82,8 +82,8 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
@@ -148,7 +148,7 @@ internal fun PersonaGallerySavePromptDialog(
                 enabled = !busy,
             )
             error?.let {
-                Text(it, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
+                Text(it, style = SyType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
             }
         },
     ) {
@@ -164,7 +164,7 @@ internal fun PersonaGallerySavePromptDialog(
                 if (isUpdate) R.string.persona_gallery_unsaved_update_hint
                 else R.string.persona_gallery_new_character_hint,
             ),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
 
@@ -480,7 +480,7 @@ internal fun PersonaGalleryScreen(
         ) {
             Text(
                 stringResource(R.string.persona_gallery_export_format_hint),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
             SyButton(
@@ -535,7 +535,7 @@ internal fun PersonaGalleryScreen(
             selectedStory?.let { story ->
                 Text(
                     stringResource(R.string.persona_gallery_current_story_actions, story.title),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 )
                 if (editingStoryTitle) {
@@ -642,7 +642,7 @@ internal fun PersonaGalleryScreen(
 
             Text(
                 stringResource(R.string.persona_gallery_persona_actions),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
             SySheetChoiceRow(
@@ -694,12 +694,12 @@ internal fun PersonaGalleryScreen(
                     SyGlassCard {
                         Text(
                             stringResource(R.string.persona_gallery_delete_story_confirm, story.title),
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                         )
                         Text(
                             stringResource(R.string.persona_gallery_delete_story_hint),
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -765,7 +765,7 @@ internal fun PersonaGalleryScreen(
                     onClick = { deletingStory = false; deletingCharacter = true },
                 )
             }
-            error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
+            error?.let { Text(it, style = SyType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
         }
     }
     if (showPersonaDetails && selected != null) {
@@ -813,7 +813,7 @@ internal fun PersonaGalleryScreen(
                     enabled = !busy,
                 )
             }
-            error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
+            error?.let { Text(it, style = SyType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
         }
     }
 
@@ -957,12 +957,12 @@ internal fun PersonaGalleryScreen(
                     notice?.let {
                         Surface(
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac.copy(alpha = .18f),
-                            shape = DsShapes.block,
+                            shape = SyShapes.block,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
                                 it,
-                                style = DsType.small13.withReadingWeight(),
+                                style = SyType.small13.withReadingWeight(),
                                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                                 modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                             )
@@ -975,13 +975,13 @@ internal fun PersonaGalleryScreen(
                             variant = SyButtonVariant.Outline)
                     Text(
                         stringResource(R.string.persona_gallery_storylines_title),
-                        style = DsType.std14Strong.withReadingWeight(),
+                        style = SyType.std14Strong.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                     )
                     if (selected.stories.isEmpty()) {
                         Text(
                             stringResource(R.string.persona_gallery_storylines_empty),
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                             modifier = Modifier.padding(vertical = SyMetric.gapMd),
                         )
@@ -1015,7 +1015,7 @@ internal fun PersonaGalleryScreen(
                     if (inspecting) {
                         Text(
                             stringResource(R.string.persona_gallery_inspecting),
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                         )
                     }
@@ -1072,7 +1072,7 @@ internal fun PersonaGalleryScreen(
                         )
                         Text(
                             stringResource(R.string.persona_v4_story_stage_hint),
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                         )
                         val savedKnowledgePath = story.chatContext.unlockedStoryStages
@@ -1086,7 +1086,7 @@ internal fun PersonaGalleryScreen(
                                     R.string.persona_vnext_saved_stage_path,
                                     savedKnowledgePath.joinToString(" → "),
                                 ),
-                                style = DsType.small13.withReadingWeight(),
+                                style = SyType.small13.withReadingWeight(),
                                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                             )
                         }
@@ -1185,7 +1185,7 @@ internal fun PersonaGalleryScreen(
                 error?.let {
                     Text(
                         it,
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                         modifier = Modifier.padding(top = SyMetric.gapMd),
                     )

@@ -61,8 +61,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -181,7 +181,7 @@ internal fun PersonaGalleryDetailHeaderV3(
                                 )
                                 Text(
                                     stringResource(R.string.persona_gallery_portrait_photo_empty),
-                                    style = DsType.small13.withReadingWeight(),
+                                    style = SyType.small13.withReadingWeight(),
                                     color = colors.textSecondary,
                                     textAlign = TextAlign.Center,
                                 )
@@ -194,7 +194,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         Spacer(Modifier.size(SyMetric.gapSm))
         Text(
             entry.persona.name,
-            style = DsType.title22.withReadingWeight().copy(fontFamily = DsType.contentFont),
+            style = SyType.title22.withReadingWeight().copy(fontFamily = SyType.contentFont),
             color = colors.text,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -203,7 +203,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         if (entry.persona.coreIdentity.isNotBlank()) {
             Text(
                 subtitle,
-                style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                style = SyType.small13.withReadingWeight().copy(fontFamily = SyType.contentFont),
                 color = colors.textSecondary,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -212,7 +212,7 @@ internal fun PersonaGalleryDetailHeaderV3(
         }
         Text(
             relationSummary,
-            style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+            style = SyType.small13.withReadingWeight().copy(fontFamily = SyType.contentFont),
             color = colors.textSecondary,
             textAlign = TextAlign.Center,
         )
@@ -251,12 +251,12 @@ internal fun PersonaGalleryAddPanel(
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.persona_gallery_add_title),
-                    style = DsType.base16Strong.withReadingWeight(),
+                    style = SyType.base16Strong.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                 )
                 Text(
                     stringResource(R.string.persona_gallery_add_hint),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
@@ -288,7 +288,7 @@ internal fun PersonaGalleryAddPanel(
                 items(presets, key = PersonaPreset::id) { preset ->
                     val installed = preset.id in installedPresetIds
                     Surface(
-                        shape = DsShapes.row,
+                        shape = SyShapes.row,
                         color = Color.Transparent,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -305,14 +305,14 @@ internal fun PersonaGalleryAddPanel(
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     preset.persona.name,
-                                    style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                                    style = SyType.std14Strong.withReadingWeight().copy(fontFamily = SyType.contentFont),
                                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
                                     preset.franchise + " · " + preset.summary,
-                                    style = DsType.caption11.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                                    style = SyType.caption11.withReadingWeight().copy(fontFamily = SyType.contentFont),
                                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
@@ -348,7 +348,7 @@ internal fun PersonaGalleryAddPanel(
 internal fun PersonaGallerySectionLabel(title: String) {
     Text(
         title,
-        style = DsType.caption11.withReadingWeight(),
+        style = SyType.caption11.withReadingWeight(),
         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
         modifier = Modifier.padding(start = SyMetric.gapMd, top = SyMetric.gapSm),
     )
@@ -378,12 +378,12 @@ internal fun PersonaGalleryEmptyState(
             )
             Text(
                 title,
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             )
             Text(
                 body,
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
             SyButton(
@@ -421,7 +421,7 @@ internal fun CompactPersonaRow(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val rowColor = if (selected) colors.selected.copy(alpha = .24f) else Color.Transparent
     Surface(
-        shape = DsShapes.row,
+        shape = SyShapes.row,
         color = rowColor,
         modifier = Modifier
             .fillMaxWidth()
@@ -447,7 +447,7 @@ internal fun CompactPersonaRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         entry.persona.name,
-                        style = DsType.std14Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                        style = SyType.std14Strong.withReadingWeight().copy(fontFamily = SyType.contentFont),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -470,7 +470,7 @@ internal fun CompactPersonaRow(
                             entry.totalDialogueCount(),
                         )
                     },
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
