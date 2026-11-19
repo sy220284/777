@@ -113,10 +113,12 @@ fun SyComponentAtlasGallery() {
                     style = MaterialTheme.typography.bodySmall)
                 SyTabs(atlasSections, section, onSelect = { section = it })
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SyButton("典雅白", { theme = ShenyanMode.LIGHT }, compact = true,
+                    SyButton("典雅白", { theme = ShenyanMode.LIGHT },
+                        modifier = Modifier.testTag("sy-atlas-mode-light"), compact = true,
                         style = if (theme == ShenyanMode.LIGHT) SyButtonStyle.PRIMARY
                         else SyButtonStyle.GHOST)
-                    SyButton("磨砂黑", { theme = ShenyanMode.MATTE }, compact = true,
+                    SyButton("磨砂黑", { theme = ShenyanMode.MATTE },
+                        modifier = Modifier.testTag("sy-atlas-mode-matte"), compact = true,
                         style = if (theme == ShenyanMode.MATTE) SyButtonStyle.PRIMARY
                         else SyButtonStyle.GHOST)
                 }
@@ -126,6 +128,7 @@ fun SyComponentAtlasGallery() {
                 ) {
                     AccentPalettes.ALL.forEach { palette ->
                         SyButton(palette.cnName, { accentKey = palette.key },
+                            modifier = Modifier.testTag("sy-atlas-palette-" + palette.key),
                             compact = true,
                             style = if (AccentPalettes.of(accentKey).key == palette.key)
                                 SyButtonStyle.INFO else SyButtonStyle.GHOST)

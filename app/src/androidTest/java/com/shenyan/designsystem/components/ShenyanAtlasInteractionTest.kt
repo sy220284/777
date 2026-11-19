@@ -7,6 +7,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import com.shenyan.designsystem.foundation.ShenyanTheme
 import com.shenyan.designsystem.foundation.SyOption
 import org.junit.Assert.assertEquals
@@ -100,4 +104,68 @@ class ShenyanAtlasInteractionTest {
         compose.onNodeWithText("确认执行").performClick()
         compose.runOnIdle { assertEquals("delete", chosen) }
     }
+    @Test fun swipeRevealsActionAndRequiresDeliberateDeleteConfirmation() {
+        var calls = 0
+        compose.setContent {
+            ShenyanTheme {
+                SySwipeActionRow(
+                    actionLabel = "删除任务",
+                    onAction = { calls++ },
+                    destructive = true,
+                    modifier = Modifier.testTag("swipe-test-row"),
+                ) { androidx.compose.material3.Text("任务名称") }
+            }
+        }
+        compose.onNodeWithTag("swipe-test-row").performTouchInput { swipeLeft() }
+        compose.onNodeWithText("删除任务").performClick()
+        compose.runOnIdle { assertEquals(0, calls) }
+        compose.onNodeWithText("确认执行").performClick()
+        compose.runOnIdle { assertEquals(1, calls) }
+    }
+
+    @Test fun onboardingPagerCommitsPageChangesFromSwipe() {
+        var current by mutableStateOf(0)
+        var done = false
+        compose.setContent {
+            ShenyanTheme {
+                SyOnboardingCarousel(
+                    pages = listOf(
+                        SyOnboardingPage("欢迎", "开始配置"),
+                        SyOnboardingPage("选择方式", "选择聊天或工作"),
+                    ),
+                    selectedPage = current,
+                    onPageChanged = { current = it },
+                    onSkip = null,
+                    onComplete = { done = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("sy-onboarding-pages").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(1, current); assertEquals(false, done) }
+        compose.onNodeWithText("开始使用").performClick()
+        compose.runOnIdle { assertEquals(true, done) }
+    }
+
+    @Test fun miniPlayerKeepsParentOwnedPlaybackAndCanBeDismissed() {
+        var playing by mutableStateOf(false)
+        var dismissed by mutableStateOf(false)
+        compose.setContent {
+            ShenyanTheme {
+                if (!dismissed) SyMiniPlayer(
+                    title = "测试录音",
+                    subtitle = "0:03 / 0:21",
+                    playing = playing,
+                    onPlayPause = { playing = !playing },
+                    onExpand = {},
+                    onClose = { dismissed = true },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("继续播放").performClick()
+        compose.runOnIdle { assertEquals(true, playing) }
+        compose.onNodeWithContentDescription("关闭迷你播放器").performClick()
+        compose.runOnIdle { assertEquals(true, dismissed) }
+    }
+
 }
