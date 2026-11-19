@@ -53,7 +53,7 @@ class CiSelectChecksTest(unittest.TestCase):
             "CI_BASE_SHA": "a" * 40,
             "CI_HEAD_SHA": "b" * 40,
         }):
-            with patch.object(tool.subprocess, "check_output", return_value=b"app/src/main/AndroidManifest.xml\\0") as diff:
+            with patch.object(tool.subprocess, "check_output", return_value=b"app/src/main/AndroidManifest.xml\0") as diff:
                 self.assertEqual(tool.changed_files(), ["app/src/main/AndroidManifest.xml"])
                 self.assertIn("D", diff.call_args.args[0][3])
 
