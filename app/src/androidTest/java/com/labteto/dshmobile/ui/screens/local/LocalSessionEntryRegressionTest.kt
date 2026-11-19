@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.hasSetTextAction
 import com.labteto.dshmobile.uicontract.UiMessagePage
 import com.labteto.dshmobile.uicontract.UiMessageRole
@@ -77,6 +79,43 @@ class LocalSessionEntryRegressionTest {
         compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
         compose.onNodeWithTag("menu-item:" + ctx.getString(R.string.local_session_sample_title)).performClick()
         compose.runOnIdle { assertEquals(1, opened) }
+    }
+
+    @Test fun overflowMenuUsesCompactShortcutGridAndKeepsActionsReachable() {
+        var searched = 0
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.setContent {
+            DshTheme {
+                ConversationActionsMenu(
+                    pinned = false,
+                    onTogglePin = {},
+                    onRename = {},
+                    onDelete = {},
+                    onOpenWorkEvidence = {},
+                    onOpenDocuments = {},
+                    onOpenSample = {},
+                    onSearchMessages = { searched++ },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
+        val popup = compose.onNodeWithTag("conversation-action-popup").getUnclippedBoundsInRoot()
+        val search = compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.sy_v6_search_messages),
+        ).getUnclippedBoundsInRoot()
+        val workEvidence = compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.work_evidence_title),
+        ).getUnclippedBoundsInRoot()
+        val documents = compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.local_session_documents),
+        ).getUnclippedBoundsInRoot()
+        assertEquals(search.top, workEvidence.top)
+        org.junit.Assert.assertTrue(documents.top > search.top)
+        org.junit.Assert.assertTrue(popup.width <= 242.dp)
+        compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.sy_v6_search_messages),
+        ).performClick()
+        compose.runOnIdle { assertEquals(1, searched) }
     }
 
     @Test fun modelConfigurationEntryClosesPickerThenOpensSettings() {
