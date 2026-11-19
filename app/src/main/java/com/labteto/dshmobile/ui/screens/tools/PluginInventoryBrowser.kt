@@ -45,6 +45,11 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SyEmptyState
+import com.shenyan.designsystem.components.SyInlineBanner
+import com.shenyan.designsystem.components.SyBannerKind
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -383,22 +388,20 @@ internal fun PluginInventoryBrowser(
             ) {
                 if (error != null) {
                     item(key = "inventory-error") {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
-                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(error, style = SyType.std14.withReadingWeight(), color = colors.dangerInk)
-                            if (onRetry != null) {
-                                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
-                            }
-                        }
+                        SyInlineBanner(
+                            message = error,
+                            kind = SyBannerKind.ERROR,
+                            actionLabel = if (onRetry != null) stringResource(R.string.common_retry) else null,
+                            onAction = onRetry,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
                 if (sections.none { it.entries.isNotEmpty() } && error == null && !loading) {
                     item(key = "inventory-empty") {
-                        Text(
-                            when {
+                        SyEmptyState(
+                            icon = FeatherIcons.Search,
+                            title = when {
                                 query.isNotEmpty() && !addedOnly && owned.isNotEmpty() &&
                                     !showOwnedInDiscover -> "可添加项目中没有匹配项；可展开下方已添加项目"
                                 query.isNotEmpty() -> stringResource(R.string.tools_catalog_no_match)
@@ -406,9 +409,8 @@ internal fun PluginInventoryBrowser(
                                 addedOnly -> "尚未添加技能、插件或连接器"
                                 else -> "暂无可添加的能力；可查看已添加的项目"
                             },
-                            style = SyType.std14.withReadingWeight(),
-                            color = colors.textSecondary,
-                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
+                            body = "可以调整查找条件、切换已添加／发现，或检查连接与授权状态。",
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
@@ -550,10 +552,10 @@ internal fun PluginInventoryBrowser(
                     color = colors.textSecondary)
             }
             if (item.requirements.isNotEmpty()) {
-                Surface(
+                SyMaterialSurface(
                     modifier = Modifier.fillMaxWidth().testTag("skill-dependency-summary"),
-                    color = colors.materialL4,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                    tier = SyMaterialTier.L2_BAR,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(SyMetric.radiusControl),
                     onClick = { requirementsExpanded = !requirementsExpanded },
                 ) {
                     Row(Modifier.fillMaxWidth().padding(14.dp),
