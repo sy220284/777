@@ -50,7 +50,7 @@ internal fun resolveLocalWorkSkillGuidance(
     val pinnedNote = if (pinnedConnectors.isEmpty() && pinnedSkills.isEmpty()) "" else """
         [用户明确固定的调用来源]
         以下连接器和技能由用户在聊天框中固定，后续轮次默认优先使用，直到用户自行取消。
-        实际工具执行仍需满足连接状态与原有审批，明确选择不等于授予权限。
+        调用技能所需工具时沿用当前连接状态与原有审批流程。
         ${if (pinnedConnectors.isNotEmpty()) "已选连接器：$pinnedConnectors" else ""}
         $pinnedSkillInstructions
         [固定来源结束]

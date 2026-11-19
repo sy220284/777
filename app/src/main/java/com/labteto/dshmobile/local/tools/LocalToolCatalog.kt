@@ -267,7 +267,7 @@ object LocalToolCatalog {
             "start_line" to integer("专项资料起始行，默认 1"),
             "end_line" to integer("专项资料结束行，默认读取 200 行"),
         )))
-        add(tool("skill_create", "将技能直接写入工作区、安装到真实技能目录并读取校验；不会自动证明执行效果", properties(
+        add(tool("skill_create", "写入并安装技能，复读校验技能文件。需要验证执行效果时按任务场景试用该技能", properties(
             "id" to string("英文技能标识"),
             "display_name" to string("技能中文名称"),
             "description" to string("用途，1—240 字"),
@@ -297,14 +297,14 @@ object LocalToolCatalog {
         add(tool("mcp_start_local", "按经过哈希核验的本机清单启动 MCP；通过既有插件桥接真实连接和注册工具；会运行本地代码，需审批", properties(
             "id" to string("已创建的本机 MCP 服务标识"),
         ), listOf("id")))
-        add(tool("extension_record", "把自建技能、工具、连接器、MCP、插件的过程及证据登记到长期工作区；记录不等于验收", properties(
+        add(tool("extension_record", "将自建技能、工具、连接器、MCP、插件的过程和实际验证凭据登记到工作区", properties(
             "kind" to string("skill/tool/connector/mcp/plugin"),
             "id" to string("扩展 ID"),
             "phase" to string("discovered/created/registered/tested/improved/failed"),
             "summary" to string("本次做了什么，最多 1200 字"),
             "evidence_path" to string("工作区证据文件相对路径；tested 时必填"),
         ), listOf("kind", "id", "phase", "summary", "evidence_path")))
-        add(tool("extension_inspect", "比较自建扩展工作区记录与当前真实技能、工具、插件注册状态；绝不把登记当实测", properties(
+        add(tool("extension_inspect", "比较工作区扩展记录与当前技能、工具及插件注册状态；核实执行效果时查看实际调用结果", properties(
             "kind" to string("skill/tool/connector/mcp/plugin"),
             "id" to string("扩展 ID"),
         ), listOf("kind", "id")))
@@ -345,10 +345,10 @@ object LocalToolCatalog {
             "profile_id" to string("需要查询的已保存模型 profileId；联网查询时必填"),
         )))
         add(tool("list_agents", "列出当前会话启动的后台代理", properties()))
-        add(tool("agent_tree", "从本会话持久 Run 检查点查看主子代理关系和最新记录状态；结果可能是部分历史，不代表当前活跃进程清单", properties(
+        add(tool("agent_tree", "从本会话持久 Run 检查点查看主子代理关系和最近记录。需要当前运行状态时用 agent_inspect", properties(
             "max_nodes" to integer("最大返回代理运行节点数，1–256，默认100；历史窗口不足会标记partial"),
         )))
-        add(tool("send_message", "向后台代理的持久 Inbox 投递消息；接受回执不代表模型已读取。trigger_turn 在需要时唤醒继续执行；queue_only 仅入队等待下一次自然激活", properties(
+        add(tool("send_message", "向后台代理的持久 Inbox 投递消息；需要确认模型处理情况时查询后续回执。trigger_turn 在需要时唤醒继续执行；queue_only 仅入队等待下一次自然激活", properties(
             "agent_id" to string("后台代理编号"),
             "message" to string("需要追加的消息"),
             "delivery_mode" to string("trigger_turn（默认，投递后按需唤醒）或 queue_only（只入持久队列，不启动新轮次）"),
@@ -356,21 +356,21 @@ object LocalToolCatalog {
         add(tool("interrupt_agent", "仅中断可恢复后台代理当前 Activation，含本会话 Team 成员；保留身份、检查点与持久 Inbox。非可恢复 Agent 将被拒绝", properties(
             "agent_id" to string("当前 Work 会话中的可恢复代理编号"),
         ), listOf("agent_id")))
-        add(tool("agent_inspect", "检查当前 Work 会话后台 Agent 的身份、运行状态、消息数、持久恢复类型和摘要；状态输出并非最终成果验收", properties(
+        add(tool("agent_inspect", "检查当前 Work 会话后台 Agent 的身份、运行状态、消息数、持久恢复类型和摘要；需要验收时读取实际产出及对应证据", properties(
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
-        add(tool("agent_watch", "有界观察指定 Agent 的 Job 状态变化；先用 agent_inspect 获取 observation_cursor，再传入游标等待；无变化不会冒充轮次完成或消息消费", properties(
+        add(tool("agent_watch", "有界观察指定 Agent 的 Job 状态变化；先用 agent_inspect 获取 observation_cursor，再传入游标等待；按返回状态判断有无新事件，收到结果后再处理依赖步骤", properties(
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
             "after_cursor" to string("之前 agent_inspect/agent_watch 返回的 observation_cursor"),
             "wait_ms" to integer("最长等待毫秒，0–20000，默认0；可取消，超时返回 changed=false"),
         ), listOf("agent_id", "after_cursor")))
-        add(tool("agent_resume", "仅请求已中断或 dormant 的持久只读代理通过既有恢复检查点重新激活；需要待处理 Inbox 消息或安全暂停执行片；返回的是请求回执，不代表轮次已被准入", properties(
+        add(tool("agent_resume", "仅请求已中断或 dormant 的持久只读代理通过既有恢复检查点重新激活；需要待处理 Inbox 消息或安全暂停执行片；返回恢复请求回执，随后可用 agent_inspect 核对运行状态", properties(
             "agent_id" to string("当前 Work 会话中的持久可恢复代理编号"),
         ), listOf("agent_id")))
         add(tool("agent_close", "永久关闭当前 Work 会话的后台 Agent：先用 agent_inspect/list_agents 获取真实 agent_id；Team 成员按团队生命周期解雇、释放任务和清理邮箱，普通代理清理持久 Inbox。普通后台命令用 job_kill。", properties(
             "agent_id" to string("当前 Work 会话中的后台代理编号"),
         ), listOf("agent_id")))
-        add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空/字符串验收仅是窄文本检查，不证明通用交付", properties(
+        add(tool("workflow", "以持久 Kotlin DAG 调度子任务，恢复已验收节点并继续剩余依赖。默认只读；可写需显式授权且未知副作用不重放。非空与字符串规则校验文本；完整交付按目标要求核对对应成果", properties(
             "execution_backend" to string("执行后端：in_process、isolated_process 或用户已授权的 trusted_remote；成员/节点固定原后端与远端授权版本，后代继承隔离"),
             "workspace_repository" to string("可选；工作区内 Git 仓库根目录。须 allow_mutation=true，并为每个节点声明交付文件；节点在独立目录执行，仅声明范围可三方合并，冲突或越界变更会停止整合"),
             "tasks" to buildJsonObject {
@@ -396,7 +396,7 @@ object LocalToolCatalog {
             },
             "allow_mutation" to boolean("仅在当前主代理拥有写授权时，显式授权本图节点使用原有受控写工具；中断且副作用未知时停止，不自动重放"),
             "resume_graph_id" to string("可选；按未结算图编号显式恢复原完整不可变计划，不需要重传 tasks；新用户请求优先，恢复写图还需本次 allow_mutation=true"),
-            "replan_graph_id" to string("显式替换现存未结算只读 DAG：需同时提供新 tasks/dependencies；新建独立图与执行 ID，旧结果保留来源但不冒充新执行的验收；可写图须单独核验"),
+            "replan_graph_id" to string("显式替换现存未结算只读 DAG：需同时提供新 tasks/dependencies；新建独立图与执行 ID，保留旧结果来源，按新执行 ID 核对验收记录；可写图单独核验"),
             "origin_finding_id" to string("因调查发现改变任务图时填写 work_finding 返回的 ID；仅接受当前目标仍受真实来源支持的发现，并关联到新旧图的事件记录"),
             "node_input_files" to buildJsonObject {
                 put("type", "array"); put("description", "与 tasks 等长的逐节点输入文件路径数组；恢复时按节点内容版本校验")
@@ -467,7 +467,7 @@ object LocalToolCatalog {
             "target" to string("teammate 名称"),
             "message" to string("消息内容"),
         ), listOf("target", "message")))
-        add(tool("team_ack_message", "成员明确确认普通协作消息：必须已经投递给本人、进入模型持久历史且有后续模型回复；handled 仅为本人处理声明，不证明任务完成。无法处理时用 cannot_handle 并附原因。请在收到消息后的下一轮模型步骤调用，不能在首次阅读该消息的同轮工具调用中直接确认", properties(
+        add(tool("team_ack_message", "成员明确确认普通协作消息：必须已经投递给本人、进入模型持久历史且有后续模型回复；handled 记录成员的处理声明。任务成果由 Lead 按实际产出核对。无法处理时用 cannot_handle 并附原因。在收到消息后的下一轮模型步骤调用", properties(
             "message_id" to string("本人收到的 team-msg-* 普通消息 ID；不能代确认或确认关闭请求"),
             "outcome" to string("handled 或 cannot_handle"),
             "reason" to string("不能处理时必填原因；已处理时可填简短说明"),
@@ -481,7 +481,7 @@ object LocalToolCatalog {
             "target" to string("active teammate 名称"),
             "reason" to string("申请关闭的理由及应完成的交接"),
         ), listOf("target", "reason")))
-        add(tool("team_message_receipt", "查询 Team 消息的持久排队、投递、模型回复以及成员显式处理声明；任何一项都不自动证明任务已核验完成", properties(
+        add(tool("team_message_receipt", "查询 Team 消息排队、投递、模型回复与成员处理声明；核验任务时查看对应的结果及证据", properties(
             "message_id" to string("team-msg-* 持久消息ID"),
         ), listOf("message_id")))
         add(tool("team_messages", "读取 Team 成员独立结果消息流；返回 durable EventLog sequence 作为结果游标", properties(
@@ -511,13 +511,13 @@ object LocalToolCatalog {
             "task_id" to string("task-N"),
         ), listOf("task_id")))
         add(tool("team_task_list", "列出 Team 当前未删除任务及 readiness / owner / write-scope 警告", properties()))
-        add(tool("team_task_review", "记录独立 verify/review 成员对指定已完成任务的结构化核验结果。核验代理必须与任务执行人不同，且其真实终态模型输出为 JSON：task_id、reviewed_result_id、verdict(approve/reject)、reason。事件记录核验人意见，不代替真实测试/工件内容的机器证明", properties(
+        add(tool("team_task_review", "记录独立 verify/review 成员对指定已完成任务的结构化核验结果。核验代理必须与任务执行人不同，且其真实终态模型输出为 JSON：task_id、reviewed_result_id、verdict(approve/reject)、reason。事件保存核验人意见；目标要求测试或工件验证时核对对应运行证据", properties(
             "task_id" to string("已完成的 Team 任务编号"),
             "expected_revision" to integer("已完成任务当前 revision"),
             "reviewer" to string("具备 verify/review 角色的另一位 active 成员"),
             "review_result_id" to string("该 reviewer 自己的持久模型输出结果 ID"),
         ), listOf("task_id", "expected_revision", "reviewer", "review_result_id")))
-        add(tool("team_task_evidence", "从持久事件核查已完成 Team 任务的结果 ID、实际子代理 Job、检查点序号和任务归属；这只验证证据关联，不代表内容正确、独立审查通过或 Goal 完成", properties(
+        add(tool("team_task_evidence", "从持久事件核查已完成 Team 任务的结果 ID、实际子代理 Job、检查点序号和任务归属；返回结果与执行事件的关联，供对应任务的内容检查和审查使用", properties(
             "task_id" to string("已经完成的 Team 任务编号 task-N"),
         ), listOf("task_id")))
         add(tool("team_task_update", "用 compare-and-set revision 更新 Team 任务", properties(

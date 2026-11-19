@@ -17,7 +17,7 @@ internal fun renderAgentModelCatalog(
 ): String = buildString {
     appendLine("【777 模型与凭据清单（应用实时配置）】")
     appendLine("凭据由宿主安全存储并代为鉴权，不向智能体、工具参数、工作区或日志输出明文。")
-    appendLine("“凭据就绪”只表示本地存在有效绑定，不代表服务商在线、余额足够或具备独立媒体 API 权限。")
+    appendLine("“凭据就绪”表示本地存在有效绑定。按本次需要检查服务商连接、账户配额或媒体 API 权限。")
     if (profiles.isEmpty()) {
         appendLine("暂无已保存模型；请先在设置里连接模型账户或 API Key。")
         return@buildString
@@ -54,6 +54,6 @@ internal fun renderAgentModelCatalog(
         appendLine()
     }
     appendLine("只有“凭据已就绪”的 profileId 才可交给 subagent / workflow 选择；普通请求不自动查询远端服务商目录。")
-    appendLine("查询服务商返回的模型清单：list_subagent_models(include_provider_models=true, profile_id=目标档案编号)。该清单不自动创建新路由，也不证明每个模型都能成功推理。")
-    appendLine("图片输入能力不等于图片/视频/语音生成授权：MiniMax 原生媒体入口可通过已存 API Key 调用，但实际权限、计费和入口可用性需分别验证。")
+    appendLine("查询服务商返回的模型清单：list_subagent_models(include_provider_models=true, profile_id=目标档案编号)。选择已有路由或按需配置路由，再用实际请求核实目标模型。")
+    appendLine("图片输入查看模型输入能力；图片、视频或语音生成查看媒体服务配置。MiniMax 原生媒体入口使用已存 API Key，按实际权限、计费和入口状态选用。")
 }.trimEnd()

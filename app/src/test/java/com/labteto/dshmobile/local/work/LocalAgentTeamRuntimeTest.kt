@@ -437,7 +437,7 @@ class LocalAgentTeamRuntimeTest {
         ).orEmpty()
         assertTrue(result.contains("status=checkpointed_in_model_history"))
         assertTrue(result.contains("target_id=member-1"))
-        assertTrue(result.contains("does not prove comprehension"))
+        assertTrue(result.contains("Check the task result for completion"))
         assertNull(fixture.runtime.project(sessionId).failure)
     }
 
@@ -645,7 +645,7 @@ class LocalAgentTeamRuntimeTest {
             put("step", 2)
         })
         kotlinx.coroutines.withContext(owners.executionContext(identity)) {
-            assertTrue(ack("handled").contains("不代表任务成果已验收"))
+            assertTrue(ack("handled").contains("验收时查看对应任务产出"))
             assertTrue(ack("handled").contains("无重复事件"))
             val conflict = runCatching {
                 ack("cannot_handle", "改变已经提交的声明")

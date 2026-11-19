@@ -20,7 +20,7 @@ class WorkExperienceBootstrapTest {
         assertFalse(observed.supports("tool_failure"))
         val prompt = WorkExperienceBootstrap.reviewPrompt("普通任务", observed, true, true)
         assertTrue(prompt.contains("NO_ENTRY"))
-        assertTrue(prompt.contains("WITHOUT an independent baseline comparison"))
+        assertTrue(prompt.contains("candidate method for later comparison against a baseline"))
     }
 
     @Test

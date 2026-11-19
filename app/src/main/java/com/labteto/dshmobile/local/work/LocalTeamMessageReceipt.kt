@@ -52,9 +52,8 @@ internal data class LocalTeamMessageReceipt(
         memberAcknowledgedOutcome?.let { append("member_ack_outcome=").append(it).append("\n") }
         memberAcknowledgedReason?.let { append("member_ack_reason=").append(it).append("\n") }
         append("model_reply_observed means the request included the exact message and a subsequent ")
-        append("model reply was durably observed; it does not prove comprehension, ")
-        append("task completion or user authorization; a member-handled report is an explicit ")
-        append("member declaration, never independent proof of verified task completion")
+        append("model reply was durably observed. A member-handled report records the member's ")
+        append("declaration. Check the task result for completion and the current approval for authorization.")
     }
 }
 

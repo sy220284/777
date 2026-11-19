@@ -51,7 +51,7 @@ class LocalSystemPromptContinuityTest {
         assertTrue(prompt.contains("当前用户本轮明确的任务目标"))
         assertTrue(prompt.contains("先核实现状和工具能力"))
         assertTrue(prompt.contains("修改状态后检查结果与相关回归"))
-        assertTrue(prompt.contains("只在重要进展或真实阻塞时简要用中文说明"))
+        assertTrue(prompt.contains("用简短中文说明关键进展和需要用户处理的事项"))
         assertTrue(prompt.contains("不公开内部推理及敏感资料"))
         assertTrue(prompt.contains("收尾前按用户要求逐项核对成果，补齐能继续做的工作"))
         assertTrue(prompt.contains("答复先给结论与交付，再附关键证据"))

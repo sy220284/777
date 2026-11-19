@@ -113,7 +113,7 @@ class LocalTeamMessageReceiptTest {
         )
         assertEquals("model_reply_observed", receipt.status)
         assertEquals(4L, receipt.modelReplySequence)
-        assertTrue(receipt.render().contains("does not prove comprehension"))
+        assertTrue(receipt.render().contains("Check the task result for completion"))
         assertFalse(receipt.render().contains("completion_status=completed"))
     }
 
@@ -180,7 +180,7 @@ class LocalTeamMessageReceiptTest {
             checkpoint(3, jobId)), true, sessionId)
         assertEquals("checkpointed_in_model_history", c.status)
         assertEquals(3L, c.historyCheckpointSequence)
-        assertTrue(c.render().contains("does not prove comprehension"))
+        assertTrue(c.render().contains("Check the task result for completion"))
     }
 
     @Test fun differentJobCannotForgeMessageConsumption() {

@@ -19,7 +19,7 @@
 2. “发现候选”只说明找到了入口；真正可用以语言服务器启动并成功完成查询为准。请勿通过创建 PATH 同名占位文件来让检测变绿。
 3. 查定义用 `lsp_definition`；引用/调用关系用 `lsp_references`；类型用 `lsp_hover`；文件/全局符号分别用 `lsp_symbols` / `lsp_workspace_symbols`；错误用 `lsp_diagnostics`。
 4. LSP 先使用项目里兼容的 `node_modules`，然后使用 App 已安装的共享服务；都没有时，TypeScript/JavaScript 或 Python 的首次语义调用可申请按需安装。拒绝、失败时用 `read` / `grep` / 构建测试继续任务。
-5. `lsp_diagnostics` 返回“待发布/超时”不等于“没有诊断”；应检查状态和明确错误，不要反复做同一无效操作。
+5. `lsp_diagnostics` 返回返回“待发布”或“超时”时，先检查语言服务器状态与实际错误，再按结果决定继续等待或使用构建测试。
 
 ## 工具如何直接调用
 

@@ -11,7 +11,7 @@ internal object LocalMiniMaxSkillCatalog {
             适用：用户明确要求媒体生成、查看任务进度或获取已有生成结果时。
             执行：
             1. 读取 .dsh/skills/minimax-media/MOBILE.md；优先使用 777 已实现的媒体 API 与成果档案，不再默认启动 Node / mmx-cli。
-            2. MiniMax 生图在 Work 中用 media_image_options 选择用户指定账户、media_image_create 提交，并以 media_image_status 查询真实回执；没有配置媒体 API Key 时不冒充 M Plan 已授权。
+            2. MiniMax 生图在 Work 中用 media_image_options 选择用户指定账户、media_image_create 提交，并以 media_image_status 查询原任务结果。通过媒体服务配置核对所用的 API Key 与账户授权。
             3. 其他媒体类型先核实是否已有原生 API 入口和执行权限；未接入时仅在用户明确同意且设备具备已安装 CLI 的情况下按 CLI.md 操作，不在任务中自动下载安装依赖。
             4. 异步生成等待真实结果并检查已保存的媒体档案；状态未知时不重复付费提交。
             交付：媒体文件、可预览路径以及实际任务状态；需要额外媒体 API 权限时说明具体条件。

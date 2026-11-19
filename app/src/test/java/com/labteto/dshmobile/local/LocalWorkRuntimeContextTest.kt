@@ -96,7 +96,7 @@ class LocalWorkRuntimeContextTest {
         assertTrue(context.contains("work_finding"))
         assertTrue(context.contains("重要发现及时向用户自然说明并主动追查"))
         assertTrue(context.contains("允许真实好奇、惊讶和兴奋"))
-        assertTrue(context.contains("不得以模型文字代替实际结果"))
+        assertTrue(context.contains("要求全量检查时读到分页终点"))
         assertFalse(context.contains("每次工具调用必须"))
     }
 
