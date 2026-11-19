@@ -81,5 +81,30 @@ class SharedApkDeviceTests(unittest.TestCase):
             self.assertIn("失效", (Path(folder) / "TEST-extension-market.xml").read_text())
 
 
+    def test_emulator_workflows_pass_complete_suite_commands(self):
+        import re
+        import shlex
+        workflow = (SCRIPT.parents[2] / ".github/workflows/android-capability-contract.yml").read_text(encoding="utf-8")
+        script_blocks = re.findall(r"(?m)^          script: >-\n((?:            [^\n]+\n)+)", workflow)
+        self.assertEqual(len(script_blocks), 2, "两组设备测试必须使用 YAML 单行折叠命令")
+        commands = [
+            shlex.split(" ".join(line.strip() for line in block.splitlines()))
+            for block in script_blocks
+        ]
+        for command, suite, expected_classes in zip(
+            commands, ("extension-market", "session-storage"), (5, 10)
+        ):
+            self.assertNotIn("\\", command, "模拟器执行器不能收到孤立的续行符")
+            self.assertIn("--suite", command)
+            self.assertEqual(command[command.index("--suite") + 1], suite)
+            self.assertIn("--classes", command)
+            index = command.index("--classes")
+            self.assertEqual(len(command), index + 2, "测试类列表必须完整作为一个参数传入")
+            classes = command[index + 1].split(",")
+            self.assertEqual(len(classes), expected_classes)
+            self.assertEqual(len(classes), len(set(classes)))
+            self.assertTrue(all(re.fullmatch(r"[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+", name) for name in classes))
+
+
 if __name__ == "__main__":
     unittest.main()
