@@ -5,6 +5,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.Slider
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -201,6 +210,55 @@ private fun AtlasGestures() {
         }
     }
     Text("操作次数：" + actionCount, style = MaterialTheme.typography.bodySmall)
+    AtlasLiquidOptics()
+}
+
+/** Native optical study: the lens and page draw the SAME live words at the
+ * same global positions. Sliding the lens changes which glyphs are refracted.
+ * This is actual Compose + AGSL output, rather than a static image mockup. */
+@Composable
+private fun AtlasLiquidOptics() {
+    var left by remember { mutableFloatStateOf(36f) }
+    var revision by remember { mutableIntStateOf(1) }
+    val words = listOf(
+        "玻璃光学 · 文字在边缘产生弯折",
+        "实时折射：清晰的文字与背景层次",
+        "拖动滑块，镜片内的文字随位置变化",
+        "文字动态刷新 · 第 ${revision} 次光学测试",
+    )
+    val ink = MaterialTheme.colorScheme.onBackground
+    val substrate = MaterialTheme.colorScheme.background
+    val backing: @Composable (Modifier) -> Unit = { move ->
+        Column(move.width(365.dp).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(11.dp)) {
+            words.forEach { line ->
+                Text(line, color = ink, style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1)
+            }
+        }
+    }
+    AtlasHeading("真实像素折射 · 玻璃透过文字")
+    Box(Modifier.fillMaxWidth().height(192.dp).clip(RoundedCornerShape(22.dp))
+        .background(substrate)) {
+        backing(Modifier)
+        SyMaterialSurface(
+            modifier = Modifier.offset(x = left.dp, y = 37.dp)
+                .width(254.dp).height(115.dp).testTag("sy-liquid-optical-lens"),
+            tier = SyMaterialTier.L2_BAR,
+            backdrop = {
+                Box(Modifier.fillMaxSize()) {
+                    backing(Modifier.offset(x = (-left).dp, y = (-37).dp))
+                }
+            },
+        ) {
+            Box(Modifier.fillMaxSize().padding(9.dp), contentAlignment = Alignment.BottomEnd) {
+                Text("液态光学", color = ink,
+                    style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+    Slider(value = left, onValueChange = { left = it }, valueRange = 4f..112f)
+    SyButton("刷新实时文字", { revision++ }, style = SyButtonStyle.SECONDARY)
 }
 
 @Composable
