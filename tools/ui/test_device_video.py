@@ -1,4 +1,5 @@
 """Isolated fake-adb checks for video finalization and automatic rollover."""
+import hashlib
 import json
 import os
 import subprocess
@@ -27,6 +28,7 @@ if args[0]=='kill':
  except ProcessLookupError:pass
  sys.exit(0)
 if args[0]=='screenrecord':
+ if os.environ.get('FAKE_ADB_EARLY_EXIT130')=='1':sys.exit(130)
  if not args[-1].startswith('/data/local/tmp/'):raise Exception('Use device shell-writable storage')
  dest=store/Path(args[-1]).name
  quitting=False
@@ -46,7 +48,7 @@ if args[0]=='screenrecord':
  while not quitting and time.monotonic()<end:time.sleep(.025)
  dest.write_bytes(b'\0\0\0\x18ftypisom'+b'0'*1024)
  (store/'pid').unlink(missing_ok=True)
- sys.exit(0)
+ sys.exit(130 if quitting and os.environ.get('FAKE_ADB_STOP_EXIT130')=='1' else 0)
 if args[0]=='pull':
  if os.environ.get('FAKE_ADB_FAIL_PULL')=='1':
   sys.stderr.write('simulated interrupted transfer')
@@ -73,6 +75,34 @@ class VideoTest(unittest.TestCase):
             receipt=rec.stop()
             self.assertEqual(len(receipt['clips']),1)
             self.assertTrue((root/'videos'/'part-001.mp4').exists())
+
+    def test_controlled_sigint_130_still_preserves_valid_mp4(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            rec = self.setup_recorder(root)
+            os.environ['FAKE_ADB_STOP_EXIT130'] = '1'
+            try:
+                rec.start()
+                time.sleep(.1)
+                receipt = rec.stop()
+                self.assertEqual(receipt['errors'], [])
+                self.assertEqual(len(receipt['clips']), 1)
+                self.assertTrue((root / 'videos' / 'part-001.mp4').exists())
+                self.assertEqual(receipt['clips'][0]['sha256'],
+                                 hashlib.sha256((root / 'videos' / 'part-001.mp4').read_bytes()).hexdigest())
+            finally:
+                os.environ.pop('FAKE_ADB_STOP_EXIT130', None)
+
+    def test_unexpected_adb_exit_130_remains_a_failure(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            rec = self.setup_recorder(root)
+            os.environ['FAKE_ADB_EARLY_EXIT130'] = '1'
+            try:
+                with self.assertRaisesRegex(RuntimeError, 'screenrecord 退出 130'):
+                    rec.start()
+            finally:
+                os.environ.pop('FAKE_ADB_EARLY_EXIT130', None)
 
     def test_long_journey_rolls_over_and_keeps_all_parts(self):
         with tempfile.TemporaryDirectory() as d:
