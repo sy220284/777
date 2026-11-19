@@ -21,7 +21,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SySheetChoiceRow
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -94,7 +94,7 @@ internal fun McpElicitationDialog(
         scrollable = true,
         seamlessBackground = true,
     ) {
-        Text(question.question, style = DsType.base16Strong.withReadingWeight())
+        Text(question.question, style = SyType.base16Strong.withReadingWeight())
         if (question.mcpUrl != null) {
             val url = question.mcpUrl
             val host = Uri.parse(url).host.orEmpty()

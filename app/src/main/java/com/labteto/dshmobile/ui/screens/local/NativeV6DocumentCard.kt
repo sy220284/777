@@ -116,7 +116,7 @@ internal fun NativeV6DocumentModalHost(
                 tint = colors.textSecondary,
             )
             Text(latest.document.title,
-                style = com.labteto.dshmobile.ui.theme.DsType.small13Strong,
+                style = com.labteto.dshmobile.ui.theme.SyType.small13Strong,
                 color = colors.text,
                 modifier = Modifier.weight(1f),
                 maxLines = 2,
@@ -129,7 +129,7 @@ internal fun NativeV6DocumentModalHost(
             )
         }
         summary?.let { text ->
-            Text(text, style = com.labteto.dshmobile.ui.theme.DsType.small13,
+            Text(text, style = com.labteto.dshmobile.ui.theme.SyType.small13,
                 color = colors.textSecondary,
                 modifier = Modifier.padding(start = 26.dp),
                 maxLines = 2,
@@ -137,7 +137,7 @@ internal fun NativeV6DocumentModalHost(
         }
         if (documents.size > 1) {
             Text("关联文档 ${documents.size} 份",
-                style = com.labteto.dshmobile.ui.theme.DsType.caption11,
+                style = com.labteto.dshmobile.ui.theme.SyType.caption11,
                 color = colors.textTertiary, modifier = Modifier.padding(start = 26.dp))
         }
     }

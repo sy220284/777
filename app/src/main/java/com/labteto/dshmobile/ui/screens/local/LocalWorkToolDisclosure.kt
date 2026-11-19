@@ -41,7 +41,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import androidx.compose.ui.text.style.TextOverflow
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -221,12 +221,12 @@ internal fun LocalWorkToolDisclosureRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "工具执行记录 · ${counts.total} 项",
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 Text(
                     latestText,
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = when (newest?.phase) {
                         LocalToolUiPhase.FAILED -> colors.dangerInk
                         LocalToolUiPhase.OUTCOME_UNKNOWN -> colors.warningInk
@@ -238,7 +238,7 @@ internal fun LocalWorkToolDisclosureRow(
                 if (counts.running > 0 || issues > 0) {
                     Text(
                         counts.summary,
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                         color = if (counts.failed > 0) colors.dangerInk
                             else if (counts.uncertain > 0) colors.warningInk
                             else colors.textSecondary,
@@ -292,7 +292,7 @@ internal fun LocalWorkToolDisclosureRow(
                     Text(
                         if (filter == WorkToolListFilter.RUNNING) "当前没有执行中的操作"
                         else "当前没有异常操作",
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 } else {

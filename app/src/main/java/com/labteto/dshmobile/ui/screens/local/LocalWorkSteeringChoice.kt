@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyPill
@@ -80,7 +80,7 @@ internal fun LocalWorkSteeringChoice(
             Text(
                 text = stringResource(R.string.local_work_steer_boundary),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
