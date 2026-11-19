@@ -116,7 +116,7 @@ class RuntimeDiagnostics(
     companion object {
         val DEFAULT_COMMANDS = listOf(
             "sh", "git", "python3", "python", "node", "curl", "ssh",
-            "rg", "jq", "tar", "zip",
+            "rg", "jq", "npm", "pip", "pip3", "tar", "zip",
         )
     }
 }
