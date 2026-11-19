@@ -117,13 +117,20 @@ internal object SyLiquidShader {
                 refracted = mix(refracted, soft, half(0.08 + 0.10 * rim));
             }
 
-            float tintAlpha = glassTint.a * (1.0 - clarity * rim);
+            // A wallpaper far from the chosen light/dark ink needs a stronger
+            // local veil. On neutral backgrounds the lens remains clear.
+            // This adapts PER PIXEL without an extra GPU sampling pass.
+            float sourceLuma = dot(refracted, half3(0.2126, 0.7152, 0.0722));
+            float materialLuma = dot(glassTint.rgb, half3(0.2126, 0.7152, 0.0722));
+            float mismatch = smoothstep(0.22, 0.70, abs(sourceLuma - materialLuma));
+            float protectiveAlpha = mix(float(glassTint.a), max(float(glassTint.a), 0.88), mismatch);
+            float tintAlpha = protectiveAlpha * (1.0 - clarity * rim * 0.65);
             half3 colour = mix(refracted, glassTint.rgb, half(tintAlpha));
             half alpha = mix(centerSample.a, half(1.0), half(tintAlpha));
             // The optical rim adapts to the live brightness underneath:
             // pale scenes reveal a thin darker edge; dark scenes reflect light.
             // No drop shadow, opaque stroke, or full-surface glare is drawn.
-            float luminance = dot(refracted, half3(0.2126, 0.7152, 0.0722));
+            float luminance = sourceLuma;
             float facing = max(dot(normal, float2(-0.71, -0.71)), 0.0);
             float edgeLight = pow(rim, 3.0) * reflection * (0.035 + 0.18 * facing);
             half3 edgeTone = half3(luminance > 0.64 ? 0.43 : 1.0) * half(alpha);
