@@ -24,6 +24,7 @@ class LocalCreativeSkillBundleTest {
             val store = LocalSkillStore(workspace, creativeBundleFiles = ::bundle)
             store.seedOnce()
             val ids = LocalCreativeSkillCatalog.entries.map { it.id }
+            assertEquals(ids.toSet(), LocalCreativeSkillCatalog.bundleRevisions.keys)
             assertEquals(setOf("finesse-ui", "finesse-brief", "finesse-term", "frame-smith"), ids.toSet())
             assertTrue(workspace.skills().containsAll(ids))
             assertTrue(store.presets().filter { it.id in ids }.all { it.installed })
@@ -97,6 +98,22 @@ class LocalCreativeSkillBundleTest {
             assertFalse(File(root, ".dsh/skills/finesse-ui/.bundled-baseline-sha256").exists())
             store.seedOnce()
             assertEquals(userContent, store.readDocument("finesse-ui"))
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun unchangedAppReleaseDoesNotReloadLargeAssetTrees() {
+        val root = Files.createTempDirectory("creative-skill-fast-startup").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            val reads = mutableMapOf<String, Int>()
+            val store = LocalSkillStore(workspace, creativeBundleFiles = { id ->
+                reads[id] = reads.getOrDefault(id, 0) + 1
+                bundle(id)
+            })
+            store.seedOnce()
+            assertEquals(4, reads.values.sum())
+            store.seedOnce()
+            assertEquals(4, reads.values.sum())
         } finally { root.deleteRecursively() }
     }
 }

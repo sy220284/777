@@ -30,12 +30,17 @@ internal class LocalCreativeSkillBundle(
         workspace.write(".dsh/skills/${preset.id}/SKILL.md", document)
         File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
             .writeText(fingerprint(document) + "\n")
+        versionMarker(preset.id).writeText(LocalCreativeSkillCatalog.bundleRevisions.getValue(preset.id) + "\n")
     }
 
     fun refresh(preset: LocalPresetSkill) {
         val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
         // A colliding user-imported skill without a bundled fingerprint is user-owned.
         if (!Files.isRegularFile(baseline.toPath(), LinkOption.NOFOLLOW_LINKS)) return
+        val revision = LocalCreativeSkillCatalog.bundleRevisions.getValue(preset.id)
+        val installedRevision = versionMarker(preset.id)
+        if (Files.isRegularFile(installedRevision.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            installedRevision.readText(Charsets.UTF_8).trim() == revision) return
         val previous = baseline.readText(Charsets.UTF_8).trim()
         require(Regex("[0-9a-f]{64}").matches(previous)) {
             "内置技能升级基线损坏：${preset.id}"
@@ -48,7 +53,10 @@ internal class LocalCreativeSkillBundle(
         val current = workspace.readSkill(preset.id)
         val currentHash = fingerprint(current)
         val desiredHash = fingerprint(document)
-        if (currentHash != previous && currentHash != desiredHash) return
+        if (currentHash != previous && currentHash != desiredHash) {
+            installedRevision.writeText(revision + "\n")
+            return
+        }
 
         val disabled = !parseLocalSkillMetadata(preset.id, current).modelInvocable
         val next = if (disabled) {
@@ -56,7 +64,10 @@ internal class LocalCreativeSkillBundle(
         } else document
         if (current != next) workspace.write(".dsh/skills/${preset.id}/SKILL.md", next)
         baseline.writeText(desiredHash + "\n")
+        installedRevision.writeText(revision + "\n")
     }
+
+    private fun versionMarker(id: String): File = File(skillsDir, "$id/.bundled-asset-version")
 
     private fun validatedAssets(id: String): Map<String, ByteArray> {
         require(id in LocalCreativeSkillCatalog.entries.map { it.id }) { "未知内置技能：$id" }

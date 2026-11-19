@@ -6,6 +6,14 @@ package com.labteto.dshmobile.local.tools
  * not additional Android or tool permissions.
  */
 internal object LocalCreativeSkillCatalog {
+    // Source directory Git trees: bump only when an included asset changes.
+    // This prevents re-reading 4.68 MB of assets on every app startup.
+    val bundleRevisions = mapOf(
+        "finesse-ui" to "5b855340d2de0c59f9ff6f5457eb68e5dd05c4d0",
+        "finesse-brief" to "cf14bf229a3c3840451e0b0a40cd2d869a4a8d2d",
+        "finesse-term" to "7f28994fcb2c67b23d4ef4987db13b82ef1f746e",
+        "frame-smith" to "56a15608eea8d3e19002109596b582b2c9d975d6",
+    )
     val entries = listOf(
         LocalPresetSkill(
             id = "finesse-ui",
