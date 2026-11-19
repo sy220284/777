@@ -24,7 +24,7 @@ def instrumentation(classes):
             "INSTRUMENTATION_STATUS: test=works",
             "INSTRUMENTATION_STATUS_CODE: 0",
         ]
-    return "\n".join(parts + [f"OK ({len(classes)} tests)", "INSTRUMENTATION_CODE: -1"])
+    return "\n".join(parts + [f"OK ({len(classes)} {'test' if len(classes) == 1 else 'tests'})", "INSTRUMENTATION_CODE: -1"])
 
 
 class SharedApkDeviceTests(unittest.TestCase):
