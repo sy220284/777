@@ -72,6 +72,8 @@ class TasksViewModel @Inject constructor(
     private var observation: Job? = null
     private val planner = AutomationPlannerUiController(viewModelScope, automation, mutableState)
 
+    private var refreshingSnapshot = false
+
     init { refresh() }
 
     fun acknowledgeNotice(notice: TasksNotice) {
@@ -79,6 +81,8 @@ class TasksViewModel @Inject constructor(
     }
 
     fun refresh() = viewModelScope.launch {
+        if (refreshingSnapshot) return@launch
+        refreshingSnapshot = true
         mutableState.update { it.copy(loading = true) }
         try {
             val snapshot = withContext(Dispatchers.IO) { automation.snapshot() }
@@ -88,6 +92,8 @@ class TasksViewModel @Inject constructor(
         } catch (failure: Exception) {
             AppLog.failure("TaskScheduling", "refresh_tasks", failure)
             mutableState.update { it.copy(loading = false, listLoadFailed = true) }
+        } finally {
+            refreshingSnapshot = false
         }
         observeTasks()
     }

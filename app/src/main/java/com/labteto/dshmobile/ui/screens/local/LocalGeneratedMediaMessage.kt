@@ -3,6 +3,8 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.components.SyProgressBar
 import com.shenyan.designsystem.foundation.SyPhase
 import com.shenyan.designsystem.components.SyIconButton
+import com.shenyan.designsystem.components.SyRadialActionMenu
+import com.shenyan.designsystem.components.SyActionEntry
 import com.labteto.dshmobile.local.model.belongsTo
 
 import com.shenyan.designsystem.foundation.SyMetric
@@ -23,8 +25,6 @@ import android.os.Build
 import android.media.MediaMetadataRetriever
 import android.widget.Toast
 import android.net.Uri
-import android.widget.MediaController
-import android.widget.VideoView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -78,7 +78,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalMediaCreationJob
 import com.labteto.dshmobile.local.model.LocalMediaCreationPhase
@@ -417,17 +416,13 @@ internal fun LocalGeneratedVideoTaskRow(
         }
         if (canPlayGeneratedVideo(task.phase, savedVideo?.isFile == true, task.downloadUrl)) {
             if (showingPlayer) {
-                InlineVideoPlayer(task.downloadUrl.orEmpty(), localVideo, onError = { error = it })
+                InlineVideoPlayer(task.downloadUrl.orEmpty(), localVideo, onError = { error = it },
+                    onCollapse = { showingPlayer = false })
             } else {
                 MediaVideoPoster(localVideo, onPlay = { showingPlayer = true },
                     onLongPress = requestDelete)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                if (showingPlayer) SyButton(
-                    text = resources.getString(R.string.media_chat_collapse_video),
-                    size = SyButtonSize.Small,
-                    onClick = { showingPlayer = false },
-                )
                 if (localVideo != null) {
                     if (inline) {
                         InlineReplyMediaActions(localVideo, "video/mp4") { error = it }
@@ -1048,46 +1043,6 @@ private fun formatMediaDuration(ms: Int): String {
     return "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 }
 
-@Composable
-internal fun InlineVideoPlayer(url: String?, localFile: File?, onError: (String) -> Unit) {
-    val resources = LocalResources.current
-    val source = localFile?.takeIf { it.isFile }?.let(Uri::fromFile)
-        ?: url?.takeIf(String::isNotBlank)?.let(Uri::parse)
-    if (source == null) {
-        Text(resources.getString(R.string.media_chat_video_failed),
-            style = SyType.caption11.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
-        return
-    }
-    var player by remember { mutableStateOf<VideoView?>(null) }
-    DisposableEffect(Unit) {
-        onDispose { player?.stopPlayback(); player = null }
-    }
-    AndroidView(
-        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-        factory = { viewContext ->
-            VideoView(viewContext).apply {
-                val controls = MediaController(viewContext)
-                controls.setAnchorView(this)
-                setMediaController(controls)
-                setOnPreparedListener { start() }
-                setOnErrorListener { _, _, _ -> onError(resources.getString(R.string.media_chat_video_failed)); true }
-                player = this
-            }
-        },
-        update = { view ->
-            // AndroidView retains its native view across recompositions. Update the media source
-            // explicitly instead of leaving an expired URL in a previously created VideoView.
-            val sourceKey = source.toString()
-            if (view.tag != sourceKey) {
-                view.stopPlayback()
-                view.tag = sourceKey
-                view.setVideoURI(source)
-            }
-        },
-    )
-}
-
 private fun shareMediaUrl(context: Context, url: String, onError: (String) -> Unit) {
     runCatching {
         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -1332,7 +1287,16 @@ internal fun InlineReplyArtifactActions(
             modifier = Modifier.testTag("inlineArtifactActions"),
             tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
-        SyPopupMenu(expanded = open, onDismiss = { open = false }, items = menu)
+        if (open) {
+            SyRadialActionMenu(
+                title = resources.getString(R.string.fluid_message_actions),
+                entries = menu.mapIndexed { index, item ->
+                    SyActionEntry(index.toString(), item.text, icon = item.icon, destructive = item.danger)
+                },
+                onDismiss = { open = false },
+                onChoose = { id -> menu[id.toInt()].onClick() },
+            )
+        }
     }
 }
 

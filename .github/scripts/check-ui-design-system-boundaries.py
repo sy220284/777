@@ -165,6 +165,13 @@ for path in UI.rglob("*.kt"):
         if name in RAW_MATERIAL_COMPONENTS:
             violations.append(f"{relative}: route {name} through {RAW_MATERIAL_COMPONENTS[name]}")
 
+# Feedback, date actions and transport belong to the canonical button family too.
+DESIGN_COMPONENTS = ROOT / "app/src/main/java/com/shenyan/designsystem/components"
+for path in DESIGN_COMPONENTS.glob("*.kt"):
+    source = mask_non_code(path.read_text(encoding="utf-8"))
+    if re.search(r"\bTextButton\s*\(", source):
+        violations.append(f"{path.name}: use SyButton for design-system text actions")
+
 
 # Keep the main V6 transition owners on one SyMotion vocabulary. Other feature
 # delays (network, debounce, accessibility speech) are intentionally not animation tokens.
@@ -223,12 +230,15 @@ REQUIRED_ATLAS_FEATURES = {
     "screens/local/GroupChatMemberPicker.kt": ("SyMultiSelectSheet",),
     "screens/local/FirstLaunchOnboarding.kt": ("SyOnboardingCarousel",),
     "screens/local/LocalWorkCapabilitySheet.kt": ("SyCoachMark",),
-    "screens/local/LocalGeneratedMediaMessage.kt": ("SyMediaTransport", "SyMiniPlayer"),
+    "screens/local/LocalGeneratedMediaMessage.kt": ("SyMediaTransport", "SyMiniPlayer", "SyRadialActionMenu", "InlineVideoPlayer"),
+    "screens/local/LocalInlineVideoPlayer.kt": ("SyMediaTransport",),
+    "screens/local/LocalQueuedUserQueueSheet.kt": ("detectDragGesturesAfterLongPress", "SyResponsiveSheet"),
+    "shenyan/SyResponsiveSheet.kt": ("SySnapBottomSheet",),
     "screens/tasks/TaskCardComponents.kt": ("SySwipeActionRow",),
     "shenyan/SyConversation.kt": ("SyChatComposer",),
     "screens/local/LocalConversationSurface.kt": ("SyUndoSnackbarHost", "ConversationTranscriptGlass"),
     "components/ConversationScrollShortcut.kt": ("SyLiveGlassScene",),
-    "screens/tasks/TasksScreen.kt": ("SySkeletonCard",),
+    "screens/tasks/TasksScreen.kt": ("SySkeletonCard", "SyPullRefresh"),
     "screens/tasks/TaskEditorComponents.kt": ("SyDatePickerField", "SyDateCalendar", "SyTimeInput", "SyNumericStepper"),
     "screens/settings/UsageCalculationPage.kt": ("SyDateRangePickerDialog",),
 }

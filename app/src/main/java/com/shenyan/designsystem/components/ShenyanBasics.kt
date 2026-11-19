@@ -202,6 +202,8 @@ fun SySheetScaffold(
     scrollable: Boolean = false,
     maxBodyHeight: Dp = 440.dp,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
+    bodyScrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
+    bodyViewport: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val palette = LocalSyColors.current
@@ -233,8 +235,8 @@ fun SySheetScaffold(
             }
         }
         if (scrollable) {
-            Column(Modifier.fillMaxWidth().heightIn(max = maxBodyHeight)
-                .verticalScroll(rememberScrollState())
+            Column(bodyViewport.fillMaxWidth().heightIn(max = maxBodyHeight)
+                .verticalScroll(bodyScrollState)
                 .testTag("bottomSheetScrollBody"),
                 verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
         } else {

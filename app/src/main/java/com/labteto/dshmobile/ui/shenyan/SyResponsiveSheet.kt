@@ -29,6 +29,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SySheetScaffold
+import com.shenyan.designsystem.components.SySnapBottomSheet
 import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.foundation.SyMotion
@@ -71,11 +72,22 @@ fun SyResponsiveSheet(
     dimScrimWhenSeamless: Boolean = true,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     allowPartialExpansion: Boolean = false,
+    useSnapStops: Boolean = false,
+    bodyScrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
+    bodyViewport: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = LocalSyPalette.current
     val cfg = LocalConfiguration.current
     val wide = cfg.screenWidthDp >= 600
+    if (!wide && useSnapStops) {
+        SySnapBottomSheet(
+            title = requireNotNull(title), onDismiss = onDismiss,
+            dismissEnabled = dismissEnabled, bodyScrollState = bodyScrollState,
+            bodyViewport = bodyViewport, content = content,
+        )
+        return
+    }
     val maxBodyHeight = cfg.screenHeightDp.dp * scrollBodyHeightFraction
     val dismissal = rememberUpdatedState(dismissEnabled)
     val sheetState = rememberModalBottomSheetState(
@@ -94,6 +106,7 @@ fun SyResponsiveSheet(
             scrollable = scrollable,
             maxBodyHeight = maxBodyHeight,
             footer = footer,
+            bodyScrollState = bodyScrollState, bodyViewport = bodyViewport,
             content = content,
         )
     }

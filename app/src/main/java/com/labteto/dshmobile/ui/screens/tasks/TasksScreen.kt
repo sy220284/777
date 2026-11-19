@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import com.shenyan.designsystem.components.SyFlatSurface
 import com.shenyan.designsystem.components.SySkeletonCard
+import com.shenyan.designsystem.components.SyPullRefresh
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -284,10 +285,17 @@ private fun WorkTasksScreen(
                             saving = state.savingEditor,
                             onReset = ::resetEditor,
                         )
-                        visibleTasks.isEmpty() -> TaskEmptyState(
-                            onManualCreate = ::startCreate,
-                            onCreateViaChat = onCreateViaChat?.let { createFromChat },
-                        )
+                        visibleTasks.isEmpty() -> SyPullRefresh(
+                            refreshing = state.loading, onRefresh = { viewModel.refresh() },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        ) {
+                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                                TaskEmptyState(
+                                    onManualCreate = ::startCreate,
+                                    onCreateViaChat = onCreateViaChat?.let { createFromChat },
+                                )
+                            }
+                        }
                         selectedTask != null -> Column(
                             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                         ) {
@@ -330,29 +338,28 @@ private fun WorkTasksScreen(
                                 hapticOnChange = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            if (filteredTasks.isEmpty()) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                                ) {
-                                    Text(
-                                        stringResource(R.string.tasks_filter_empty),
-                                        style = SyType.small13.withReadingWeight(),
-                                        color = colors.textSecondary,
-                                    )
-                                    SyButton(
-                                        text = stringResource(R.string.tasks_filter_all),
-                                        onClick = { listFilter = WorkTaskListFilter.ALL },
-                                        variant = SyButtonVariant.Outline,
-                                    )
-                                }
-                            } else {
+                            SyPullRefresh(
+                                refreshing = state.loading, onRefresh = { viewModel.refresh() },
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                            ) {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = SyMetric.gapLg),
                                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
+                                    if (filteredTasks.isEmpty()) item(key = "empty-filter") {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                                        ) {
+                                            Text(stringResource(R.string.tasks_filter_empty),
+                                                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
+                                            SyButton(stringResource(R.string.tasks_filter_all),
+                                                onClick = { listFilter = WorkTaskListFilter.ALL },
+                                                variant = SyButtonVariant.Outline)
+                                        }
+                                    }
                                     items(filteredTasks, key = AutomationTask::id) { task ->
                                         TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
                                     }

@@ -212,10 +212,15 @@ private fun AtlasDialogs() {
 
 @Composable
 private fun AtlasSheets() {
+    var snapSheet by remember { mutableStateOf(false) }
     var actionSheet by remember { mutableStateOf(false) }
     var selectSheet by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(setOf("a")) }
     AtlasHeading("底部操作面板、多选面板、半屏/全屏")
+    SyButton("打开三段面板", { snapSheet = true })
+    if (snapSheet) SySnapBottomSheet("三段吸附面板", onDismiss = { snapSheet = false }) {
+        repeat(8) { Text("可滚动内容 ${it + 1}", Modifier.padding(8.dp)) }
+    }
     SyButton("打开操作面板", { actionSheet = true })
     SyButton("打开多选面板", { selectSheet = true }, style = SyButtonStyle.SECONDARY)
     if (actionSheet) SyActionSheet("更多操作", listOf(

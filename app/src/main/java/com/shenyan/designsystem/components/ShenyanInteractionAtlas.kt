@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
@@ -185,9 +187,7 @@ fun SyUndoSnackbarHost(
                 Text(data.visuals.message, color = p.text, modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium)
                 data.visuals.actionLabel?.let { action ->
-                    TextButton(onClick = data::performAction) {
-                        Text(action, color = p.linkInk)
-                    }
+                    SyButton(action, data::performAction, style = SyButtonStyle.GHOST, compact = true)
                 }
                 if (data.visuals.withDismissAction) {
                     SyIconButton(icon = Icons.Default.Close, contentDescription = "关闭提示",
@@ -229,7 +229,7 @@ fun SyInlineBanner(
             Text(message, modifier = Modifier.weight(1f), color = p.text,
                 style = MaterialTheme.typography.bodyMedium)
             if (actionLabel != null && onAction != null) {
-                TextButton(onClick = onAction) { Text(actionLabel, color = p.linkInk) }
+                SyButton(actionLabel, onAction, style = SyButtonStyle.GHOST, compact = true)
             }
             onClose?.let {
                 SyIconButton(Icons.Default.Close, "关闭提示", it, bare = true)
@@ -548,11 +548,11 @@ fun SyDatePickerField(
         } else {
             val state = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis)
             DatePickerDialog(onDismissRequest = dismiss, confirmButton = {
-                TextButton(enabled = state.selectedDateMillis != null, onClick = {
+                SyButton("确定", enabled = state.selectedDateMillis != null, onClick = {
                     state.selectedDateMillis?.let(select)
-                }) { Text("确定") }
+                }, compact = true)
             }, dismissButton = {
-                TextButton(onClick = dismiss) { Text("取消") }
+                SyButton("取消", dismiss, style = SyButtonStyle.GHOST, compact = true)
             }) { SyDateCalendar(state) }
         }
     }
@@ -607,16 +607,18 @@ fun SyDateRangePickerDialog(
         selectableDates = selectableDates,
     )
     DatePickerDialog(onDismissRequest = onDismiss, confirmButton = {
-        TextButton(
+        SyButton(
+            text = "应用",
+            compact = true,
             enabled = state.selectedStartDateMillis != null &&
                 state.selectedEndDateMillis != null,
             onClick = {
                 val start = state.selectedStartDateMillis
                 val end = state.selectedEndDateMillis
                 if (start != null && end != null) onConfirm(start, end)
-            }) { Text("应用") }
+            })
     }, dismissButton = {
-        TextButton(onClick = onDismiss) { Text("取消") }
+        SyButton("取消", onDismiss, style = SyButtonStyle.GHOST, compact = true)
     }) {
         DateRangePicker(
             state = state,
@@ -830,6 +832,8 @@ fun SyMediaTransport(
     enabled: Boolean = true,
     seekable: Boolean = true,
     onCollapse: (() -> Unit)? = null,
+    onSeekBackward: (() -> Unit)? = null,
+    onSeekForward: (() -> Unit)? = null,
 ) {
     val p = LocalSyColors.current
     SyMaterialSurface(
@@ -848,16 +852,12 @@ fun SyMediaTransport(
                     SyIconButton(Icons.Default.KeyboardArrowDown, "收起播放器", it, bare = true)
                 }
             }
-            Slider(value = progress.coerceIn(0f, 1f), onValueChange = onSeek,
-                enabled = seekable,
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(thumbColor = p.primary,
-                    activeTrackColor = p.primary,
-                    inactiveTrackColor = p.textTertiary.copy(alpha = .2f)))
+            SySliderControl(value = progress.coerceIn(0f, 1f), onValueChange = onSeek,
+                enabled = seekable, modifier = Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(elapsedLabel, color = p.textSecondary,
-                    style = MaterialTheme.typography.labelSmall)
+                    style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("sy-media-elapsed"))
                 Text(durationLabel, color = p.textSecondary,
                     style = MaterialTheme.typography.labelSmall)
             }
@@ -866,9 +866,15 @@ fun SyMediaTransport(
                 onPrevious?.let {
                     SyIconButton(Icons.Default.SkipPrevious, "上一项", it, bare = true)
                 }
+                onSeekBackward?.let {
+                    SyIconButton(Icons.Default.Replay10, "后退 10 秒", it, enabled = seekable, bare = true)
+                }
                 SyIconButton(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                     if (playing) "暂停" else "播放", onPlayPause,
                     enabled = enabled, selected = true, iconSize = 24.dp)
+                onSeekForward?.let {
+                    SyIconButton(Icons.Default.Forward10, "前进 10 秒", it, enabled = seekable, bare = true)
+                }
                 onNext?.let {
                     SyIconButton(Icons.Default.SkipNext, "下一项", it, bare = true)
                 }
