@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +31,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -38,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.isSpecified
+import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.shenyan.designsystem.foundation.*
@@ -128,6 +131,19 @@ fun SyMaterialSurface(
     val defaultInteraction = remember { MutableInteractionSource() }
     val interaction = interactionSource ?: defaultInteraction
     val pressed by interaction.collectIsPressedAsState()
+    var touchOrigin by remember(interaction) { mutableStateOf<Offset?>(null) }
+    LaunchedEffect(interaction) {
+        // Observe the press without intercepting scrolling, sheets or system back gestures.
+        interaction.interactions.collect { event ->
+            if (event is PressInteraction.Press) touchOrigin = event.pressPosition
+        }
+    }
+    val pressLight by animateFloatAsState(
+        targetValue = if (pressed && onClick != null && enabled && !LocalSyReduceMotion.current) 1f else 0f,
+        animationSpec = tween(SyMotion.duration(SyMotion.interactionColorMs,
+            LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
+        label = "glassTouchReflection",
+    )
     val press by animateFloatAsState(
         if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) SyMotion.pressedScale else 1f,
         tween(SyMotion.duration(SyMotion.pressMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current)), label = "materialPress",
@@ -136,22 +152,21 @@ fun SyMaterialSurface(
     // unrelated content show through. Nested cards inherit their parent's backing.
     val fill = if (scene == null && backdrop == null && nested == 0)
         materialFill.compositeOver(c.canvas) else materialFill
-    // Opaque Matte surfaces must never sample or blur the supplied backdrop.
-    val blurRadius = if (resolved == SyMaterialTier.L5_SOLID || fill.alpha == 1f) 0.dp else when (resolved) {
-        SyMaterialTier.L1_SECTION -> 0.dp
-        SyMaterialTier.L2_BAR -> 24.dp
-        SyMaterialTier.L3_CARD -> 0.dp
-        SyMaterialTier.L4_OVERLAY -> 32.dp
-        SyMaterialTier.L5_SOLID -> 0.dp
-    }
-    val elevation = when (resolved) {
-        SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 0.dp
-        SyMaterialTier.L2_BAR -> 2.dp
-        SyMaterialTier.L3_CARD -> 1.dp
-        SyMaterialTier.L4_OVERLAY -> 16.dp
-    }
-    val rim = if (materialFill.alpha < 1f && resolved in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY)) BorderStroke(1.dp, Brush.linearGradient(
-        listOf(c.materialSheen, c.border.copy(alpha = c.border.alpha * .45f), c.materialSheen.copy(alpha = .12f)),
+    val optics = syGlassOptics(
+        colors = c, tier = resolved, fill = fill,
+        reduceTransparency = LocalSyReduceTransparency.current,
+        nestedDepth = nested, hasBackdrop = scene != null || backdrop != null,
+    )
+    val blurRadius = optics.blur
+    val elevation = optics.elevation
+    val rim = if (optics.glass) BorderStroke(1.dp, Brush.linearGradient(
+        listOf(
+            c.text.copy(alpha = .095f * optics.reflection),
+            c.materialSheen.copy(alpha = .88f * optics.reflection),
+            c.text.copy(alpha = .11f * optics.reflection),
+            c.materialSheen.copy(alpha = .60f * optics.reflection),
+            c.text.copy(alpha = .13f * optics.reflection),
+        ),
     )) else BorderStroke(1.dp, c.border)
     @Composable fun Interior() {
         Box(Modifier.clip(shape)) {
@@ -172,18 +187,45 @@ fun SyMaterialSurface(
             CompositionLocalProvider(LocalSyGlassDepth provides (nested + 1)) {
                 content()
             }
-            if (materialFill.alpha < 1f && resolved in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY)) {
-                // A decorative highlight must never participate in Box measurement.
-                // fillMaxWidth() here made compact surfaces stretch to the entire Row,
-                // squeezing adjacent labels into single-character vertical columns.
+            if (optics.glass) {
+                // Reflected light belongs beneath content: the reading text stays crisp.
+                // The reactive pool follows PressInteraction without owning touch gestures.
                 Canvas(Modifier.matchParentSize()) {
-                    val y = 0.5.dp.toPx()
-                    drawLine(
-                        color = c.materialSheen,
-                        start = Offset(size.width * .035f, y),
-                        end = Offset(size.width * .965f, y),
-                        strokeWidth = 1.dp.toPx(),
-                    )
+                    val extent = max(size.width, size.height).coerceAtLeast(1f)
+                    drawRect(Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = .17f * optics.reflection),
+                            c.primary.copy(alpha = .035f * optics.reflection),
+                            Color.Transparent,
+                        ),
+                        start = Offset.Zero,
+                        end = Offset(size.width * .82f, size.height * .88f),
+                    ))
+                    if (pressLight > 0f) {
+                        val point = touchOrigin ?: Offset(size.width * .5f, size.height * .5f)
+                        val centre = Offset(point.x.coerceIn(0f, size.width),
+                            point.y.coerceIn(0f, size.height))
+                        val radius = extent * .67f
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = .23f * pressLight * optics.reflection),
+                                    c.primary.copy(alpha = .075f * pressLight * optics.reflection),
+                                    Color.Transparent,
+                                ),
+                                center = centre, radius = radius,
+                            ),
+                            radius = radius, center = centre,
+                        )
+                    }
+                    if (resolved == SyMaterialTier.L2_BAR || resolved == SyMaterialTier.L4_OVERLAY) {
+                        drawLine(
+                            color = c.text.copy(alpha = .040f * optics.reflection),
+                            start = Offset(size.width * .05f, size.height - .75.dp.toPx()),
+                            end = Offset(size.width * .95f, size.height - .75.dp.toPx()),
+                            strokeWidth = .75.dp.toPx(),
+                        )
+                    }
                 }
             }
         }
