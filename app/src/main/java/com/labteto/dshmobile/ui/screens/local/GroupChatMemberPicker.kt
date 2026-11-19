@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.components.SyCheckboxControl
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.local.presentation.MAX_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.presentation.MIN_GROUP_CHAT_MEMBERS
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -164,10 +166,11 @@ internal fun GroupChatMemberPickerSheet(
                     items(filteredEntries, key = PersonaGalleryEntry::id) { entry ->
                         val checked = entry.id in selected
                         val canAdd = checked || selected.size < MAX_GROUP_CHAT_MEMBERS
-                        Surface(
+                        SyMaterialSurface(
+                            tier = SyMaterialTier.L2_BAR,
                             shape = SyShapes.row,
-                            color = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .32f)
-                                else androidx.compose.ui.graphics.Color.Transparent,
+                            tint = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .32f)
+                                else androidx.compose.ui.graphics.Color.Unspecified,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .toggleable(

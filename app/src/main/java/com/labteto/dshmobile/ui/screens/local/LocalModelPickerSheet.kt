@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.theme.SyShapes
@@ -82,21 +84,23 @@ internal fun LocalModelPickerSheet(
                     )
                     else -> stringResource(R.string.app_model_available)
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 60.dp)
-                        .clip(SyShapes.row)
-                        .background(if (selected) colors.selected.copy(alpha = .35f)
-                            else androidx.compose.ui.graphics.Color.Transparent)
-                        .clickable {
-                            onSelect(profile.id)
-                            onDismiss()
-                        }
-                        .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                SyMaterialSurface(
+                    onClick = {
+                        onSelect(profile.id)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
+                    tier = SyMaterialTier.L3_CARD,
+                    shape = SyShapes.row,
+                    tint = if (selected) colors.selected.copy(alpha = .35f)
+                        else androidx.compose.ui.graphics.Color.Unspecified,
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                    ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_ui_model),
                         contentDescription = null,
@@ -126,6 +130,7 @@ internal fun LocalModelPickerSheet(
                             tint = colors.linkInk,
                             modifier = Modifier.size(18.dp),
                         )
+                    }
                     }
                 }
             }
