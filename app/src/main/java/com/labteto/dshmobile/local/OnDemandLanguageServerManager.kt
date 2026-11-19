@@ -138,6 +138,10 @@ internal class OnDemandLanguageServerManager(
 
     /** npm itself ships JS plus bundled dependencies; never run downloaded shell binaries. */
     private fun ensureNpm(): File {
+        // Reuse the pinned npm CLI already verified and bundled with the APK.
+        processEnvironment()["DSH_NPM_CLI"]?.let { bundled ->
+            File(bundled).takeIf { it.isFile && it.length() > 0L }?.let { return it }
+        }
         val cli = File(home, "bootstrap/npm-11.6.2/package/bin/npm-cli.js")
         if (cli.isFile && cli.length() > 0L) return cli
         val parent = File(home, "bootstrap")
