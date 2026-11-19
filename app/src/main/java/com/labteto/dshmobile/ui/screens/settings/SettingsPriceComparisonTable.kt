@@ -18,7 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import com.labteto.dshmobile.R
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
@@ -40,10 +40,10 @@ internal fun PriceComparisonTable(offPeak: PricePeriodValues, peak: PricePeriodV
     val rows = listOf(offPeak, peak)
     val headers = listOf(stringResource(R.string.pricing_col_cache_hit),
         stringResource(R.string.pricing_col_cache_miss), stringResource(R.string.pricing_col_output))
-    val headerStyle = DsType.caption11.withReadingWeight()
-    val valueStyle = DsType.small13.withReadingWeight().copy(fontFeatureSettings = "tnum")
-    val labelStyle = DsType.small13.withReadingWeight()
-    val activeStyle = DsType.small13Strong.withReadingWeight()
+    val headerStyle = SyType.caption11.withReadingWeight()
+    val valueStyle = SyType.small13.withReadingWeight().copy(fontFeatureSettings = "tnum")
+    val labelStyle = SyType.small13.withReadingWeight()
+    val activeStyle = SyType.small13Strong.withReadingWeight()
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val periodWidth = rows.maxOf { row -> with(density) {

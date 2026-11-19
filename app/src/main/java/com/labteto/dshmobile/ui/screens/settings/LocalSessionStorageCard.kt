@@ -18,7 +18,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -47,7 +47,7 @@ internal fun LocalSessionStorageCard(
         if (status == null) {
             Text(
                 text = "尚未取得存储信息，请重新读取",
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
         } else {
@@ -56,7 +56,7 @@ internal fun LocalSessionStorageCard(
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
             ) {
                 Text(formatStorageBytes(status.totalBytes),
-                    style = DsType.display24.withReadingWeight().copy(fontFeatureSettings = "tnum"),
+                    style = SyType.display24.withReadingWeight().copy(fontFeatureSettings = "tnum"),
                     color = colors.text)
                 Text(
                     text = stringResource(
@@ -64,7 +64,7 @@ internal fun LocalSessionStorageCard(
                         formatStorageBytes(status.totalBytes),
                         formatStorageBytes(status.budgetBytes),
                     ),
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = if (status.warning) colors.warningInk else colors.text,
                 )
                 // Design #25: truthful occupancy of the session archive only;
@@ -81,7 +81,7 @@ internal fun LocalSessionStorageCard(
                         formatStorageBytes(status.freeBytes),
                         status.sessionCount,
                     ),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 Text(
@@ -90,7 +90,7 @@ internal fun LocalSessionStorageCard(
                         status.rawSegmentCount,
                         status.compressedSegmentCount,
                     ),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 Text(
@@ -101,7 +101,7 @@ internal fun LocalSessionStorageCard(
                             R.string.settings_local_session_storage_retention
                         },
                     ),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = if (status.warning) colors.warningInk else colors.textTertiary,
                 )
             }
@@ -136,7 +136,7 @@ internal fun LocalSessionStorageCard(
         // Explicitly distinguish session-only and complete backup scopes.
         Text(
             text = stringResource(R.string.settings_local_session_storage_backup_scope),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.warningInk,
         )
         SyButton(
