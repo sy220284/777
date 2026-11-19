@@ -47,7 +47,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -74,7 +74,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -1091,7 +1090,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         if (state.usageMode == LocalUsageMode.WORK && state.deviceApprovalLease) {
-            Surface(
+            SyFlatSurface(
                 color = colors.warning.copy(alpha = .18f),
                 shape = SyShapes.block,
                 modifier = Modifier.fillMaxWidth()
@@ -1913,7 +1912,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 color = colors.textSecondary,
             )
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
-                Surface(
+                SyFlatSurface(
                     onClick = {
                         drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
                         showReplySuggestions = false

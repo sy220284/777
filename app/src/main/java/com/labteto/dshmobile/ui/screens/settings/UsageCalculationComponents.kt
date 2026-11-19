@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,7 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -185,7 +190,12 @@ internal fun UsageDayChart(
             Column(
                 modifier = Modifier
                     .width(SyMetric.touch)
-                    .clickable { onSelect(epochDay) },
+                    .clip(SyShapes.row)
+                    .background(if (selected) colors.selected else Color.Transparent)
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(epochDay) })
+                    .semantics {
+                        contentDescription = "${LocalDate.ofEpochDay(epochDay)}，${formatTokens(aggregate.totalTokens)} Token"
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
@@ -336,7 +346,7 @@ internal fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
 internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SectionHeading(stringResource(R.string.usage_prompt_composition))
-    Surface(
+    SyFlatSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = SyShapes.block,
         color = colors.lilac.copy(alpha = .18f),

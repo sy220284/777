@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.model.LocalModelProbe
 import com.shenyan.designsystem.foundation.SyMetric
 
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -20,7 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -240,7 +239,7 @@ internal fun LocalModelSettingsCard(
         local.error?.let { Text(it, style = SyType.small13.withReadingWeight(), color = colors.dangerInk) }
         apiProfiles.forEach { profile ->
             val isSelectedProfile = local.modelSelection.isActive(profile)
-            Surface(
+            SyFlatSurface(
                 shape = SyShapes.row,
                 color = if (isSelectedProfile) colors.selected.copy(alpha = .24f)
                     else androidx.compose.ui.graphics.Color.Transparent,
@@ -417,7 +416,7 @@ internal fun LocalModelSettingsCard(
                     color = colors.text)
                 SyMenu(
                     anchor = {
-                        Surface(shape = SyShapes.row,
+                        SyFlatSurface(shape = SyShapes.row,
                             color = androidx.compose.ui.graphics.Color.Transparent,
                             modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
@@ -579,7 +578,7 @@ internal fun LocalModelSettingsCard(
                     }
                     SyMenu(
                         anchor = {
-                            Surface(shape = SyShapes.row,
+                            SyFlatSurface(shape = SyShapes.row,
                                 color = androidx.compose.ui.graphics.Color.Transparent,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),

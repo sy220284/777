@@ -1,5 +1,9 @@
 package com.shenyan.designsystem.components
 
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -67,6 +71,7 @@ fun SyButton(
     val c = LocalSyColors.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
     val repeatAction by rememberUpdatedState(onHoldRepeat)
     LaunchedEffect(pressed, enabled, loading) {
         if (!pressed || !enabled || loading || repeatAction == null) return@LaunchedEffect
@@ -112,8 +117,12 @@ fun SyButton(
         color = fill,
         contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),
-        border = if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE || style == SyButtonStyle.INFO)
-            BorderStroke(1.dp, c.border) else null,
+        border = when {
+            focused && enabled && !loading -> BorderStroke(1.dp, c.linkInk)
+            style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE || style == SyButtonStyle.INFO ->
+                BorderStroke(1.dp, c.border)
+            else -> null
+        },
     ) {
         Row(
             Modifier.padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 11.dp),
@@ -121,8 +130,7 @@ fun SyButton(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (loading) {
-                CircularProgressIndicator(Modifier.size(16.dp),
-                    color = foreground, strokeWidth = 2.dp)
+                SyActivityIndicator(Modifier.size(16.dp), color = foreground)
                 Spacer(Modifier.width(8.dp))
             } else if (icon != null) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -389,7 +397,18 @@ fun SyProgressBar(
     }
     // Unknown percentage is indeterminate ONLY when work is genuinely active.
     if (progress == null && phase == SyPhase.RUNNING) {
-        LinearProgressIndicator(modifier.fillMaxWidth(), color = color, trackColor = syMaterialColor(SyMaterialTier.L2_BAR))
+        val track = syMaterialColor(SyMaterialTier.L2_BAR)
+        if (LocalSyReduceMotion.current) {
+            LinearProgressIndicator(
+                progress = { .25f },
+                modifier = modifier.fillMaxWidth().clearAndSetSemantics {
+                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                },
+                color = color, trackColor = track,
+            )
+        } else {
+            LinearProgressIndicator(modifier.fillMaxWidth(), color = color, trackColor = track)
+        }
     } else {
         val amount = progress?.coerceIn(0f, 1f) ?: if (phase == SyPhase.DONE) 1f else 0f
         LinearProgressIndicator(progress = { amount }, modifier = modifier.fillMaxWidth(),
@@ -517,7 +536,7 @@ fun SyLoadingStates(phase: SyPhase, message: String, onRetry: (() -> Unit)? = nu
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // WAITING is not an active spinner; only a genuinely running operation animates.
         if (phase == SyPhase.RUNNING) {
-            CircularProgressIndicator(color = LocalSyColors.current.mint)
+            SyActivityIndicator(color = LocalSyColors.current.mint)
         }
         Text(message, color = LocalSyColors.current.text)
         if (phase == SyPhase.RUNNING && elapsedLabel != null) {

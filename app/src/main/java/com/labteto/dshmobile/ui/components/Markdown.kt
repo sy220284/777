@@ -1,10 +1,10 @@
 package com.labteto.dshmobile.ui.components
 
-import com.shenyan.designsystem.foundation.SyMetric
+import com.shenyan.designsystem.components.SyFlatSurface
+import com.shenyan.designsystem.components.SyIconButton
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -673,58 +672,52 @@ private fun CodeBlock(
             copied = false
         }
     }
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(SyShapes.block)
-            .background(colors.materialL2)
-            .border(1.dp, colors.border, SyShapes.block),
+    SyFlatSurface(
+        modifier = modifier.fillMaxWidth(),
+        shape = SyShapes.block,
+        color = colors.materialL2,
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(colors.materialL1)
-                .padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                lang ?: stringResource(R.string.markdown_code_language),
-                style = SyType.caption11Strong.withReadingWeight().copy(fontFamily = SyType.codeFont),
-                color = colors.textSecondary,
-                modifier = Modifier.weight(1f),
-            )
-            if (allowCopy) {
-                Box(
-                    modifier = Modifier
-                        .size(SyMetric.touch)
-                        .clip(SyShapes.chip)
-                        .clickable {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.materialL1)
+                    .padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    lang ?: stringResource(R.string.markdown_code_language),
+                    style = SyType.caption11Strong.withReadingWeight().copy(fontFamily = SyType.codeFont),
+                    color = colors.textSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+                if (allowCopy) {
+                    SyIconButton(
+                        icon = if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                        contentDescription = stringResource(
+                            if (copied) R.string.chat_copy_success else R.string.markdown_copy_code,
+                        ),
+                        onClick = {
                             clipboard.setText(AnnotatedString(code))
                             copied = true
                         },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        if (copied) FeatherIcons.Check else FeatherIcons.Copy,
-                        contentDescription = stringResource(
-                            if (copied) R.string.chat_copy_success else R.string.markdown_copy_code
-                        ),
                         tint = colors.textSecondary,
-                        modifier = Modifier.size(18.dp),
+                        iconSize = 18.dp,
                     )
                 }
             }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Text(
-                styledCode,
-                style = SyType.mdCode.withReadingWeight(),
-                color = colors.text,
-                softWrap = false,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    styledCode,
+                    style = SyType.mdCode.withReadingWeight(),
+                    color = colors.text,
+                    softWrap = false,
+                )
+            }
         }
     }
 }

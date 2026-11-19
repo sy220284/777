@@ -1,8 +1,8 @@
 package com.labteto.dshmobile.ui.shenyan
 
+import com.shenyan.designsystem.components.SyDivider
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.animation.core.animateFloatAsState
@@ -272,6 +272,41 @@ fun SyPopupMenu(
 }
 
 @Composable
+fun SyMenuRow(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    dangerous: Boolean = false,
+) {
+    val colors = LocalSyColors.current
+    DropdownMenuItem(
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                Text(text, color = when {
+                    !enabled -> colors.textTertiary
+                    dangerous -> colors.dangerInk
+                    else -> colors.text
+                }, style = MaterialTheme.typography.bodyMedium)
+                if (subtitle != null) {
+                    Text(subtitle, color = if (enabled) colors.textSecondary else colors.textTertiary,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        leadingIcon = icon?.let { vector ->
+            { Icon(vector, contentDescription = null, tint = if (dangerous && enabled)
+                colors.dangerInk else colors.textTertiary) }
+        },
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = SyMetric.touch),
+    )
+}
+
+@Composable
 fun SyPopupMenu(
     expanded: Boolean, onDismiss: () -> Unit,
     items: List<SyMenuItem>,
@@ -279,23 +314,14 @@ fun SyPopupMenu(
     containerColor: Color? = null,
     seamlessBackground: Boolean = true,
 ) {
-    val p = LocalSyColors.current
     SyPopupMenu(expanded, onDismiss,
         focusable = focusable, containerColor = containerColor,
         seamlessBackground = seamlessBackground) {
         items.forEach { item ->
-            DropdownMenuItem(
-                text = {
-                    Text(item.text,
-                        color = if (item.danger) p.dangerInk else p.text)
-                },
-                leadingIcon = if (item.icon == null) null else {
-                    { Icon(item.icon, contentDescription = null,
-                        tint = if (item.danger) p.dangerInk else p.textSecondary) }
-                },
+            SyMenuRow(
+                text = item.text, icon = item.icon, dangerous = item.danger,
                 onClick = { onDismiss(); item.onClick() },
-                modifier = Modifier.heightIn(min = SyMetric.touch)
-                    .testTag("menu-item:" + item.text),
+                modifier = Modifier.testTag("menu-item:" + item.text),
             )
         }
     }
@@ -415,7 +441,7 @@ fun SyContextActionMenu(
             enter = fadeIn(tween(enterMs, easing = SyMotion.ease)),
             exit = fadeOut(tween(exitMs, easing = SyMotion.ease)),
         ) {
-            Surface(
+            SyFlatSurface(
                 modifier = Modifier.width(width).heightIn(max = maxHeight)
                     .graphicsLayer {
                         transformOrigin = origin.value
@@ -450,7 +476,7 @@ fun SyContextActionMenu(
                         val position = gridCount + index
                         if (position > 0 && (position == primaryActionCount ||
                                 item.danger && !items[position - 1].danger)) {
-                            HorizontalDivider(
+                            SyDivider(
                                 modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = 2.dp),
                                 color = palette.border,
                             )

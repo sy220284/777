@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -50,7 +50,7 @@ internal class LocalChatTurnUsageUi {
 @Composable
 internal fun LocalChatTurnUsageButton(aggregate: TokenUsageAggregate, onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Surface(
+        SyFlatSurface(
             onClick = onClick,
             modifier = Modifier.heightIn(min = 48.dp).testTag("chat-turn-usage"),
             shape = RoundedCornerShape(10.dp),

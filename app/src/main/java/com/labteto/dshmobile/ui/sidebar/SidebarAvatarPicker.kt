@@ -29,7 +29,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -115,7 +115,7 @@ internal fun SidebarAvatarPicker(modifier: Modifier = Modifier, drawerOpen: Bool
             },
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.size(44.dp),
             shape = CircleShape,
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac.copy(alpha = .18f),
@@ -123,7 +123,7 @@ internal fun SidebarAvatarPicker(modifier: Modifier = Modifier, drawerOpen: Bool
         ) {
             SidebarAvatarImage(source = source, contentDescription = stringResource(R.string.sidebar_avatar_open))
         }
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.align(Alignment.BottomEnd).size(17.dp),
             shape = CircleShape,
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.primary,
@@ -265,7 +265,7 @@ private fun SidebarAvatarSheet(
             items(presets, key = PersonaPreset::id) { preset ->
                 val assetPath = checkNotNull(preset.artwork).assetPath
                 val isSelected = selected == bundledSidebarAvatarSource(assetPath)
-                Surface(
+                SyFlatSurface(
                     onClick = { onPreset(preset) },
                     enabled = !busy,
                     shape = SyShapes.block,
@@ -280,7 +280,7 @@ private fun SidebarAvatarSheet(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                     ) {
-                        Surface(
+                        SyFlatSurface(
                             modifier = Modifier.size(52.dp),
                             shape = CircleShape,
                             color = colors.lilac.copy(alpha = .18f),

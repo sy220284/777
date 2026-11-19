@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import com.shenyan.designsystem.components.SySkeletonCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -216,7 +216,7 @@ private fun WorkTasksScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+        SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(
                 Modifier
                     .fillMaxSize()

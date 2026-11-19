@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,7 +31,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
     val portrait by produceState<ImageBitmap?>(null, member.portraitPath) {
         value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(member.portraitPath, maxEdgePx = 256) }
     }
-    Surface(
+    SyFlatSurface(
         modifier = Modifier.size(24.dp),
         shape = CircleShape,
         color = if (active) colors.lilac.copy(alpha = .18f) else Color.Transparent,
@@ -77,7 +77,7 @@ internal fun LocalPersonaHeaderAvatar(
             }
         }
     }
-    Surface(
+    SyFlatSurface(
         modifier = Modifier.size(34.dp),
         shape = CircleShape,
         color = colors.lilac.copy(alpha = .18f),

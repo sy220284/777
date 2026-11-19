@@ -9,9 +9,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performClick
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.uicontract.UiDocument
+import com.labteto.dshmobile.uicontract.UiDocumentNode
 import com.labteto.dshmobile.uicontract.UiDocumentSource
 import com.labteto.dshmobile.uicontract.UiDocumentSnapshot
 import com.labteto.dshmobile.uicontract.UiDocumentProvenance
@@ -100,4 +102,24 @@ class NativeV6DocumentModalHostTest {
         compose.onNodeWithTag("reply_document_open:msg").assertExists()
     }
 
+    @Test fun generatedSelectionUsesSharedMenuAndCommitsOnlyTheChosenValue() {
+        val field = UiDocumentNode.Select("priority", "优先级", listOf("普通", "紧急"), "普通")
+        var current by mutableStateOf("普通")
+        var editable by mutableStateOf(true)
+        compose.setContent {
+            DshTheme {
+                NativeV6CompactSelect(field, mapOf(field.id to current), enabled = editable) { _, value ->
+                    current = value
+                }
+            }
+        }
+        compose.onNodeWithText("普通").performClick()
+        compose.onNodeWithTag("menu-item:紧急").performClick()
+        compose.onNodeWithTag("menu-item:紧急").assertDoesNotExist()
+        compose.runOnIdle {
+            org.junit.Assert.assertEquals("紧急", current)
+            editable = false
+        }
+        compose.onNodeWithText("紧急").assertIsNotEnabled()
+    }
 }

@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyProgressBar
+import com.shenyan.designsystem.foundation.SyPhase
+import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.local.model.belongsTo
 
 import com.shenyan.designsystem.foundation.SyMetric
@@ -47,8 +50,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -202,11 +203,7 @@ internal fun LocalCreationJobMessageRow(
         }
         when (job.phase) {
             LocalMediaCreationPhase.PREPARING, LocalMediaCreationPhase.SAVING, LocalMediaCreationPhase.SUBMITTING -> {
-                androidx.compose.material3.LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-                    trackColor = com.shenyan.designsystem.foundation.LocalSyColors.current.materialL3,
-                )
+                SyProgressBar(progress = null, phase = SyPhase.RUNNING)
                 Text(resources.getString(R.string.media_chat_creating_hint),
                     style = SyType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
@@ -592,12 +589,13 @@ internal fun InlineReplyMediaActions(file: File, mime: String, onError: (String)
             else "保存失败：${failure ?: "未知错误"}", Toast.LENGTH_LONG).show()
     }
     Box {
-        IconButton(onClick = { open = true },
-            modifier = Modifier.testTag("inlineMediaActions")) {
-            Icon(FeatherIcons.MoreVertical,
-                contentDescription = resources.getString(R.string.fluid_message_actions),
-                tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
-        }
+        SyIconButton(
+            icon = FeatherIcons.MoreVertical,
+            contentDescription = resources.getString(R.string.fluid_message_actions),
+            onClick = { open = true },
+            modifier = Modifier.testTag("inlineMediaActions"),
+            tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+        )
         SyPopupMenu(
             expanded = open,
             onDismiss = { open = false },
@@ -821,14 +819,13 @@ internal fun MediaImageDetailDialog(
             Box(
                 modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(12.dp),
             ) {
-                IconButton(
+                SyIconButton(
+                    icon = FeatherIcons.MoreVertical,
+                    contentDescription = resources.getString(R.string.fluid_message_actions),
                     onClick = { actionsOpen = true },
                     modifier = Modifier.testTag("mediaImageActions"),
-                ) {
-                    Icon(FeatherIcons.MoreVertical,
-                        contentDescription = resources.getString(R.string.fluid_message_actions),
-                        tint = colors.text)
-                }
+                    tint = colors.text,
+                )
                 SyPopupMenu(
                     expanded = actionsOpen,
                     onDismiss = { actionsOpen = false },
@@ -1328,12 +1325,13 @@ internal fun InlineReplyArtifactActions(
         }
     }
     Box {
-        IconButton(onClick = { open = true },
-            modifier = Modifier.testTag("inlineArtifactActions")) {
-            Icon(FeatherIcons.MoreVertical,
-                contentDescription = resources.getString(R.string.fluid_message_actions),
-                tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
-        }
+        SyIconButton(
+            icon = FeatherIcons.MoreVertical,
+            contentDescription = resources.getString(R.string.fluid_message_actions),
+            onClick = { open = true },
+            modifier = Modifier.testTag("inlineArtifactActions"),
+            tint = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
+        )
         SyPopupMenu(expanded = open, onDismiss = { open = false }, items = menu)
     }
 }

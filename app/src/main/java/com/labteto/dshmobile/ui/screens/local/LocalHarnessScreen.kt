@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 
+import com.shenyan.designsystem.components.SyActivityIndicator
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,7 +12,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,7 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -1022,7 +1022,7 @@ fun LocalHarnessScreen(
         if (waitingForSession != null) {
             // Cheap, read-only rendering of the selected session's SQLite tail.
             // This page is never connected to the outgoing Chat/Work send handlers.
-            Surface(modifier = Modifier.fillMaxSize()) {
+            SyFlatSurface(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Text(
                         text = shell.sessions.firstOrNull { it.id == waitingForSession }?.title
@@ -1059,7 +1059,7 @@ fun LocalHarnessScreen(
                                 horizontalArrangement = if (fromUser)
                                     Arrangement.End else Arrangement.Start,
                             ) {
-                                Surface(
+                                SyFlatSurface(
                                     modifier = Modifier.fillMaxWidth(0.92f),
                                     shape = RoundedCornerShape(12.dp),
                                     tonalElevation = if (fromUser) 2.dp else 0.dp,
@@ -1096,12 +1096,12 @@ fun LocalHarnessScreen(
     // Keep the conversation shell out of the hierarchy until that decision is
     // settled; otherwise the sidebar becomes interactive before onboarding appears.
     if (!onboardingDecided) {
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.fillMaxSize(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface(),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator()
+                SyActivityIndicator()
             }
         }
     } else if (presentFirstLaunch) {

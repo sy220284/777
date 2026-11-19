@@ -1,15 +1,12 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.ui.shenyan.SyMenuRow
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import com.shenyan.designsystem.foundation.LocalSyColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,12 +68,8 @@ internal fun LocalWorkspaceBrowseToolbar(
                 )
                 SyPopupMenu(expanded = expanded, onDismiss = { expanded = false }) {
                     @Composable fun Entry(label: String, tag: String, action: (() -> Unit)?, available: Boolean = true, hint: String? = null) {
-                        if (action != null) DropdownMenuItem(
-                            text = { Column {
-                                Text(label)
-                                if (hint != null) Text(hint, style = MaterialTheme.typography.bodySmall,
-                                    color = LocalSyColors.current.textSecondary)
-                            } }, enabled = available,
+                        if (action != null) SyMenuRow(
+                            text = label, subtitle = hint, enabled = available,
                             modifier = Modifier.testTag(tag),
                             onClick = { expanded = false; action() },
                         )

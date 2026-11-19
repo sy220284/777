@@ -8,7 +8,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,9 +24,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.SelectableDates
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.components.SyDateRangePickerDialog
 import com.labteto.dshmobile.R
@@ -221,7 +218,7 @@ internal fun UsageCalculationPage(
                     item(key = entry.key) {
                         // Design #04: the model-composition rows are functional filter
                         // entrances backed by the same selectedModel source as the menu.
-                        Surface(
+                        SyFlatSurface(
                             onClick = { onSelectModel(entry.key) },
                             modifier = Modifier.fillMaxWidth()
                                 .testTag("usage-model-select:" + entry.key),
@@ -390,7 +387,7 @@ internal fun UsageCalculationPage(
     }
 
     if (selectedModel == null && usage.totalTokens > analytics.tracked.totalTokens) {
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = SyShapes.row,
             color = colors.selected,
@@ -420,7 +417,7 @@ internal fun UsageCalculationPage(
     }
 
     if (visibleUsage.unreportedRequestCount > 0L || (selectedModel == null && usage.unpricedTokens > 0L)) {
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = SyShapes.row,
             color = colors.warning.copy(alpha = .18f),

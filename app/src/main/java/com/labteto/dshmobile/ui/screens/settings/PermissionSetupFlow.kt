@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.components.SyCheckboxControl
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,8 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -144,7 +144,7 @@ internal fun PermissionSetupFlow(
         }
     }
     val colors = LocalSyColors.current
-    Surface(modifier = Modifier.fillMaxSize().testTag("permissionSetupFlow"), color = colors.rootSurface()) {
+    SyFlatSurface(modifier = Modifier.fillMaxSize().testTag("permissionSetupFlow"), color = colors.rootSurface()) {
         Column(
             modifier = Modifier.fillMaxSize().safeDrawingPadding()
                 .verticalScroll(rememberScrollState()).padding(SyMetric.gapSection),
@@ -171,7 +171,7 @@ internal fun PermissionSetupFlow(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Checkbox(checked = feature.name in chosenNames, onCheckedChange = null)
+                            SyCheckboxControl(checked = feature.name in chosenNames, onCheckedChange = null)
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(stringResource(feature.titleRes()), style = SyType.std14.withReadingWeight())
                                 Text(stringResource(feature.reasonRes()), color = colors.textSecondary,

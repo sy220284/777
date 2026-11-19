@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,7 +74,7 @@ internal fun FluidSectionNavigation(
                     tween(duration),
                     label = "sectionFill",
                 )
-                Surface(
+                SyFlatSurface(
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                         .testTag("$tag:$index")
                         .selectable(active, enabled = enabled, role = Role.Tab, onClick = {

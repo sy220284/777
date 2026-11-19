@@ -14,7 +14,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import com.shenyan.designsystem.components.SyChatComposer
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -157,7 +156,7 @@ fun SyComposerAction(
     disabledContainerColor: Color? = null,
 ) {
     val p = LocalSyColors.current
-    Surface(
+    SyFlatSurface(
         onClick = onClick, enabled = enabled,
         modifier = modifier.size(SyMetric.touch)
             .semantics { this.contentDescription = contentDescription },

@@ -26,7 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -148,7 +148,7 @@ internal fun PersonaGalleryDetailHeaderV3(
                 ),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Surface(
+                SyFlatSurface(
                     shape = RoundedCornerShape(18.dp),
                     color = colors.lilac.copy(alpha = .18f),
                     modifier = Modifier
@@ -287,7 +287,7 @@ internal fun PersonaGalleryAddPanel(
             ) {
                 items(presets, key = PersonaPreset::id) { preset ->
                     val installed = preset.id in installedPresetIds
-                    Surface(
+                    SyFlatSurface(
                         shape = SyShapes.row,
                         color = Color.Transparent,
                         modifier = Modifier.fillMaxWidth(),
@@ -420,7 +420,7 @@ internal fun CompactPersonaRow(
     val tick = rememberHapticPulse(minIntervalMillis = 65L)
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val rowColor = if (selected) colors.selected.copy(alpha = .24f) else Color.Transparent
-    Surface(
+    SyFlatSurface(
         shape = SyShapes.row,
         color = rowColor,
         modifier = Modifier

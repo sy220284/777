@@ -22,7 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -160,7 +159,7 @@ internal fun ChatAutomationScreen(
         observedSaveRevision = state.saveRevision
     }
 
-    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding(),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),

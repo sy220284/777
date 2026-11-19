@@ -37,7 +37,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1041,7 +1041,7 @@ internal fun ToolsScreen(
 
     if (showAgentSettings) {
         val agentSettings by settingsViewModel.localHarnessState.collectAsStateWithLifecycle()
-        Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+        SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 SyTopBar(
                     title = stringResource(R.string.advanced_agent_settings),
@@ -1059,7 +1059,7 @@ internal fun ToolsScreen(
         }
     } else {
         Box(Modifier.fillMaxSize()) {
-            Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+            SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                     SyTopBar(
                         title = stringResource(

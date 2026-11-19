@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -112,7 +112,7 @@ internal fun GroupChatMemberPickerSheet(
             val entry = requireNotNull(byId[option.id])
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                Surface(shape = CircleShape, color = colors.selected) {
+                SyFlatSurface(shape = CircleShape, color = colors.selected) {
                     Text(entry.persona.name.trim().take(1).ifBlank { fallback },
                         style = SyType.std14Strong.withReadingWeight(), color = colors.text,
                         modifier = Modifier.padding(SyMetric.gapMd))

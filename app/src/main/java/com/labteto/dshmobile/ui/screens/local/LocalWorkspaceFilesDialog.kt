@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyActivityIndicator
 import com.shenyan.designsystem.foundation.SyMetric
 
 import android.content.Intent
@@ -25,9 +26,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -799,7 +799,7 @@ internal fun LocalWorkspaceFilesDialog(
             selecting || query.isNotBlank()
     BackHandler(enabled = hasInternalBackLayer, onBack = ::navigateBack)
 
-    Surface(Modifier.fillMaxSize(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface()) {
+    SyFlatSurface(Modifier.fillMaxSize(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()

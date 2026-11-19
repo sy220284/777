@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyActivityIndicator
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -77,7 +77,7 @@ internal fun LocalStreamingChatTurn(
         }
         if (stream.reasoning.isBlank() && visibleReply.isBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                SyActivityIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(SyMetric.gapMd))
                 Text(
                     stringResource(R.string.local_chat_replying),
@@ -132,7 +132,7 @@ internal fun LocalStreamingWorkPreview(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            SyActivityIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             Text(
                 stringResource(
                     if (waitingForUser) R.string.local_work_waiting_for_user

@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""Keep high-level Compose screens on shared overlay/card primitives.
-
-This is intentionally a narrow ratchet: full-screen Dialog surfaces remain allowed, while the
-small modal/menu/card primitives that already have Design System wrappers may not be reintroduced
-directly in feature screens.
-"""
+"""Keep production Compose UI on the shared Shenyan visual and interaction primitives."""
 
 from pathlib import Path
 import re
 import json
 import sys
-import subprocess
 import subprocess
 import tempfile
 import zipfile
@@ -47,6 +41,39 @@ RULES = (
         "use SyMaterialFrame/SyGlassCard",
     ),
 )
+
+# Platform primitives belong inside the system or its overlay adapters. Feature screens
+# may still compose ordinary layout, Text/Icon, gestures and accessible domain content.
+RAW_MATERIAL_COMPONENTS = {
+    "Surface": "SyFlatSurface/SyMaterialSurface",
+    "Button": "SyButton",
+    "TextButton": "SyButton",
+    "OutlinedButton": "SyButton",
+    "FilledTonalButton": "SyButton",
+    "IconButton": "SyIconButton",
+    "Card": "SyMaterialFrame",
+    "ElevatedCard": "SyMaterialFrame",
+    "OutlinedCard": "SyMaterialFrame",
+    "TextField": "SyTextField",
+    "OutlinedTextField": "SyTextField",
+    "Switch": "SySwitchControl",
+    "Checkbox": "SyCheckboxControl",
+    "RadioButton": "SyRadioControl",
+    "Slider": "SySliderControl",
+    "DatePicker": "SyDateCalendar",
+    "DatePickerDialog": "SyDatePickerField/SyDateRangePickerDialog",
+    "DateRangePicker": "SyDateRangePickerDialog",
+    "TimeInput": "SyTimeInput",
+    "CircularProgressIndicator": "SyActivityIndicator",
+    "LinearProgressIndicator": "SyProgressBar",
+    "DropdownMenuItem": "SyMenuRow",
+    "HorizontalDivider": "SyDivider",
+    "SnackbarHost": "SyUndoSnackbarHost",
+    "FilterChip": "SyFilterChip",
+    "AssistChip": "SyPill",
+}
+MATERIAL_IMPORT = re.compile(r"^import androidx\.compose\.material3\.(\w+)(?: as (\w+))?\s*$", re.M)
+
 
 def mask_non_code(source: str) -> str:
     """Mask comments, Kotlin strings and character literals, retaining line positions."""
@@ -127,6 +154,17 @@ for path in UI.rglob("*.kt"):
             line = text.count("\n", 0, match.start()) + 1
             violations.append(f"{relative}:{line}: {match.group(0).strip()} -> {hint}")
 
+    for original, alias in MATERIAL_IMPORT.findall(text):
+        if original not in RAW_MATERIAL_COMPONENTS or (
+            original == "DropdownMenuItem" and relative == "shenyan/SyOverlays.kt"
+        ):
+            continue
+        if re.search(r"\b" + re.escape(alias or original) + r"\s*\(", text):
+            violations.append(f"{relative}: route {original} through {RAW_MATERIAL_COMPONENTS[original]}")
+    for name in re.findall(r"\bandroidx\.compose\.material3\.(\w+)\s*\(", text):
+        if name in RAW_MATERIAL_COMPONENTS:
+            violations.append(f"{relative}: route {name} through {RAW_MATERIAL_COMPONENTS[name]}")
+
 
 # Keep the main V6 transition owners on one SyMotion vocabulary. Other feature
 # delays (network, debounce, accessibility speech) are intentionally not animation tokens.
@@ -191,7 +229,7 @@ REQUIRED_ATLAS_FEATURES = {
     "screens/local/LocalConversationSurface.kt": ("SyUndoSnackbarHost", "ConversationTranscriptGlass"),
     "components/ConversationScrollShortcut.kt": ("SyLiveGlassScene",),
     "screens/tasks/TasksScreen.kt": ("SySkeletonCard",),
-    "screens/tasks/TaskEditorComponents.kt": ("SyDatePickerField", "SyDateCalendar", "SyNumericStepper"),
+    "screens/tasks/TaskEditorComponents.kt": ("SyDatePickerField", "SyDateCalendar", "SyTimeInput", "SyNumericStepper"),
     "screens/settings/UsageCalculationPage.kt": ("SyDateRangePickerDialog",),
 }
 REQUIRED_MATERIAL_FEATURES = {

@@ -7,7 +7,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
@@ -26,7 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -588,9 +586,7 @@ internal fun LocalModeDrawer(
                                 color = colors.textSecondary,
                                 modifier = Modifier.weight(1f),
                             )
-                            TextButton(onClick = { createSectionDialog = true }) {
-                                Text("新建分区")
-                            }
+                            SyButton("新建分区", onClick = { createSectionDialog = true }, variant = SyButtonVariant.Ghost)
                         }
                     }
                 }
@@ -615,9 +611,7 @@ internal fun LocalModeDrawer(
                                 style = SyType.navigationSupporting.withReadingWeight(),
                                 color = colors.textTertiary,
                             )
-                            TextButton(onClick = { menuOpen = true }) {
-                                Text("管理")
-                            }
+                            SyButton("管理", onClick = { menuOpen = true }, variant = SyButtonVariant.Ghost)
                             com.labteto.dshmobile.ui.shenyan.SyPopupMenu(
                                 expanded = menuOpen,
                                 onDismiss = { menuOpen = false },
@@ -901,13 +895,13 @@ internal fun LocalModeDrawer(
             ) {
                 LazyColumn(modifier = Modifier.height(320.dp)) {
                     item(key = "none") {
-                        TextButton(onClick = { commitMove(null) }) { Text("移出分区（最近记录）") }
+                        SyButton("移出分区（最近记录）", onClick = { commitMove(null) }, variant = SyButtonVariant.Ghost)
                     }
                     items(sectionCatalog.sections, key = LocalSessionSection::id) { section ->
-                        TextButton(
-                            onClick = { commitMove(section.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        SyButton(
+                            text = section.title, onClick = { commitMove(section.id) },
+                            modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost,
+                        )
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

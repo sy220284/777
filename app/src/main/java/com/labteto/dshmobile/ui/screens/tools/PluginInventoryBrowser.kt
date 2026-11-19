@@ -15,13 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.Color
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,7 +68,7 @@ private data class InventoryRow(
     val detail: String,
     val connectedService: Boolean,
     val icon: ImageVector = FeatherIcons.Globe,
-    val accent: Color = Color(0xFF62758A),
+    val group: ExtensionGroup,
     val documentIcon: Int? = null,
     val available: Boolean = true,
     val modelInvocable: Boolean = true,
@@ -191,7 +190,7 @@ internal fun PluginInventoryBrowser(
         }
         val copy = extensionPresentation(id, label, stringResource(hint), ExtensionKind.PLUGIN)
         InventoryRow("local:$id", copy.title, copy.description, connectedService = false,
-            icon = copy.icon, accent = copy.accent, documentIcon = copy.documentIcon,
+            icon = copy.icon, group = copy.group, documentIcon = copy.documentIcon,
             sourceLabel = "777 · 随应用安装",
             marketState = ExtensionMarketState(
                 ExtensionMarketStatus.BUILTIN, "已内置", "调用时核验实际授权",
@@ -208,13 +207,13 @@ internal fun PluginInventoryBrowser(
             sourceLabel = "MCP · ${server.transport.uppercase()}",
             marketState = connectorMarketState(server.registration, server.connection),
             icon = copy.icon,
-            accent = copy.accent,
+            group = copy.group,
         )
     }
     val installedSkills = skills.map { skill ->
         val copy = extensionPresentation(skill.name, skill.displayName, skill.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + skill.name, copy.title, copy.description,
-            connectedService = false, icon = copy.icon, accent = copy.accent,
+            connectedService = false, icon = copy.icon, group = copy.group,
             documentIcon = copy.documentIcon,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
             sourceUrl = skill.sourceUrl,
@@ -228,7 +227,7 @@ internal fun PluginInventoryBrowser(
     val availablePresets = presets.filterNot { it.installed || it.id in installedSkillIds }.map { preset ->
         val copy = extensionPresentation(preset.id, preset.title, preset.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + preset.id, copy.title, copy.description,
-            connectedService = false, icon = copy.icon, accent = copy.accent,
+            connectedService = false, icon = copy.icon, group = copy.group,
             documentIcon = copy.documentIcon,
             available = false, installablePreset = true,
             sourceLabel = "777 · 内置精选",
@@ -242,7 +241,7 @@ internal fun PluginInventoryBrowser(
         connectedService = githubConfigured,
         available = false,
         icon = githubVisual.icon,
-        accent = githubVisual.accent,
+        group = githubVisual.group,
         documentIcon = githubVisual.documentIcon,
         sourceLabel = "777 · GitHub 连接器",
         marketState = if (githubConfigured)
@@ -257,7 +256,7 @@ internal fun PluginInventoryBrowser(
         connectedService = false,
         available = false,
         icon = FeatherIcons.Plus,
-        accent = addMcpVisual.accent,
+        group = addMcpVisual.group,
         sourceLabel = "777 · MCP",
         marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "可添加"),
     )
@@ -308,7 +307,7 @@ internal fun PluginInventoryBrowser(
         ) else emptyList()
     }
 
-    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
             if (!embedded) SyTopBar(
                 title = stringResource(R.string.tools_catalog_title),
@@ -427,7 +426,7 @@ internal fun PluginInventoryBrowser(
                             title = item.name,
                             description = item.detail,
                             icon = item.icon,
-                            accent = item.accent,
+                            accent = item.group.accent(colors),
                             documentIcon = item.documentIcon,
                             marketState = item.marketState,
                             onOpen = {
@@ -518,9 +517,9 @@ internal fun PluginInventoryBrowser(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                Surface(
+                SyFlatSurface(
                     modifier = Modifier.size(84.dp),
-                    color = item.accent.copy(alpha = 0.10f),
+                    color = androidx.compose.ui.graphics.lerp(colors.materialL4, item.group.accent(colors), .10f),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -529,7 +528,7 @@ internal fun PluginInventoryBrowser(
                                 painter = painterResource(item.documentIcon),
                                 contentDescription = null, modifier = Modifier.size(64.dp),
                             )
-                            else -> Icon(item.icon, contentDescription = null, tint = item.accent,
+                            else -> Icon(item.icon, contentDescription = null, tint = item.group.accent(colors),
                                 modifier = Modifier.size(44.dp))
                         }
                     }

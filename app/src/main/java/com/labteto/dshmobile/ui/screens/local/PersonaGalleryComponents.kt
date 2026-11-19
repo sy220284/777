@@ -39,7 +39,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -534,7 +534,7 @@ private fun PersonaAvatar(name: String, large: Boolean = false) {
     val size = if (large) 56.dp else 44.dp
     val fallback = stringResource(R.string.persona_gallery_avatar_fallback)
     val initial = name.trim().firstOrNull()?.toString().orEmpty().ifBlank { fallback }
-    Surface(
+    SyFlatSurface(
         shape = CircleShape,
         color = com.shenyan.designsystem.foundation.LocalSyColors.current.primary.copy(alpha = 0.13f),
         modifier = Modifier.size(size),

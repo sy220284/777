@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyDivider
+import com.shenyan.designsystem.components.SyActivityIndicator
 import com.shenyan.designsystem.foundation.SyMetric
 import androidx.activity.compose.BackHandler
 
@@ -22,9 +24,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -313,7 +314,7 @@ internal fun CharacterDiaryScreen(
 
     val diaryDays = remember(visibleEntries) { groupCharacterDiaryDays(visibleEntries) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             SyTopBar(
                 title = stringResource(R.string.chat_diary_title),
@@ -661,7 +662,7 @@ private fun CharacterDiaryDayCard(
                 modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)
                     .testTag("diary_paper_event_" + day.entries.first().id),
             )
-            androidx.compose.material3.HorizontalDivider(
+            SyDivider(
                 color = colors.textTertiary.copy(alpha = 0.18f),
             )
             SyButton(

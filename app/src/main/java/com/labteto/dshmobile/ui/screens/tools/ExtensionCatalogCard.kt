@@ -12,13 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -29,6 +30,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
+import com.shenyan.designsystem.foundation.syReadableInk
 import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -51,6 +53,8 @@ internal fun ExtensionCatalogCard(
     onOpen: () -> Unit,
 ) {
     val colors = LocalSyColors.current
+    val tile = if (documentIcon == null && brandLogo == null) lerp(colors.materialL4, accent, .10f)
+        else colors.materialL4
     SyMaterialSurface(
         modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-card-$id"),
         onClick = onOpen,
@@ -64,10 +68,9 @@ internal fun ExtensionCatalogCard(
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
+            SyFlatSurface(
                 modifier = Modifier.size(42.dp).testTag("$tagPrefix-icon-$id"),
-                color = if (documentIcon == null && brandLogo == null)
-                    accent.copy(alpha = 0.09f) else colors.materialL4,
+                color = tile,
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -81,7 +84,7 @@ internal fun ExtensionCatalogCard(
                             modifier = Modifier.size(36.dp),
                         )
                         else -> Icon(
-                            icon, contentDescription = null, tint = accent,
+                            icon, contentDescription = null, tint = syReadableInk(accent, tile, 3f),
                             modifier = Modifier.size(23.dp),
                         )
                     }

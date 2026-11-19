@@ -13,7 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,7 +69,7 @@ internal fun FirstLaunchOnboarding(
             title = stringResource(R.string.shenyan_onboarding_welcome),
             description = stringResource(R.string.shenyan_onboarding_intro),
             illustration = {
-                Surface(
+                SyFlatSurface(
                     modifier = Modifier.padding(vertical = SyMetric.gapSm),
                     shape = RoundedCornerShape(SyMetric.radiusCard),
                     color = colors.materialL2,
@@ -85,7 +85,7 @@ internal fun FirstLaunchOnboarding(
             title = stringResource(R.string.shenyan_onboarding_choose),
             description = stringResource(R.string.shenyan_onboarding_mode_intro),
             illustration = {
-                Surface(
+                SyFlatSurface(
                     modifier = Modifier.padding(vertical = SyMetric.gapSm),
                     shape = RoundedCornerShape(SyMetric.radiusCard),
                     color = colors.materialL2,
@@ -105,7 +105,7 @@ internal fun FirstLaunchOnboarding(
             title = stringResource(R.string.shenyan_onboarding_permission_later),
             description = stringResource(R.string.shenyan_onboarding_privacy_intro),
             illustration = {
-                Surface(
+                SyFlatSurface(
                     modifier = Modifier.padding(vertical = SyMetric.gapSm),
                     shape = RoundedCornerShape(SyMetric.radiusCard),
                     color = colors.materialL2,
@@ -117,7 +117,7 @@ internal fun FirstLaunchOnboarding(
             },
         ),
     )
-    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding()
                 .verticalScroll(rememberScrollState()).padding(SyMetric.gapSection),

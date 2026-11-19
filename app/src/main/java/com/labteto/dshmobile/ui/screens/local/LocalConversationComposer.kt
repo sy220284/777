@@ -31,7 +31,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -287,7 +287,7 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun ModelControl() {
-        Surface(
+        SyFlatSurface(
             onClick = onOpenModelPicker,
             enabled = !state.loading,
             color = colors.primary.copy(alpha = .08f),

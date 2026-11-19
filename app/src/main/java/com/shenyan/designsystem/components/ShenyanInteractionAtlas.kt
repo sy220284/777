@@ -572,6 +572,24 @@ fun SyDateCalendar(state: DatePickerState) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun SyTimeInput(state: TimePickerState) {
+    val colors = LocalSyColors.current
+    val scheme = MaterialTheme.colorScheme
+    MaterialTheme(colorScheme = scheme.copy(
+        primary = colors.linkInk,
+        onPrimary = colors.materialL5,
+        primaryContainer = colors.selected,
+        onPrimaryContainer = colors.text,
+        surfaceVariant = colors.materialL3,
+        onSurfaceVariant = colors.textSecondary,
+        outline = colors.textTertiary,
+    )) {
+        TimeInput(state = state)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun SyDateRangePickerDialog(
     visible: Boolean,
     onDismiss: () -> Unit,
@@ -874,29 +892,7 @@ fun SyProgressRing(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (amount == null && LocalSyReduceMotion.current) {
-            CircularProgressIndicator(
-                progress = { .25f },
-                modifier = Modifier.size(30.dp),
-                color = palette.primary,
-                trackColor = palette.textTertiary.copy(alpha = .2f),
-                strokeWidth = 3.dp,
-            )
-        } else if (amount == null) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(30.dp),
-                color = palette.primary,
-                strokeWidth = 3.dp,
-            )
-        } else {
-            CircularProgressIndicator(
-                progress = { amount },
-                modifier = Modifier.size(30.dp),
-                color = palette.primary,
-                trackColor = palette.textTertiary.copy(alpha = .2f),
-                strokeWidth = 3.dp,
-            )
-        }
+        SyActivityIndicator(modifier = Modifier.size(30.dp), progress = amount)
         Text(
             if (amount == null) label else "$label · ${(amount * 100f).roundToInt()}%",
             color = palette.text,

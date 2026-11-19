@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,7 +48,7 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
-            Surface(color = colors.lilac.copy(alpha = .18f), shape = RoundedCornerShape(20.dp),
+            SyFlatSurface(color = colors.lilac.copy(alpha = .18f), shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.size(80.dp).clickable(enabled = enabled, onClick = onPortrait)) {
                 val picture = portrait
                 if (picture != null) Image(picture, entry.persona.name, contentScale = ContentScale.Fit)

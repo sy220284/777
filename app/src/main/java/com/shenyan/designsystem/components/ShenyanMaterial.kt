@@ -6,13 +6,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.FilterQuality
@@ -34,7 +35,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -49,6 +52,55 @@ import com.shenyan.designsystem.foundation.*
  * foreground text sits above it. Flat surfaces keep their readable material fill.
  */
 enum class SyMaterialTier { L1_SECTION, L2_BAR, L3_CARD, L4_OVERLAY, L5_SOLID }
+
+/**
+ * Flat chrome, reading surfaces and image masks keep a caller's semantic fill
+ * and geometry. Interactive panels share focus and press feedback without
+ * introducing a shadow or a backdrop effect.
+ */
+@Composable
+fun SyFlatSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = androidx.compose.ui.graphics.RectangleShape,
+    color: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = contentColorFor(color),
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp = 0.dp,
+    border: BorderStroke? = null,
+    onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
+    content: @Composable () -> Unit,
+) {
+    if (onClick == null) {
+        Surface(
+            modifier = modifier, shape = shape, color = color, contentColor = contentColor,
+            tonalElevation = tonalElevation, shadowElevation = shadowElevation,
+            border = border, content = content,
+        )
+    } else {
+        val palette = LocalSyColors.current
+        val source = interactionSource ?: remember { MutableInteractionSource() }
+        val pressed by source.collectIsPressedAsState()
+        val focused by source.collectIsFocusedAsState()
+        val tone by animateColorAsState(
+            targetValue = if (enabled && (pressed || focused)) {
+                palette.primary.copy(alpha = if (pressed) .12f else .07f).compositeOver(color)
+            } else color,
+            animationSpec = tween(SyMotion.duration(
+                SyMotion.interactionColorMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current,
+            )),
+            label = "syFlatSurfaceTone",
+        )
+        Surface(
+            onClick = onClick, modifier = modifier, enabled = enabled, shape = shape,
+            color = tone, contentColor = contentColor, tonalElevation = tonalElevation,
+            shadowElevation = shadowElevation,
+            border = if (focused && enabled) BorderStroke(1.dp, palette.linkInk) else border,
+            interactionSource = source, content = content,
+        )
+    }
+}
 
 @Composable
 fun SyMaterialFrame(

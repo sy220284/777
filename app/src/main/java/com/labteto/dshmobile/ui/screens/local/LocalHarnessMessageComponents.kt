@@ -38,7 +38,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -806,7 +806,7 @@ internal fun CompactMessageAction(
     iconRotation: Float = 0f,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Surface(
+    SyFlatSurface(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.size(SyMetric.touch),

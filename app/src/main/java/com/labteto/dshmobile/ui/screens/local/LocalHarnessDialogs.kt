@@ -45,7 +45,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -262,7 +262,7 @@ private fun PersonaPickerAvatarTile(
         animationSpec = tween(motion.duration(motion.interactionColorMs, reduced, tempo), easing = motion.ease),
         label = "personaAvatarOutline",
     )
-    Surface(
+    SyFlatSurface(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interaction,
@@ -312,7 +312,7 @@ private fun PersonaPickerAvatarTile(
                 }
             }
             if (selected) {
-                Surface(
+                SyFlatSurface(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(26.dp),
                     shape = CircleShape,
                     color = colors.primary,

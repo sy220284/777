@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.shenyan.designsystem.foundation.SyColors
 
 /**
  * The display catalogue is separate from plugin IDs and SKILL.md identities.
@@ -17,7 +18,6 @@ internal data class ExtensionPresentation(
     val title: String,
     val description: String,
     val icon: ImageVector,
-    val accent: Color,
     val group: ExtensionGroup,
     val documentIcon: Int? = null,
 )
@@ -268,13 +268,6 @@ internal fun extensionPresentation(
             ExtensionKind.PLUGIN -> FeatherIcons.Tool
         }
     }
-    val accent = when (group) {
-        ExtensionGroup.OFFICE -> Color(0xFF34866A)
-        ExtensionGroup.DEVELOPMENT -> Color(0xFF526FB2)
-        ExtensionGroup.CREATIVE -> Color(0xFF9862B5)
-        ExtensionGroup.AUTOMATION -> Color(0xFFB57A3C)
-        ExtensionGroup.GENERAL -> Color(0xFF62758A)
-    }
     // Exact publisher identities take priority over generic category glyphs.
     // Files are Android VectorDrawable assets, so they remain crisp at every density.
     val documentIcon = when {
@@ -296,7 +289,15 @@ internal fun extensionPresentation(
             R.drawable.ic_ui_fileword_light
         else -> null
     }
-    return ExtensionPresentation(title, description, icon, accent, group, documentIcon)
+    return ExtensionPresentation(title, description, icon, group, documentIcon)
 }
 
 private fun containsHan(value: String): Boolean = value.any { it.code in 0x4e00..0x9fff }
+
+internal fun ExtensionGroup.accent(colors: SyColors): Color = when (this) {
+    ExtensionGroup.OFFICE -> colors.successInk
+    ExtensionGroup.DEVELOPMENT -> colors.linkInk
+    ExtensionGroup.CREATIVE -> colors.personaInk
+    ExtensionGroup.AUTOMATION -> colors.warningInk
+    ExtensionGroup.GENERAL -> colors.textSecondary
+}
