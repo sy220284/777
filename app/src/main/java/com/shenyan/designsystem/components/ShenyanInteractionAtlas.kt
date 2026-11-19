@@ -88,58 +88,56 @@ fun SyActionSheet(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
 ) {
-    val p = LocalSyColors.current
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = p.materialL5,
-        contentColor = p.text,
-        shape = RoundedCornerShape(topStart = SyMetric.radiusSheet, topEnd = SyMetric.radiusSheet),
-        tonalElevation = 0.dp,
+    val palette = LocalSyColors.current
+    var destructiveChoice by remember { mutableStateOf<SyActionEntry?>(null) }
+    SyModalSheet(
+        onDismiss = onDismiss, title = title, subtitle = subtitle, scrollable = true,
+        footer = {
+            SyButton("取消", onDismiss, modifier = Modifier.fillMaxWidth(),
+                style = SyButtonStyle.SECONDARY)
+        },
     ) {
-        Column(
-            modifier.fillMaxWidth().navigationBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = p.text)
-            subtitle?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = p.textSecondary)
-            }
-            Spacer(Modifier.height(8.dp))
-            entries.forEach { entry ->
-                Surface(
-                    onClick = { onDismiss(); onChoose(entry.id) },
-                    enabled = entry.enabled,
-                    shape = RoundedCornerShape(SyMetric.radiusControl),
-                    color = if (entry.destructive) p.danger.copy(alpha = .09f) else p.materialL3,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
-                        .testTag("sy-action:" + entry.id),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        entry.icon?.let {
-                            Icon(it, null, Modifier.size(22.dp),
-                                tint = if (entry.destructive) p.dangerInk else p.textSecondary)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(entry.title,
-                                color = if (entry.destructive) p.dangerInk else p.text,
-                                style = MaterialTheme.typography.bodyLarge,
-                                maxLines = 2)
-                            entry.subtitle?.let { detail ->
-                                Text(detail, color = p.textSecondary,
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
+        entries.forEach { entry ->
+            SyMaterialSurface(
+                onClick = {
+                    if (entry.destructive) destructiveChoice = entry
+                    else { onChoose(entry.id); onDismiss() }
+                },
+                enabled = entry.enabled,
+                shape = RoundedCornerShape(SyMetric.radiusControl),
+                tier = SyMaterialTier.L3_CARD,
+                modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
+                    .testTag("sy-action:" + entry.id),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    entry.icon?.let {
+                        Icon(it, null, Modifier.size(22.dp),
+                            tint = if (entry.destructive) palette.dangerInk else palette.textSecondary)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(entry.title,
+                            color = if (entry.destructive) palette.dangerInk else palette.text,
+                            style = MaterialTheme.typography.bodyLarge)
+                        entry.subtitle?.let {
+                            Text(it, color = palette.textSecondary,
+                                style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
             }
-            SyButton("取消", onDismiss, modifier = Modifier.fillMaxWidth(),
-                style = SyButtonStyle.SECONDARY)
         }
+    }
+    destructiveChoice?.let { entry ->
+        SyConfirmDialog("确认" + entry.title, entry.subtitle ?: "执行后可能无法恢复。",
+            dangerous = true,
+            onConfirm = {
+                destructiveChoice = null
+                onChoose(entry.id)
+                onDismiss()
+            },
+            onDismiss = { destructiveChoice = null })
     }
 }
 
@@ -459,42 +457,48 @@ fun SyNumericStepper(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyMultiSelectSheet(
     title: String,
     options: List<SyOption>,
     selectedIds: Set<String>,
-    onToggle: (String) -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (Set<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val p = LocalSyColors.current
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = p.materialL5,
-        contentColor = p.text) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge,
-                color = p.text)
-            Column(Modifier.heightIn(max = 380.dp)
-                .verticalScroll(rememberScrollState())) {
-                options.forEach { option ->
-                    Surface(onClick = { onToggle(option.id) }, enabled = option.enabled,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
-                        color = Color.Transparent) {
-                        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text(option.label, color = p.text,
-                                modifier = Modifier.weight(1f))
-                            SyCheckboxControl(checked = option.id in selectedIds,
-                                onCheckedChange = null, enabled = option.enabled)
-                        }
-                    }
+    val palette = LocalSyColors.current
+    // Transactional selection: cancel/back dismisses without changing the caller's data.
+    var draft by remember(selectedIds) { mutableStateOf(selectedIds) }
+    SyModalSheet(
+        onDismiss = onDismiss, title = title, scrollable = true,
+        footer = {
+            Row(Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SyButton("取消", onDismiss, modifier = Modifier.weight(1f),
+                    style = SyButtonStyle.SECONDARY)
+                SyButton("应用（${draft.size}）", { onConfirm(draft) },
+                    modifier = Modifier.weight(1f))
+            }
+        },
+    ) {
+        options.forEach { option ->
+            SyMaterialSurface(
+                onClick = {
+                    draft = if (option.id in draft) draft - option.id else draft + option.id
+                },
+                enabled = option.enabled,
+                modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
+                shape = RoundedCornerShape(SyMetric.radiusControl),
+                tier = SyMaterialTier.L2_BAR,
+            ) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(option.label, color = palette.text,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge)
+                    SyCheckboxControl(checked = option.id in draft,
+                        onCheckedChange = null, enabled = option.enabled)
                 }
             }
-            SyButton("应用（${selectedIds.size}）", onConfirm,
-                modifier = Modifier.fillMaxWidth())
         }
     }
 }

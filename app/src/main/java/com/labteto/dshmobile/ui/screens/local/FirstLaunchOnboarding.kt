@@ -167,19 +167,7 @@ internal fun FirstLaunchOnboarding(
                 }
             }
             Spacer(Modifier.height(SyMetric.gapPage))
-            Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-                repeat(3) { index ->
-                    Spacer(
-                        Modifier
-                            .width(if (index == step) 24.dp else 8.dp)
-                            .height(3.dp)
-                            .background(
-                                if (index == step) colors.primary else colors.border,
-                                RoundedCornerShape(2.dp),
-                            ),
-                    )
-                }
-            }
+            com.shenyan.designsystem.components.SyPageDots(count = 3, selectedIndex = step)
             Spacer(Modifier.height(SyMetric.gapPage))
             SyButton(
                 text = stringResource(

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,7 +39,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.ShenyanMode
-import com.shenyan.designsystem.foundation.ShenyanTheme
+import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.theme.ThemePreference
+import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.shenyan.designsystem.foundation.SyOption
 import kotlinx.coroutines.launch
 
@@ -72,10 +75,17 @@ private val atlasSections = listOf(
 fun SyComponentAtlasGallery() {
     var section by remember { mutableStateOf("basics") }
     var theme by remember { mutableStateOf(ShenyanMode.LIGHT) }
-    var accent by remember { mutableStateOf<Color?>(null) }
+    var accentKey by remember { mutableStateOf<String?>(null) }
     val host = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    ShenyanTheme(mode = theme, accentColor = accent) {
+    DshTheme(
+        preference = when (theme) {
+            ShenyanMode.LIGHT -> ThemePreference.LIGHT
+            ShenyanMode.DARK -> ThemePreference.DARK
+            ShenyanMode.MATTE -> ThemePreference.MATTE_BLACK
+        },
+        accentKey = accentKey,
+    ) {
         Scaffold(snackbarHost = { SyUndoSnackbarHost(host) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)
                 .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -96,16 +106,15 @@ fun SyComponentAtlasGallery() {
                         style = if (theme == ShenyanMode.MATTE) SyButtonStyle.PRIMARY
                         else SyButtonStyle.GHOST)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(
-                        "默认" to null,
-                        "朱红" to Color(0xFFB34435),
-                        "森林" to Color(0xFF416E52),
-                        "琥珀" to Color(0xFFD29338),
-                    ).forEach { (label, hue) ->
-                        SyButton(label, { accent = hue }, compact = true,
-                            style = if (accent == hue) SyButtonStyle.INFO
-                                else SyButtonStyle.GHOST)
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    AccentPalettes.ALL.forEach { palette ->
+                        SyButton(palette.cnName, { accentKey = palette.key },
+                            compact = true,
+                            style = if (AccentPalettes.of(accentKey).key == palette.key)
+                                SyButtonStyle.INFO else SyButtonStyle.GHOST)
                     }
                 }
                 when (section) {
@@ -175,9 +184,9 @@ private fun AtlasSheets() {
     if (selectSheet) SyMultiSelectSheet("选择标签",
         listOf(SyOption("a", "设计"), SyOption("b", "交互"),
             SyOption("c", "动效")),
-        selectedIds = selected, onToggle = { id ->
-            selected = if (id in selected) selected - id else selected + id
-        }, onConfirm = { selectSheet = false }, onDismiss = { selectSheet = false })
+        selectedIds = selected,
+        onConfirm = { result -> selected = result; selectSheet = false },
+        onDismiss = { selectSheet = false })
 }
 
 @Composable

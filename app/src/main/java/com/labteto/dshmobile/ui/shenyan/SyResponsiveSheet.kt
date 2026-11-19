@@ -28,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SySheetScaffold
 import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.foundation.SyMotion
@@ -84,56 +85,17 @@ fun SyResponsiveSheet(
     val reducedMotion = LocalSyReducedMotion.current
     val tempo = LocalSyMotionTempo.current
     @Composable fun SheetBody() {
-        Column(
-            Modifier.fillMaxWidth().imePadding()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (!wide && showDragHandle) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Spacer(Modifier.width(44.dp).height(4.dp)
-                        .clip(RoundedCornerShape(3.dp)).background(p.border))
-                }
-            }
-            if (title != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(title, color = p.text,
-                            fontWeight = FontWeight.SemiBold)
-                        if (!subtitle.isNullOrBlank())
-                            Text(subtitle, color = p.secondaryText)
-                    }
-                    if (trailing != null) trailing() else if (dismissEnabled) {
-                        com.shenyan.designsystem.components.SyIconButton(
-                            icon = com.labteto.dshmobile.ui.components.FeatherIcons.X,
-                            contentDescription = androidx.compose.ui.res.stringResource(com.labteto.dshmobile.R.string.common_close),
-                            onClick = onDismiss,
-                        )
-                    }
-                }
-            }
-            if (scrollable) {
-                Column(
-                    // Reserve pinned-footer space within the actual viewport.
-                    // On mobile, unweighted content allows short, footer-free sheets
-                    // to wrap their content. A footer requires a bounded, weighted
-                    // scroll body so the action remains visible after scrolling.
-                    (if (wide || footer != null) Modifier.fillMaxWidth().weight(1f, fill = false)
-                     else Modifier.fillMaxWidth())
-                        .heightIn(max = maxBodyHeight)
-                        .verticalScroll(rememberScrollState())
-                        .testTag("bottomSheetScrollBody"),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    content = content,
-                )
-            } else {
-                content()
-            }
-            if (footer != null) {
-                Column(Modifier.fillMaxWidth(), content = footer)
-            }
-            Spacer(Modifier.height(6.dp))
-        }
+        SySheetScaffold(
+            title = title,
+            subtitle = subtitle,
+            onDismiss = if (dismissEnabled) onDismiss else null,
+            trailing = trailing,
+            showDragHandle = !wide && showDragHandle,
+            scrollable = scrollable,
+            maxBodyHeight = maxBodyHeight,
+            footer = footer,
+            content = content,
+        )
     }
     if (wide) {
         Dialog(

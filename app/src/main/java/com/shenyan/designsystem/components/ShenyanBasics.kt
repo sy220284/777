@@ -9,6 +9,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -173,20 +176,87 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
     }
 }
 
+/**
+ * Shared sheet structure for the entire Shenyan family. Only the outer container changes
+ * between compact bottom sheets and wide-screen side panels.
+ * The scroll body and pinned actions have one implementation.
+ */
+@Composable
+fun SySheetScaffold(
+    title: String?,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    onDismiss: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    showDragHandle: Boolean = true,
+    scrollable: Boolean = false,
+    maxBodyHeight: Dp = 440.dp,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val palette = LocalSyColors.current
+    Column(
+        modifier.fillMaxWidth().imePadding()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        if (showDragHandle) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Spacer(Modifier.width(44.dp).height(4.dp)
+                    .background(palette.border, RoundedCornerShape(3.dp)))
+            }
+        }
+        if (title != null) {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = palette.text)
+                    if (!subtitle.isNullOrBlank()) {
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall,
+                            color = palette.textSecondary)
+                    }
+                }
+                if (trailing != null) trailing()
+                else if (onDismiss != null) {
+                    SyIconButton(Icons.Default.Close, "关闭面板", onDismiss, bare = true)
+                }
+            }
+        }
+        if (scrollable) {
+            Column(Modifier.fillMaxWidth().heightIn(max = maxBodyHeight)
+                .verticalScroll(rememberScrollState())
+                .testTag("bottomSheetScrollBody"),
+                verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        } else {
+            Column(Modifier.fillMaxWidth(), content = content)
+        }
+        if (footer != null) Column(Modifier.fillMaxWidth(), content = footer)
+        Spacer(Modifier.height(6.dp))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SyModalSheet(onDismiss: () -> Unit, title: String, content: @Composable ColumnScope.() -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss,
+fun SyModalSheet(
+    onDismiss: () -> Unit,
+    title: String,
+    subtitle: String? = null,
+    scrollable: Boolean = false,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val height = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
         containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY),
         contentColor = LocalSyColors.current.text,
         shape = RoundedCornerShape(topStart = SyMetric.radiusSheet, topEnd = SyMetric.radiusSheet),
-        tonalElevation = 0.dp) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 22.dp, vertical = 14.dp), content = {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(14.dp))
-            content()
-            Spacer(Modifier.height(26.dp))
-        })
+        dragHandle = null,
+        tonalElevation = 0.dp,
+    ) {
+        SySheetScaffold(title, subtitle = subtitle, onDismiss = onDismiss,
+            scrollable = scrollable, maxBodyHeight = height * .62f,
+            footer = footer, content = content)
     }
 }
 
