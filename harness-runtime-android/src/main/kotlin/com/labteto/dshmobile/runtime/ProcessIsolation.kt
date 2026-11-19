@@ -28,7 +28,7 @@ private suspend fun isolatedProcessCommand(
         "/com/labteto/dshmobile/runtime/process_sandbox.py")) { "PROCESS_ISOLATION_HELPER_MISSING" }
         .bufferedReader().use { it.readText() }
     val runtimeKeys = setOf("LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH", "GIT_EXEC_PATH", "GIT_TEMPLATE_DIR",
-        "SSL_CERT_FILE", "OPENSSL_CONF", "NODE_EXTRA_CA_CERTS")
+        "SSL_CERT_FILE", "OPENSSL_CONF", "NODE_EXTRA_CA_CERTS", "DSH_NPM_HOME")
     val roots = (listOf("/system", "/apex", "/vendor", "/product", "/system_ext", "/dev/null", "/dev/urandom", "/dev/tty") +
         trustedReadRoots.map { it.canonicalPath } + trustedPaths.map { it.canonicalPath } + trustedEnvironment.filterKeys { it in runtimeKeys }.values
             .flatMap { it.split(File.pathSeparatorChar) }).map(::File).filter(File::exists).map { it.canonicalPath }.distinct()
