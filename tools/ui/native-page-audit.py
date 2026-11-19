@@ -106,6 +106,11 @@ def home():
     print('Back returned to Android launcher; reopen verified application',flush=True)
     adb('shell','-n','am','start','-W','--user',user,'-n',component,
      '-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER')
+    ready_until=time.monotonic()+20
+    while time.monotonic()<ready_until:
+     t=tree()
+     if is_conversation(t):return
+     time.sleep(.35)
     break
    time.sleep(.25)
  # Keep the native hierarchy when returning to conversation genuinely fails.
