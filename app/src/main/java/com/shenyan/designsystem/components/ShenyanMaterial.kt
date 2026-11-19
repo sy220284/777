@@ -71,6 +71,29 @@ fun SyMaterialFrame(
     }
 }
 
+/** Shared material and geometry for the actual Chat/Work and preview composers. */
+@Composable
+fun SyComposerSurface(
+    modifier: Modifier = Modifier,
+    tint: Color = Color.Unspecified,
+    shadowElevation: Dp = 0.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val palette = LocalSyColors.current
+    SyMaterialSurface(
+        modifier = modifier,
+        tier = SyMaterialTier.L2_BAR,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
+        tint = tint,
+        border = BorderStroke(1.dp, palette.border),
+        shadowElevation = shadowElevation,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            content = content)
+    }
+}
+
 /** A single material renderer for columns, rows, images, controls and overlays. */
 @Composable
 fun SyMaterialSurface(

@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyComposerSurface
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.material3.Text
@@ -57,8 +58,8 @@ import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
-const val SY_COMPOSER_FIELD_TAG = "ds-composer-field"
-const val SY_CONVERSATION_COMPOSER_TAG = "ds-conversation-composer"
+const val SY_COMPOSER_FIELD_TAG = "sy-composer-field"
+const val SY_CONVERSATION_COMPOSER_TAG = "sy-conversation-composer"
 
 object SyComposerMetrics {
     val actionTouchTarget = SyMetric.touch
@@ -97,7 +98,7 @@ fun SyComposerField(
     val p = LocalSyColors.current
     BasicTextField(
         value = value, onValueChange = onValueChange,
-        modifier = modifier.testTag("ds-composer-field")
+        modifier = modifier.testTag(SY_COMPOSER_FIELD_TAG)
             .heightIn(min = SyMetric.touch)
             .onFocusChanged { onFocusedChange(it.isFocused) }
             .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -128,27 +129,19 @@ fun SyConversationComposer(
     animateSize: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val p = LocalSyColors.current
-    val reduceMotion = LocalSyReduceMotion.current
-    val shape = RoundedCornerShape(SyMetric.radiusCard)
-    SyMaterialSurface(
-        tier = SyMaterialTier.L2_BAR,
-        modifier = modifier.testTag("ds-conversation-composer")
+    val reduced = LocalSyReduceMotion.current
+    SyComposerSurface(
+        modifier = modifier.testTag(SY_CONVERSATION_COMPOSER_TAG)
             .fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
             .then(if (animateSize)
                 Modifier.animateContentSize(tween(SyMotion.duration(
-                    SyMotion.toolExpandMs, reduceMotion, LocalSyMotionTempo.current
+                    SyMotion.toolExpandMs, reduced, LocalSyMotionTempo.current
                 ), easing = SyMotion.ease))
                 else Modifier),
-        shape = shape,
         tint = surfaceColor.copy(alpha = surfaceColor.alpha.coerceAtMost(.06f)),
-        border = BorderStroke(1.dp, p.border),
         shadowElevation = shadowElevation,
-    ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            content = content,
-        )
-    }
+        content = content,
+    )
 }
 
 /** Action wheel: a 32dp glyph plate inside the 48dp accessibility target. */

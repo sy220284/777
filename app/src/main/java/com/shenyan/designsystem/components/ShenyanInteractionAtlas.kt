@@ -711,12 +711,10 @@ fun SyChatComposer(
     onAttachment: (() -> Unit)? = null,
     onVoice: (() -> Unit)? = null,
 ) {
-    val p = LocalSyColors.current
-    Surface(modifier.fillMaxWidth().imePadding().testTag("sy-atlas-composer"),
-        shape = RoundedCornerShape(SyMetric.radiusCard),
-        color = p.materialL3,
-        border = androidx.compose.foundation.BorderStroke(1.dp, p.border)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
+    SyComposerSurface(
+        modifier = modifier.fillMaxWidth().imePadding().testTag("sy-atlas-composer"),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             onAttachment?.let {
