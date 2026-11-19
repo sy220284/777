@@ -5,6 +5,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialFrame
 
 
 import com.labteto.dshmobile.ui.components.FeatherIcons
@@ -426,13 +427,14 @@ internal fun GalleryStoryCard(
     unsaved: Boolean,
     onClick: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(SyShapes.row)
-            .background(if (selected) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .22f)
-                else androidx.compose.ui.graphics.Color.Transparent)
-            .clickable(onClick = onClick),
+    SyMaterialSurface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapXs),
+        tier = SyMaterialTier.L3_CARD,
+        shape = SyShapes.row,
+        onClick = onClick,
+        tint = if (selected)
+            com.shenyan.designsystem.foundation.LocalSyColors.current.selected
+        else androidx.compose.ui.graphics.Color.Unspecified,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
@@ -497,7 +499,12 @@ private fun ArchivedDialogueRow(message: com.labteto.dshmobile.uicontract.UiMess
 
 @Composable
 internal fun PersonaHero(persona: PersonaProfile, subtitle: String) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    SyMaterialFrame(
+        modifier = Modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L3_CARD,
+        horizontalPadding = SyMetric.gapLg,
+        verticalPadding = SyMetric.gapLg,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PersonaAvatar(persona.name, large = true)
             Spacer(Modifier.width(SyMetric.gapLg))
