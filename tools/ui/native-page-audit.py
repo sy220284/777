@@ -84,11 +84,10 @@ def drawer():
 def home():
  def is_conversation(t):
   return not drawer_visible(t) and bool(candidates(t,strings['app_open_navigation']))
- # Pages reached through the sidebar can be top-level destinations: pressing
- # Back there may exit the app. Prefer the visible in-app navigation and use
- # Back only to leave a nested screen without an available navigation drawer.
  t=tree()
  if is_conversation(t):return
+ # A sidebar destination can be a top-level Android screen. Prefer in-app
+ # navigation; Back may intentionally finish the activity and show the launcher.
  for _ in range(4):
   if drawer_visible(t):
    tap(strings['local_usage_work'])
@@ -101,12 +100,19 @@ def home():
   while time.monotonic()<deadline:
    t=tree()
    if is_conversation(t):return
+   if not any(n.get('package')==a.package for n in t.iter('node')):
+    # A root-level Back may finish the app. Record the actual transition,
+    # then launch the same verified APK to continue the page-coverage audit.
+    print('Back returned to Android launcher; reopen verified application',flush=True)
+    adb('shell','-n','am','start','-W','--user',user,'-n',component,
+     '-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER')
+    break
    time.sleep(.25)
- # Retain the observed UI when the in-app return path itself is broken.
+ # Keep the native hierarchy when returning to conversation genuinely fails.
  ET.ElementTree(t).write(out/'home-return-failure.xml',encoding='utf-8')
  visible=[n.get('text') or n.get('content-desc') for n in t.iter('node')
   if n.get('text') or n.get('content-desc')]
- raise RuntimeError('Could not return to conversation via in-app navigation or Back; visible controls: '+repr(visible[:35]))
+ raise RuntimeError('Could not return to conversation via app navigation or relaunch; visible controls: '+repr(visible[:35]))
 
 def page(resource,name):
  drawer();tap(strings[resource]);snapshot(name);home()
