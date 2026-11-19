@@ -25,7 +25,7 @@
 
 `ShenyanFoundation.kt` → `SyColors / SyMetric / SyMotion / SyMaterialPolicy`；`ShenyanMaterialColor.kt` → 动态壁纸区域取色和文字对比；`ShenyanMaterial.kt` → 五层材质和实际模糊；`AppBackground.kt / SySceneBackgroundSurface` → 全局连续场景；`ui/shenyan` 只做代理桥接。禁止每个页面自己生成一套色板、过度透明底、过渡曲线或带背景的图标盒。
 
-当前只有 Android 手机设计，原尺寸参考 393/412dp，另须覆盖 320/360dp 与系统放大字体。暖纸、烟熏玻璃、哑光黑为 V6 三个视觉模式；系统跟随属于设置策略，不是第四套独立材质。只要最终编译并不等于全场景视觉验收。
+当前只有 Android 手机设计，原尺寸参考 393/412dp，另须覆盖 320/360dp 与系统放大字体。典雅白、烟熏玻璃、哑光黑为 V6 三个视觉模式；系统跟随属于设置策略，不是第四套独立材质。只要最终编译并不等于全场景视觉验收。
 
 ## 已废弃来源与历史合并记录
 
