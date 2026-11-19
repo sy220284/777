@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.animation.Crossfade
 import com.shenyan.designsystem.foundation.SyMetric
 
 
@@ -87,56 +88,6 @@ private fun teamRevealSpec() = com.shenyan.designsystem.foundation.SyMotion.run 
 }
 
 @Composable
-internal fun LocalAgentSwarmLaunchEntry(
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    androidx.compose.material3.Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        shape = DsShapes.row,
-    ) {
-        Row(
-            modifier = Modifier.heightIn(min = 48.dp)
-                .padding(horizontal = SyMetric.gapMd, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_ui_create_subagent),
-                contentDescription = null,
-                tint = if (selected) colors.primary else colors.textSecondary,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(
-                stringResource(R.string.local_team_title),
-                style = DsType.std14Strong.withReadingWeight(),
-                color = if (selected) colors.primary else colors.text,
-                modifier = Modifier.weight(1f),
-            )
-            if (selected) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_ui_check),
-                    contentDescription = null,
-                    tint = colors.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            } else {
-                Icon(
-                    imageVector = FeatherIcons.ChevronRight,
-                    contentDescription = null,
-                    tint = colors.textTertiary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 internal fun LocalAgentTeamStatusBar(
     team: LocalAgentTeamUiState,
     launchPending: Boolean,
@@ -156,116 +107,34 @@ internal fun LocalAgentTeamStatusBar(
             onClick = onClick,
             enabled = team.visible,
             modifier = modifier.fillMaxWidth(),
-            shape = DsShapes.block,
-            color = androidx.compose.ui.graphics.Color.Transparent,
-            border = BorderStroke(1.dp, colors.border),
+            shape = DsShapes.row,
+            color = colors.materialL2,
         ) {
-            Column {
-                Row(
-                    modifier = Modifier.padding(
-                        horizontal = SyMetric.gapLg,
-                        vertical = SyMetric.gapMd,
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_ui_task_subagent),
-                        contentDescription = null,
-                        tint = if (teamDotState(team, launchPending) == StateDotState.Running) {
-                            colors.primary
-                        } else {
-                            colors.textSecondary
-                        },
+            Row(
+                modifier = Modifier.heightIn(min = SyMetric.touch)
+                    .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            ) {
+                StateDot(teamDotState(team, launchPending), size = 8.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty())
+                            R.string.local_agent_children_title else R.string.local_team_title),
+                        style = DsType.std14Strong.withReadingWeight(),
+                        color = colors.text,
                     )
-                    StateDot(teamDotState(team, launchPending), size = 8.dp)
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty()) "子智能体"
-                            else stringResource(R.string.local_team_title),
-                            style = DsType.std14Strong.withReadingWeight(),
-                            color = colors.text,
-                        )
-                        Text(
-                            teamSummary(team, launchPending),
-                            style = DsType.caption11.withReadingWeight(),
-                            color = colors.textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (team.tasks.isNotEmpty()) {
-                        Text(
-                            stringResource(
-                                R.string.local_team_progress_compact,
-                                team.completedTaskCount,
-                                team.tasks.size,
-                            ),
-                            style = DsType.small13.withReadingWeight(),
-                            color = colors.textTertiary,
-                        )
-                    }
-                    if (team.visible) {
-                        Icon(
-                            FeatherIcons.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.textTertiary,
-                        )
+                    Crossfade(
+                        targetState = teamSummary(team, launchPending),
+                        animationSpec = teamFadeSpec(),
+                        label = "workCollaborationStatus",
+                    ) { summary ->
+                        Text(summary, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
                     }
                 }
-                if (team.visible && (team.members.isNotEmpty() || team.standaloneAgents.isNotEmpty())) {
-                    Column(
-                        modifier = Modifier.padding(
-                            start = SyMetric.gapLg,
-                            end = SyMetric.gapLg,
-                            bottom = SyMetric.gapMd,
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                    ) {
-                        team.members
-                            .sortedBy(::teamMemberPriority)
-                            .take(MAX_INLINE_TEAM_MEMBERS)
-                            .forEach { member ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                                ) {
-                                    StateDot(memberDotState(member), size = 6.dp)
-                                    Text(
-                                        member.friendlyName,
-                                        style = DsType.caption11Strong.withReadingWeight(),
-                                        color = colors.text,
-                                        maxLines = 1,
-                                    )
-                                    Text(
-                                        member.currentTask ?: memberStatusLabel(member),
-                                        style = DsType.caption11.withReadingWeight(),
-                                        color = colors.textSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                            }
-                        if (team.members.isEmpty()) {
-                            team.standaloneAgents.take(MAX_INLINE_TEAM_MEMBERS).forEach { agent ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                                    StateDot(if (agent.status == "running") StateDotState.Running else StateDotState.Idle, size = 6.dp)
-                                    Text(agent.label, style = DsType.caption11Strong.withReadingWeight(), color = colors.text)
-                                    Text(agent.status, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
-                                }
-                            }
-                        }
-                        val hidden = (team.members.size + team.standaloneAgents.size) - MAX_INLINE_TEAM_MEMBERS
-                        if (hidden > 0) {
-                            Text(
-                                stringResource(R.string.local_team_more_assistants, hidden),
-                                style = DsType.caption11.withReadingWeight(),
-                                color = colors.textTertiary,
-                            )
-                        }
-                    }
+                if (team.visible) {
+                    Icon(FeatherIcons.ChevronRight, contentDescription = null,
+                        tint = colors.textSecondary, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -297,15 +166,16 @@ internal fun LocalAgentTeamSheet(
     }
 
     SyResponsiveSheet(
-        title = if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty()) "子智能体"
-            else stringResource(R.string.local_team_title),
+        title = stringResource(if (team.members.isEmpty() && team.standaloneAgents.isNotEmpty())
+            R.string.local_agent_children_title else R.string.local_team_title),
         scrollable = true,
-        subtitle = if (team.rebuilding) stringResource(R.string.common_loading) else stringResource(
-            R.string.local_team_sheet_summary,
-            team.members.size,
-            team.completedTaskCount,
-            team.tasks.size,
-        ),
+        subtitle = when {
+            team.rebuilding -> stringResource(R.string.common_loading)
+            team.members.isEmpty() && team.tasks.isEmpty() && team.standaloneAgents.isNotEmpty() ->
+                stringResource(R.string.local_agent_children_count, team.standaloneAgents.size)
+            else -> stringResource(R.string.local_team_sheet_summary,
+                team.members.size, team.completedTaskCount, team.tasks.size)
+        },
         trailing = {
             if (team.runningMemberCount > 0) {
                 SyButton(
@@ -881,7 +751,7 @@ private fun teamSummary(team: LocalAgentTeamUiState, launchPending: Boolean): St
     team.members.isNotEmpty() ->
         stringResource(R.string.local_team_waiting_task)
     team.standaloneAgents.isNotEmpty() ->
-        "${team.standaloneAgents.size} 个独立子智能体"
+        stringResource(R.string.local_agent_children_count, team.standaloneAgents.size)
     else ->
         stringResource(R.string.local_team_matching_members)
 }
@@ -957,7 +827,6 @@ private fun taskStatusLabel(task: LocalAgentTeamTaskUiState): String = stringRes
     },
 )
 
-private const val MAX_INLINE_TEAM_MEMBERS = 2
 
 @Composable
 private fun TeamActivityFeed(team: LocalAgentTeamUiState) {

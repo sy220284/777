@@ -40,9 +40,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyGroupCard
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-import java.text.DateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.TimeZone
 
 internal data class TaskEditorStateRefs(
@@ -131,8 +129,7 @@ internal fun ColumnScope.TaskEditorPane(
             SyButton(
                 text = stringResource(
                     R.string.tasks_first_run_value,
-                    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                        .format(Date(firstRunAt)),
+                    taskDateTime(firstRunAt),
                 ),
                 onClick = {
                     showSchedulePicker = true
@@ -198,7 +195,7 @@ internal fun ColumnScope.TaskEditorPane(
                     text = stringResource(R.string.common_cancel),
                     onClick = onReset,
                     enabled = !saving,
-                    variant = SyButtonVariant.Info,
+                    variant = SyButtonVariant.Outline,
                     modifier = Modifier.weight(1f),
                     size = SyButtonSize.Large,
 

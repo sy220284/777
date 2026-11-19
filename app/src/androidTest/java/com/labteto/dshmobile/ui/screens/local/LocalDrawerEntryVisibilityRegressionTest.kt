@@ -14,6 +14,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.session.LocalSessionSummary
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.audit.captureUiAudit
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -219,6 +220,7 @@ class LocalDrawerEntryVisibilityRegressionTest {
         }
         compose.onNodeWithText("触点定位会话").performTouchInput { longClick() }
         compose.onNodeWithTag("conversation-action-popup").assertExists()
+        captureUiAudit(compose, "conversation-drawer-action-menu")
         compose.onNodeWithTag("menu-item:" + context.getString(R.string.common_rename)).performClick()
         compose.runOnIdle { assertEquals(1, renamed) }
     }
