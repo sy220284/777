@@ -202,7 +202,7 @@ for relative, components in {**REQUIRED_ATLAS_FEATURES, **REQUIRED_MATERIAL_FEAT
         continue
     actual_code = mask_non_code(source_path.read_text(encoding="utf-8"))
     for component in components:
-        if not re.search(r"\\b" + re.escape(component) + r"\\s*\\(", actual_code):
+        if not re.search(r"\b" + re.escape(component) + r"\s*\(", actual_code):
             violations.append(f"{relative}: shared component {component} is no longer in production")
 
 # Debug previews must follow the same spacing tokens as production Compose UI.
