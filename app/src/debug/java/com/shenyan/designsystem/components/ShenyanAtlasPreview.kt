@@ -31,10 +31,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -77,6 +79,8 @@ fun SyComponentAtlasGallery() {
     var theme by remember { mutableStateOf(ShenyanMode.LIGHT) }
     var accentKey by remember { mutableStateOf<String?>(null) }
     val host = remember { SnackbarHostState() }
+    val atlasScroll = rememberScrollState()
+    LaunchedEffect(section) { atlasScroll.scrollTo(0) }
     val scope = rememberCoroutineScope()
     DshTheme(
         preference = when (theme) {
@@ -87,7 +91,8 @@ fun SyComponentAtlasGallery() {
     ) {
         Scaffold(snackbarHost = { SyUndoSnackbarHost(host) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)
-                .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+                .verticalScroll(atlasScroll).testTag("sy-atlas-scroll")
+                .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("神言 · 十类交互组件实验室",
                     style = MaterialTheme.typography.headlineSmall)
