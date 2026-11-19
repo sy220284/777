@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalConfiguration
 import com.labteto.dshmobile.ui.theme.SyHostMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
@@ -58,6 +59,7 @@ import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.components.SySceneBackgroundSurface
+import com.shenyan.designsystem.components.SyMaterialSurface
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.automation.AutomationTask
 import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
@@ -153,10 +155,7 @@ internal fun LocalModeDrawer(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val sy = LocalSyPalette.current
-    val hasWallpaper = LocalSySceneBackdrop.current?.image != null
-    val drawerMaterial = if (hasWallpaper) syMaterialColor(SyMaterialTier.L2_BAR) else Color.Transparent
-    // The drawer has its own visual backing: raw L2 on the scene looked fully transparent.
-    // Wallpaper mode retains a faint view of the user's image without sacrificing legibility.
+    // The entire drawer is one adaptive optical layer; nested rows inherit its depth.
     val expandLabel = stringResource(R.string.sy_v5_nav_expand)
     val collapseLabel = stringResource(R.string.sy_v5_nav_collapse)
     val docked = LocalConfiguration.current.screenWidthDp >= 1024
@@ -364,15 +363,14 @@ internal fun LocalModeDrawer(
             else LocalConfiguration.current.screenWidthDp.dp * SyHostMetrics.drawerWidthFraction
         ),
     ) {
-        // The drawer continues the original background without a full-screen slab.
-        SySceneBackgroundSurface(
-            modifier = Modifier.fillMaxHeight(),
+        // The glass panel samples the shared scene for either palette and every wallpaper.
+        SyMaterialSurface(
+            modifier = Modifier.fillMaxHeight().testTag("sy-global-glass-drawer"),
+            tier = SyMaterialTier.L4_OVERLAY,
             shape = androidx.compose.ui.graphics.RectangleShape,
         ) {
         Column(
-            Modifier.fillMaxHeight()
-                .background(drawerMaterial.copy(alpha = if (hasWallpaper) drawerMaterial.alpha.coerceAtLeast(.48f) else 0f))
-                .safeDrawingPadding()
+            Modifier.fillMaxHeight().safeDrawingPadding()
         ) {
             Column(
                 modifier = Modifier
