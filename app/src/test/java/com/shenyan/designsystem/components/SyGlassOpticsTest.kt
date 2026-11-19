@@ -32,6 +32,19 @@ class SyGlassOpticsTest {
         assertTrue(sheet.reflection > card.reflection)
     }
 
+    @Test fun fullResolutionShaderTargetsRealPixelsWithoutSpendingGpuOnAllCards() {
+        assertTrue(syShouldRefract(SyMaterialTier.L2_BAR, 0, false))
+        assertTrue(syShouldRefract(SyMaterialTier.L4_OVERLAY, 0, false))
+        assertFalse(syShouldRefract(SyMaterialTier.L3_CARD, 0, false))
+        assertFalse(syShouldRefract(SyMaterialTier.L2_BAR, 1, false))
+        assertTrue(syShouldRefract(SyMaterialTier.L3_CARD, 1, true))
+        assertFalse(syShouldRefract(SyMaterialTier.L5_SOLID, 0, false))
+        assertTrue(SyLiquidShader.PROGRAM.contains("source.eval"))
+        assertTrue(SyLiquidShader.PROGRAM.contains("signedDistance"))
+        assertTrue(SyLiquidShader.PROGRAM.contains("touchAmount"))
+        assertTrue(SyLiquidShader.PROGRAM.contains("glassTint"))
+    }
+
     @Test fun matteBlackNeverUsesGlassOptics() {
         for (tier in SyMaterialTier.entries) {
             val style = syGlassOptics(ShenyanPalettes.matte, tier,

@@ -32,6 +32,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -161,6 +165,17 @@ fun SyMaterialSurface(
         )
         animated
     } else 0f
+    // One GPU lens for anchored chrome and overlays; list cards retain their
+    // inexpensive rim unless they explicitly own a live underlay.
+    val refract = optics.glass && syShouldRefract(resolved, nested, backdrop != null)
+    var lensPoint by remember { mutableStateOf(Offset.Zero) }
+    var lensDown by remember { mutableStateOf(false) }
+    val lensPressure by animateFloatAsState(
+        if (refract && lensDown && !LocalSyReduceMotion.current) 1f else 0f,
+        tween(SyMotion.duration(SyMotion.interactionColorMs,
+            LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
+        label = "liquidLensPressure",
+    )
     val blurRadius = optics.blur
     val elevation = optics.elevation
     val rim = if (optics.glass) BorderStroke(1.dp, Brush.linearGradient(
@@ -174,19 +189,33 @@ fun SyMaterialSurface(
     )) else BorderStroke(1.dp, c.border)
     @Composable fun Interior() {
         Box(Modifier.clip(shape)) {
-            if (blurRadius > 0.dp && nested == 0) {
-                // An explicit caller backdrop wins. Otherwise sample the scene's actual wallpaper
-                // or global light fields at this material's window coordinates.
-                val sampled = backdrop ?: scene?.let { sample ->
+            // The same source can be live content supplied by the caller or the root
+            // aligned wallpaper. Both are sampled on the GPU and remain current while
+            // the scene or the glass moves. No sibling bitmap capture is assumed.
+            val sampled = if (refract || (blurRadius > 0.dp && nested == 0)) {
+                backdrop ?: scene?.let { sample ->
                     @Composable { SyPaintAlignedScene(sample, materialOrigin) }
                 }
-                if (sampled != null) {
+            } else null
+            if (sampled != null && refract) {
+                SyLiquidRefractionLayer(
+                    modifier = Modifier.matchParentSize(),
+                    shape = shape,
+                    fill = fill,
+                    tier = resolved,
+                    reflection = optics.reflection,
+                    touchPoint = lensPoint,
+                    pressure = lensPressure,
+                    backdrop = sampled,
+                )
+            } else {
+                if (blurRadius > 0.dp && nested == 0 && sampled != null) {
                     Box(Modifier.matchParentSize().blur(blurRadius, BlurredEdgeTreatment.Unbounded)) {
                         sampled()
                     }
                 }
+                Box(Modifier.matchParentSize().background(fill))
             }
-            Box(Modifier.matchParentSize().background(fill))
             if (tint.isSpecified) Box(Modifier.matchParentSize().background(tint.copy(alpha = tint.alpha.coerceAtMost(.22f))))
             if (optics.glass) {
                 // Reflected light belongs beneath content: the reading text stays crisp.
@@ -234,7 +263,21 @@ fun SyMaterialSurface(
             }
         }
     }
-    val outer = modifier.onGloballyPositioned { coordinates ->
+    val opticalPointer = if (refract) Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            // Observe in the Final pass without consuming the page's scroll/drag events.
+            val first = awaitFirstDown(requireUnconsumed = false)
+            lensPoint = first.position
+            lensDown = true
+            do {
+                val next = awaitPointerEvent(PointerEventPass.Final)
+                    .changes.firstOrNull { it.id == first.id }
+                if (next != null && next.pressed) lensPoint = next.position
+            } while (next != null && next.pressed)
+            lensDown = false
+        }
+    } else Modifier
+    val outer = modifier.then(opticalPointer).onGloballyPositioned { coordinates ->
         view.rootView.getLocationOnScreen(windowOnScreen)
         val point = coordinates.positionInWindow()
         val next = IntOffset(point.x.roundToInt() + windowOnScreen[0], point.y.roundToInt() + windowOnScreen[1])
