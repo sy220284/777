@@ -82,11 +82,31 @@ def drawer():
  raise RuntimeError('Sidebar did not open after tapping the navigation control')
 
 def home():
+ def is_conversation(t):
+  return not drawer_visible(t) and bool(candidates(t,strings['app_open_navigation']))
+ # Pages reached through the sidebar can be top-level destinations: pressing
+ # Back there may exit the app. Prefer the visible in-app navigation and use
+ # Back only to leave a nested screen without an available navigation drawer.
+ t=tree()
+ if is_conversation(t):return
  for _ in range(4):
-  t=tree()
-  if not drawer_visible(t) and candidates(t,strings['app_open_navigation']):return
-  adb('shell','-n','input','keyevent','4')
- raise RuntimeError('Could not return to conversation')
+  if drawer_visible(t):
+   tap(strings['local_usage_work'])
+  elif candidates(t,strings['app_open_navigation']):
+   drawer()
+   tap(strings['local_usage_work'])
+  else:
+   adb('shell','-n','input','keyevent','4')
+  deadline=time.monotonic()+4
+  while time.monotonic()<deadline:
+   t=tree()
+   if is_conversation(t):return
+   time.sleep(.25)
+ # Retain the observed UI when the in-app return path itself is broken.
+ ET.ElementTree(t).write(out/'home-return-failure.xml',encoding='utf-8')
+ visible=[n.get('text') or n.get('content-desc') for n in t.iter('node')
+  if n.get('text') or n.get('content-desc')]
+ raise RuntimeError('Could not return to conversation via in-app navigation or Back; visible controls: '+repr(visible[:35]))
 
 def page(resource,name):
  drawer();tap(strings[resource]);snapshot(name);home()
