@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.luminance
 import com.shenyan.designsystem.foundation.syInkContrastRatio
 
 /**
- * 777 的交互色卡。流体杏为当前默认，历史传统色继续作为显式可选外观。
+ * 777 的交互色卡。当前默认色与历史色仅为用户可选入口；页面最终配色由语义对比、背景与场景共同决定。
  *
  * 每张卡提供亮 / 暗两档主色，只覆盖交互 accent 家族，不改变成功、警告、错误等语义色。
  */
@@ -71,7 +71,7 @@ internal fun readableAccentForeground(preferred: Color, fills: List<Color>): Col
  * 把选中的色卡覆盖进语义色：accent 家族整体换血，其余语义（文字/画布/成功/警示）原样保留。
  * 换色面刻意收窄——整页只有交互色变，Functional 族与 Family 容器色不跟卡走，页面不会花。
  */
-fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
+fun SyHostColors.withAccent(palette: AccentPalette, dark: Boolean): SyHostColors {
     val accent = if (dark) palette.darkAccent else palette.lightAccent
     val preferredOn = if (dark) palette.onDark else palette.onLight
     val tertiary = if (dark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.12f)

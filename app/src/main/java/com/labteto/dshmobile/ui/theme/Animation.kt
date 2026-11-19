@@ -24,7 +24,7 @@ import com.shenyan.designsystem.foundation.SyMetric
  * for genuine loading or a genuinely live running state; completed and failed states settle immediately.
  */
 /** Specific animation specs retained for screen-level semantics; shared timings come from V6 SyMotion. */
-object DsAnimations {
+object SyAnimations {
     private val fluidEase = SyMotion.ease
     val modal: FiniteAnimationSpec<Float> = tween(SyMotion.dialogMs, easing = fluidEase)
     val progress: FiniteAnimationSpec<Float> = tween(SyMotion.progressMs, easing = fluidEase)
@@ -154,3 +154,21 @@ object DsAnimations {
         const val pressed = SyMotion.pressedScale
     }
 }
+
+/** Touch-first response uses one duration policy including accessibility and user tempo. */
+@androidx.compose.runtime.Composable
+fun syPressResponse(): FiniteAnimationSpec<Float> = tween(
+    SyMotion.duration(SyMotion.pressMs,
+        com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current),
+    easing = SyMotion.ease,
+)
+
+/** Predictable, interrupted sheet settling with reduced-motion support. */
+@androidx.compose.runtime.Composable
+fun syPanelResponse(): FiniteAnimationSpec<IntOffset> = tween(
+    SyMotion.duration(SyMotion.sheetDragSettleMs,
+        com.shenyan.designsystem.foundation.LocalSyReduceMotion.current,
+        com.shenyan.designsystem.foundation.LocalSyMotionTempo.current),
+    easing = SyMotion.ease,
+)

@@ -18,8 +18,8 @@ import com.labteto.dshmobile.ui.shenyan.rememberSyReducedMotion
 /** Theme preference exposed by the app Appearance row. */
 enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
 
-/** Full DeepSeek Harness semantic palette for one scheme. */
-data class DsColors(
+/** Shenyan host semantic palette for screen-level preferences and system integration. */
+data class SyHostColors(
     val bgBase: Color,
     val bgLayer1: Color,
     val bgLayer2: Color,
@@ -83,75 +83,75 @@ data class DsColors(
     val overlayMask: Color,
 )
 
-object DsThemeTokens {
-    val light = DsColors(
-        bgBase = DsLight.bgBase, bgLayer1 = DsLight.bgLayer1, bgLayer2 = DsLight.bgLayer2,
-        bgLayer3 = DsLight.bgLayer3, bgModulePlatform = DsLight.bgModulePlatform,
-        borderL1 = DsLight.borderL1, borderL2 = DsLight.borderL2, borderL3 = DsLight.borderL3,
-        brandPrimary = DsLight.brandPrimary, onBrandPrimary = DsLight.onBrandPrimary,
-        labelPrimary = DsLight.labelPrimary, labelSecondary = DsLight.labelSecondary,
-        labelTertiary = DsLight.labelTertiary, labelCaption = DsLight.labelCaption,
-        labelDimmed = DsLight.labelDimmed,
-        accent = DsLight.accent, onAccent = DsLight.onAccent,
-        accentTertiary = DsLight.accentTertiary,
-        characterAccent = Color(0xFF84619D),
-        characterAccentTertiary = Color(0x30B9A0D4),
-        accentHover = DsLight.accentHover,
-        hover = DsLight.hover, hoverSolid = DsLight.hoverSolid, hoverAccent = DsLight.hoverAccent,
-        active = DsLight.active, dangerHover = DsLight.dangerHover,
-        buttonPrimaryHover = DsLight.buttonPrimaryHover, buttonPrimaryDimmed = DsLight.buttonPrimaryDimmed,
-        buttonInfoFill = DsLight.buttonInfoFill, buttonInfoHover = DsLight.buttonInfoHover,
-        error = DsLight.error, onError = Color.White, errorSecondary = DsLight.errorSecondary, errorTertiary = DsLight.errorTertiary,
-        success = DsLight.success, successSecondary = DsLight.successSecondary,
-        successTertiary = DsLight.successTertiary,
-        warnLabel = DsLight.warnLabel, warn = DsLight.warn, warnSecondary = DsLight.warnSecondary,
-        warnTertiary = DsLight.warnTertiary,
-        progressFailedStart = DsLight.progressFailedStart,
-        progressFailedEnd = DsLight.progressFailedEnd,
-        toastBg = DsLight.toastBg, onToast = Color(0xFFFAF6EC), tooltipBg = DsLight.tooltipBg,
-        userBubble = DsLight.userBubble, userBubbleHighlight = DsLight.userBubbleHighlight,
-        composerCard = DsLight.composerCard,
-        sidebar = DsLight.sidebar, sidebarNavActive = DsLight.sidebarNavActive,
-        sidebarNavAccent = DsLight.sidebarNavAccent, sidebarNavHover = DsLight.sidebarNavHover,
-        tipSurface = DsLight.tipSurface,
-        codeBlockBg = DsLight.codeBlockBg, codeBlockBanner = DsLight.codeBlockBanner,
-        inlineCode = DsLight.inlineCode, citation = DsLight.citation,
-        markdownTag = DsLight.markdownTag, overlayMask = DsLight.overlayMask,
+object SyHostThemeTokens {
+    val light = SyHostColors(
+        bgBase = SyHostLight.bgBase, bgLayer1 = SyHostLight.bgLayer1, bgLayer2 = SyHostLight.bgLayer2,
+        bgLayer3 = SyHostLight.bgLayer3, bgModulePlatform = SyHostLight.bgModulePlatform,
+        borderL1 = SyHostLight.borderL1, borderL2 = SyHostLight.borderL2, borderL3 = SyHostLight.borderL3,
+        brandPrimary = SyHostLight.brandPrimary, onBrandPrimary = SyHostLight.onBrandPrimary,
+        labelPrimary = SyHostLight.labelPrimary, labelSecondary = SyHostLight.labelSecondary,
+        labelTertiary = SyHostLight.labelTertiary, labelCaption = SyHostLight.labelCaption,
+        labelDimmed = SyHostLight.labelDimmed,
+        accent = SyHostLight.accent, onAccent = SyHostLight.onAccent,
+        accentTertiary = SyHostLight.accentTertiary,
+        characterAccent = Color(0xFF9A684D),
+        characterAccentTertiary = Color(0x30C98B6B),
+        accentHover = SyHostLight.accentHover,
+        hover = SyHostLight.hover, hoverSolid = SyHostLight.hoverSolid, hoverAccent = SyHostLight.hoverAccent,
+        active = SyHostLight.active, dangerHover = SyHostLight.dangerHover,
+        buttonPrimaryHover = SyHostLight.buttonPrimaryHover, buttonPrimaryDimmed = SyHostLight.buttonPrimaryDimmed,
+        buttonInfoFill = SyHostLight.buttonInfoFill, buttonInfoHover = SyHostLight.buttonInfoHover,
+        error = SyHostLight.error, onError = Color.White, errorSecondary = SyHostLight.errorSecondary, errorTertiary = SyHostLight.errorTertiary,
+        success = SyHostLight.success, successSecondary = SyHostLight.successSecondary,
+        successTertiary = SyHostLight.successTertiary,
+        warnLabel = SyHostLight.warnLabel, warn = SyHostLight.warn, warnSecondary = SyHostLight.warnSecondary,
+        warnTertiary = SyHostLight.warnTertiary,
+        progressFailedStart = SyHostLight.progressFailedStart,
+        progressFailedEnd = SyHostLight.progressFailedEnd,
+        toastBg = SyHostLight.toastBg, onToast = Color(0xFFFAF6EC), tooltipBg = SyHostLight.tooltipBg,
+        userBubble = SyHostLight.userBubble, userBubbleHighlight = SyHostLight.userBubbleHighlight,
+        composerCard = SyHostLight.composerCard,
+        sidebar = SyHostLight.sidebar, sidebarNavActive = SyHostLight.sidebarNavActive,
+        sidebarNavAccent = SyHostLight.sidebarNavAccent, sidebarNavHover = SyHostLight.sidebarNavHover,
+        tipSurface = SyHostLight.tipSurface,
+        codeBlockBg = SyHostLight.codeBlockBg, codeBlockBanner = SyHostLight.codeBlockBanner,
+        inlineCode = SyHostLight.inlineCode, citation = SyHostLight.citation,
+        markdownTag = SyHostLight.markdownTag, overlayMask = SyHostLight.overlayMask,
     )
 
-    val dark = DsColors(
-        bgBase = DsDark.bgBase, bgLayer1 = DsDark.bgLayer1, bgLayer2 = DsDark.bgLayer2,
-        bgLayer3 = DsDark.bgLayer3, bgModulePlatform = DsDark.bgModulePlatform,
-        borderL1 = DsDark.borderL1, borderL2 = DsDark.borderL2, borderL3 = DsDark.borderL3,
-        brandPrimary = DsDark.brandPrimary, onBrandPrimary = DsDark.onBrandPrimary,
-        labelPrimary = DsDark.labelPrimary, labelSecondary = DsDark.labelSecondary,
-        labelTertiary = DsDark.labelTertiary, labelCaption = DsDark.labelCaption,
-        labelDimmed = DsDark.labelDimmed,
-        accent = DsDark.accent, onAccent = DsDark.onAccent,
-        accentTertiary = DsDark.accentTertiary,
-        characterAccent = Color(0xFFB9A0D4),
-        characterAccentTertiary = Color(0x30B9A0D4),
-        accentHover = DsDark.accentHover,
-        hover = DsDark.hover, hoverSolid = DsDark.hoverSolid, hoverAccent = DsDark.hoverAccent,
-        active = DsDark.active, dangerHover = DsDark.dangerHover,
-        buttonPrimaryHover = DsDark.buttonPrimaryHover, buttonPrimaryDimmed = DsDark.buttonPrimaryDimmed,
-        buttonInfoFill = DsDark.buttonInfoFill, buttonInfoHover = DsDark.buttonInfoHover,
-        error = DsDark.error, onError = Color(0xFF0C1A19), errorSecondary = DsDark.errorSecondary, errorTertiary = DsDark.errorTertiary,
-        success = DsDark.success, successSecondary = DsDark.successSecondary,
-        successTertiary = DsDark.successTertiary,
-        warnLabel = DsDark.warnLabel, warn = DsDark.warn, warnSecondary = DsDark.warnSecondary,
-        warnTertiary = DsDark.warnTertiary,
-        progressFailedStart = DsDark.progressFailedStart,
-        progressFailedEnd = DsDark.progressFailedEnd,
-        toastBg = DsDark.toastBg, onToast = Color(0xFFF5F0E8), tooltipBg = DsDark.tooltipBg,
-        userBubble = DsDark.userBubble, userBubbleHighlight = DsDark.userBubbleHighlight,
-        composerCard = DsDark.composerCard,
-        sidebar = DsDark.sidebar, sidebarNavActive = DsDark.sidebarNavActive,
-        sidebarNavAccent = DsDark.sidebarNavAccent, sidebarNavHover = DsDark.sidebarNavHover,
-        tipSurface = DsDark.tipSurface,
-        codeBlockBg = DsDark.codeBlockBg, codeBlockBanner = DsDark.codeBlockBanner,
-        inlineCode = DsDark.inlineCode, citation = DsDark.citation,
-        markdownTag = DsDark.markdownTag, overlayMask = DsDark.overlayMask,
+    val dark = SyHostColors(
+        bgBase = SyHostDark.bgBase, bgLayer1 = SyHostDark.bgLayer1, bgLayer2 = SyHostDark.bgLayer2,
+        bgLayer3 = SyHostDark.bgLayer3, bgModulePlatform = SyHostDark.bgModulePlatform,
+        borderL1 = SyHostDark.borderL1, borderL2 = SyHostDark.borderL2, borderL3 = SyHostDark.borderL3,
+        brandPrimary = SyHostDark.brandPrimary, onBrandPrimary = SyHostDark.onBrandPrimary,
+        labelPrimary = SyHostDark.labelPrimary, labelSecondary = SyHostDark.labelSecondary,
+        labelTertiary = SyHostDark.labelTertiary, labelCaption = SyHostDark.labelCaption,
+        labelDimmed = SyHostDark.labelDimmed,
+        accent = SyHostDark.accent, onAccent = SyHostDark.onAccent,
+        accentTertiary = SyHostDark.accentTertiary,
+        characterAccent = Color(0xFFD7A477),
+        characterAccentTertiary = Color(0x30C98B6B),
+        accentHover = SyHostDark.accentHover,
+        hover = SyHostDark.hover, hoverSolid = SyHostDark.hoverSolid, hoverAccent = SyHostDark.hoverAccent,
+        active = SyHostDark.active, dangerHover = SyHostDark.dangerHover,
+        buttonPrimaryHover = SyHostDark.buttonPrimaryHover, buttonPrimaryDimmed = SyHostDark.buttonPrimaryDimmed,
+        buttonInfoFill = SyHostDark.buttonInfoFill, buttonInfoHover = SyHostDark.buttonInfoHover,
+        error = SyHostDark.error, onError = Color(0xFF0C1A19), errorSecondary = SyHostDark.errorSecondary, errorTertiary = SyHostDark.errorTertiary,
+        success = SyHostDark.success, successSecondary = SyHostDark.successSecondary,
+        successTertiary = SyHostDark.successTertiary,
+        warnLabel = SyHostDark.warnLabel, warn = SyHostDark.warn, warnSecondary = SyHostDark.warnSecondary,
+        warnTertiary = SyHostDark.warnTertiary,
+        progressFailedStart = SyHostDark.progressFailedStart,
+        progressFailedEnd = SyHostDark.progressFailedEnd,
+        toastBg = SyHostDark.toastBg, onToast = Color(0xFFF5F0E8), tooltipBg = SyHostDark.tooltipBg,
+        userBubble = SyHostDark.userBubble, userBubbleHighlight = SyHostDark.userBubbleHighlight,
+        composerCard = SyHostDark.composerCard,
+        sidebar = SyHostDark.sidebar, sidebarNavActive = SyHostDark.sidebarNavActive,
+        sidebarNavAccent = SyHostDark.sidebarNavAccent, sidebarNavHover = SyHostDark.sidebarNavHover,
+        tipSurface = SyHostDark.tipSurface,
+        codeBlockBg = SyHostDark.codeBlockBg, codeBlockBanner = SyHostDark.codeBlockBanner,
+        inlineCode = SyHostDark.inlineCode, citation = SyHostDark.citation,
+        markdownTag = SyHostDark.markdownTag, overlayMask = SyHostDark.overlayMask,
     )
     /**
      * A warmer, low-glare dark palette for the optional matte-black appearance.
@@ -199,21 +199,21 @@ object DsThemeTokens {
 }
 
 /** The resolved 777 UI palette as a CompositionLocal. */
-val LocalDsColors = staticCompositionLocalOf { DsThemeTokens.light }
+val LocalSyHostColors = staticCompositionLocalOf { SyHostThemeTokens.light }
 
-data class DsReadingPreferences(
+data class SyReadingPreferences(
     val textScale: Float = 1f,
     val textWeightAdjustment: Int = 0,
 )
 
-val LocalDsReadingPreferences = staticCompositionLocalOf { DsReadingPreferences() }
+val LocalSyReadingPreferences = staticCompositionLocalOf { SyReadingPreferences() }
 
-object DsTheme {
-    val colors: DsColors
-        @Composable get() = LocalDsColors.current
+object SyHostTheme {
+    val colors: SyHostColors
+        @Composable get() = LocalSyHostColors.current
 }
 
-private fun materialLightScheme(c: DsColors) = lightColorScheme(
+private fun materialLightScheme(c: SyHostColors) = lightColorScheme(
     primary = c.accent,
     onPrimary = c.onAccent,
     secondary = c.labelSecondary,
@@ -231,7 +231,7 @@ private fun materialLightScheme(c: DsColors) = lightColorScheme(
     onError = c.onError,
 )
 
-private fun materialDarkScheme(c: DsColors) = darkColorScheme(
+private fun materialDarkScheme(c: SyHostColors) = darkColorScheme(
     primary = c.accent,
     onPrimary = c.onAccent,
     secondary = c.labelSecondary,
@@ -251,11 +251,11 @@ private fun materialDarkScheme(c: DsColors) = darkColorScheme(
 
 /**
  * Single palette resolution path shared by the app theme and JVM regression tests.
- * DsColors remains a host preference projection; production surfaces use [controls].
+ * SyHostColors supplies screen preferences while canonical SyColors owns components; production surfaces use [controls].
  */
 internal data class V6ThemeProjection(
     val dark: Boolean,
-    val page: DsColors,
+    val page: SyHostColors,
     val controls: com.shenyan.designsystem.foundation.SyColors,
     val isDefaultAccent: Boolean,
 )
@@ -271,10 +271,10 @@ internal fun resolveV6ThemePalette(
         ThemePreference.SYSTEM -> systemDark
     }
     val base = when (preference) {
-        ThemePreference.LIGHT -> DsThemeTokens.light
-        ThemePreference.DARK -> DsThemeTokens.dark
-        ThemePreference.MATTE_BLACK -> DsThemeTokens.matteBlack
-        ThemePreference.SYSTEM -> if (systemDark) DsThemeTokens.dark else DsThemeTokens.light
+        ThemePreference.LIGHT -> SyHostThemeTokens.light
+        ThemePreference.DARK -> SyHostThemeTokens.dark
+        ThemePreference.MATTE_BLACK -> SyHostThemeTokens.matteBlack
+        ThemePreference.SYSTEM -> if (systemDark) SyHostThemeTokens.dark else SyHostThemeTokens.light
     }
     val palette = AccentPalettes.of(accentKey)
     val canonical = com.shenyan.designsystem.foundation.ShenyanPalettes.forMode(
@@ -330,15 +330,15 @@ fun DshTheme(
     val clampedTextScale = textScale.coerceIn(AppDisplayLimits.MIN_READING_SCALE, AppDisplayLimits.MAX_READING_SCALE)
     val effectiveFontScale = (currentDensity.fontScale * clampedTextScale)
         .coerceAtMost(AppDisplayLimits.MAX_EFFECTIVE_FONT_SCALE)
-    val readingPreferences = DsReadingPreferences(
+    val readingPreferences = SyReadingPreferences(
         textScale = clampedTextScale,
         textWeightAdjustment = textWeightAdjustment.coerceIn(0, 2),
     )
     val userMotionScale = motionDurationScale.coerceIn(.7f, 1.3f)
     CompositionLocalProvider(
         com.shenyan.designsystem.foundation.LocalSyMotionTempo provides userMotionScale,
-        LocalDsColors provides themed,
-        LocalDsReadingPreferences provides readingPreferences,
+        LocalSyHostColors provides themed,
+        LocalSyReadingPreferences provides readingPreferences,
         LocalDensity provides Density(
             density = currentDensity.density,
             fontScale = effectiveFontScale,
@@ -357,7 +357,7 @@ fun DshTheme(
             ambientPalette = controlPalette,
         ) {
             // One canonical visual theme owns all Material3 colour and shape tokens.
-            // Canonical V6 palette owns production controls; DsColors now only projects retained preferences.
+            // Canonical V6 palette owns production controls; SyHostColors now only projects retained preferences.
             val syMode = when (preference) {
                 ThemePreference.LIGHT -> SyMode.LIGHT
                 ThemePreference.DARK -> SyMode.DARK
@@ -390,7 +390,7 @@ fun DshTheme(
                             MaterialTheme.colorScheme else scheme
                         MaterialTheme(
                             colorScheme = resolvedScheme,
-                            typography = dsTypography(readingPreferences.textWeightAdjustment),
+                            typography = syTypography(readingPreferences.textWeightAdjustment),
                             shapes = MaterialTheme.shapes,
                             content = content,
                         )

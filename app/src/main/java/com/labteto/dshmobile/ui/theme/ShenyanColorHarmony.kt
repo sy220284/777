@@ -4,13 +4,13 @@ import androidx.compose.ui.graphics.compositeOver
 import com.shenyan.designsystem.foundation.SyColors
 
 /**
- * Legacy host preference projection only. Production UI colors are served by LocalSyColors;
+ * Screen-level projection from one canonical Shenyan colour contract. Production UI colors are served by LocalSyColors;
  * keep historical preference values in sync with the canonical V6 palette.
  * This is a visual adapter only: explicit user accent selection remains untouched.
  * The backgrounds are composed over the canonical canvas so a nested page cannot
  * accidentally become a bright white plate or an unbacked transparent drawer.
  */
-internal fun DsColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = false): DsColors {
+internal fun SyHostColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = false): SyHostColors {
     val bar = p.materialL2.compositeOver(p.canvas)
     val card = p.materialL3.compositeOver(p.canvas)
     val overlay = p.materialL4.compositeOver(p.canvas)
@@ -47,7 +47,7 @@ internal fun DsColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = false):
 /** Project the saved accent into the canonical controls as well as legacy page consumers.
  * Material tiers and semantic status colours still belong to the V6 palette.
  */
-internal fun SyColors.withV6Accent(source: DsColors): SyColors = copy(
+internal fun SyColors.withV6Accent(source: SyHostColors): SyColors = copy(
     primary = source.accent,
     primaryPressed = source.accentHover.compositeOver(source.bgBase),
     onPrimary = source.onAccent,

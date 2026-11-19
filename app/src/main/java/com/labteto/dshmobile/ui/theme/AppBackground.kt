@@ -485,10 +485,10 @@ internal fun analyzeBackground(bitmap: Bitmap, viewport: IntSize? = null): Backg
  * The fill for a surface that covers the whole window.
  *
  * Transparent while a background image is in use, so the picture shows through; the plain
- * [DsColors.bgBase] otherwise.
+ * [SyHostColors.bgBase] otherwise.
  */
 @Composable
-fun DsColors.wallpaperSurface(
+fun SyHostColors.wallpaperSurface(
     level: WallpaperSurfaceLevel,
     region: BackgroundRegion = BackgroundRegion.ALL,
     base: Color = when (level) {
@@ -518,7 +518,7 @@ fun DsColors.wallpaperSurface(
 }
 
 @Composable
-fun DsColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)
+fun SyHostColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)
 
 /** V6 root surfaces preserve wallpaper visibility just like the legacy page contract. */
 @Composable
