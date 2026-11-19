@@ -29,6 +29,9 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
+import com.shenyan.designsystem.foundation.SyMetric
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 
 /** One selectable marketplace row. All actions belong to the detail destination.
  * This is the sole row implementation; it does not retain a second card/action mode.
@@ -48,16 +51,16 @@ internal fun ExtensionCatalogCard(
     onOpen: () -> Unit,
 ) {
     val colors = LocalSyColors.current
-    Surface(
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-card-$id"),
         onClick = onOpen,
         enabled = enabled,
-        color = colors.materialL4,
-        shape = RoundedCornerShape(15.dp),
+        tier = SyMaterialTier.L3_CARD,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 66.dp)
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -99,7 +102,7 @@ internal fun ExtensionCatalogCard(
                     modifier = Modifier.testTag("$tagPrefix-detail-$id"),
                     style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
-                    maxLines = if (LocalDensity.current.fontScale >= 1.2f) 2 else 1,
+                    maxLines = if (LocalDensity.current.fontScale >= 1.2f) 4 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 marketState?.let { state ->
