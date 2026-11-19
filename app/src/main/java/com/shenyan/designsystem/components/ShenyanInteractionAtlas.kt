@@ -309,46 +309,99 @@ data class SyOnboardingPage(
     val illustration: (@Composable () -> Unit)? = null,
 )
 
+/**
+ * The real first-launch flow and the design laboratory use the same gesture-driven pager.
+ * Optional slots preserve feature-owned choices, navigation and permission transitions.
+ */
 @Composable
 fun SyOnboardingCarousel(
     pages: List<SyOnboardingPage>,
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
     onSkip: (() -> Unit)? = onComplete,
+    selectedPage: Int? = null,
+    onPageChanged: ((Int) -> Unit)? = null,
+    extraPageContent: (@Composable (Int) -> Unit)? = null,
+    actions: (@Composable (Int, () -> Unit, () -> Unit) -> Unit)? = null,
 ) {
     if (pages.isEmpty()) return
     val p = LocalSyColors.current
-    val state = rememberPagerState(pageCount = { pages.size })
+    val reduced = LocalSyReduceMotion.current
+    val state = rememberPagerState(
+        initialPage = (selectedPage ?: 0).coerceIn(0, pages.lastIndex),
+        pageCount = { pages.size },
+    )
     val scope = rememberCoroutineScope()
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally) {
-        HorizontalPager(state = state, modifier = Modifier.fillMaxWidth()) { index ->
+    LaunchedEffect(selectedPage) {
+        if (selectedPage != null && selectedPage in pages.indices &&
+            state.currentPage != selectedPage
+        ) state.scrollToPage(selectedPage)
+    }
+    LaunchedEffect(state.currentPage) { onPageChanged?.invoke(state.currentPage) }
+    val goNext: () -> Unit = {
+        if (state.currentPage == pages.lastIndex) onComplete()
+        else scope.launch {
+            if (reduced) state.scrollToPage(state.currentPage + 1)
+            else state.animateScrollToPage(state.currentPage + 1)
+        }
+    }
+    val goBack: () -> Unit = {
+        if (state.currentPage > 0) scope.launch {
+            if (reduced) state.scrollToPage(state.currentPage - 1)
+            else state.animateScrollToPage(state.currentPage - 1)
+        }
+    }
+    Column(
+        modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        HorizontalPager(
+            state = state,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp, max = 420.dp)
+                .testTag("sy-onboarding-pages"),
+        ) { index ->
             val page = pages[index]
-            Column(Modifier.fillMaxWidth().padding(20.dp),
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            ) {
                 page.illustration?.invoke()
-                Text(page.title, color = p.text,
+                Text(page.title, color = p.text, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     style = MaterialTheme.typography.headlineSmall)
                 Text(page.description, color = p.textSecondary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium)
+                extraPageContent?.invoke(index)
             }
         }
-        SyPageDots(pages.size, state.currentPage)
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            onSkip?.let { SyButton("跳过", it, modifier = Modifier.weight(1f),
-                style = SyButtonStyle.SECONDARY) }
-            SyButton(
-                if (state.currentPage == pages.lastIndex) "开始使用" else "下一步",
-                onClick = {
-                    if (state.currentPage == pages.lastIndex) onComplete()
-                    else scope.launch { state.animateScrollToPage(state.currentPage + 1) }
-                },
-                modifier = Modifier.weight(1f),
-                icon = if (state.currentPage == pages.lastIndex) Icons.Default.Check
-                    else Icons.AutoMirrored.Filled.ArrowForward,
-            )
+        SyPageDots(pages.size, state.currentPage,
+            onSelect = { page ->
+                scope.launch {
+                    if (reduced) state.scrollToPage(page)
+                    else state.animateScrollToPage(page)
+                }
+            },
+        )
+        if (actions != null) {
+            actions(state.currentPage, goNext, goBack)
+        } else {
+            Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                onSkip?.let {
+                    SyButton("跳过", it, modifier = Modifier.weight(1f),
+                        style = SyButtonStyle.SECONDARY)
+                }
+                SyButton(
+                    if (state.currentPage == pages.lastIndex) "开始使用" else "下一步",
+                    onClick = goNext,
+                    modifier = Modifier.weight(1f),
+                    icon = if (state.currentPage == pages.lastIndex) Icons.Default.Check
+                        else Icons.AutoMirrored.Filled.ArrowForward,
+                )
+            }
         }
     }
 }
