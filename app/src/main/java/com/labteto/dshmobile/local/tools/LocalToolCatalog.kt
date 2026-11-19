@@ -49,9 +49,9 @@ object LocalToolCatalog {
             "offset" to integerRange("必须等于上次返回的 next_byte，首次 0", min = 0),
             "finish" to boolean("是否提交完整文件，默认 false"),
         ), listOf("path", "offset")))
-        add(tool("edit", "按唯一原文字面量精确替换。已明确掌握 old_text 时可直接编辑，无需先调用 read；工具会校验原文仅出现一次和文件版本，原文不存在、重复或已读取版本过期时拒绝修改；不确定内容时先 read", properties(
+        add(tool("edit", "按唯一原文字面量精确替换。掌握最新的唯一 old_text 时直接编辑；需要确认原文时用 read 读取相关行", properties(
             "path" to string("相对工作区的路径"),
-            "old_text" to string("必须只出现一次的原文"),
+            "old_text" to string("文件中仅出现一次的完整原文，包含匹配所需的缩进和上下文"),
             "new_text" to string("替换后的文字"),
         ), listOf("path", "old_text", "new_text")))
         add(tool("apply_patch", "通过 Git 预检及原子应用补丁；支持 unified diff 与 Codex *** Begin Patch 格式", properties(
@@ -88,7 +88,7 @@ object LocalToolCatalog {
             "regex" to boolean("是否按正则表达式搜索，默认 false"),
             "cursor" to string("可选；上次返回的搜索未完成游标，保持 query/path/regex 不变以继续扫描"),
         ), listOf("query")))
-        add(tool("bash", "需要 shell 语法或执行命令时使用。先确认执行目录和目标；命令结束后查看退出状态与相关输出", properties(
+        add(tool("bash", "在工作区执行 Android 系统 Shell 命令，用于管道、变量展开等 Shell 操作。前台执行查看退出状态和输出，后台执行用返回的任务编号查结果", properties(
             "command" to string("shell 命令"),
             "timeout_seconds" to integer("无 stdout/stderr 的连续空闲超时秒数，不是整个任务时长；每次实际输出都会续期。前台默认 30/最大 120，后台默认 300/最大 900；大型构建、全量扫描建议后台执行并持续输出进度，主动取消不受此值约束"),
             "run_in_background" to boolean("是否转为后台任务，默认 false；普通后台 shell 属当前会话非持久任务，创建、切换或删除会话时会取消"),
@@ -166,12 +166,12 @@ object LocalToolCatalog {
         ), listOf("url")))
         add(tool("environment_info", "查看安卓本机 Harness 的可用环境能力与限制", properties()))
         // The model uses one stable dispatch tool for every registered capability.
-        add(tool("tool_call", "按注册名称直接调用工具，无需预加载。使用 JSON 参数，不传 shell 命令字符串。bash 示例：{\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}}；需要执行的命令位于 arguments.command。未知工具或参数通过 tool_search 查询真实 Schema；执行器负责校验、审批及回执。", properties(
-            "name" to string("已注册工具名（例如 bash、read、grep），不是 shell 命令；不确定时用 tool_search 查询"),
-            "arguments" to jsonSchemaObject("目标工具的完整 JSON 对象。bash 参数示例：{\"command\":\"pwd\"}；实际字段和必填项以 tool_search 返回的工具 Schema 为准"),
+        add(tool("tool_call", "按已注册的工具名和参数直接调用。运行 Shell 命令时传 {\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}}。", properties(
+            "name" to string("已注册工具名，例如 bash、read、grep"),
+            "arguments" to jsonSchemaObject("按目标工具的定义填写 JSON 对象。需要查询时，用 tool_search 获取 schema.function.parameters"),
         ), listOf("name", "arguments")))
-        add(tool("tool_search", "只读查找实时工具注册表及准确参数定义；不选择、不加载、不改变模型工具表。", properties(
-            "query" to string("工具名称、功能描述或 能力目录"),
+        add(tool("tool_search", "查询当前可用工具。已知名称时按名称查参数定义，寻找能力时按功能关键词查。", properties(
+            "query" to string("工具名称、功能关键词，或「能力目录」"),
         ), listOf("query")))
         add(tool("update_plan", "为复杂任务记录实施顺序、依赖和验证步骤；执行状态用 todo_write，跨轮完成条件用 create_goal。单一步骤直接处理", properties(
             "items" to buildJsonObject {

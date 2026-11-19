@@ -81,7 +81,7 @@ class LocalTeamMessageReceiptTest {
         assertEquals("member_handled_reported", handled.status)
         assertEquals(5L, handled.memberAcknowledgedSequence)
         assertEquals("handled", handled.memberAcknowledgedOutcome)
-        assertTrue(handled.render().contains("never independent proof of verified task completion"))
+        assertTrue(handled.render().contains("Check the task result for completion"))
         val declined = projectLocalTeamMessageReceipt(id,
             received + acknowledged(5, outcome = "cannot_handle", reason = "缺少授权"), true, sessionId)
         assertEquals("member_cannot_handle_reported", declined.status)

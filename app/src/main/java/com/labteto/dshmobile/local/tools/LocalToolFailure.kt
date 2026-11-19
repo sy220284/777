@@ -52,6 +52,8 @@ internal fun toolArgumentContractSummary(schema: kotlinx.serialization.json.Json
             ?: "schema"
         name + ":" + type
     }
-    return "按当前工具 schema 重构参数；必填=" + required.joinToString(",").ifBlank { "无" } +
-        "；字段类型=" + fields + "。数组必须传数组，JSON Schema 的 required 必须是字符串数组；不要凭猜测补字段。"
+    val schemaFieldHint = if (properties?.containsKey("output_schema") == true)
+        "output_schema 中的 required 必须是字符串数组。" else ""
+    return "按返回的工具定义填写参数。必填=" + required.joinToString(",").ifBlank { "无" } +
+        "；字段类型=" + fields + "。按字段类型填写 JSON 值。" + schemaFieldHint
 }

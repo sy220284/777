@@ -203,14 +203,21 @@ class HarnessJobManager(
         expectedDurationMillis: Long? = null,
         ownerId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String = startInternal(
+    ): String = startResult(label, expectedDurationMillis, ownerId, block).message
+
+    fun startResult(
+        label: String,
+        expectedDurationMillis: Long? = null,
+        ownerId: String? = null,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): JobStartResult = startInternal(
         label = label,
         resumeKind = null,
         resumePayload = null,
         ownerId = ownerId,
         expectedDurationMillis = expectedDurationMillis,
         block = block,
-    ).message
+    )
 
     fun startPersistent(
         label: String,

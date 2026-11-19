@@ -110,7 +110,8 @@ class LocalWorkToolArgumentsRepairTest {
         assertEquals(2, calls)
         assertTrue(instruction.contains("ANTHROPIC_PROTOCOL_ERROR"))
         assertTrue(instruction.contains("SSE"))
-        assertTrue(instruction.contains("tool_search"))
+        assertTrue(instruction.contains("根据错误原因重新生成本轮响应"))
+        assertTrue(!instruction.contains("tool_search"))
     }
 
     @Test fun allAdmittedProviderProtocolErrorsProvideInStepCorrection() = runTest {
@@ -139,7 +140,8 @@ class LocalWorkToolArgumentsRepairTest {
             assertEquals(LocalWorkSamplingOutcome.Completed("已纠正"), result)
             assertEquals(2, samples)
             assertTrue(correction.contains(code))
-            assertTrue(correction.contains("tool_search"))
+            assertTrue(correction.contains("根据错误原因重新生成本轮响应"))
+            assertTrue(!correction.contains("tool_search"))
         }
     }
 

@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.capability.ProcessRequest
+import com.labteto.dshmobile.local.jobs.toToolReceipt
 import com.labteto.dshmobile.local.memory.LocalMemoryTools
 import com.labteto.dshmobile.local.memory.LocalMemoryToolContext
 import com.labteto.dshmobile.local.memory.MemoryManager
@@ -479,7 +480,11 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
                             if (!inventory) put("schema", tool.schema)
                         }
                     }))
-                    put("instruction", "使用 tool_call(name, arguments) 直接调用；每次独立校验实际参数、连接与审批。")
+                    put("instruction", when {
+                        found.isEmpty() -> "可以换用更具体的功能关键词继续查找。"
+                        inventory -> "需要查看参数时，用 tool_search 的 query 填工具名称。"
+                        else -> "选中工具后，将返回的 name 和按 schema.function.parameters 填写的 arguments 传给 tool_call。"
+                    })
                 }.toString()
             }
             "skill_create" -> {
@@ -606,7 +611,7 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         val boundWorkspace = executionLocalWorkspace(workspace)
         val workspaceId = currentCoroutineContext()[com.labteto.dshmobile.harness.capability.WorkspaceExecutionContext]?.workspaceId
         val selected = tools.get().webTools.atWorkspace(boundWorkspace)
-        return jobs.startPersistent(
+        return jobs.startPersistentResult(
             label = "网页抓取：${url.take(120)}",
             resumeKind = "web_fetch",
             resumePayload = buildJsonObject {
@@ -622,6 +627,6 @@ internal class LocalBuiltinToolRuntime @Inject constructor(
         ) { _, report ->
             report("正在抓取：$url")
             selected.fetch(url, maxBytes, format, timeoutSeconds, provider = provider)
-        }
+        }.toToolReceipt()
     }
 }

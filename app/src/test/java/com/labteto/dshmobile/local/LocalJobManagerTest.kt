@@ -2,8 +2,10 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.harness.agent.QueuedAgentInput
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
+import com.labteto.dshmobile.harness.jobs.JobStartResult
 import com.labteto.dshmobile.local.jobs.LocalJobManager
 import com.labteto.dshmobile.local.jobs.LocalPersistentJobStore
+import com.labteto.dshmobile.local.jobs.toToolReceipt
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,6 +15,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -20,6 +24,22 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalJobManagerTest {
+    @Test
+    fun admittedToolJobReceiptUsesTheActualJobIdInCallableArguments() = runTest {
+        val manager = LocalJobManager(this) { }
+        val started = manager.startResult("tool-receipt") { _, _ -> "actual output" }
+        val receipt = started.toToolReceipt()
+        val arguments = Json.parseToJsonElement(
+            receipt.substringAfter("tool_call(").substringBefore(") 查看"),
+        ).jsonObject
+        assertEquals("job_output", arguments.getValue("name").jsonPrimitive.content)
+        val jobId = arguments.getValue("arguments").jsonObject.getValue("job_id").jsonPrimitive.content
+        assertEquals(started.id, jobId)
+        advanceUntilIdle()
+        assertTrue(manager.output(jobId).contains("actual output"))
+        assertEquals("拒绝启动", JobStartResult(false, null, "拒绝启动").toToolReceipt())
+    }
+
     @Test
     fun historicalCommandLabelsDoNotRevealCredentialsInJobList() = runTest {
         val manager = LocalJobManager(this, onChanged = { })
