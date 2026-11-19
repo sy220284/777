@@ -190,6 +190,7 @@ REQUIRED_ATLAS_FEATURES = {
     "shenyan/SyConversation.kt": ("SyChatComposer",),
 }
 REQUIRED_MATERIAL_FEATURES = {
+    "screens/tools/ToolsScreen.kt": ("SyMaterialSurface",),
     "screens/tools/ExtensionCatalogCard.kt": ("SyMaterialSurface",),
     "screens/local/LocalWorkspaceFilesDialog.kt": ("SyMaterialSurface",),
     "screens/local/PersonaGalleryComponents.kt": ("SyMaterialFrame", "SyMaterialSurface"),
