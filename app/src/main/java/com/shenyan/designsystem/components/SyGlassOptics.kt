@@ -69,10 +69,10 @@ internal fun syWindowedGlassDrag(
     position: Offset,
 ): Offset {
     history.addLast(timeMillis to position)
-    while (history.size > 2 && timeMillis - history.first.first > 48L) {
+    while (history.size > 2 && timeMillis - history.first().first > 48L) {
         history.removeFirst()
     }
-    val oldest = history.first
+    val oldest = history.first()
     val elapsed = (timeMillis - oldest.first).coerceAtLeast(8L).toFloat()
     return (position - oldest.second) * (16f / elapsed)
 }
