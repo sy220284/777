@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#ecebe5">
+<title>SHEET LAB · App 弹层交互实验室 — 移动端交互 H5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* finesse · register=h5 · morph=A-app-shell · wraps=product
+   * A=lime-white+single-vermilion · B=Archivo-800/Mono
+   * C=numbered-swiss-grid · D=pointer-events-sheet-machines · E=lab-worksheet
+   * SOUL=7 SPECTACLE=5 DENSITY=7
+   *
+   * 语料库参考页 —— `../references/interaction-motion.md` 的可运行证据。
+   * 这一页在语料库里的位置：第三张「实验室」页，和另外两张同一套视觉语言、不同内容：
+   *   · MOTION LAB（12 条动效「怎么动」，纯 CSS keyframes）
+   *   · TOUCH LAB （12 格手势「怎么跟手」，Pointer Events 状态机）
+   *   · 本页 SHEET LAB（10 种弹层「弹出来之后」，Pointer Events + 状态机）
+   *
+   * ⚠️ 这一页的存在理由，就是 interaction-motion.md §1 那条判据：
+   *   **一格够不够高级，看的不是它有几条动画，而是它有没有在处理输入本身的
+   *     不确定性（速度、方向、阈值、丢帧）。只有 class 切换的格子一眼就会被看穿。**
+   *   所以这十格里没有一格是 `.on` 开关：06/07 全程跟手并把 d/v 显示出来，
+   *   01/04/05/09 都带一个**同屏反例**（右边那台演错的），错在哪是看出来的不是读出来的。
+   *
+   * 要读的东西，按 interaction-motion.md 的章节号：
+   *   §3.1 出身   01 —— sheet 从手指来的方向出现；从中心 scale 的那是 modal
+   *   §3.2 层级   04 · 08 —— 底页「退到后面」靠模糊 + 缩小，不靠压黑
+   *   §3.3 控制权 06 —— 松手判定是「距离 OR 速度」两个条件，不是只看距离
+   *   §3.4 档位   07 —— 吸到最近一档；档与档之间是过路，不是车位
+   *   §3.5 去处   09 · 10 —— 卡直接长成页；结束也是一段动画
+   *   §2   跟手   06 · 07 —— 1:1 位移 → 越界阻尼 → 阈值 → 吸附，四件缺一手感就散
+   *   §4   转场   09 —— 手写 FLIP 的 First/Last/Invert/Play 四步
+   *
+   * 无依赖、无图片、无外部资源（除 Google Fonts）。所有图形都是 CSS/SVG 画的。 */
+  :root {
+    --page: #ecebe5;
+    --card: #f6f5f1;
+    --ink: #16161a;
+    --ink-2: rgba(22,22,26,.58);
+    --ink-3: rgba(22,22,26,.34);
+    --line: rgba(22,22,26,.13);
+    --accent: #ff4436;
+    --ease: cubic-bezier(.22,.9,.28,1);
+    --spring: cubic-bezier(.34,1.56,.64,1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow-x: clip; }
+  body {
+    background: #cfcdc6; color: var(--ink); overflow: hidden;
+    font-family: "Noto Sans SC", "Archivo", -apple-system, "PingFang SC", sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .phone { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--page); }
+  @media (min-width: 560px) {
+    body { background: radial-gradient(120% 90% at 50% 0%, #e4e2db 0%, #a9a7a0 62%); }
+    .phone {
+      width: 406px; height: min(880px, 94vh);
+      border-radius: 46px; border: 1px solid rgba(0,0,0,.12);
+      box-shadow: 0 46px 110px -34px rgba(0,0,0,.5), 0 0 0 10px #26262a;
+    }
+  }
+  #app { position: absolute; inset: 0; overflow-y: auto; overflow-x: clip; }
+  #app::-webkit-scrollbar { width: 0; }
+
+  /* ── 头 ───────────────────────────────────────────── */
+  header { padding: calc(env(safe-area-inset-top) + 34px) 22px 0; }
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .26em;
+    color: var(--accent); display: flex; align-items: center; gap: 9px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  h1 {
+    font-family: "Archivo", sans-serif; font-weight: 800; font-size: 46px;
+    line-height: 1.02; letter-spacing: -.03em; margin-top: 16px;
+    overflow-wrap: anywhere; min-width: 0;
+  }
+  h1 em { font-style: normal; color: var(--accent); }
+  header p { font-size: 12.5px; color: var(--ink-2); line-height: 1.95; margin-top: 14px; max-width: 26em; }
+  .meta {
+    display: flex; gap: 18px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-3);
+  }
+
+  /* ── 网格 ─────────────────────────────────────────── */
+  .grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px; background: var(--line); margin: 26px 0 0;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  }
+  .cell {
+    background: var(--page); padding: 15px 13px 13px;
+    display: flex; flex-direction: column; gap: 11px; min-height: 208px;
+  }
+  .cell.wide { grid-column: 1 / -1; }
+  .cell .no {
+    font-family: "JetBrains Mono", monospace; font-size: 9.5px; color: var(--ink-3);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .cell .no b { color: var(--accent); font-weight: 500; }
+  .cell .stage { flex: 1; display: grid; place-items: center; min-height: 120px; position: relative; }
+  .cell .nm { font-size: 12px; font-weight: 500; }
+  .cell .nm small { display: block; font-size: 10px; color: var(--ink-3); margin-top: 3px; font-weight: 400; }
+  .hint {
+    font-family: "JetBrains Mono", monospace; font-size: 8.5px; letter-spacing: .1em;
+    color: var(--accent); border: 1px solid rgba(255,68,54,.4); border-radius: 99px; padding: 2px 7px;
+  }
+
+  /* ══ 迷你屏 —— 十格共用的演示台 ═══════════════════════
+     每格里都是一台「小手机」：弹层需要一个边界才谈得上「从下面上来」。
+     ⚠️ overflow:hidden + position:relative 是全部十格的地基，
+        sheet 用 absolute + bottom:0 + translateY(100%) 藏在台子外面。 */
+  .scr {
+    position: relative; width: 100%; height: 100%; min-height: 128px;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    background: var(--card); touch-action: none;
+  }
+  .scr.pair { min-height: 118px; }
+  .pairwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; height: 100%; }
+  .pairwrap .lab {
+    position: absolute; top: 6px; left: 6px; z-index: 8;
+    font-family: "JetBrains Mono", monospace; font-size: 7.5px; letter-spacing: .1em;
+    padding: 2px 5px; border-radius: 99px; background: rgba(22,22,26,.72); color: var(--page);
+  }
+  .pairwrap .lab.bad { background: var(--accent); }
+  /* ⚠️ 角标是浮在底页上的，底页必须给它让出这 25px —— 否则标签直接糊在标题上 */
+  .pairwrap .base { padding-top: 25px; }
+
+  /* 底页 —— 十格共用：一张列表，让「底下那页还在不在」看得出来 */
+  .base { position: absolute; inset: 0; padding: 9px 10px; will-change: transform, filter; }
+  .base .bh {
+    font-family: "Archivo", sans-serif; font-weight: 800; font-size: 13px; letter-spacing: -.02em;
+    margin-bottom: 7px;
+  }
+  .brow {
+    display: flex; align-items: center; gap: 6px; padding: 5px 0;
+    border-bottom: 1px solid var(--line); font-size: 9.5px; color: var(--ink-2);
+  }
+  .brow:last-child { border-bottom: 0; }
+  .brow i { width: 5px; height: 5px; border-radius: 99px; background: var(--ink-3); flex: none; }
+  .brow b { font-weight: 500; color: var(--ink); }
+  .brow time { margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 8px; color: var(--ink-3); }
+
+  /* 遮罩 */
+  .mask {
+    position: absolute; inset: 0; background: rgba(22,22,26,.34); opacity: 0;
+    pointer-events: none; transition: opacity .34s var(--ease);
+  }
+  .mask.on { opacity: 1; pointer-events: auto; }
+
+  /* sheet 本体 —— 102% 不是 100%：留 2% 把阴影和 1px 边一起藏出台外 */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: var(--page); border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 26px -12px rgba(0,0,0,.4);
+    transform: translateY(102%); will-change: transform;
+    padding: 8px 11px 12px;
+  }
+  .sheet.snap { transition: transform .46s var(--spring); }
+  .sheet.ease { transition: transform .42s var(--ease); }
+  .grab {
+    width: 34px; height: 3.5px; border-radius: 99px; background: rgba(22,22,26,.22);
+    margin: 0 auto 8px; transition: opacity .3s var(--ease), width .3s var(--ease);
+  }
+  .sheet h4 {
+    font-family: "Archivo", sans-serif; font-weight: 800; font-size: 12px;
+    letter-spacing: -.01em; margin-bottom: 6px;
+  }
+  .li {
+    display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 9.5px; color: var(--ink-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .li:last-child { border-bottom: 0; }
+  .li i { width: 14px; height: 14px; border-radius: 5px; background: var(--line); flex: none; }
+  .li em { font-style: normal; margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 8px; color: var(--ink-3); }
+
+  /* 台子里的小按钮 */
+  .tap {
+    position: absolute; left: 50%; bottom: 9px; transform: translateX(-50%); z-index: 3;
+    border: 0; border-radius: 99px; background: var(--ink); color: var(--page);
+    font-family: "JetBrains Mono", monospace; font-size: 8.5px; letter-spacing: .12em;
+    padding: 6px 13px; cursor: pointer; min-height: 26px; white-space: nowrap;
+    transition: transform .18s var(--ease), background .2s;
+  }
+  .tap:active { transform: translateX(-50%) scale(.94); }
+  .tap.sm { font-size: 7.5px; padding: 5px 9px; letter-spacing: .08em; min-height: 22px; }
+
+  /* 数据条 —— 06/07 用，把「输入的不确定性」显示出来 */
+  .dat {
+    position: absolute; top: 6px; right: 6px; z-index: 8; text-align: right;
+    font-family: "JetBrains Mono", monospace; font-size: 8px; line-height: 1.55; color: var(--ink-3);
+    background: rgba(236,235,229,.9); border-radius: 6px; padding: 4px 6px; pointer-events: none;
+  }
+  .dat b { color: var(--accent); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .dat u { text-decoration: none; color: var(--ink); }
+
+  /* ══ 02 半屏停住 —— 露出来那一截的标注 ═══════════════ */
+  .peek {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 4; pointer-events: none;
+    border-bottom: 1px dashed var(--accent); opacity: 0; transition: opacity .3s var(--ease);
+  }
+  .peek.on { opacity: 1; }
+  .peek span {
+    position: absolute; right: 5px; bottom: 3px;
+    font-family: "JetBrains Mono", monospace; font-size: 7.5px; letter-spacing: .08em; color: var(--accent);
+  }
+
+  /* ══ 07 档位刻度 ═════════════════════════════════════ */
+  .rail { position: absolute; left: 4px; top: 8px; bottom: 8px; width: 12px; z-index: 7; pointer-events: none; }
+  .rail i {
+    position: absolute; left: 3px; width: 6px; height: 6px; border-radius: 99px;
+    background: var(--line); transform: translateY(-50%); transition: background .2s, transform .2s;
+  }
+  .rail i.on { background: var(--accent); transform: translateY(-50%) scale(1.5); }
+
+  /* ══ 09 卡长成页 ═════════════════════════════════════ */
+  .gcard {
+    position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 4; height: 42px;
+    background: var(--page); border: 1px solid var(--line); border-radius: 10px;
+    padding: 7px 9px; cursor: pointer; will-change: transform;
+  }
+  .gcard .t { font-family: "Archivo", sans-serif; font-weight: 800; font-size: 11px; }
+  .gcard .s { font-size: 8.5px; color: var(--ink-3); margin-top: 2px; }
+  .gpage {
+    position: absolute; inset: 0; z-index: 6; background: var(--page);
+    padding: 10px; opacity: 0; pointer-events: none;
+  }
+  .gpage.on { opacity: 1; pointer-events: auto; }
+  .gpage .t { font-family: "Archivo", sans-serif; font-weight: 800; font-size: 14px; }
+  .gpage .body { opacity: 0; transition: opacity .26s var(--ease) .12s; }
+  .gpage.lit .body { opacity: 1; }
+  .white { position: absolute; inset: 0; z-index: 7; background: #fff; opacity: 0; pointer-events: none; }
+
+  /* ══ 10 按钮变成功 ═══════════════════════════════════ */
+  .cta {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 4; height: 32px;
+    border: 0; border-radius: 8px; background: var(--ink); color: var(--page);
+    font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: .14em; cursor: pointer;
+    display: grid; place-items: center; overflow: hidden;
+    transition: left .42s var(--ease), right .42s var(--ease), border-radius .42s var(--ease),
+                height .42s var(--ease), bottom .42s var(--ease), background .3s var(--ease);
+  }
+  .cta .txt { transition: opacity .18s var(--ease); }
+  .cta svg { position: absolute; width: 17px; height: 17px; opacity: 0; }
+  .cta svg path {
+    fill: none; stroke: var(--page); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 22; stroke-dashoffset: 22;
+  }
+  .cta.round { left: calc(50% - 16px); right: calc(50% - 16px); height: 32px; border-radius: 99px; background: var(--accent); }
+  .cta.round .txt { opacity: 0; }
+  .cta.round svg { opacity: 1; }
+  .cta.round svg path { transition: stroke-dashoffset .34s var(--ease) .1s; stroke-dashoffset: 0; }
+  .cta.toast {
+    left: 12px; right: 12px; bottom: 12px; height: 26px; border-radius: 99px;
+    background: var(--ink); font-size: 8.5px;
+  }
+  .cta.toast .txt { opacity: 1; }
+  .cta.toast svg { opacity: 0; }
+
+  /* ── 底部说明条 ───────────────────────────────────── */
+  .note {
+    position: absolute; left: 10px; right: 10px; bottom: calc(env(safe-area-inset-bottom) + 10px);
+    z-index: 40; background: rgba(22,22,26,.94); color: #f2f1ec; border-radius: 15px;
+    padding: 13px 15px 15px; transform: translateY(calc(100% + 22px)); opacity: 0;
+    transition: transform .46s var(--ease), opacity .3s; backdrop-filter: blur(10px);
+  }
+  .note.on { transform: none; opacity: 1; }
+  .note .hd { display: flex; align-items: baseline; gap: 9px; margin-bottom: 7px; }
+  .note .hd b { font-size: 13px; font-weight: 500; }
+  .note .hd small { font-family: "JetBrains Mono", monospace; font-size: 9px; color: rgba(242,241,236,.5); }
+  .note .hd button {
+    margin-left: auto; border: 1px solid rgba(242,241,236,.3); background: none; color: #f2f1ec;
+    font-family: "JetBrains Mono", monospace; font-size: 8.5px; letter-spacing: .1em;
+    padding: 4px 9px; border-radius: 99px; cursor: pointer; min-height: 24px;
+  }
+  .note p { font-size: 11px; line-height: 1.85; color: rgba(242,241,236,.78); }
+  .note code {
+    font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--accent);
+    background: rgba(255,68,54,.12); padding: 1px 4px; border-radius: 4px;
+  }
+
+  footer {
+    padding: 34px 22px calc(env(safe-area-inset-bottom) + 96px);
+    font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-3); line-height: 2.2;
+  }
+  .allbtn {
+    width: 100%; margin-top: 16px; padding: 14px; border: 1px solid var(--ink); border-radius: 99px;
+    background: none; color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 500;
+    letter-spacing: .1em; cursor: pointer; min-height: 46px; transition: background .2s, color .2s;
+  }
+  .allbtn:active { background: var(--ink); color: var(--page); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    .sheet .li, .gpage .body { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div id="app">
+
+    <header>
+      <p class="eyebrow">SHEET LAB · 2026</p>
+      <h1>十种<br><em>弹层</em>切片</h1>
+      <p>弹窗不是「弹出来」就结束了。它有出身、有层级、有控制权、有档位、有去处 —— 这五件事决定了一个面板是「浮上来的」还是「贴上去的」。每一格都能真的拖、真的停、真的甩。</p>
+      <div class="meta"><span>10 PATTERNS</span><span>POINTER EVENTS</span><span>NO LIB</span></div>
+    </header>
+
+    <div class="grid" id="grid">
+
+      <!-- 01 出身 -->
+      <div class="cell wide">
+        <div class="no"><span>01</span><b>ORIGIN</b></div>
+        <div class="stage">
+          <div class="pairwrap">
+            <div class="scr pair" id="o1a">
+              <div class="lab">SHEET</div>
+              <div class="base"><div class="bh">收件箱</div>
+                <div class="brow"><i></i><b>周会纪要</b><time>09:12</time></div>
+                <div class="brow"><i></i><b>发票已开</b><time>08:40</time></div>
+              </div>
+              <div class="mask" id="o1aM"></div>
+              <div class="sheet" id="o1aS"><div class="grab"></div>
+                <h4>更多操作</h4>
+                <div class="li"><i></i>标记未读<em>U</em></div>
+                <div class="li"><i></i>移动到<em>M</em></div>
+              </div>
+              <button class="tap sm" id="o1aB">从下面上来</button>
+            </div>
+            <div class="scr pair" id="o1b">
+              <div class="lab bad">MODAL</div>
+              <div class="base"><div class="bh">收件箱</div>
+                <div class="brow"><i></i><b>周会纪要</b><time>09:12</time></div>
+                <div class="brow"><i></i><b>发票已开</b><time>08:40</time></div>
+              </div>
+              <div class="mask" id="o1bM"></div>
+              <div class="sheet" id="o1bS" style="left:14px;right:14px;bottom:auto;top:50%;border-radius:12px;transform:translateY(-50%) scale(.86);opacity:0;transition:transform .3s var(--ease),opacity .3s">
+                <h4>更多操作</h4>
+                <div class="li"><i></i>标记未读<em>U</em></div>
+                <div class="li"><i></i>移动到<em>M</em></div>
+              </div>
+              <button class="tap sm" id="o1bB">从中间放大</button>
+            </div>
+          </div>
+        </div>
+        <div class="nm">出身 · 从哪来 <span class="hint">两台都点一下</span><small>从手指来的方向出现的才是抽屉；从中间放大的是弹窗，两件事</small></div>
+      </div>
+
+      <!-- 02 半屏停住 -->
+      <div class="cell">
+        <div class="no"><span>02</span><b>HALF</b></div>
+        <div class="stage">
+          <div class="scr" id="h2">
+            <div class="base"><div class="bh">今日</div>
+              <div class="brow"><i></i><b>跑步 5.2km</b><time>07:10</time></div>
+              <div class="brow"><i></i><b>拉伸 12min</b><time>07:45</time></div>
+              <div class="brow"><i></i><b>体重 68.4kg</b><time>08:00</time></div>
+              <div class="brow"><i></i><b>饮水 1.2L</b><time>11:20</time></div>
+            </div>
+            <div class="peek" id="h2P"><span>还看得见</span></div>
+            <div class="mask" id="h2M"></div>
+            <div class="sheet" id="h2S"><div class="grab"></div>
+              <h4>本周趋势</h4>
+              <div class="li"><i></i>配速提升<em>+6%</em></div>
+              <div class="li"><i></i>静息心率<em>-3</em></div>
+              <div class="li"><i></i>睡眠均值<em>7h12</em></div>
+            </div>
+            <button class="tap sm" id="h2B">停在 62%</button>
+          </div>
+        </div>
+        <div class="nm">半屏停住 <span class="hint">点一下</span><small>重要的不是它停了多少，是你还让人看见了多少</small></div>
+      </div>
+
+      <!-- 03 全屏展开 -->
+      <div class="cell">
+        <div class="no"><span>03</span><b>EXPAND</b></div>
+        <div class="stage">
+          <div class="scr" id="e3">
+            <div class="base"><div class="bh">相册</div>
+              <div class="brow"><i></i><b>京都 42 张</b><time>11月</time></div>
+              <div class="brow"><i></i><b>大阪 18 张</b><time>11月</time></div>
+            </div>
+            <div class="mask" id="e3M"></div>
+            <div class="sheet" id="e3S"><div class="grab" id="e3G"></div>
+              <h4 id="e3T">筛选</h4>
+              <div class="li"><i></i>按地点<em>4</em></div>
+              <div class="li"><i></i>按人物<em>7</em></div>
+              <div class="li"><i></i>按时间<em>12</em></div>
+            </div>
+            <button class="tap sm" id="e3B">半屏 → 全屏</button>
+          </div>
+        </div>
+        <div class="nm">全屏展开 <span class="hint">点一下</span><small>圆角 · 抓手 · 位置一起变，才是同一个面板在展开</small></div>
+      </div>
+
+      <!-- 04 背景退后 -->
+      <div class="cell wide">
+        <div class="no"><span>04</span><b>BEHIND</b></div>
+        <div class="stage">
+          <div class="pairwrap">
+            <div class="scr pair" id="b4a">
+              <div class="lab">BLUR + SCALE</div>
+              <div class="base" id="b4aBase"><div class="bh">书架</div>
+                <div class="brow"><i></i><b>百年孤独</b><time>62%</time></div>
+                <div class="brow"><i></i><b>世界尽头</b><time>18%</time></div>
+              </div>
+              <div class="mask" id="b4aM"></div>
+              <div class="sheet" id="b4aS"><div class="grab"></div>
+                <h4>阅读设置</h4>
+                <div class="li"><i></i>字号<em>17</em></div>
+                <div class="li"><i></i>行距<em>1.9</em></div>
+              </div>
+              <button class="tap sm" id="b4aB">退到后面</button>
+            </div>
+            <div class="scr pair" id="b4b">
+              <div class="lab bad">DIM ONLY</div>
+              <div class="base"><div class="bh">书架</div>
+                <div class="brow"><i></i><b>百年孤独</b><time>62%</time></div>
+                <div class="brow"><i></i><b>世界尽头</b><time>18%</time></div>
+              </div>
+              <div class="mask" id="b4bM"></div>
+              <div class="sheet" id="b4bS"><div class="grab"></div>
+                <h4>阅读设置</h4>
+                <div class="li"><i></i>字号<em>17</em></div>
+                <div class="li"><i></i>行距<em>1.9</em></div>
+              </div>
+              <button class="tap sm" id="b4bB">只压黑</button>
+            </div>
+          </div>
+        </div>
+        <div class="nm">层级 · 底下那页怎么办 <span class="hint">两台都点一下</span><small>只变暗读不出「退后」；模糊 + 轻微缩小才有前后</small></div>
+      </div>
+
+      <!-- 05 弹性出现 -->
+      <div class="cell wide">
+        <div class="no"><span>05</span><b>SPRING</b></div>
+        <div class="stage">
+          <div class="pairwrap">
+            <div class="scr pair" id="s5a">
+              <div class="lab">OVERSHOOT</div>
+              <div class="base"><div class="bh">购物车</div>
+                <div class="brow"><i></i><b>手冲壶</b><time>¥328</time></div>
+                <div class="brow"><i></i><b>滤纸 100</b><time>¥42</time></div>
+              </div>
+              <div class="sheet" id="s5aS"><div class="grab"></div>
+                <h4>选择规格</h4>
+                <div class="li"><i></i>600ml 细口<em>有货</em></div>
+                <div class="li"><i></i>900ml 细口<em>缺货</em></div>
+              </div>
+              <button class="tap sm" id="s5aB">掰起来再落</button>
+            </div>
+            <div class="scr pair" id="s5b">
+              <div class="lab bad">LINEAR IN</div>
+              <div class="base"><div class="bh">购物车</div>
+                <div class="brow"><i></i><b>手冲壶</b><time>¥328</time></div>
+                <div class="brow"><i></i><b>滤纸 100</b><time>¥42</time></div>
+              </div>
+              <div class="sheet" id="s5bS"><div class="grab"></div>
+                <h4>选择规格</h4>
+                <div class="li"><i></i>600ml 细口<em>有货</em></div>
+                <div class="li"><i></i>900ml 细口<em>缺货</em></div>
+              </div>
+              <button class="tap sm" id="s5bB">直接到位</button>
+            </div>
+          </div>
+        </div>
+        <div class="nm">弹性出现 <span class="hint">两台都点一下</span><small>直接到位只是「出现」；过冲一点点再落回，才像被拉出来的</small></div>
+      </div>
+
+      <!-- 06 拖拽关闭 -->
+      <div class="cell wide">
+        <div class="no"><span>06</span><b>DISMISS</b></div>
+        <div class="stage">
+          <div class="scr" id="d6" style="min-height:150px">
+            <div class="base"><div class="bh">订单 #2041</div>
+              <div class="brow"><i></i><b>顺丰 SF7382910</b><time>在途</time></div>
+              <div class="brow"><i></i><b>已离开分拣中心</b><time>09:12</time></div>
+              <div class="brow"><i></i><b>已揽收</b><time>昨天 21:40</time></div>
+            </div>
+            <div class="dat" id="d6D">d <b>0</b>%<br>v <b>0.00</b><br><u>—</u></div>
+            <div class="mask" id="d6M"></div>
+            <div class="sheet" id="d6S"><div class="grab"></div>
+              <h4>物流详情</h4>
+              <div class="li"><i></i>杭州转运中心<em>09:12</em></div>
+              <div class="li"><i></i>已发出<em>08:02</em></div>
+              <div class="li"><i></i>打包完成<em>07:30</em></div>
+            </div>
+            <button class="tap sm" id="d6B">打开，然后拖它</button>
+          </div>
+        </div>
+        <div class="nm">控制权 · 跟不跟手 <span class="hint">慢慢拖 vs 快速甩</span><small>松手别只看拖了多远，还要看拖得多快 —— 两个条件满足其一就关</small></div>
+      </div>
+
+      <!-- 07 拖拽扩展 -->
+      <div class="cell wide">
+        <div class="no"><span>07</span><b>SNAP</b></div>
+        <div class="stage">
+          <div class="scr" id="n7" style="min-height:158px">
+            <div class="base"><div class="bh">地图</div>
+              <div class="brow"><i></i><b>附近 12 个站点</b><time>500m</time></div>
+              <div class="brow"><i></i><b>人民广场</b><time>210m</time></div>
+              <div class="brow"><i></i><b>南京东路</b><time>430m</time></div>
+              <div class="brow"><i></i><b>河南中路</b><time>620m</time></div>
+            </div>
+            <div class="rail" id="n7R"><i data-k="0"></i><i data-k="1"></i><i data-k="2"></i></div>
+            <div class="dat" id="n7D">档 <b>1</b> / 3<br>y <b>0</b>%<br><u>吸附中</u></div>
+            <div class="sheet" id="n7S"><div class="grab"></div>
+              <h4>附近站点</h4>
+              <div class="li"><i></i>人民广场<em>210m</em></div>
+              <div class="li"><i></i>南京东路<em>430m</em></div>
+              <div class="li"><i></i>河南中路<em>620m</em></div>
+              <div class="li"><i></i>豫园<em>810m</em></div>
+            </div>
+          </div>
+        </div>
+        <div class="nm">档位 · 停在哪 <span class="hint">上下拖抓手</span><small>松手一定要吸到最近一档；档和档之间是过路，不是车位</small></div>
+      </div>
+
+      <!-- 08 嵌套抽屉 -->
+      <div class="cell">
+        <div class="no"><span>08</span><b>NEST</b></div>
+        <div class="stage">
+          <div class="scr" id="t8">
+            <div class="base"><div class="bh">账户</div>
+              <div class="brow"><i></i><b>余额 ¥1,240</b><time>可用</time></div>
+              <div class="brow"><i></i><b>本月支出</b><time>¥862</time></div>
+            </div>
+            <div class="mask" id="t8M"></div>
+            <div class="sheet" id="t8S1"><div class="grab"></div>
+              <h4>转账到</h4>
+              <div class="li"><i></i>招商银行<em>·6621</em></div>
+              <div class="li"><i></i>支付宝<em>·8840</em></div>
+              <button class="tap sm" id="t8B2" style="position:static;transform:none;margin-top:7px;width:100%">选择金额 →</button>
+            </div>
+            <div class="mask" id="t8M2"></div>
+            <div class="sheet" id="t8S2" style="z-index:9"><div class="grab"></div>
+              <h4>金额</h4>
+              <div class="li"><i></i>¥ 500<em>常用</em></div>
+              <div class="li"><i></i>¥ 1000<em></em></div>
+            </div>
+            <button class="tap sm" id="t8B">开第一层</button>
+          </div>
+        </div>
+        <div class="nm">嵌套 · 又多一层 <span class="hint">连点两次</span><small>第二层压上来，第一层要后退 · 缩小 · 变暗</small></div>
+      </div>
+
+      <!-- 09 抽屉变页面 -->
+      <div class="cell">
+        <div class="no"><span>09</span><b>GROW</b></div>
+        <div class="stage">
+          <div class="scr" id="g9">
+            <div class="base"><div class="bh">行程</div>
+              <div class="brow"><i></i><b>东京 4 天</b><time>3月</time></div>
+              <div class="brow"><i></i><b>大阪 3 天</b><time>4月</time></div>
+            </div>
+            <div class="gcard" id="g9C"><div class="t">京都 · 2 天</div><div class="s">清水寺 · 伏见稻荷 · 岚山</div></div>
+            <div class="white" id="g9W"></div>
+            <div class="gpage" id="g9P">
+              <div class="t">京都 · 2 天</div>
+              <div class="body">
+                <div class="brow"><i></i><b>清水寺</b><time>D1 09:00</time></div>
+                <div class="brow"><i></i><b>伏见稻荷</b><time>D1 14:00</time></div>
+                <div class="brow"><i></i><b>岚山竹林</b><time>D2 10:00</time></div>
+              </div>
+            </div>
+            <button class="tap sm" id="g9B">对比：先关再开</button>
+          </div>
+        </div>
+        <div class="nm">去处 · 怎么走 <span class="hint">点那张卡</span><small>让卡直接长成下一页；先关再开，中间那一帧白屏是另一件事</small></div>
+      </div>
+
+      <!-- 10 弹窗变成功 -->
+      <div class="cell wide">
+        <div class="no"><span>10</span><b>RESOLVE</b></div>
+        <div class="stage">
+          <div class="scr" id="r10" style="min-height:132px">
+            <div class="base"><div class="bh">确认支付</div>
+              <div class="brow"><i></i><b>手冲壶 600ml</b><time>¥328</time></div>
+              <div class="brow"><i></i><b>运费</b><time>¥0</time></div>
+              <div class="brow"><i></i><b>合计</b><time>¥328</time></div>
+            </div>
+            <button class="cta" id="r10B"><span class="txt">确 认 支 付</span>
+              <svg viewBox="0 0 24 24"><path d="M5 12.5l4.6 4.6L19 7.7"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="nm">结束也是一段动画 <span class="hint">按一下</span><small>按下去不是关掉：按钮变圆 → 画出勾 → 收成提示条</small></div>
+      </div>
+
+    </div>
+
+    <footer>
+      每一格都能真的动手 —— 点标号或名字会讲原理，点里面的构件是直接用。<br>
+      弹层的五件事：出身（从哪来）· 层级（底下那页怎么办）· 控制权（跟不跟手）· 档位（停在哪）· 去处（怎么走）。<br>
+      少一件，面板就是「贴上去的」而不是「浮上来的」。
+      <button class="allbtn" id="playAll">依 次 演 示 全 部</button>
+      <br><br>SHEET LAB · 演示内容
+    </footer>
+
+  </div>
+
+  <div class="note" id="note">
+    <div class="hd"><b id="nTitle">出身</b><small id="nTag">01 / ORIGIN</small><button id="nReplay">重放</button></div>
+    <p id="nBody"></p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── 统一的指针拖拽 ─────────────────────────────────
+     只认第一根手指，全程 setPointerCapture，
+     松手用 pointerup / pointercancel 两个出口 —— 少一个就会卡在拖拽态。
+     ⚠️ 这是全页十格的地基，interaction-motion.md §2 的第一条。 */
+  function drag(el, h) {
+    let id = null, x0 = 0, y0 = 0;
+    el.addEventListener('pointerdown', e => {
+      if (id !== null) return;
+      id = e.pointerId; x0 = e.clientX; y0 = e.clientY;
+      try { el.setPointerCapture(id); } catch (_) {}
+      h.start && h.start(e);
+    });
+    el.addEventListener('pointermove', e => {
+      if (e.pointerId !== id) return;
+      h.move && h.move(e.clientX - x0, e.clientY - y0, e);
+    });
+    const up = e => {
+      if (e.pointerId !== id) return;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      id = null; h.end && h.end(dx, dy, e);
+    };
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);   /* never omit this */
+  }
+
+  /* ── 速度追踪器 ─────────────────────────────────────
+     ⚠️ 这一段是整页调试出来的最贵一条（interaction-motion.md §2.3）。
+     算「甩得有多快」有三种写法，两种是错的：
+       ✗ 单帧瞬时  v = dy / (now - lastMove)
+         两次 pointermove 间隔可能不到 1ms，v 会飙到 12 px/ms —— 那是噪声，不是速度。
+       ✗ 全程平均  v = 总位移 / (now - pointerdown)
+         慢慢拖 2 秒、最后甩一下，平均速度仍然很小 —— 最后那一甩被稀释掉了。
+       ✓ 滑动窗口  取最近 ≤100ms 内的位移差
+         既滤掉单帧抖动，又只看「松手前那一下」，这才是用户以为的「甩」。 */
+  function vTracker(win) {
+    const buf = [];
+    return {
+      reset() { buf.length = 0; },
+      push(v) {
+        buf.push([performance.now(), v]);
+        while (buf.length > 8) buf.shift();
+      },
+      get() {
+        if (buf.length < 2) return 0;
+        const last = buf[buf.length - 1];
+        let i = buf.length - 2;
+        while (i > 0 && last[0] - buf[i][0] < (win || 100)) i--;
+        const dt = last[0] - buf[i][0];
+        return dt > 0 ? (last[1] - buf[i][1]) / dt : 0;
+      }
+    };
+  }
+
+  /* 一次性过渡：加 class → 改 transform → 到点摘掉，
+     摘掉是为了下一次拖拽能 1:1 跟手（留着过渡，跟手就会「拖不动」） */
+  const glide = (el, cls, v, ms) => {
+    el.classList.add(cls);
+    el.style.transform = v;
+    setTimeout(() => el.classList.remove(cls), ms || 500);
+  };
+
+  /* ══ 01 出身 ═════════════════════════════════════════
+     左台：从下面上来（translateY 100% → 0）
+     右台：从中心放大（scale .86 → 1 + opacity）—— 那是 modal，不是 sheet */
+  const D01 = (() => {
+    const aS = $('#o1aS'), aM = $('#o1aM'), bS = $('#o1bS'), bM = $('#o1bM');
+    let aOn = false, bOn = false;
+    const aTog = () => {
+      aOn = !aOn; aM.classList.toggle('on', aOn);
+      glide(aS, 'snap', aOn ? 'translateY(0)' : 'translateY(102%)');
+    };
+    const bTog = () => {
+      bOn = !bOn; bM.classList.toggle('on', bOn);
+      bS.style.transform = 'translateY(-50%) scale(' + (bOn ? 1 : .86) + ')';
+      bS.style.opacity = bOn ? 1 : 0;
+    };
+    $('#o1aB').addEventListener('click', aTog);
+    $('#o1bB').addEventListener('click', bTog);
+    aM.addEventListener('click', aTog);
+    bM.addEventListener('click', bTog);
+    return () => {
+      if (!aOn) aTog(); if (!bOn) setTimeout(bTog, 260);
+      setTimeout(() => { if (aOn) aTog(); if (bOn) bTog(); }, 2000);
+    };
+  })();
+
+  /* ══ 02 半屏停住 ═════════════════════════════════════
+     停在 62% —— 关键不是这个数，是上面 38% 里**还留着上下文**：
+     虚线以上那三行是「你还让人看见的东西」。停到 92% 就等于全屏，
+     那还不如直接推一页。 */
+  const D02 = (() => {
+    const S = $('#h2S'), M = $('#h2M'), P = $('#h2P'), scr = $('#h2');
+    let on = false;
+    const tog = () => {
+      on = !on; M.classList.toggle('on', on); P.classList.toggle('on', on);
+      const H = scr.clientHeight, sh = S.offsetHeight;
+      /* 面板高度固定，"停在 62%" 说的是**它盖住了台子的 62%** */
+      const target = on ? Math.max(0, sh - H * .62) : sh + 4;
+      P.style.top = (H - (sh - target)) + 'px';
+      glide(S, 'snap', 'translateY(' + target.toFixed(1) + 'px)');
+    };
+    $('#h2B').addEventListener('click', tog);
+    M.addEventListener('click', tog);
+    return () => { if (!on) { tog(); setTimeout(tog, 2100); } else tog(); };
+  })();
+
+  /* ══ 03 全屏展开 ═════════════════════════════════════
+     一个进度 p 同时驱动四件事：位置、圆角、抓手、标题。
+     ⚠️ 四件事分开写成四段动画就会「错峰」，读起来像换了个面板。 */
+  const D03 = (() => {
+    const S = $('#e3S'), M = $('#e3M'), G = $('#e3G'), T = $('#e3T'), scr = $('#e3');
+    let st = 0;  /* 0 关 · 1 半屏 · 2 全屏 */
+    const to = n => {
+      st = n;
+      const H = scr.clientHeight, sh = S.offsetHeight;
+      M.classList.toggle('on', n > 0);
+      const p = n === 2 ? 1 : 0;                       /* 展开进度 */
+      S.style.borderRadius = (14 - 14 * p) + 'px ' + (14 - 14 * p) + 'px 0 0';
+      G.style.opacity = 1 - p;                          /* 抓手：全屏了就没得拖，淡掉 */
+      G.style.width = (34 - 12 * p) + 'px';
+      T.style.fontSize = (12 + 2 * p) + 'px';
+      const y = n === 0 ? sh + 4 : n === 1 ? Math.max(0, sh - H * .58) : -(H - sh);
+      glide(S, 'snap', 'translateY(' + y.toFixed(1) + 'px)');
+    };
+    $('#e3B').addEventListener('click', () => to(st === 2 ? 0 : st + 1));
+    M.addEventListener('click', () => to(0));
+    return () => { to(1); setTimeout(() => to(2), 780); setTimeout(() => to(0), 2200); };
+  })();
+
+  /* ══ 04 背景退后 ═════════════════════════════════════
+     左：scale(.94) + blur(2.4px) + brightness(.92)
+     右：只有一层 34% 的黑
+     ⚠️ 「深度」是靠**模糊 + 后退**读出来的，不是靠压黑。
+        压黑只会让人以为「那一层被禁用了」，而不是「它退到后面去了」。 */
+  const D04 = (() => {
+    const aS = $('#b4aS'), aM = $('#b4aM'), aB = $('#b4aBase');
+    const bS = $('#b4bS'), bM = $('#b4bM');
+    let aOn = false, bOn = false;
+    const aTog = () => {
+      aOn = !aOn; aM.classList.toggle('on', aOn);
+      aB.style.transition = 'transform .42s var(--ease), filter .42s var(--ease)';
+      aB.style.transform = aOn ? 'scale(.94)' : 'none';
+      aB.style.filter = aOn ? 'blur(2.4px) brightness(.92)' : 'none';
+      glide(aS, 'snap', aOn ? 'translateY(0)' : 'translateY(102%)');
+    };
+    const bTog = () => {
+      bOn = !bOn; bM.classList.toggle('on', bOn);
+      glide(bS, 'snap', bOn ? 'translateY(0)' : 'translateY(102%)');
+    };
+    $('#b4aB').addEventListener('click', aTog);
+    $('#b4bB').addEventListener('click', bTog);
+    aM.addEventListener('click', aTog); bM.addEventListener('click', bTog);
+    return () => {
+      if (!aOn) aTog(); if (!bOn) setTimeout(bTog, 240);
+      setTimeout(() => { if (aOn) aTog(); if (bOn) bTog(); }, 2100);
+    };
+  })();
+
+  /* ══ 05 弹性出现 ═════════════════════════════════════
+     左 cubic-bezier(.34,1.56,.64,1)：第二个控制点 > 1，会越过终点再回来
+     右 cubic-bezier(.22,.9,.28,1)：单调逼近，到位就停
+     ⚠️ 差别只有 ~40ms 的一段过冲，但那一下就是「被拉出来」和「贴上去」的分界。 */
+  const D05 = (() => {
+    const aS = $('#s5aS'), bS = $('#s5bS');
+    let aOn = false, bOn = false;
+    const aTog = () => { aOn = !aOn; glide(aS, 'snap', aOn ? 'translateY(0)' : 'translateY(102%)'); };
+    const bTog = () => { bOn = !bOn; glide(bS, 'ease', bOn ? 'translateY(0)' : 'translateY(102%)'); };
+    $('#s5aB').addEventListener('click', aTog);
+    $('#s5bB').addEventListener('click', bTog);
+    return () => {
+      if (!aOn) aTog(); if (!bOn) bTog();          /* 同时起，差别才看得出来 */
+      setTimeout(() => { if (aOn) aTog(); if (bOn) bTog(); }, 1900);
+    };
+  })();
+
+  /* ══ 06 拖拽关闭 ═════════════════════════════════════
+     跟手 1:1 向下，向上越界打 0.3 折（拉不动，但不是硬墙）。
+     松手判定两个条件**取或**：
+       ① 位移过了 1/3          —— 慢慢拖到底，该关
+       ② 速度 v > 0.55 px/ms   —— 只拖了一点点但甩得快，也该关
+     ⚠️ 只看①：用户轻轻一甩，面板弹回去，感觉「没听懂我」。
+        只看②：慢慢拖到最底下反而关不掉。两个都要。 */
+  const D06 = (() => {
+    const S = $('#d6S'), M = $('#d6M'), D = $('#d6D'), scr = $('#d6');
+    const vt = vTracker(100);
+    let y = 0, H = 1, on = false, y0 = 0, sh = 1;
+    const set = v => { y = v; S.style.transform = 'translateY(' + v.toFixed(1) + 'px)'; };
+    const info = (d, v, r) => {
+      D.innerHTML = 'd <b>' + Math.round(d * 100) + '</b>%<br>v <b>' + v.toFixed(2) + '</b><br><u>' + r + '</u>';
+    };
+    const open = () => {
+      sh = S.offsetHeight; H = scr.clientHeight; on = true; M.classList.add('on');
+      glide(S, 'snap', 'translateY(0)'); y = 0; info(0, 0, '已打开');
+    };
+    const close = r => {
+      on = false; M.classList.remove('on');
+      glide(S, 'snap', 'translateY(102%)'); y = sh; info(1, 0, r || '已关闭');
+    };
+    $('#d6B').addEventListener('click', () => on ? close() : open());
+    M.addEventListener('click', () => close());
+    drag(S, {
+      start() { if (!on) return; sh = S.offsetHeight; y0 = y; vt.reset(); vt.push(y); },
+      move(dx, dy) {
+        if (!on) return;
+        const raw = y0 + dy;
+        set(raw < 0 ? raw * .3 : raw);                       /* 向上越界：0.3 折 */
+        vt.push(y);
+        info(clamp(y / sh, 0, 1), Math.abs(vt.get()), '拖拽中');
+      },
+      end() {
+        if (!on) return;
+        const v = vt.get();                                  /* 向下为正 */
+        const far = y > sh / 3, fast = v > .55;
+        if (far || fast) close(fast && !far ? '甩得够快 → 关' : '过了 1/3 → 关');
+        else { glide(S, 'snap', 'translateY(0)'); y = 0; info(0, Math.abs(v), '没过阈值 → 弹回'); }
+      }
+    });
+    return () => { if (on) close(); else { open(); setTimeout(() => close(), 1900); } };
+  })();
+
+  /* ══ 07 拖拽扩展 · 三档吸附 ═══════════════════════════
+     三档：盖住台子的 26% / 58% / 92%。
+     跟手全程 1:1，松手后**吸到最近一档** —— 松手位置和甩动方向共同决定去哪：
+     甩得快（|v| > .5）就往那个方向多走一档，否则就近吸附。
+     ⚠️ 档与档之间是过路不是车位：松手停在两档中间是 bug，不是特性。 */
+  const D07 = (() => {
+    const S = $('#n7S'), D = $('#n7D'), scr = $('#n7'), rail = $('#n7R');
+    const dots = $$('i', rail);
+    const RAT = [.26, .58, .92];
+    const vt = vTracker(100);
+    let k = 0, y = 0, sh = 1, H = 1, y0 = 0;
+    const yOf = i => Math.max(0, sh - H * RAT[i]);
+    const set = v => { y = v; S.style.transform = 'translateY(' + v.toFixed(1) + 'px)'; };
+    const paint = r => {
+      dots.forEach((d, i) => d.classList.toggle('on', i === k));
+      D.innerHTML = '档 <b>' + (k + 1) + '</b> / 3<br>y <b>' + Math.round(RAT[k] * 100) + '</b>%<br><u>' + r + '</u>';
+    };
+    const measure = () => { sh = S.offsetHeight; H = scr.clientHeight; };
+    const to = (i, r) => { k = clamp(i, 0, 2); measure(); glide(S, 'snap', 'translateY(' + yOf(k).toFixed(1) + 'px)'); y = yOf(k); paint(r); };
+    /* 刻度点的纵坐标 = 各档面板顶沿 */
+    const layout = () => {
+      measure();
+      dots.forEach((d, i) => { d.style.top = ((1 - RAT[i]) * 100).toFixed(0) + '%'; });
+    };
+    drag(S, {
+      start() { measure(); y0 = y; vt.reset(); vt.push(y); },
+      move(dx, dy) {
+        const raw = clamp(y0 + dy, yOf(2), sh);
+        set(raw); vt.push(raw);
+        const cov = clamp((sh - raw) / H, 0, 1);
+        D.innerHTML = '档 <b>' + (k + 1) + '</b> / 3<br>y <b>' + Math.round(cov * 100) + '</b>%<br><u>拖拽中</u>';
+      },
+      end() {
+        /* 两步：① 先按松手位置**就近**吸附；② 甩得快（|v| > .5）再往那个方向推一档。
+           顺序不能反 —— 先按速度选档会让「慢慢拖到某一档」这个动作失效。 */
+        const v = vt.get();                                  /* 向下为正 = 在收起 */
+        const cov = (sh - y) / H;
+        let best = 0, bd = 1e9;
+        RAT.forEach((r, j) => { const d = Math.abs(r - cov); if (d < bd) { bd = d; best = j; } });
+        const fast = Math.abs(v) > .5;
+        const i = fast ? clamp(best + (v > 0 ? -1 : 1), 0, 2) : best;
+        to(i, fast ? '甩了一下 → 多走一档' : '就近吸附');
+      }
+    });
+    setTimeout(() => { layout(); to(0, '吸附中'); }, 60);
+    window.addEventListener('resize', layout);
+    return () => {
+      to(2, '甩到顶档'); setTimeout(() => to(1, '中间档'), 760); setTimeout(() => to(0, '回到低档'), 1560);
+    };
+  })();
+
+  /* ══ 08 嵌套抽屉 ═════════════════════════════════════
+     第二层压上来时，第一层做三件事：后退 translateY(-10) · 缩小 scale(.94) · 变暗。
+     ⚠️ 只让第二层盖上去，人读不出「多了一层」，只会以为第一层换了内容。 */
+  const D08 = (() => {
+    const S1 = $('#t8S1'), S2 = $('#t8S2'), M = $('#t8M'), M2 = $('#t8M2');
+    let l1 = false, l2 = false;
+    const paint = () => {
+      M.classList.toggle('on', l1);
+      M2.classList.toggle('on', l2);
+      S1.style.transition = 'transform .42s var(--ease), filter .42s var(--ease)';
+      if (l2) {
+        S1.style.transform = 'translateY(-10px) scale(.94)';
+        S1.style.filter = 'brightness(.9)';
+      } else if (l1) {
+        S1.style.transform = 'translateY(0)';
+        S1.style.filter = 'none';
+      }
+    };
+    const o1 = () => { l1 = true; glide(S1, 'snap', 'translateY(0)'); paint(); };
+    const c1 = () => { l1 = false; l2 = false; glide(S1, 'snap', 'translateY(102%)'); glide(S2, 'snap', 'translateY(102%)'); paint(); };
+    const o2 = () => { l2 = true; glide(S2, 'snap', 'translateY(0)'); paint(); };
+    const c2 = () => { l2 = false; glide(S2, 'snap', 'translateY(102%)'); paint(); };
+    $('#t8B').addEventListener('click', () => l1 ? c1() : o1());
+    $('#t8B2').addEventListener('click', o2);
+    M.addEventListener('click', c1);
+    M2.addEventListener('click', c2);
+    return () => { o1(); setTimeout(o2, 760); setTimeout(c1, 2200); };
+  })();
+
+  /* ══ 09 抽屉变页面 ═══════════════════════════════════
+     正例：手写 FLIP —— 卡片直接长成整页
+       First  量卡片的 rect
+       Last   量目标页的 rect
+       Invert 把页面用 translate+scale **钉在卡片身上**（必须 transition:none）
+       Play   下一帧才放开
+     ⚠️ 少了「下一帧」那一下，浏览器把两次赋值合成一次，动画根本不会发生。
+     反例：先关卡 → 白屏一帧 → 新页从右推进来。那是**另一件事**（页面转场），
+           链路被切断，人会以为自己离开了原来那一页。 */
+  const D09 = (() => {
+    const C = $('#g9C'), P = $('#g9P'), W = $('#g9W'), scr = $('#g9');
+    let open = false, busy = false;
+    const grow = () => {
+      if (busy) return; busy = true; open = true;
+      const a = C.getBoundingClientRect(), b = scr.getBoundingClientRect();
+      P.classList.add('on');
+      P.style.transition = 'none';
+      P.style.transformOrigin = 'top left';
+      P.style.transform = 'translate(' + (a.left - b.left) + 'px,' + (a.top - b.top) + 'px) scale(' +
+                          (a.width / b.width) + ',' + (a.height / b.height) + ')';
+      C.style.opacity = 0;
+      requestAnimationFrame(() => requestAnimationFrame(() => {     /* ← 这两帧不能省 */
+        P.style.transition = 'transform .46s var(--ease)';
+        P.style.transform = 'none';
+        setTimeout(() => { P.classList.add('lit'); busy = false; }, 200);  /* 文字等落位再淡入 */
+      }));
+    };
+    const back = () => {
+      if (busy) return; busy = true; open = false;
+      const a = C.getBoundingClientRect(), b = scr.getBoundingClientRect();
+      P.classList.remove('lit');
+      P.style.transition = 'transform .4s var(--ease)';
+      P.style.transform = 'translate(' + (a.left - b.left) + 'px,' + (a.top - b.top) + 'px) scale(' +
+                          (a.width / b.width) + ',' + (a.height / b.height) + ')';
+      setTimeout(() => { P.classList.remove('on'); C.style.opacity = 1; busy = false; }, 400);
+    };
+    /* 反例：中间那一帧白屏 */
+    const bad = () => {
+      if (busy) return; busy = true;
+      C.style.transition = 'transform .2s var(--ease), opacity .2s';
+      C.style.transform = 'translateY(14px)'; C.style.opacity = 0;
+      setTimeout(() => {
+        W.style.transition = 'none'; W.style.opacity = 1;              /* ← 断掉的那一帧 */
+        setTimeout(() => {
+          W.style.transition = 'opacity .18s'; W.style.opacity = 0;
+          P.classList.add('on', 'lit');
+          P.style.transition = 'none'; P.style.transform = 'translateX(100%)';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            P.style.transition = 'transform .4s var(--ease)';
+            P.style.transform = 'none';
+          }));
+          setTimeout(() => {
+            P.classList.remove('on', 'lit'); P.style.transform = 'none';
+            C.style.transform = 'none'; C.style.opacity = 1; busy = false;
+          }, 1400);
+        }, 130);
+      }, 200);
+    };
+    C.addEventListener('click', () => open ? back() : grow());
+    P.addEventListener('click', back);
+    $('#g9B').addEventListener('click', e => { e.stopPropagation(); bad(); });
+    return () => { grow(); setTimeout(back, 1700); };
+  })();
+
+  /* ══ 10 弹窗变成功 ═══════════════════════════════════
+     三步一条链：按钮收成圆 → 勾用 stroke-dashoffset 画出来 → 摊成一条回执。
+     ⚠️ 「点了确认，框就没了」是把结束当成了「消失」。
+        结束也是一段动画 —— 它要告诉人「刚才那件事成了」。 */
+  const D10 = (() => {
+    const B = $('#r10B'), T = $('.txt', B);
+    let busy = false;
+    const run = () => {
+      if (busy) return; busy = true;
+      B.classList.add('round');
+      setTimeout(() => {
+        B.classList.remove('round'); B.classList.add('toast');
+        T.textContent = '支 付 成 功 · ¥328';
+      }, 900);
+      setTimeout(() => {
+        B.classList.remove('toast');
+        T.textContent = '确 认 支 付'; busy = false;
+      }, 2400);
+    };
+    B.addEventListener('click', run);
+    return run;
+  })();
+
+  /* ── 说明条 ───────────────────────────────────────── */
+  const DEMOS = [D01, D02, D03, D04, D05, D06, D07, D08, D09, D10];
+
+  const INFO = [
+    ['出身 · 从哪来', '01 / ORIGIN',
+     '抽屉必须<b>从手指来的方向</b>出现 —— 底部触发就从底部升上来，位移和触发点在同一条轴上，人才把它读成「我刚才那一下把它拉出来了」。右边那台是从中心 <code>scale(.86 → 1)</code> 放大的：那是 <b>modal</b>，一个打断你的东西，用在「你必须先回答我」的场合。两者都对，但它们是<b>两件事</b>，不能混着用 —— 底部工具条弹出一个居中框，链路当场断掉。'],
+    ['半屏停住', '02 / HALF',
+     '半屏的价值不在「停了多少」，在<b>你还让人看见了多少</b>。虚线以上那几行是留给用户的上下文：他能一边看着列表一边操作面板，不用来回开关。停到 92% 就等于全屏，那还不如直接推一页 —— 半屏的全部意义就是<b>两层同时在场</b>。取值经验：盖住 55–65%，且底页至少留得下一行完整内容。'],
+    ['全屏展开', '03 / EXPAND',
+     '一个进度同时驱动四件事：位置、圆角 <code>14 → 0</code>、抓手（淡出并收窄，因为到顶就没得拖了）、标题字号。<b>四件事必须同时走完</b>。分开写成四段动画就会错峰，读起来像「又开了一个面板」而不是「同一个面板长大了」。判据很简单：全程盯住抓手，它应该始终是同一个东西在变形，不能消失再出现。'],
+    ['层级 · 底下那页怎么办', '04 / BEHIND',
+     '底页不能只变暗。<code>scale(.94)</code> + <code>blur(2.4px)</code> + <code>brightness(.92)</code> 三件一起上，「退到后面」才读得出来。为什么：<b>深度是靠模糊和后退读出来的，不是靠亮度</b>。右边那台只压了一层 34% 的黑 —— 你会觉得那一层「被禁用了」，而不是「它退到后面去了」。⚠️ 缩放和模糊都要克制：<code>.94</code> 和 <code>2.4px</code> 已经够，糊成一团就读不出「底下那页还在」。'],
+    ['弹性出现', '05 / SPRING',
+     '两台同时弹，差别只有落位前那 ~40ms。左边 <code>cubic-bezier(.34,1.56,.64,1)</code> 第二个控制点大于 1，面板会<b>越过终点一点点再回来</b>；右边单调逼近，到位就停。前者读作「被拉出来的」，后者读作「贴上去的」。这是十二条动画原则里的 follow-through，也是整页最便宜的一处升级 —— 改一个缓动函数而已。⚠️ 过冲幅度别超过面板高度的 2%，再多就成弹簧玩具。'],
+    ['控制权 · 跟不跟手', '06 / DISMISS',
+     '跟手位移<b>必须 1:1</b>，向上越界才打 0.3 折（拉不动，但不是硬墙）。松手判定是两个条件<b>取或</b>：① 位移过了 <code>1/3</code>；② 速度 <code>v > 0.55 px/ms</code>。只看①，用户轻轻一甩面板弹回去，感觉「没听懂我」；只看②，慢慢拖到最底下反而关不掉。右上角那三行数就是判定依据，一直显示着 —— <b>能把 d 和 v 显示出来的交互，才是真的在处理输入</b>。'],
+    ['档位 · 停在哪', '07 / SNAP',
+     '三档 <code>26% / 58% / 92%</code>。跟手全程 1:1，松手<b>一定要吸到最近一档</b>，而且甩得快（<code>|v| > .5</code>）还要往那个方向多走一档 —— 这样用户既能精确停，也能一甩到顶。<b>档和档之间是过路，不是车位</b>：松手停在两档中间不是「自由」，是 bug，因为下一次交互就没有确定的起点了。左边那三个点是档位刻度，当前档标红。'],
+    ['嵌套 · 又多一层', '08 / NEST',
+     '第二层压上来时，第一层同时做三件事：<b>后退</b> <code>translateY(-10px)</code>、<b>缩小</b> <code>scale(.94)</code>、<b>变暗</b> <code>brightness(.9)</code>。这三件事和 04 是同一条规则递归了一次 —— 层级不是「盖上去」堆出来的，是<b>退出来</b>的。只让第二层盖上去，人读不出多了一层，只会以为第一层换了内容，于是返回的时候不知道会回到哪。⚠️ 超过两层就该考虑推页面了，抽屉套抽屉套抽屉没人跟得住。'],
+    ['去处 · 怎么走', '09 / GROW',
+     '手写 FLIP 四步：量卡片（First）→ 量目标页（Last）→ 把页面用 <code>translate + scale</code> <b>钉在卡片身上</b>（Invert，这一步必须 <code>transition: none</code>）→ <b>下一帧</b>才放开让它跑（Play）。少了「下一帧」那一下，浏览器把两次赋值合成一次，动画根本不会发生。文字要等落位再淡入，它会被 scale 拉扁。点右下角那个按钮看反例：先关抽屉 → <b>白屏一帧</b> → 新页才推进来。链路被切断，人会以为自己离开了原来那一页。'],
+    ['结束也是一段动画', '10 / RESOLVE',
+     '按下去不是「关掉」。三步一条链：按钮<b>收成圆</b>（left/right 同时向中间收，<code>border-radius</code> 到 99px）→ 勾用 <code>stroke-dashoffset 22 → 0</code> <b>画</b>出来（不是淡入，画出来才有「正在完成」的时间感）→ 摊成一条回执条，把金额带上。⚠️ 「点了确认，框就没了」是把结束当成了消失 —— 用户会去翻订单页确认到底成没成。<b>结束这一下要回答的是「刚才那件事成了」，不是「这个框可以走了」。</b>']
+  ];
+
+  const cells = $$('.cell');
+  const note = $('#note'), nTitle = $('#nTitle'), nTag = $('#nTag'), nBody = $('#nBody');
+  let curI = 0, hideT = null;
+
+  function open(i, run) {
+    curI = i;
+    const [t, tag, body] = INFO[i];
+    nTitle.textContent = t; nTag.textContent = tag; nBody.innerHTML = body;
+    note.classList.add('on');
+    clearTimeout(hideT);
+    hideT = setTimeout(() => note.classList.remove('on'), 8000);
+    if (run) DEMOS[i]();
+  }
+
+  cells.forEach((c, i) => c.addEventListener('click', e => {
+    /* 点在构件上：那是在用它，只讲原理不再自动演一遍 */
+    open(i, !e.target.closest('.scr'));
+  }));
+  $('#nReplay').addEventListener('click', e => { e.stopPropagation(); open(curI, true); });
+
+  $('#playAll').addEventListener('click', () => {
+    DEMOS.forEach((fn, i) => setTimeout(fn, i * 1100));
+  });
+
+  /* 进屏各演一次，页面不至于一进来就是死的 */
+  if (!RM) {
+    const io = new IntersectionObserver(es => {
+      es.forEach(e => {
+        if (!e.isIntersecting) return;
+        const i = cells.indexOf(e.target);
+        setTimeout(() => DEMOS[i](), 300 + (i % 2) * 300);
+        io.unobserve(e.target);
+      });
+    }, { root: $('#app'), threshold: .55 });
+    cells.forEach(c => io.observe(c));
+  }
+})();
+</script>
+</body>
+</html>

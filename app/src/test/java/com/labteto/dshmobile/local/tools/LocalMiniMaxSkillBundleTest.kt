@@ -113,7 +113,7 @@ class LocalMiniMaxSkillBundleTest {
     @Test fun incompleteMediaBundleDoesNotAdvertiseSkill() {
         val root = Files.createTempDirectory("minimax-media-incomplete").toFile()
         try {
-            val store = LocalSkillStore(LocalWorkspace(root)) { mapOf("LICENSE" to "MIT") }
+            val store = LocalSkillStore(LocalWorkspace(root), bundleFiles = { mapOf("LICENSE" to "MIT") })
             assertThrows(IllegalArgumentException::class.java) { store.seedOnce() }
             assertFalse(File(root, ".dsh/skills/minimax-media/SKILL.md").isFile)
             assertFalse(File(root, ".dsh/skills/.minimax-seed-v1").exists())

@@ -51,7 +51,8 @@ internal object LocalPresetSkillCatalog {
             6. Chat 模式的 OpenAI 内建图像工具与独立媒体创作界面属于不同路径，按实际可用功能调用，不把一个模式的能力虚报为另一个模式已具备。
             交付：真实生成图片和可查看位置、实际服务商/模型、任务状态；无法执行时说明缺少哪项能力或权限。
             """.trimIndent()),
-    ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) } + LocalMiniMaxSkillCatalog.entries
+    ).map { it.copy(whenToUse = triggers[it.id].orEmpty()) } +
+        LocalMiniMaxSkillCatalog.entries + LocalCreativeSkillCatalog.entries
 }
 
 internal val LOCAL_SKILL_ID_PATTERN = Regex("[a-z][a-z0-9-]{1,47}")
@@ -80,7 +81,9 @@ internal fun buildLocalSkillDocument(id: String, description: String, instructio
 internal class LocalSkillStore(
     private val workspace: LocalWorkspace,
     private val bundleFiles: ((String) -> Map<String, String>)? = null,
+    private val creativeBundleFiles: ((String) -> Map<String, ByteArray>)? = null,
 ) {
+    private val creativeBundle = creativeBundleFiles?.let { LocalCreativeSkillBundle(workspace, it) }
     private val skillsDir get() = File(workspace.path, ".dsh/skills")
     private val seedMarker = ".dsh/skills/.preset-seed-v1"
 
@@ -118,7 +121,9 @@ internal class LocalSkillStore(
 
     fun presets(): List<LocalPresetSkill> {
         val names = workspace.skills().toSet()
-        return LocalPresetSkillCatalog.entries.map { it.copy(installed = it.id in names) }
+        return LocalPresetSkillCatalog.entries
+            .filterNot { it.id in creativeIds && creativeBundle == null }
+            .map { it.copy(installed = it.id in names) }
     }
 
     /** Installed official presets track app releases; removed and custom skills remain untouched. */
@@ -127,6 +132,10 @@ internal class LocalSkillStore(
         for (preset in LocalPresetSkillCatalog.entries) {
             if (preset.id !in installedIds) continue
             requireInstalled(preset.id)
+            if (preset.id in creativeIds) {
+                creativeBundle?.refresh(preset)
+                continue
+            }
             if (preset.id in bundledIds && bundleFiles != null) {
                 val files = bundleFiles(preset.id)
                 require("MOBILE.md" in files && "LICENSE" in files && "SOURCE.md" in files) {
@@ -242,6 +251,13 @@ internal class LocalSkillStore(
             }
             workspace.write(".dsh/skills/.minimax-seed-v1", "seeded\n")
         }
+        // Existing installations receive this batch once. Explicit user removals persist.
+        if (creativeBundle != null && !File(skillsDir, ".creative-seed-v1").exists()) {
+            LocalCreativeSkillCatalog.entries.forEach { preset ->
+                if (!workspace.skills().contains(preset.id)) install(preset.id)
+            }
+            workspace.write(".dsh/skills/.creative-seed-v1", "seeded\n")
+        }
         migrateMiniMaxMobileSkills()
         archiveRetiredMiniMaxAdaptations()
         val uninstalled = removeUnlistedBundledSkills()
@@ -336,12 +352,17 @@ internal class LocalSkillStore(
         workspace.write(".dsh/skills/.minimax-retired-desktop-v3", "done\n")
     }
 
-    private val bundledIds = LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet()
+    private val creativeIds = LocalCreativeSkillCatalog.entries.map { it.id }.toSet()
+    private val bundledIds = LocalMiniMaxSkillCatalog.entries.map { it.id }.toSet() + creativeIds
 
     fun install(id: String) {
         val preset = LocalPresetSkillCatalog.entries.firstOrNull { it.id == id }
             ?: throw IllegalArgumentException("未知的预置技能")
         require(!workspace.skills().contains(id)) { "同名技能已经存在" }
+        if (id in creativeIds) {
+            requireNotNull(creativeBundle) { "当前环境未提供内置设计技能资源" }.install(preset)
+            return
+        }
         if (id in bundledIds) {
             val files = requireNotNull(bundleFiles) { "当前环境未提供 MiniMax 技能资源" }(id)
             require("MOBILE.md" in files && "LICENSE" in files && "SOURCE.md" in files) {
@@ -463,18 +484,34 @@ internal class LocalSkillManager @Inject constructor(
     private val pinnedInvocations: LocalPinnedInvocationStore,
 ) {
     private val storageWorkspace = storage.files.workspace
-    private val store = LocalSkillStore(storageWorkspace) { id ->
-        val files = linkedMapOf<String, String>()
-        fun readDirectory(relative: String) {
-            val path = "minimax-skills/$id" + if (relative.isEmpty()) "" else "/$relative"
-            val children = context.assets.list(path).orEmpty()
-            if (children.isEmpty()) {
-                files[relative] = context.assets.open(path).bufferedReader(Charsets.UTF_8).use { it.readText() }
-            } else children.forEach { child -> readDirectory(if (relative.isEmpty()) child else "$relative/$child") }
-        }
-        readDirectory("")
-        files
-    }
+    private val store = LocalSkillStore(
+        storageWorkspace,
+        bundleFiles = { id ->
+            val files = linkedMapOf<String, String>()
+            fun readDirectory(relative: String) {
+                val path = "minimax-skills/$id" + if (relative.isEmpty()) "" else "/$relative"
+                val children = context.assets.list(path).orEmpty()
+                if (children.isEmpty()) {
+                    files[relative] = context.assets.open(path).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                } else children.forEach { child -> readDirectory(if (relative.isEmpty()) child else "$relative/$child") }
+            }
+            readDirectory("")
+            files
+        },
+        creativeBundleFiles = { id ->
+            val files = linkedMapOf<String, ByteArray>()
+            fun readDirectory(relative: String) {
+                val path = "creative-skills/$id" + if (relative.isEmpty()) "" else "/$relative"
+                val children = context.assets.list(path).orEmpty()
+                if (children.isEmpty()) {
+                    require(relative.isNotEmpty()) { "内置设计技能资源缺失：$id" }
+                    files[relative] = context.assets.open(path).use { it.readBytes() }
+                } else children.forEach { child -> readDirectory(if (relative.isEmpty()) child else "$relative/$child") }
+            }
+            readDirectory("")
+            files
+        },
+    )
     fun initializeDefaults() {
         LocalSkillPackageUpdater(storageWorkspace).recoverInterruptedTransactions()
         val removed = store.seedOnce()
