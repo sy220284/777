@@ -4,7 +4,7 @@
 
 ## 当前唯一有效交付入口
 
-- **[V6.3 当前 Compose 真实实现规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)**：三主题的真实 ARGB、L1–L5 材质、区域透明度、尺寸、动效、触觉、7 条顶层路由、21 个设置二级页、工作/聊天/工具等交互与退役清单。
+- **[V6.3 当前 Compose 真实实现规范](V6-CURRENT-IMPLEMENTATION.zh-CN.md)**：双主题的真实 ARGB、L1–L5 材质、区域透明度、尺寸、动效、触觉、7 条顶层路由、21 个设置二级页、工作/聊天/工具等交互与退役清单。
 - **[现行页面与退役入口机器清单](current-ui.json)**：`LocalFeatureCatalog` 和 `SettingsDestination` 的对应关系及历史合并事实，按现行原生路由组织，不再按历史样张编号。
 - **[打开当前手机单列交互设计稿](mobile/app.html)**：本轮按主线重新组织，只允许当前仍有真实入口的页面/状态。它是离线交互投影，**不是 Android 真实截图，也不是 Figma 已同步证明**。
 - [可复用 SVG 入口图标](sy-entry-icons.svg)、[图标源文件映射](SY-ENTRY-ICONS.zh-CN.md)、[文件类 SVG](assets/file-icons-preview.svg)、[现行设计与实现状态](STATUS.zh-CN.md)。其中原代码保留 26 个原始 SVG 路径，**仅 24 个属于当前现行功能入口**；`Projects`、`RunCenter` 为历史退役入口，在新版交付素材中剔除，不以路径存在恢复 UI。详见图标规范。
@@ -25,7 +25,7 @@
 
 `ShenyanFoundation.kt` → `SyColors / SyMetric / SyMotion / SyMaterialPolicy`；`ShenyanMaterialColor.kt` → 动态壁纸区域取色和文字对比；`ShenyanMaterial.kt` → 五层材质和实际模糊；`AppBackground.kt / SySceneBackgroundSurface` → 全局连续场景；`ui/shenyan` 只做代理桥接。禁止每个页面自己生成一套色板、过度透明底、过渡曲线或带背景的图标盒。
 
-当前只有 Android 手机设计，原尺寸参考 393/412dp，另须覆盖 320/360dp 与系统放大字体。典雅白、烟熏玻璃、哑光黑为 V6 三个视觉模式；系统跟随属于设置策略，不是第四套独立材质。只要最终编译并不等于全场景视觉验收。
+当前只有 Android 手机设计，原尺寸参考 393/412dp，另须覆盖 320/360dp 与系统放大字体。典雅白、磨砂黑为 V6 两个视觉模式；系统跟随属于设置策略，不是第四套独立材质。只要最终编译并不等于全场景视觉验收。
 
 ## 已废弃来源与历史合并记录
 
@@ -52,7 +52,7 @@ Figma 当前 Starter MCP 配额耗尽，未写入可编辑画布；Canva 未检�
 - **1 处 Material 搜索默认图标**已在设计系统 `SySearchBar` 内换成 V6 搜索线条；应用启动、通知栏蝴蝶与透明启动占位是明确的品牌/系统例外，不作为 24dp 操作图标强制重绘。
 - [图标质量核验脚本](audit-all-icons.py) 逐项比较 Kotlin/Android XML 与可编辑 SVG 的真实 pathData、尺寸、描边、目录数量，运行于 CI，不仅依赖 README 统计。
 
-- [V6.3 全图标三主题检查画廊](icon-gallery.html)：按 24+61+20+11+12 五类展示 SVG 实物，支持暖纸、烟熏玻璃、哑光黑切换。它是设计目测载体，实际 Android 图标以 Compose/XML 为准。
+- [V6.3 全图标双主题检查画廊](icon-gallery.html)：按 24+61+20+11+12 五类展示 SVG 实物，支持典雅白、磨砂黑切换。它是设计目测载体，实际 Android 图标以 Compose/XML 为准。
 
 ## 图标资源规范
 
