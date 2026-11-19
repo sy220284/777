@@ -215,10 +215,12 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            python3 tools/ui/device_video.py --name extension-market --output app/build/outputs/ui-audit/videos -- \
-              python3 tools/ci/run_prebuilt_android_tests.py --suite extension-market --classes \
-              com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest,com.labteto.dshmobile.local.tools.LocalMcpCredentialStoreAndroidTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthCallbackAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerCallerAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpExternalLoopbackProtocolAndroidTest
+          script: >-
+            python3 tools/ui/device_video.py --name extension-market
+            --output app/build/outputs/ui-audit/videos --
+            python3 tools/ci/run_prebuilt_android_tests.py
+            --suite extension-market --classes
+            com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest,com.labteto.dshmobile.local.tools.LocalMcpCredentialStoreAndroidTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthCallbackAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerCallerAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpExternalLoopbackProtocolAndroidTest
       - name: 输出测试失败断言
         if: failure()
         run: |
@@ -268,9 +270,10 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            python3 tools/ci/run_prebuilt_android_tests.py --suite session-storage --classes \
-              com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest,com.labteto.dshmobile.local.session.LocalLegacySqliteMigrationAndroidTest,com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalogAndroidTest,com.labteto.dshmobile.local.session.SqliteImageAttachmentGcAndroidTest,com.labteto.dshmobile.local.session.SqliteStorageArchiveAndroidTest,com.labteto.dshmobile.local.session.SqliteSessionMediaRestoreAndroidTest,com.labteto.dshmobile.local.attachment.LocalPdfScopedRequestAndroidTest,com.labteto.dshmobile.local.usage.TokenUsageDatabaseAndroidTest
+          script: >-
+            python3 tools/ci/run_prebuilt_android_tests.py
+            --suite session-storage --classes
+            com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest,com.labteto.dshmobile.local.session.LocalLegacySqliteMigrationAndroidTest,com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalogAndroidTest,com.labteto.dshmobile.local.session.SqliteImageAttachmentGcAndroidTest,com.labteto.dshmobile.local.session.SqliteStorageArchiveAndroidTest,com.labteto.dshmobile.local.session.SqliteSessionMediaRestoreAndroidTest,com.labteto.dshmobile.local.attachment.LocalPdfScopedRequestAndroidTest,com.labteto.dshmobile.local.usage.TokenUsageDatabaseAndroidTest
       - name: 输出测试失败断言
         if: failure()
         run: |
