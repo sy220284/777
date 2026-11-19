@@ -34,7 +34,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySlider
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
@@ -96,7 +96,7 @@ internal fun CharacterBehaviorTuningDialog(
         scrollable = true,
         dismissEnabled = !saving,
         footer = {
-            saveError?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = colors.dangerInk) }
+            saveError?.let { Text(it, style = SyType.caption11.withReadingWeight(), color = colors.dangerInk) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 SyButton(
                     text = stringResource(R.string.local_character_tuning_restore),
@@ -135,13 +135,13 @@ internal fun CharacterBehaviorTuningDialog(
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
             LocalPersonaHeaderAvatar(name = personaName, portraitPath = portraitPath)
             Column {
-                Text(personaName, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
+                Text(personaName, style = SyType.base16Strong.withReadingWeight(), color = colors.text)
                 Text(listOf(relationshipState, mood).filter(String::isNotBlank).joinToString(" · "),
-                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
             }
         }
         Text(stringResource(R.string.local_character_tuning_subtitle),
-            style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+            style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         if (temperatureTuningAvailable) {
             BehaviorSlider(
                 title = stringResource(R.string.local_character_tuning_expression_variation),
@@ -162,10 +162,10 @@ internal fun CharacterBehaviorTuningDialog(
             )
         } else {
             Text(stringResource(R.string.local_composer_temperature_unavailable),
-                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         }
         evolution.lastMajorMilestone.takeIf(String::isNotBlank)?.let {
-            Text(it, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+            Text(it, style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         }
     }
 }
@@ -196,13 +196,13 @@ private fun BehaviorSlider(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 title,
-                style = DsType.std14Strong.withReadingWeight(),
+                style = SyType.std14Strong.withReadingWeight(),
                 color = colors.text,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 displayValue ?: "$valueLabel · $clean",
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.personaInk,
             )
         }
@@ -218,9 +218,9 @@ private fun BehaviorSlider(
                 .semantics { contentDescription = title },
         )
         Row(Modifier.fillMaxWidth()) {
-            Text(low, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+            Text(low, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
             Spacer(Modifier.weight(1f))
-            Text(high, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+            Text(high, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
         }
     }
 }

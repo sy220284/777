@@ -48,9 +48,9 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyCategoryRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyAnimations
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -132,13 +132,13 @@ internal fun FirstLaunchOnboarding(
                     }
                     Text(
                         stringResource(title),
-                        style = DsType.large20.withReadingWeight(),
+                        style = SyType.large20.withReadingWeight(),
                         color = colors.text,
                         textAlign = TextAlign.Center,
                     )
                     Text(
                         stringResource(subtitle),
-                        style = DsType.std14.withReadingWeight(),
+                        style = SyType.std14.withReadingWeight(),
                         color = colors.textSecondary,
                         textAlign = TextAlign.Center,
                     )

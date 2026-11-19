@@ -64,8 +64,8 @@ import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
@@ -397,7 +397,7 @@ internal fun CharacterDiaryScreen(
                                 )
                             },
                             singleLine = true,
-                            shape = DsShapes.block,
+                            shape = SyShapes.block,
                         )
                     }
                     item(key = "diary-filters") {
@@ -416,7 +416,7 @@ internal fun CharacterDiaryScreen(
                 if (sourceError) {
                     item(key = "diary-source-error") {
                         Text(stringResource(R.string.chat_diary_source_unavailable),
-                            color = colors.dangerInk, style = DsType.small13.withReadingWeight())
+                            color = colors.dangerInk, style = SyType.small13.withReadingWeight())
                     }
                 }
 
@@ -565,7 +565,7 @@ internal fun CharacterDiaryScreen(
             )
             if (mutationError) Text(
                 stringResource(R.string.chat_diary_save_failed),
-                style = DsType.small13.withReadingWeight(), color = colors.dangerInk,
+                style = SyType.small13.withReadingWeight(), color = colors.dangerInk,
             )
         }
     }
@@ -607,9 +607,9 @@ internal fun CharacterDiaryScreen(
             },
         ) {
             Text(stringResource(R.string.chat_diary_deactivate_hint),
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
             if (mutationError) Text(stringResource(R.string.chat_diary_save_failed),
-                style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+                style = SyType.small13.withReadingWeight(), color = colors.dangerInk)
         }
     }
 }
@@ -637,7 +637,7 @@ private fun CharacterDiaryDayCard(
             // A personal journal: date and voice lead; source tools are quiet.
             Text(
                 text = dateText,
-                style = DsType.titleSerif20.withReadingWeight(),
+                style = SyType.titleSerif20.withReadingWeight(),
                 color = colors.text,
                 modifier = Modifier.fillMaxWidth().testTag("diary_day_" + day.key),
             )
@@ -647,13 +647,13 @@ private fun CharacterDiaryDayCard(
                         R.string.chat_diary_private_voice
                     else R.string.chat_diary_legacy_excerpt,
                 ),
-                style = DsType.caption11Strong.withReadingWeight(),
+                style = SyType.caption11Strong.withReadingWeight(),
                 color = colors.textTertiary,
             )
             Text(
                 text = characterDiaryDayNarrative(day.entries),
-                style = DsType.chatBody.withReadingWeight().copy(
-                    fontFamily = DsType.titleFont,
+                style = SyType.chatBody.withReadingWeight().copy(
+                    fontFamily = SyType.titleFont,
                     lineHeight = 29.sp,
                 ),
                 color = colors.text,
@@ -684,7 +684,7 @@ private fun CharacterDiaryDayCard(
                                 ChatDiaryReadingVocabulary.TECHNICAL_USER,
                                 ChatDiaryReadingVocabulary.OTHER_PERSON,
                             ),
-                            style = DsType.std14.withReadingWeight(),
+                            style = SyType.std14.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("diary_raw_event_" + entry.id),
                         )

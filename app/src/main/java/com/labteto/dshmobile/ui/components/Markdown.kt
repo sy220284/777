@@ -50,8 +50,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.foundation.SyColors
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.DshTheme
 
@@ -67,7 +67,7 @@ fun MarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     allowCodeCopy: Boolean = true,
-    bodyStyle: TextStyle = DsType.mdBody,
+    bodyStyle: TextStyle = SyType.mdBody,
     preserveSoftLineBreaks: Boolean = false,
     streaming: Boolean = false,
 ) {
@@ -81,10 +81,10 @@ fun MarkdownText(
             when (block) {
                 is MdBlock.Heading -> {
                     val style = when (block.level) {
-                        1 -> DsType.mdH1
-                        2 -> DsType.mdH2
-                        3 -> DsType.mdH3
-                        else -> DsType.mdH4
+                        1 -> SyType.mdH1
+                        2 -> SyType.mdH2
+                        3 -> SyType.mdH3
+                        else -> SyType.mdH4
                     }
                     InlineMarkdown(block.text, style.copy(color = colors.text), Modifier.padding(top = 10.dp))
                 }
@@ -432,7 +432,7 @@ private fun InlineMarkdown(text: String, style: TextStyle, modifier: Modifier = 
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val effectiveStyle = style.withReadingWeight()
     val codeStyle = effectiveStyle.copy(
-        fontFamily = DsType.codeFont,
+        fontFamily = SyType.codeFont,
         color = colors.text,
     )
     val result = remember(text, effectiveStyle, codeStyle, colors) {
@@ -561,7 +561,7 @@ private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(DsShapes.block)
+            .clip(SyShapes.block)
             .background(colors.materialL3)
             .height(IntrinsicSize.Min)
             .padding(vertical = 10.dp, horizontal = 12.dp),
@@ -577,7 +577,7 @@ private fun MdBlockquote(block: MdBlock.Blockquote, bodyStyle: TextStyle) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (title != null) Text(
                 title,
-                style = DsType.mdSmall.withReadingWeight().copy(fontWeight = FontWeight.SemiBold),
+                style = SyType.mdSmall.withReadingWeight().copy(fontWeight = FontWeight.SemiBold),
                 color = if (kind == MarkdownCalloutKind.WARNING) colors.warningInk
                     else if (kind == MarkdownCalloutKind.IMPORTANT) colors.primary
                     else colors.text,
@@ -610,8 +610,8 @@ private fun MarkdownTable(block: MdBlock.Table) {
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .clip(DsShapes.block)
-            .border(1.dp, colors.border, DsShapes.block),
+            .clip(SyShapes.block)
+            .border(1.dp, colors.border, SyShapes.block),
     ) {
         fun textAlign(column: Int): TextAlign = when (block.alignments.getOrElse(column) { TableAlignment.START }) {
             TableAlignment.START -> TextAlign.Start
@@ -623,7 +623,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
             block.header.forEachIndexed { column, cell ->
                 InlineMarkdown(
                     cell,
-                    DsType.mdSmall.copy(
+                    SyType.mdSmall.copy(
                         color = colors.text,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = textAlign(column),
@@ -640,7 +640,7 @@ private fun MarkdownTable(block: MdBlock.Table) {
                 block.header.indices.forEach { column ->
                     InlineMarkdown(
                         row.getOrElse(column) { "" },
-                        DsType.mdSmall.copy(
+                        SyType.mdSmall.copy(
                             color = colors.text,
                             textAlign = textAlign(column),
                         ),
@@ -676,9 +676,9 @@ private fun CodeBlock(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(DsShapes.block)
+            .clip(SyShapes.block)
             .background(colors.materialL2)
-            .border(1.dp, colors.border, DsShapes.block),
+            .border(1.dp, colors.border, SyShapes.block),
     ) {
         Row(
             modifier = Modifier
@@ -689,7 +689,7 @@ private fun CodeBlock(
         ) {
             Text(
                 lang ?: stringResource(R.string.markdown_code_language),
-                style = DsType.caption11Strong.withReadingWeight().copy(fontFamily = DsType.codeFont),
+                style = SyType.caption11Strong.withReadingWeight().copy(fontFamily = SyType.codeFont),
                 color = colors.textSecondary,
                 modifier = Modifier.weight(1f),
             )
@@ -697,7 +697,7 @@ private fun CodeBlock(
                 Box(
                     modifier = Modifier
                         .size(SyMetric.touch)
-                        .clip(DsShapes.chip)
+                        .clip(SyShapes.chip)
                         .clickable {
                             clipboard.setText(AnnotatedString(code))
                             copied = true
@@ -721,7 +721,7 @@ private fun CodeBlock(
         ) {
             Text(
                 styledCode,
-                style = DsType.mdCode.withReadingWeight(),
+                style = SyType.mdCode.withReadingWeight(),
                 color = colors.text,
                 softWrap = false,
             )

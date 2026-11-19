@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion
-import com.labteto.dshmobile.ui.theme.DsAnimations
+import com.labteto.dshmobile.ui.theme.SyAnimations
 import com.shenyan.designsystem.foundation.SyMetric
 import kotlinx.coroutines.delay
 
@@ -44,11 +44,11 @@ internal fun FluidPersonaGalleryGrid(
     ) {
         itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
             var appeared by rememberSaveable(entry.id, animateEntrance) {
-                mutableStateOf(!animateEntrance || index >= DsAnimations.cascadeMaxItems)
+                mutableStateOf(!animateEntrance || index >= SyAnimations.cascadeMaxItems)
             }
             LaunchedEffect(entry.id, animateEntrance) {
                 if (!appeared) {
-                    delay(index.coerceAtMost(DsAnimations.cascadeMaxItems - 1) *
+                    delay(index.coerceAtMost(SyAnimations.cascadeMaxItems - 1) *
                         motion.duration(motion.cascadeStaggerMs, reduced, tempo).toLong())
                     appeared = true
                 }

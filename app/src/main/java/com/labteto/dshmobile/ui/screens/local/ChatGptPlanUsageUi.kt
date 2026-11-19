@@ -16,8 +16,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 internal fun isChatGptPlanUsageError(message: String?): Boolean {
@@ -56,7 +56,7 @@ internal fun LocalConversationErrorCard(
 
     Surface(
         color = colors.warning.copy(alpha = .18f),
-        shape = DsShapes.block,
+        shape = SyShapes.block,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = SyMetric.gapLg),
@@ -69,7 +69,7 @@ internal fun LocalConversationErrorCard(
         ) {
             Text(
                 message,
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.dangerInk,
             )
             when {
