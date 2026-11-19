@@ -37,6 +37,26 @@ class CiSelectChecksTest(unittest.TestCase):
         self.assertEqual(tool.select_checks(["tools/ui/run-native-ui-audit.py"]),
                          {"ui": True, "market": True, "migration": False})
 
+    def test_mixed_pr_cannot_hide_ordinary_app_device_checks(self):
+        paths = [
+            "app/src/test/java/com/labteto/dshmobile/local/tools/ToolTest.kt",
+            "app/src/main/AndroidManifest.xml",
+        ]
+        self.assertEqual(tool.select_checks(paths),
+                         {"ui": True, "market": True, "migration": False})
+
+    def test_deleted_source_must_still_be_diffed(self):
+        import os
+        from unittest.mock import patch
+        with patch.dict(os.environ, {
+            "GITHUB_EVENT_NAME": "pull_request",
+            "CI_BASE_SHA": "a" * 40,
+            "CI_HEAD_SHA": "b" * 40,
+        }):
+            with patch.object(tool.subprocess, "check_output", return_value=b"app/src/main/AndroidManifest.xml\\0") as diff:
+                self.assertEqual(tool.changed_files(), ["app/src/main/AndroidManifest.xml"])
+                self.assertIn("D", diff.call_args.args[0][3])
+
     def test_manual_runs_full(self):
         self.assertEqual(tool.select_checks([], manual=True),
                          {"ui": True, "market": True, "migration": True})
