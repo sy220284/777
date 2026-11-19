@@ -5,6 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -218,7 +222,8 @@ private fun AtlasGestures() {
  * This is actual Compose + AGSL output, rather than a static image mockup. */
 @Composable
 private fun AtlasLiquidOptics() {
-    var left by remember { mutableFloatStateOf(36f) }
+    var left by remember { mutableFloatStateOf(22f) }
+    var top by remember { mutableFloatStateOf(37f) }
     var revision by remember { mutableIntStateOf(1) }
     val words = listOf(
         "玻璃光学 · 文字在边缘产生弯折",
@@ -238,24 +243,45 @@ private fun AtlasLiquidOptics() {
         }
     }
     AtlasHeading("真实像素折射 · 玻璃透过文字")
-    SyLiveGlassScene(
-        modifier = Modifier.fillMaxWidth().height(192.dp)
-            .clip(RoundedCornerShape(22.dp)).background(substrate),
-        underlay = { backing(Modifier) },
-        glass = {
-            SyMaterialSurface(
-                modifier = Modifier.align(Alignment.TopStart).offset(x = left.dp, y = 37.dp)
-                    .width(254.dp).height(115.dp).testTag("sy-liquid-optical-lens"),
-                tier = SyMaterialTier.L2_BAR,
-            ) {
-                Box(Modifier.fillMaxSize().padding(9.dp), contentAlignment = Alignment.BottomEnd) {
-                    Text("液态光学", color = ink,
-                        style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        },
-    )
-    Slider(value = left, onValueChange = { left = it }, valueRange = 4f..112f)
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // Keep the whole lens visible at 320dp and with large system font scale.
+        val maxLeft = (maxWidth - 254.dp).value.coerceAtLeast(0f)
+        Column {
+            SyLiveGlassScene(
+                modifier = Modifier.fillMaxWidth().height(192.dp)
+                    .clip(RoundedCornerShape(22.dp)).background(substrate),
+                underlay = { backing(Modifier) },
+                glass = {
+                    SyMaterialSurface(
+                        modifier = Modifier.align(Alignment.TopStart)
+                            .offset(x = left.coerceIn(0f, maxLeft).dp,
+                                y = top.coerceIn(0f, 77f).dp)
+                            .width(254.dp).height(115.dp)
+                            .pointerInput(maxLeft, density) {
+                                detectDragGestures { change, drag ->
+                                    left = (left + drag.x / density.density)
+                                        .coerceIn(0f, maxLeft)
+                                    top = (top + drag.y / density.density)
+                                        .coerceIn(0f, 77f)
+                                    change.consume()
+                                }
+                            }
+                            .testTag("sy-liquid-optical-lens"),
+                        tier = SyMaterialTier.L2_BAR,
+                    ) {
+                        Box(Modifier.fillMaxSize().padding(9.dp),
+                            contentAlignment = Alignment.BottomEnd) {
+                            Text("液态光学", color = ink,
+                                style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                },
+            )
+            Slider(value = left.coerceIn(0f, maxLeft),
+                onValueChange = { left = it }, valueRange = 0f..maxLeft.coerceAtLeast(1f))
+        }
+    }
     SyButton("刷新实时文字", { revision++ }, style = SyButtonStyle.SECONDARY)
 }
 
