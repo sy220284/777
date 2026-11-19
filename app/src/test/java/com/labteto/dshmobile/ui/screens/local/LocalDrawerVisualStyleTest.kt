@@ -18,10 +18,13 @@ class LocalDrawerVisualStyleTest {
             assertTrue((thumb.luminance() + .05f) / .05f >= 4.5f)
         }
     }
-    @Test fun matteDrawerUsesOpaqueThemeSurfaces() {
+    @Test fun matteDrawerTracksTheActualSceneInsteadOfForcingOpaqueTiles() {
         val colors = ShenyanPalettes.matte
-        val (track, thumb) = drawerModeSurfaceColors(colors, Color(0xFFE7BA8F))
-        org.junit.Assert.assertEquals(colors.materialL1, track)
-        org.junit.Assert.assertEquals(colors.materialL4, thumb)
+        val amber = drawerModeSurfaceColors(colors, Color(0xFFE7BA8F))
+        val olive = drawerModeSurfaceColors(colors, Color(0xFF366C48))
+        assertNotEquals("Wallpaper tint must affect dark navigation", amber.first, olive.first)
+        assertNotEquals(colors.materialL1, amber.first)
+        assertTrue(amber.first.luminance() < .5f)
+        assertTrue(amber.second.luminance() < .5f)
     }
 }
