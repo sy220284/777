@@ -55,7 +55,7 @@ class CiSelectChecksTest(unittest.TestCase):
         }):
             with patch.object(tool.subprocess, "check_output", return_value=b"app/src/main/AndroidManifest.xml\0") as diff:
                 self.assertEqual(tool.changed_files(), ["app/src/main/AndroidManifest.xml"])
-                self.assertIn("D", diff.call_args.args[0][3])
+                self.assertIn("D", diff.call_args.args[0][2])
 
     def test_manual_runs_full(self):
         self.assertEqual(tool.select_checks([], manual=True),
