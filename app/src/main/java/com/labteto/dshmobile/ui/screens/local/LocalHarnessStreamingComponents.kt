@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyActivityIndicator
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,7 +27,7 @@ import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.StateFlow
 
@@ -77,11 +77,11 @@ internal fun LocalStreamingChatTurn(
         }
         if (stream.reasoning.isBlank() && visibleReply.isBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                SyActivityIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(SyMetric.gapMd))
                 Text(
                     stringResource(R.string.local_chat_replying),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
@@ -132,7 +132,7 @@ internal fun LocalStreamingWorkPreview(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            SyActivityIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             Text(
                 stringResource(
                     if (waitingForUser) R.string.local_work_waiting_for_user
@@ -145,13 +145,13 @@ internal fun LocalStreamingWorkPreview(
                     else R.string.local_work_process_preparing,
                     stream.attempt,
                 ),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
         }
         if (visiblePreview) {
             SelectionContainer {
-                MarkdownText(text = text, bodyStyle = DsType.workBody, streaming = true)
+                MarkdownText(text = text, bodyStyle = SyType.workBody, streaming = true)
             }
         }
     }

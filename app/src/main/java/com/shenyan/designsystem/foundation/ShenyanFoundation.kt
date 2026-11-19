@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /** 完全独立的新组件库，不依赖 777 旧版 DsTheme / DsButton / Ds*。 */
-enum class ShenyanMode { LIGHT, DARK, MATTE }
+enum class ShenyanMode { LIGHT, MATTE }
 
 @Immutable
 data class SyColors(
@@ -40,7 +40,7 @@ data class SyColors(
     val primaryPressed: Color = Color(0xFFD9926B),
     val onPrimary: Color = Color(0xFF3A342D),
     val mint: Color = Color(0xFF7FBFA8),
-    val lilac: Color = Color(0xFFB9A0D4),
+    val lilac: Color = Color(0xFF8E9A72),
     val warning: Color = Color(0xFFE0A458),
     val danger: Color = Color(0xFFD9705F),
     val selected: Color,
@@ -51,7 +51,7 @@ data class SyColors(
     val actionFill: Color get() = primary
     val actionInk: Color get() = onPrimary
     val linkInk: Color get() = syReadableInk(
-        if (primary == Color(0xFFE8A87C)) Color(0xFF44618C) else primary, materialL5)
+        lerp(primary, text, .18f), materialL5)
     val personaInk: Color get() = syReadableInk(lilac, materialL5)
     val successInk: Color get() = if (text.luminance() < .5f) Color(0xFF2E6755) else mint
     val warningInk: Color get() = if (text.luminance() < .5f) Color(0xFF80511F) else warning
@@ -85,25 +85,15 @@ fun syReadableInk(accent: Color, background: Color, minimumRatio: Float = 4.5f):
 }
 
 private val Light = SyColors(
-    canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
-    // All material tiers share the warm canvas hue; increasing opacity, not whiteness, adds depth.
-    materialL1 = Color(0x4DEDE6DA), materialL2 = Color(0x75F1E8DC),
-    materialL3 = Color(0xA3F1E8DC), materialL4 = Color(0xE0F1E8DC),
-    materialL5 = Color(0xFFF1E8DC), materialSheen = Color(0x66F6F0E6),
-    surface = Color(0xA3F1E8DC), surfaceRaised = Color(0x75F1E8DC), surfaceSolid = Color(0xFFF1E8DC),
-    border = Color(0x66D3C5B5), text = Color(0xFF3A342D),
-    textSecondary = Color(0xFF6A6156), textTertiary = Color(0xFF70665A),
-    selected = Color(0xFFF2C7A8), overlay = Color(0x335A4837)
-)
-private val Dark = SyColors(
-    canvas = Color(0xFF24211E), topBar = Color(0xFF292521),
-    materialL1 = Color(0x1A302B27), materialL2 = Color(0x29302B27),
-    materialL3 = Color(0x4035302B), materialL4 = Color(0xE0312B26),
-    materialL5 = Color(0xFF35312D), materialSheen = Color(0x29FFF1DE),
-    surface = Color(0x4035302B), surfaceRaised = Color(0x29302B27), surfaceSolid = Color(0xFF35312D),
-    border = Color(0x21FFFFFF), text = Color(0xFFF5F0E8),
-    textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
-    selected = Color(0xFF60422F), overlay = Color(0x5C000000)
+    // 典雅白：亮白画布、白色卡片与黑色文字，通过细描边区分层次。
+    canvas = Color(0xFFFCFCFB), topBar = Color(0xFFFFFFFF),
+    materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0xC2FFFFFF),
+    materialL3 = Color(0xE6FFFFFF), materialL4 = Color(0xF7FFFFFF),
+    materialL5 = Color(0xFFFFFFFF), materialSheen = Color(0xB3FFFFFF),
+    surface = Color(0xE6FFFFFF), surfaceRaised = Color(0xC2FFFFFF), surfaceSolid = Color.White,
+    border = Color(0x38777777), text = Color.Black,
+    textSecondary = Color(0xFF353535), textTertiary = Color(0xFF595959),
+    onPrimary = Color.Black, selected = Color(0xFFF9EDE5), overlay = Color(0x33000000)
 )
 private val Matte = SyColors(
     canvas = Color(0xFF0F0F10), topBar = Color(0xFF18181A),
@@ -116,14 +106,27 @@ private val Matte = SyColors(
     selected = Color(0xFF573F30), overlay = Color(0x99000000)
 )
 
+/** Build a high-contrast, scene-coordinated accent rather than a fixed theme colour list.
+ * The host chooses the hue; every component consumes the same semantic palette.
+ */
+fun SyColors.withAccent(accent: Color): SyColors {
+    val opaque = accent.copy(alpha = 1f)
+    val onAccent = if (syInkContrastRatio(Color.Black, opaque) >= 4.5f)
+        Color.Black else Color.White
+    return copy(
+        primary = opaque,
+        primaryPressed = lerp(opaque, text, .14f),
+        onPrimary = onAccent,
+        selected = lerp(opaque, surfaceSolid, .76f),
+    )
+}
+
 /** Published read-only palettes; one source for Figma, native and migration adapters. */
 object ShenyanPalettes {
     val light: SyColors get() = Light
-    val dark: SyColors get() = Dark
     val matte: SyColors get() = Matte
     fun forMode(mode: ShenyanMode): SyColors = when (mode) {
         ShenyanMode.LIGHT -> Light
-        ShenyanMode.DARK -> Dark
         ShenyanMode.MATTE -> Matte
     }
 }
@@ -164,10 +167,10 @@ object SyMetric {
     val gapSection = 22.dp
     val gapPage = 34.dp
     val gapHero = 54.dp
-    val radiusSm = 9.dp
-    val radiusControl = 13.dp
-    val radiusCard = 18.dp
-    val radiusSheet = 24.dp
+    val radiusSm = 10.dp
+    val radiusControl = 14.dp
+    val radiusCard = 20.dp
+    val radiusSheet = 28.dp
 }
 /** Opacity response shared by V6 glass and retained legacy surface adapters. */
 object SyMaterialPolicy {
@@ -180,16 +183,20 @@ object SyMotion {
     // One motion vocabulary for the current V6 UI pack. Timing variants belong here,
     // not in screens or a second DsAnimations token collection.
     val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
-    const val pressedScale = .985f
+    const val pressedScale = .975f
     const val reducedMotionMs = 0
     fun duration(ms: Int, reducedMotion: Boolean, tempo: Float = 1f): Int =
         if (reducedMotion) reducedMotionMs
         else (ms * tempo.coerceIn(.7f, 1.3f)).roundToInt()
     // Responsive V6 motion: input first, geometry second; all lengths in milliseconds.
-    const val pressMs = 70
-    const val selectMs = 150
+    const val pressMs = 85
+    const val selectMs = 165
     const val dialogMs = 220
-    const val sheetMs = 280
+    const val sheetMs = 290
+    const val sheetDragSettleMs = 240
+    const val swipeRevealMs = 220
+    const val onboardingMs = 280
+    const val skeletonPulseMs = 950
     const val pushMs = 260
     const val morphMs = 260
     const val toolExpandMs = 170
@@ -225,13 +232,14 @@ fun ShenyanTheme(
     mode: ShenyanMode = ShenyanMode.LIGHT,
     reduceMotion: Boolean = false,
     reduceTransparency: Boolean = false,
+    accentColor: Color? = null,
     content: @Composable () -> Unit
 ) {
-    val colors = when (mode) {
+    val baseColors = when (mode) {
         ShenyanMode.LIGHT -> Light
-        ShenyanMode.DARK -> Dark
         ShenyanMode.MATTE -> Matte
     }
+    val colors = accentColor?.let(baseColors::withAccent) ?: baseColors
     val scheme = (if (mode == ShenyanMode.LIGHT) lightColorScheme(
         primary = colors.primary, onPrimary = colors.onPrimary,
         background = colors.canvas, onBackground = colors.text,

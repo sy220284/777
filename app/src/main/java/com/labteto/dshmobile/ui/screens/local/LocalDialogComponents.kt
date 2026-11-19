@@ -22,7 +22,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** A single-field rename dialog, shared by the session and workspace rename paths. */
@@ -40,7 +40,7 @@ internal fun RenameDialog(
             onValueChange = { text = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            placeholder = { Text(title, style = DsType.std14.withReadingWeight()) },
+            placeholder = { Text(title, style = SyType.std14.withReadingWeight()) },
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             SyButton(
@@ -69,7 +69,7 @@ internal fun ConfirmDialog(
     onConfirm: () -> Unit,
 ) {
     SyDialog(title = title, onDismiss = onDismiss) {
-        Text(body, style = DsType.std14.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+        Text(body, style = SyType.std14.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             SyButton(
                 text = stringResource(R.string.common_cancel),

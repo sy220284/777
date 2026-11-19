@@ -11,10 +11,10 @@ import androidx.compose.ui.unit.sp
 import com.labteto.dshmobile.R
 
 /**
- * Mobile type roles: page titles, body, supporting text and code have independent metrics.
+ * Shenyan typographic grammar: editorial titles, generous reading line-height and compact controls.
  * Reading preferences adjust weight without replacing the reference glyph families.
  */
-object DsType {
+object SyType {
     // Uploaded design: Outfit for Latin UI, existing CJK subsets for chrome, system fallback for prose.
     val uiFont = FontFamily(
         Font(R.font.fluid_outfit_400, FontWeight.Normal),
@@ -43,25 +43,25 @@ object DsType {
     )
 
     // Markdown roles
-    val mdH1 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp)
-    val mdH2 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Bold, fontSize = 21.sp, lineHeight = 30.sp)
+    val mdH1 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Bold, fontSize = 25.sp, lineHeight = 34.sp)
+    val mdH2 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 31.sp)
     val mdH3 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, lineHeight = 28.sp)
     val mdH4 = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 26.sp)
-    val mdBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
+    val mdBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 25.sp)
     val workBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 25.sp)
     val mdSmall = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val mdCode = TextStyle(fontFamily = codeFont, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 22.sp)
 
     // UI roles
     // Clear Realm navigation hierarchy. General UI is sans-serif; serif stays literary-only.
-    val largeTitle28 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp)
-    val title22 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp)
+    val largeTitle28 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 39.sp)
+    val title22 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 30.sp)
     val headline17 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
     val display24 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 33.sp)
     val hero26 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 34.sp)
     val large20 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
     val titleSerif20 = TextStyle(fontFamily = titleFont, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
-    val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 15.5.sp, lineHeight = 27.sp)
+    val base16 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 26.sp)
     val base16Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 15.5.sp, lineHeight = 27.sp)
     val std14 = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val std14Strong = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 23.sp)
@@ -79,12 +79,12 @@ object DsType {
     val drawerItem = navigationItem.copy(fontWeight = FontWeight.Medium)
     val drawerSession = navigationItem.copy(fontFamily = contentFont, fontSize = 14.sp, lineHeight = 23.sp, fontWeight = FontWeight.Normal)
     val drawerSection = caption11.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium)
-    val settingsItem = navigationItem.copy(fontSize = 14.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
+    val settingsItem = navigationItem.copy(fontSize = 15.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium)
 
     // Composer / rows / chat
     // User and assistant body text deliberately share the exact same metrics. Role distinction comes
     // from container, alignment and colour rather than an accidental font-size mismatch.
-    val chatBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 26.sp)
+    val chatBody = TextStyle(fontFamily = contentFont, fontWeight = FontWeight.Normal, fontSize = 15.5.sp, lineHeight = 26.sp)
     val bubbleText = chatBody
     val rowText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 23.sp)
     val tabText = TextStyle(fontFamily = uiFont, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)
@@ -103,26 +103,26 @@ fun TextStyle.adjustedReadingWeight(adjustment: Int): TextStyle {
 
 @Composable
 fun TextStyle.withReadingWeight(): TextStyle =
-    adjustedReadingWeight(LocalDsReadingPreferences.current.textWeightAdjustment)
+    adjustedReadingWeight(LocalSyReadingPreferences.current.textWeightAdjustment)
 
-/** Material 3 mapping: sizes follow DsType and weight follows the app-wide reading preference. */
-fun dsTypography(textWeightAdjustment: Int): Typography = Typography(
-    displayLarge = DsType.largeTitle28.adjustedReadingWeight(textWeightAdjustment),
-    displayMedium = DsType.display24.adjustedReadingWeight(textWeightAdjustment),
-    displaySmall = DsType.title22.adjustedReadingWeight(textWeightAdjustment),
-    headlineLarge = DsType.display24.adjustedReadingWeight(textWeightAdjustment),
-    headlineMedium = DsType.title22.adjustedReadingWeight(textWeightAdjustment),
-    headlineSmall = DsType.large20.adjustedReadingWeight(textWeightAdjustment),
-    titleLarge = DsType.large20.adjustedReadingWeight(textWeightAdjustment),
-    titleMedium = DsType.headline17.adjustedReadingWeight(textWeightAdjustment),
-    titleSmall = DsType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
-    bodyLarge = DsType.base16.copy(fontFamily = DsType.contentFont).adjustedReadingWeight(textWeightAdjustment),
-    bodyMedium = DsType.std14.copy(fontFamily = DsType.contentFont).adjustedReadingWeight(textWeightAdjustment),
-    bodySmall = DsType.small13.copy(fontFamily = DsType.contentFont).adjustedReadingWeight(textWeightAdjustment),
-    labelLarge = DsType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
-    labelMedium = DsType.small13Strong.adjustedReadingWeight(textWeightAdjustment),
-    labelSmall = DsType.caption11.adjustedReadingWeight(textWeightAdjustment),
+/** All app and canonical controls consume this same role-based Material 3 type scale. */
+fun syTypography(textWeightAdjustment: Int): Typography = Typography(
+    displayLarge = SyType.largeTitle28.adjustedReadingWeight(textWeightAdjustment),
+    displayMedium = SyType.display24.adjustedReadingWeight(textWeightAdjustment),
+    displaySmall = SyType.title22.adjustedReadingWeight(textWeightAdjustment),
+    headlineLarge = SyType.display24.adjustedReadingWeight(textWeightAdjustment),
+    headlineMedium = SyType.title22.adjustedReadingWeight(textWeightAdjustment),
+    headlineSmall = SyType.large20.adjustedReadingWeight(textWeightAdjustment),
+    titleLarge = SyType.large20.adjustedReadingWeight(textWeightAdjustment),
+    titleMedium = SyType.headline17.adjustedReadingWeight(textWeightAdjustment),
+    titleSmall = SyType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
+    bodyLarge = SyType.base16.copy(fontFamily = SyType.contentFont).adjustedReadingWeight(textWeightAdjustment),
+    bodyMedium = SyType.std14.copy(fontFamily = SyType.contentFont).adjustedReadingWeight(textWeightAdjustment),
+    bodySmall = SyType.small13.copy(fontFamily = SyType.contentFont).adjustedReadingWeight(textWeightAdjustment),
+    labelLarge = SyType.std14Strong.adjustedReadingWeight(textWeightAdjustment),
+    labelMedium = SyType.small13Strong.adjustedReadingWeight(textWeightAdjustment),
+    labelSmall = SyType.caption11.adjustedReadingWeight(textWeightAdjustment),
 )
 
 /** Kept for previews/tests that need the unadjusted baseline. */
-val DsTypography = dsTypography(0)
+val SyTypography = syTypography(0)

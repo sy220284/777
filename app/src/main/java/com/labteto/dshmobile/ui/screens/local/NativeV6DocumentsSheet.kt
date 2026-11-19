@@ -9,10 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.labteto.dshmobile.ui.shenyan.SyDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Slider
+import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SySwitchControl
+import com.shenyan.designsystem.components.SySliderControl
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -137,7 +136,7 @@ internal fun NativeV6DocumentsSheet(
                             current, workMode, msg, UiLocalDocumentTemplate.REPLY_FORM)) }
                     }, enabled = !busy, size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
                 }
-                OutlinedTextField(
+                SyTextField(
                     value = prompt, onValueChange = { prompt = it },
                     label = { Text("需要生成的交互文档") },
                     modifier = Modifier.fillMaxWidth(), maxLines = 3,
@@ -302,7 +301,7 @@ private fun NativeV6DocumentCard(
     }
     edit?.let { target ->
         SyDialog(title = "修改文档显示内容", onDismiss = { edit = null }) {
-    OutlinedTextField(value = editValue, onValueChange = { editValue = it },
+    SyTextField(value = editValue, onValueChange = { editValue = it },
                 modifier = Modifier.fillMaxWidth(), maxLines = 5)
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         SyButton("取消", onClick = { edit = null },
@@ -357,7 +356,7 @@ private fun NativeV6DocumentNode(
             }
             Text("${node.label}：$value", color = colors.textSecondary)
         }
-        is UiDocumentNode.Field -> OutlinedTextField(
+        is UiDocumentNode.Field -> SyTextField(
             value = fields[node.id] ?: node.initial,
             onValueChange = { onFieldChange(node.id, it) },
             label = { Text(node.label) }, modifier = Modifier.fillMaxWidth(),
@@ -368,21 +367,21 @@ private fun NativeV6DocumentNode(
         )
         is UiDocumentNode.Switch -> Row {
             Text(node.label, modifier = Modifier.weight(1f), color = colors.textSecondary)
-            Switch(checked = (fields[node.id] ?: node.initial.toString()) == "true",
+            SySwitchControl(checked = (fields[node.id] ?: node.initial.toString()) == "true",
                 onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = enabled)
         }
         is UiDocumentNode.Slider -> Column {
             val value = fields[node.id]?.toDoubleOrNull()?.coerceIn(node.minimum, node.maximum) ?: node.initial
             Text("${node.label}：${value.toBigDecimal().stripTrailingZeros().toPlainString()}",
                 color = colors.textSecondary)
-            Slider(value = value.toFloat(),
+            SySliderControl(value = value.toFloat(),
                 onValueChange = { update ->
                     val steps = kotlin.math.round((update.toDouble() - node.minimum) / node.step)
                     onFieldChange(node.id, (node.minimum + steps * node.step)
                         .coerceIn(node.minimum, node.maximum).toString())
                 },
                 valueRange = node.minimum.toFloat()..node.maximum.toFloat(),
-                steps = kotlin.math.round((node.maximum - node.minimum) / node.step).toInt() - 1,
+                steps = (kotlin.math.round((node.maximum - node.minimum) / node.step).toInt() - 1).coerceAtLeast(0),
                 enabled = enabled)
         }
         is UiDocumentNode.Calculated -> Column {

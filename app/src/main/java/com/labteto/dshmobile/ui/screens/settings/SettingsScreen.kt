@@ -20,7 +20,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,8 +40,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -58,7 +56,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -66,7 +63,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -82,6 +78,8 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SyMaterialFrame
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegment
@@ -95,7 +93,7 @@ import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.AccentPalettes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -479,7 +477,7 @@ fun SettingsScreen(
         )
         return
     }
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Box {
             Column(
                 modifier = Modifier
@@ -618,7 +616,7 @@ fun SettingsScreen(
                         }
                         Text(
                             "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textTertiary,
                             modifier = Modifier.fillMaxWidth()
                                 .padding(top = SyMetric.gapMd)
@@ -668,7 +666,7 @@ fun SettingsScreen(
                             )
                             Text(
                                 stringResource(R.string.settings_appearance_preview),
-                                style = DsType.std14Strong.withReadingWeight(),
+                                style = SyType.std14Strong.withReadingWeight(),
                                 color = colors.text,
                             )
                             AppearanceReadingPreview()
@@ -746,14 +744,14 @@ fun SettingsScreen(
                             if (!localHarness.chatStyleGuardEnabled) {
                                 Text(
                                     stringResource(R.string.settings_chat_filter_disabled_notice),
-                                    style = DsType.small13.withReadingWeight(),
+                                    style = SyType.small13.withReadingWeight(),
                                     color = colors.textSecondary,
                                 )
                             }
 
                             Text(
                                 stringResource(R.string.settings_chat_custom_filters_title, customFilters.size),
-                                style = DsType.small13Strong.withReadingWeight(),
+                                style = SyType.small13Strong.withReadingWeight(),
                                 color = colors.text,
                             )
                             Text(
@@ -762,7 +760,7 @@ fun SettingsScreen(
                                     MAX_CUSTOM_CHAT_FILTERS,
                                     MAX_CUSTOM_CHAT_FILTER_CHARS,
                                 ),
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                                 color = colors.textTertiary,
                             )
                             Row(
@@ -802,13 +800,13 @@ fun SettingsScreen(
 
                             Text(
                                 stringResource(R.string.settings_chat_persona_filters_title, personaFilters.size),
-                                style = DsType.small13Strong.withReadingWeight(),
+                                style = SyType.small13Strong.withReadingWeight(),
                                 color = colors.text,
                             )
                             if (personaFilters.isEmpty()) {
                                 Text(
                                     stringResource(R.string.settings_chat_persona_filters_empty),
-                                    style = DsType.caption11.withReadingWeight(),
+                                    style = SyType.caption11.withReadingWeight(),
                                     color = colors.textTertiary,
                                 )
                             } else {
@@ -834,7 +832,7 @@ fun SettingsScreen(
                                 if (showChatPreferenceDiagnostics) {
                                     Text(
                                         stringResource(R.string.settings_chat_guard_hits_title),
-                                        style = DsType.small13Strong.withReadingWeight(),
+                                        style = SyType.small13Strong.withReadingWeight(),
                                         color = colors.text,
                                     )
                                     localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
@@ -1012,7 +1010,7 @@ fun SettingsScreen(
                         SettingsCard(stringResource(R.string.settings_approval_mode_title)) {
                             Text(
                                 stringResource(R.string.settings_approval_mode_subtitle),
-                                style = DsType.small13.withReadingWeight(),
+                                style = SyType.small13.withReadingWeight(),
                                 color = colors.textSecondary,
                             )
                             Column(Modifier.selectableGroup()) {
@@ -1039,10 +1037,10 @@ fun SettingsScreen(
                                     ) {
                                         SyRadioControl(selected = mode == approvalMode, onClick = null)
                                         Column(Modifier.weight(1f)) {
-                                            Text(stringResource(title), style = DsType.std14Strong.withReadingWeight(),
+                                            Text(stringResource(title), style = SyType.std14Strong.withReadingWeight(),
                                                 color = colors.text)
                                             if (mode == approvalMode) {
-                                                Text(stringResource(detail), style = DsType.small13.withReadingWeight(),
+                                                Text(stringResource(detail), style = SyType.small13.withReadingWeight(),
                                                     color = colors.textSecondary)
                                             }
                                         }
@@ -1136,42 +1134,42 @@ fun SettingsScreen(
                             when {
                                 failure != null -> Text(
                                     "策略加载失败：${failure.message ?: "配置无效，请检查管理策略文件"}",
-                                    style = DsType.caption11.withReadingWeight(),
+                                    style = SyType.caption11.withReadingWeight(),
                                     color = colors.dangerInk,
                                 )
                                 policy == null -> Text(
                                     "正在读取当前执行策略…",
-                                    style = DsType.caption11.withReadingWeight(),
+                                    style = SyType.caption11.withReadingWeight(),
                                     color = colors.textSecondary,
                                 )
                                 else -> {
                                     Text(
                                         "网络：${if (policy.networkEnabled) "可用" else "已限制"}",
-                                        style = DsType.std14.withReadingWeight(),
+                                        style = SyType.std14.withReadingWeight(),
                                         color = colors.text,
                                     )
                                     Text(
                                         "手机操作按 Android 系统授权和工具审批执行。" +
                                             "此处显示网络与模型使用规则，其他管理项目会在实际支持后显示。",
-                                        style = DsType.caption11.withReadingWeight(),
+                                        style = SyType.caption11.withReadingWeight(),
                                         color = colors.textSecondary,
                                     )
                                     policy.allowedModelProviders?.let { providers ->
                                         Text("可用模型来源：${providers.joinToString().ifBlank { "全部受限" }}",
-                                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                                            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                                     }
                                     policy.allowedHosts?.let { hosts ->
                                         Text("网络允许列表：${hosts.joinToString().ifBlank { "全部受限" }}",
-                                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                                            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                                     }
                                     if (policy.deniedHosts.isNotEmpty()) Text(
                                         "被限制的域名：${policy.deniedHosts.joinToString()}",
-                                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
+                                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary,
                                     )
                                     Text(
                                         if (policy.managedRestrictions.isEmpty()) "当前无额外管理限制"
                                         else "管理策略锁定：${policy.managedRestrictions.joinToString("、")}",
-                                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
+                                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary,
                                     )
                                 }
                             }
@@ -1319,7 +1317,7 @@ private fun ChatFilterPhraseRow(
     ) {
         Text(
             text = "• " + phrase,
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textSecondary,
             modifier = Modifier.weight(1f),
         )
@@ -1360,8 +1358,23 @@ internal fun SettingsSeamlessGroup(
 
 @Composable
 internal fun SettingsCard(title: String, content: @Composable () -> Unit) {
-    // Lightweight settings share the same canvas. Explicit data/approval cards keep their own material.
-    SettingsSeamlessGroup(title, content)
+    // Structured settings use one shared L1 material; editorial/seamless sections keep
+    // SettingsSeamlessGroup's open layout so every page does not become a card grid.
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("settingsSeamlessGroup"),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
+        SettingsGroupTitle(title)
+        SyMaterialFrame(
+            modifier = Modifier.fillMaxWidth(),
+            tier = SyMaterialTier.L1_SECTION,
+            horizontalPadding = SyMetric.gapLg,
+            verticalPadding = SyMetric.gapMd,
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        ) {
+            content()
+        }
+    }
 }
 
 /** 更新检查是设置页内的即时操作，不占用独立导航层级。 */

@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,7 +47,6 @@ import com.labteto.dshmobile.local.tools.LocalWorkspaceFile
 import com.labteto.dshmobile.local.chat.LocalChatMode
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.session.LocalSessionSummary
-import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyIconBox
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.shenyan.designsystem.components.SyCheckboxControl
@@ -58,9 +56,9 @@ import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.relativeTime
-import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyAnimations
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** The drawer uses only public persona-card fields; private dialogue/diaries are never searched here. */
@@ -213,7 +211,7 @@ internal fun DrawerQuickAction(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = SyMetric.touch)
-            .clip(DsShapes.row)
+            .clip(SyShapes.row)
             .background(feedbackColor)
             .hoverable(interaction)
             .clickable(
@@ -228,7 +226,7 @@ internal fun DrawerQuickAction(
         SyIconBox(icon = icon, adaptivePlate = true)
         Text(
             title,
-            style = DsType.drawerItem.withReadingWeight(),
+            style = SyType.drawerItem.withReadingWeight(),
             color = colors.text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -250,14 +248,14 @@ internal fun DrawerSectionTitle(
     ) {
         Text(
             title,
-            style = DsType.drawerSection.withReadingWeight(),
+            style = SyType.drawerSection.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             modifier = Modifier.weight(1f),
         )
         count?.let {
             Text(
                 it.toString(),
-                style = DsType.navigationSupporting.withReadingWeight(),
+                style = SyType.navigationSupporting.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         }
@@ -286,7 +284,7 @@ internal fun LocalSessionDrawerRow(
     var menuOpen by remember(session.id) { mutableStateOf(false) }
     val pressAnchor = remember(session.id) { ContextMenuPressAnchor() }
     var menuAnchor by remember(session.id) { mutableStateOf<IntOffset?>(null) }
-    Box(Modifier.fillMaxWidth().clip(DsShapes.row)) {
+    Box(Modifier.fillMaxWidth().clip(SyShapes.row)) {
         Row(
             modifier = pressAnchor.observe(Modifier)
                 .combinedClickable(
@@ -295,7 +293,7 @@ internal fun LocalSessionDrawerRow(
                 )
                 .fillMaxWidth()
                 .heightIn(min = SyMetric.touch)
-                .clip(DsShapes.row)
+                .clip(SyShapes.row)
                 .background(
                     animateColorAsState(
                         targetValue = when {
@@ -331,7 +329,7 @@ internal fun LocalSessionDrawerRow(
                 ) {
                     Text(
                         displayTitle,
-                        style = DsType.drawerSession.copy(fontWeight = if (current) DsType.drawerItem.fontWeight else DsType.drawerSession.fontWeight).withReadingWeight(),
+                        style = SyType.drawerSession.copy(fontWeight = if (current) SyType.drawerItem.fontWeight else SyType.drawerSession.fontWeight).withReadingWeight(),
                         color = colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -349,7 +347,7 @@ internal fun LocalSessionDrawerRow(
                 searchModeLabel?.let { mode ->
                     Text(
                         mode,
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                         maxLines = 1,
                     )

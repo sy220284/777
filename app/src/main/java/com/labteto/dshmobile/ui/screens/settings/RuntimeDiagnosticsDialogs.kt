@@ -27,7 +27,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,7 +54,7 @@ internal fun NetworkDiagnosticDialog(
     ) {
         Text(
             stringResource(R.string.settings_runtime_network_diagnostic_intro),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         SyTextField(
@@ -91,7 +91,7 @@ internal fun NetworkDiagnosticDialog(
             SelectionContainer {
                 Text(
                     it,
-                    style = DsType.mdCode.withReadingWeight(),
+                    style = SyType.mdCode.withReadingWeight(),
                     color = colors.text,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
                 )
@@ -118,13 +118,13 @@ internal fun EnvironmentInfoDialog(
     ) {
         Text(
             stringResource(R.string.settings_runtime_environment_intro),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         SelectionContainer {
             Text(
                 text,
-                style = DsType.mdCode.withReadingWeight(),
+                style = SyType.mdCode.withReadingWeight(),
                 color = colors.text,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
             )
@@ -155,7 +155,7 @@ internal fun EnvironmentInfoDialog(
                 if (visible.isEmpty()) emptyEvents else visible.joinToString("\n") {
                     "${eventTime.format(Date(it.timestampMillis))} ${it.level}/${it.tag} ${it.throwableType.orEmpty()} ${sanitizeDiagnosticText(it.message).replace("\n", " ").take(240)}"
                 },
-                style = DsType.mdCode.withReadingWeight(),
+                style = SyType.mdCode.withReadingWeight(),
                 color = colors.text,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).verticalScroll(rememberScrollState()),
             )
@@ -183,7 +183,7 @@ internal fun DiagnosticReviewDialog(
     ) {
         Text(
             "请先核对以下完整报告。分享将调用 Android 应用选择器，由你指定接收方；保存只写入所选位置。",
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         SelectionContainer {
@@ -192,12 +192,12 @@ internal fun DiagnosticReviewDialog(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp)
                     .verticalScroll(rememberScrollState())
                     .then(Modifier),
-                style = DsType.mdCode.withReadingWeight(),
+                style = SyType.mdCode.withReadingWeight(),
                 color = colors.text,
             )
         }
         Text("共 ${report.toByteArray(Charsets.UTF_8).size} 字节，以下操作使用当前预览的同一版本。",
-            style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+            style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         SyButton(text = "保存此报告", onClick = onExport,
             enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("diagnostic-reviewed-export"))
         SyButton(text = "选择应用分享", onClick = onShare,

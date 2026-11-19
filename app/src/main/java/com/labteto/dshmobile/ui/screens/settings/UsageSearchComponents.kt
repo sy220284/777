@@ -21,7 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.web.LocalSearchUsageSnapshot
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
@@ -89,7 +89,7 @@ internal fun UsageSearchSection(
         )
         Text(
             stringResource(R.string.usage_search_independent),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textSecondary,
         )
     }
@@ -116,7 +116,7 @@ internal fun UsageSearchSection(
             ) {
                 Text(
                     if (count > 0) formatNumber(count) else "",
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 Box(
@@ -131,7 +131,7 @@ internal fun UsageSearchSection(
                 }
                 Text(
                     formatEpochDay(day),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                 )
             }
@@ -140,7 +140,7 @@ internal fun UsageSearchSection(
     if (usage.requests == 0L) {
         Text(
             stringResource(R.string.usage_search_no_data),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
     }

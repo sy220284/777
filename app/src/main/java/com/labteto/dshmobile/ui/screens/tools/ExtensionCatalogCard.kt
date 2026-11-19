@@ -12,13 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -26,9 +27,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
+import com.shenyan.designsystem.foundation.syReadableInk
+import com.shenyan.designsystem.foundation.SyMetric
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 
 /** One selectable marketplace row. All actions belong to the detail destination.
  * This is the sole row implementation; it does not retain a second card/action mode.
@@ -48,23 +53,24 @@ internal fun ExtensionCatalogCard(
     onOpen: () -> Unit,
 ) {
     val colors = LocalSyColors.current
-    Surface(
+    val tile = if (documentIcon == null && brandLogo == null) lerp(colors.materialL4, accent, .10f)
+        else colors.materialL4
+    SyMaterialSurface(
         modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-card-$id"),
         onClick = onOpen,
         enabled = enabled,
-        color = colors.materialL4,
-        shape = RoundedCornerShape(15.dp),
+        tier = SyMaterialTier.L3_CARD,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 66.dp)
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
+            SyFlatSurface(
                 modifier = Modifier.size(42.dp).testTag("$tagPrefix-icon-$id"),
-                color = if (documentIcon == null && brandLogo == null)
-                    accent.copy(alpha = 0.09f) else colors.materialL4,
+                color = tile,
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -78,7 +84,7 @@ internal fun ExtensionCatalogCard(
                             modifier = Modifier.size(36.dp),
                         )
                         else -> Icon(
-                            icon, contentDescription = null, tint = accent,
+                            icon, contentDescription = null, tint = syReadableInk(accent, tile, 3f),
                             modifier = Modifier.size(23.dp),
                         )
                     }
@@ -91,22 +97,22 @@ internal fun ExtensionCatalogCard(
                 Text(
                     title,
                     modifier = Modifier.fillMaxWidth().testTag("$tagPrefix-title-$id"),
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 Text(
                     description,
                     modifier = Modifier.testTag("$tagPrefix-detail-$id"),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
-                    maxLines = if (LocalDensity.current.fontScale >= 1.2f) 2 else 1,
+                    maxLines = if (LocalDensity.current.fontScale >= 1.2f) 4 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 marketState?.let { state ->
                     Text(
                         state.label,
                         modifier = Modifier.testTag("$tagPrefix-status-$id"),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = when (state.status) {
                             ExtensionMarketStatus.FAILED -> colors.dangerInk
                             ExtensionMarketStatus.NEEDS_SETUP,

@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyDivider
+import com.shenyan.designsystem.components.SyActivityIndicator
 import com.shenyan.designsystem.foundation.SyMetric
 import androidx.activity.compose.BackHandler
 
@@ -22,9 +24,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,8 +65,8 @@ import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
@@ -313,7 +314,7 @@ internal fun CharacterDiaryScreen(
 
     val diaryDays = remember(visibleEntries) { groupCharacterDiaryDays(visibleEntries) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(modifier = Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             SyTopBar(
                 title = stringResource(R.string.chat_diary_title),
@@ -397,7 +398,7 @@ internal fun CharacterDiaryScreen(
                                 )
                             },
                             singleLine = true,
-                            shape = DsShapes.block,
+                            shape = SyShapes.block,
                         )
                     }
                     item(key = "diary-filters") {
@@ -416,7 +417,7 @@ internal fun CharacterDiaryScreen(
                 if (sourceError) {
                     item(key = "diary-source-error") {
                         Text(stringResource(R.string.chat_diary_source_unavailable),
-                            color = colors.dangerInk, style = DsType.small13.withReadingWeight())
+                            color = colors.dangerInk, style = SyType.small13.withReadingWeight())
                     }
                 }
 
@@ -565,7 +566,7 @@ internal fun CharacterDiaryScreen(
             )
             if (mutationError) Text(
                 stringResource(R.string.chat_diary_save_failed),
-                style = DsType.small13.withReadingWeight(), color = colors.dangerInk,
+                style = SyType.small13.withReadingWeight(), color = colors.dangerInk,
             )
         }
     }
@@ -607,9 +608,9 @@ internal fun CharacterDiaryScreen(
             },
         ) {
             Text(stringResource(R.string.chat_diary_deactivate_hint),
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
             if (mutationError) Text(stringResource(R.string.chat_diary_save_failed),
-                style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+                style = SyType.small13.withReadingWeight(), color = colors.dangerInk)
         }
     }
 }
@@ -637,7 +638,7 @@ private fun CharacterDiaryDayCard(
             // A personal journal: date and voice lead; source tools are quiet.
             Text(
                 text = dateText,
-                style = DsType.titleSerif20.withReadingWeight(),
+                style = SyType.titleSerif20.withReadingWeight(),
                 color = colors.text,
                 modifier = Modifier.fillMaxWidth().testTag("diary_day_" + day.key),
             )
@@ -647,13 +648,13 @@ private fun CharacterDiaryDayCard(
                         R.string.chat_diary_private_voice
                     else R.string.chat_diary_legacy_excerpt,
                 ),
-                style = DsType.caption11Strong.withReadingWeight(),
+                style = SyType.caption11Strong.withReadingWeight(),
                 color = colors.textTertiary,
             )
             Text(
                 text = characterDiaryDayNarrative(day.entries),
-                style = DsType.chatBody.withReadingWeight().copy(
-                    fontFamily = DsType.titleFont,
+                style = SyType.chatBody.withReadingWeight().copy(
+                    fontFamily = SyType.titleFont,
                     lineHeight = 29.sp,
                 ),
                 color = colors.text,
@@ -661,7 +662,7 @@ private fun CharacterDiaryDayCard(
                 modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd)
                     .testTag("diary_paper_event_" + day.entries.first().id),
             )
-            androidx.compose.material3.HorizontalDivider(
+            SyDivider(
                 color = colors.textTertiary.copy(alpha = 0.18f),
             )
             SyButton(
@@ -684,7 +685,7 @@ private fun CharacterDiaryDayCard(
                                 ChatDiaryReadingVocabulary.TECHNICAL_USER,
                                 ChatDiaryReadingVocabulary.OTHER_PERSON,
                             ),
-                            style = DsType.std14.withReadingWeight(),
+                            style = SyType.std14.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("diary_raw_event_" + entry.id),
                         )

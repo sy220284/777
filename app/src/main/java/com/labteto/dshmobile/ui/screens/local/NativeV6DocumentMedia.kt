@@ -37,9 +37,11 @@ internal fun NativeV6DocumentMedia(
             UiDocumentMediaKind.IMAGE -> MediaInlinePicture(file, owned.remoteUrl)
             UiDocumentMediaKind.AUDIO -> if (file != null) InlineSpeechPlayer(file)
                 else Text("音频文件暂不可用")
-            UiDocumentMediaKind.VIDEO -> InlineVideoPlayer(owned.remoteUrl, file) {
-                playbackError = it
-            }
+            UiDocumentMediaKind.VIDEO -> InlineVideoPlayer(
+                url = owned.remoteUrl,
+                localFile = file,
+                onError = { playbackError = it },
+            )
         }
         playbackError?.let { Text(it) }
     }

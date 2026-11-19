@@ -1,12 +1,19 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
 import com.shenyan.designsystem.foundation.SyMetric
 
 
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
@@ -20,10 +27,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,8 +64,8 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.model.DeepSeekUsageSnapshot
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -86,29 +92,29 @@ internal fun DeviceUsageHero(usage: DeepSeekUsageSnapshot, showEstimatedCost: Bo
         ) {
             Text(
                 stringResource(R.string.usage_device_total),
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Text(
                 formatTokens(usage.totalTokens),
-                style = DsType.display24.withReadingWeight(),
+                style = SyType.display24.withReadingWeight(),
                 color = colors.text,
             )
             Text(
                 "${stringResource(R.string.usage_calculation_input)} ${formatTokens(usage.inputTokens)} · " +
                     "${stringResource(R.string.usage_calculation_output)} ${formatTokens(usage.outputTokens)}" +
                     if (showEstimatedCost) " · ${stringResource(R.string.usage_deepseek_cost_label)} ¥${String.format(Locale.US, "%.4f", usage.estimatedCostCny)}" else "",
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.local_usage_cache_hit_rate),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                     modifier = Modifier.weight(1f),
                 )
-                Text(cacheValue, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                Text(cacheValue, style = SyType.small13Strong.withReadingWeight(), color = colors.text)
             }
         }
     }
@@ -159,20 +165,20 @@ internal fun UsageDayChart(
     onSelect: (Long) -> Unit,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val scrollState = rememberScrollState()
+    val scrollState = rememberLazyListState()
     val maxTokens = max(1L, days.maxOfOrNull { it.second.totalTokens } ?: 1L)
-    LaunchedEffect(days.size, scrollState.maxValue) {
-        if (scrollState.maxValue > 0) scrollState.scrollTo(scrollState.maxValue)
+    LaunchedEffect(days.firstOrNull()?.first, days.lastOrNull()?.first) {
+        if (days.isNotEmpty()) {
+            scrollState.scrollToItem(days.lastIndex)
+        }
     }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(136.dp)
-            .horizontalScroll(scrollState),
+    LazyRow(
+        state = scrollState,
+        modifier = Modifier.fillMaxWidth().height(136.dp),
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         verticalAlignment = Alignment.Bottom,
     ) {
-        days.forEach { (epochDay, aggregate) ->
+        items(days, key = { it.first }) { (epochDay, aggregate) ->
             val selected = epochDay == selectedEpochDay
             val totalFraction = aggregate.totalTokens.toFloat() / maxTokens.toFloat()
             val totalHeight = 92.dp * totalFraction.coerceIn(0.04f, 1f)
@@ -184,7 +190,12 @@ internal fun UsageDayChart(
             Column(
                 modifier = Modifier
                     .width(SyMetric.touch)
-                    .clickable { onSelect(epochDay) },
+                    .clip(SyShapes.row)
+                    .background(if (selected) colors.selected else Color.Transparent)
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(epochDay) })
+                    .semantics {
+                        contentDescription = "${LocalDate.ofEpochDay(epochDay)}，${formatTokens(aggregate.totalTokens)} Token"
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
@@ -230,7 +241,7 @@ internal fun UsageDayChart(
                 }
                 Text(
                     LocalDate.ofEpochDay(epochDay).dayOfMonth.toString(),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = if (selected) colors.text else colors.textTertiary,
                 )
             }
@@ -255,7 +266,7 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
         ) {
             Text(
                 group.title,
-                style = DsType.std14Strong.withReadingWeight(),
+                style = SyType.std14Strong.withReadingWeight(),
                 color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -270,14 +281,14 @@ internal fun UsageGroupRow(group: TokenUsageGroupSummary, onClick: () -> Unit) {
                 } else {
                     stringResource(R.string.usage_turn_count, group.turnCount)
                 },
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
                 maxLines = 1,
             )
         }
         Text(
             formatTokens(group.aggregate.totalTokens),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = colors.text,
         )
         Spacer(Modifier.width(SyMetric.gapMd))
@@ -307,24 +318,24 @@ internal fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
         ) {
             Text(
                 actionLabel(record.context.action),
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.text,
                 maxLines = 1,
             )
             Text(
                 "${formatTime(record.timestamp)} · ${record.model}" +
                     record.context.agentId?.let { " · $it" }.orEmpty(),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(formatTokens(record.totalTokens), style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+            Text(formatTokens(record.totalTokens), style = SyType.small13Strong.withReadingWeight(), color = colors.text)
             Text(
                 "↓${formatTokens(record.inputTokens)}  ↑${formatTokens(record.outputTokens)}",
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
@@ -335,9 +346,9 @@ internal fun UsageRequestRow(record: TokenUsageRecord, onClick: () -> Unit) {
 internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SectionHeading(stringResource(R.string.usage_prompt_composition))
-    Surface(
+    SyFlatSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = DsShapes.block,
+        shape = SyShapes.block,
         color = colors.lilac.copy(alpha = .18f),
     ) {
         Column(
@@ -346,7 +357,7 @@ internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
         ) {
             Text(
                 stringResource(R.string.usage_estimated_badge),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.personaInk,
             )
             PromptLine(stringResource(R.string.usage_prompt_system), breakdown.systemBaseTokens)
@@ -364,7 +375,7 @@ internal fun PromptBreakdownCard(breakdown: TokenPromptBreakdown) {
             )
             Text(
                 stringResource(R.string.usage_prompt_note),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
         }
@@ -392,22 +403,22 @@ internal fun UsageAggregateHero(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     title,
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 badge?.let {
-                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.linkInk)
+                    Text(it, style = SyType.caption11.withReadingWeight(), color = colors.linkInk)
                 }
             }
-            Text(formatTokens(aggregate.totalTokens), style = DsType.display24.withReadingWeight(), color = colors.text)
+            Text(formatTokens(aggregate.totalTokens), style = SyType.display24.withReadingWeight(), color = colors.text)
             Text(
                 "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
                     "${stringResource(R.string.usage_calculation_output)} ${formatTokens(aggregate.outputTokens)} · " +
                     "¥${String.format(Locale.US, "%.4f", aggregate.estimatedCostCny)}",
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
@@ -423,7 +434,7 @@ internal fun UsageMetricPair(
 ) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val valueStyle = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum")
+    val valueStyle = SyType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum")
     val widest = with(density) {
         maxOf(measurer.measure(firstValue, style = valueStyle, softWrap = false).size.width,
             measurer.measure(secondValue, style = valueStyle, softWrap = false).size.width).toDp()
@@ -452,10 +463,10 @@ internal fun CompactMetric(label: String, value: String, modifier: Modifier = Mo
             .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
     ) {
-        Text(label, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+        Text(label, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
         Text(
             value,
-            style = DsType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
+            style = SyType.large20.withReadingWeight().copy(fontFeatureSettings = "tnum"),
             color = colors.text,
             // Responsive columns already reserve space for the entire numeric value.
             // Regular layout keeps complete text readable without an inner horizontal scroller.
@@ -476,7 +487,7 @@ internal fun EmptyUsageDetail(message: String? = null) {
     Text(
         resolvedMessage,
         modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),
-        style = DsType.small13.withReadingWeight(),
+        style = SyType.small13.withReadingWeight(),
         color = colors.textSecondary,
     )
 }
@@ -490,9 +501,9 @@ internal fun UsageValueLine(label: String, value: String, padded: Boolean = true
             .then(if (padded) Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = DsType.small13.withReadingWeight(), color = colors.textSecondary, modifier = Modifier.weight(1f))
+        Text(label, style = SyType.small13.withReadingWeight(), color = colors.textSecondary, modifier = Modifier.weight(1f))
         if (value.isNotEmpty()) {
-            Text(value, style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+            Text(value, style = SyType.small13Strong.withReadingWeight(), color = colors.text)
         }
     }
 }
@@ -538,16 +549,20 @@ internal fun dailyWindow(
     mode: LocalUsageMode,
     days: Int,
 ): List<Pair<Long, TokenUsageAggregate>> {
-    val byDay = source.associateBy(TokenUsageDailyBucket::epochDay)
     val today = LocalDate.now().toEpochDay()
-    return ((days - 1) downTo 0).map { offset ->
-        val epochDay = today - offset
+    return dailyWindow(source, mode, (today - days + 1)..today)
+}
+
+internal fun dailyWindow(
+    source: List<TokenUsageDailyBucket>,
+    mode: LocalUsageMode,
+    days: LongRange,
+): List<Pair<Long, TokenUsageAggregate>> {
+    val byDay = source.associateBy(TokenUsageDailyBucket::epochDay)
+    return days.map { epochDay ->
         epochDay to (byDay[epochDay]?.forMode(mode) ?: TokenUsageAggregate())
     }
 }
-
-internal fun todayAggregate(days: List<Pair<Long, TokenUsageAggregate>>): TokenUsageAggregate =
-    days.lastOrNull()?.second ?: TokenUsageAggregate()
 
 internal fun formatEpochDay(epochDay: Long): String =
     LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("MM/dd"))

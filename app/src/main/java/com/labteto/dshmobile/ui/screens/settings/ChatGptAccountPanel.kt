@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,8 +50,8 @@ import com.shenyan.designsystem.components.SyPill
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
@@ -117,13 +117,13 @@ internal fun ChatGptAccountPanel(
                 Column(Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.chatgpt_account_title),
-                        style = DsType.std14Strong.withReadingWeight(),
+                        style = SyType.std14Strong.withReadingWeight(),
                         color = colors.text,
                     )
                     if (selected == null) {
                         Text(
                             stringResource(R.string.chatgpt_account_hint),
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textSecondary,
                         )
                     }
@@ -155,7 +155,7 @@ internal fun ChatGptAccountPanel(
             if (selected == null) {
                 Text(
                     stringResource(R.string.chatgpt_privacy_hint),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                 )
                 SyButton(
@@ -169,11 +169,11 @@ internal fun ChatGptAccountPanel(
                     selected.displayName?.takeIf(String::isNotBlank)
                         ?: selected.email?.takeIf(String::isNotBlank)
                         ?: stringResource(R.string.chatgpt_account_fallback),
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 selected.email?.takeIf { it != selected.displayName }?.let {
-                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                    Text(it, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -181,7 +181,7 @@ internal fun ChatGptAccountPanel(
                 ) {
                     Text(
                         "$accountShortLabel ${selected.id.takeLast(6)}",
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textTertiary,
                         modifier = Modifier.weight(1f),
                     )
@@ -219,7 +219,7 @@ internal fun ChatGptAccountPanel(
                 if (!selected.sharingEnabled && selected.signedIn) {
                     Text(
                         stringResource(R.string.chatgpt_plan_disabled_hint),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                     SyButton(
@@ -235,7 +235,7 @@ internal fun ChatGptAccountPanel(
                 if (otherAccounts.isNotEmpty()) {
                     Text(
                         stringResource(R.string.chatgpt_saved_accounts),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textTertiary,
                     )
                     otherAccounts.forEach { account ->
@@ -255,7 +255,7 @@ internal fun ChatGptAccountPanel(
                                     append(' ')
                                     append(account.id.takeLast(6))
                                 },
-                                style = DsType.small13.withReadingWeight(),
+                                style = SyType.small13.withReadingWeight(),
                                 color = colors.textSecondary,
                                 modifier = Modifier.weight(1f),
                             )
@@ -324,11 +324,11 @@ internal fun ChatGptAccountPanel(
                 )
                 Text(
                     stringResource(R.string.chatgpt_test_hint),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                 )
                 testStatus?.let {
-                    Text(it, style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    Text(it, style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
 
 
@@ -379,13 +379,13 @@ internal fun ChatGptAccountPanel(
                 if (selected.signedIn && selected.sharingEnabled) {
                     Text(
                         stringResource(R.string.chatgpt_account_models_title, planModels.size),
-                        style = DsType.small13Strong.withReadingWeight(),
+                        style = SyType.small13Strong.withReadingWeight(),
                         color = colors.text,
                     )
                     if (!state.connected && planModels.isNotEmpty()) {
                         Text(
                             stringResource(R.string.chatgpt_account_models_cached),
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textTertiary,
                         )
                     }
@@ -395,13 +395,13 @@ internal fun ChatGptAccountPanel(
                                 if (state.connected) R.string.chatgpt_account_models_empty
                                 else R.string.chatgpt_account_models_pending,
                             ),
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textTertiary,
                         )
                     }
                     planModels.forEach { model ->
-                        Surface(
-                            shape = DsShapes.row,
+                        SyFlatSurface(
+                            shape = SyShapes.row,
                             color = androidx.compose.ui.graphics.Color.Transparent,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
@@ -417,7 +417,7 @@ internal fun ChatGptAccountPanel(
                                     ) {
                                         Text(
                                             model.displayName,
-                                            style = DsType.std14Strong.withReadingWeight(),
+                                            style = SyType.std14Strong.withReadingWeight(),
                                             color = colors.text,
                                             modifier = Modifier.weight(1f, fill = false),
                                         )
@@ -431,7 +431,7 @@ internal fun ChatGptAccountPanel(
                                     if (model.slug != model.displayName) {
                                         Text(
                                             model.slug,
-                                            style = DsType.caption11.withReadingWeight(),
+                                            style = SyType.caption11.withReadingWeight(),
                                             color = colors.textTertiary,
                                         )
                                     }
@@ -464,7 +464,7 @@ internal fun ChatGptAccountPanel(
                         ChatGptAuthPhase.LOADING_MODELS -> stringResource(R.string.chatgpt_loading_models)
                         else -> stringResource(R.string.chatgpt_connecting)
                     },
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 if (authorizationCanRestart) {
@@ -493,7 +493,7 @@ internal fun ChatGptAccountPanel(
                     }
                 }
             }
-            state.error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = colors.dangerInk) }
+            state.error?.let { Text(it, style = SyType.caption11.withReadingWeight(), color = colors.dangerInk) }
         }
     }
 
@@ -504,7 +504,7 @@ internal fun ChatGptAccountPanel(
         ) {
             Text(
                 stringResource(R.string.chatgpt_remove_registration_body),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Row(
@@ -540,7 +540,7 @@ internal fun ChatGptAccountPanel(
         ) {
             Text(
                 stringResource(R.string.chatgpt_welcome_body),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             SyButton(
@@ -555,7 +555,7 @@ internal fun ChatGptAccountPanel(
     }
 }
 
-/** 账户页专用紧凑操作：沿用 Ds 颜色、圆角、间距和文字规格。 */
+/** 账户页专用紧凑操作：沿用 SyPrimitiveColors 颜色、圆角、间距和文字规格。 */
 @Composable
 private fun ChatGptAccountAction(
     label: String,
@@ -569,11 +569,11 @@ private fun ChatGptAccountAction(
     val labelColor = (if (danger) colors.dangerInk else colors.text)
         .copy(alpha = if (enabled) 1f else 0.45f)
 
-    Surface(
+    SyFlatSurface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.heightIn(min = 64.dp),
-        shape = DsShapes.row,
+        shape = SyShapes.row,
         color = androidx.compose.ui.graphics.Color.Transparent,
         contentColor = labelColor,
         border = BorderStroke(1.dp, colors.border),
@@ -586,7 +586,7 @@ private fun ChatGptAccountAction(
             Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(
                 text = label,
-                style = DsType.caption11Strong.withReadingWeight(),
+                style = SyType.caption11Strong.withReadingWeight(),
                 textAlign = TextAlign.Center,
                 maxLines = 2,
             )

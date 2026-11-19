@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /** V5 is the only new visual contract. Business state stays in the existing 777 owners. */
-enum class SyMode { LIGHT, DARK, MATTE, SYSTEM }
+enum class SyMode { LIGHT, MATTE, SYSTEM }
 
 @Immutable
 data class SyPalette(
@@ -48,13 +48,11 @@ object SyPalettes {
         warning = p.warning, danger = p.danger, scrim = p.overlay,
     )
     val Light: SyPalette get() = fromCanonical(com.shenyan.designsystem.foundation.ShenyanPalettes.light)
-    val Dark: SyPalette get() = fromCanonical(com.shenyan.designsystem.foundation.ShenyanPalettes.dark)
     val Matte: SyPalette get() = fromCanonical(com.shenyan.designsystem.foundation.ShenyanPalettes.matte)
     fun forMode(mode: SyMode, systemDark: Boolean = false): SyPalette = when (mode) {
         SyMode.LIGHT -> Light
-        SyMode.DARK -> Dark
         SyMode.MATTE -> Matte
-        SyMode.SYSTEM -> if (systemDark) Dark else Light
+        SyMode.SYSTEM -> if (systemDark) Matte else Light
     }
 }
 
@@ -119,10 +117,9 @@ fun ShenyanTheme(
     val systemDark = isSystemInDarkTheme()
     val canonicalMode = when (mode) {
         SyMode.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-        SyMode.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
         SyMode.MATTE -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
         SyMode.SYSTEM -> if (systemDark)
-            com.shenyan.designsystem.foundation.ShenyanMode.DARK
+            com.shenyan.designsystem.foundation.ShenyanMode.MATTE
             else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
     }
     com.shenyan.designsystem.foundation.ShenyanTheme(

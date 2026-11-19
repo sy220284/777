@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import com.labteto.dshmobile.ui.shenyan.LocalSyReducedMotion
 import com.labteto.dshmobile.ui.shenyan.SyHierarchyPage
-import com.labteto.dshmobile.ui.theme.DsAnimations
+import com.labteto.dshmobile.ui.theme.SyAnimations
 
 /**
  * Owns the spatial grammar for the local feature stack.
@@ -33,7 +33,7 @@ internal fun LocalFeatureAnimatedHost(
     content: @Composable (LocalFeaturePage) -> Unit,
 ) {
     val predictiveBackMaxOffsetPx = with(LocalDensity.current) {
-        DsAnimations.predictiveBackMaxOffset.toPx()
+        SyAnimations.predictiveBackMaxOffset.toPx()
     }
     val settledBackProgress = predictiveBackProgress.coerceIn(0f, 1f)
     SharedTransitionLayout(modifier = modifier) {

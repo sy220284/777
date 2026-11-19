@@ -8,7 +8,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,8 +23,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SelectableDates
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,8 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.shenyan.designsystem.components.SyDateRangePickerDialog
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.TokenPromptBreakdown
@@ -62,14 +62,15 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
@@ -97,6 +98,7 @@ private enum class UsageRange(val days: Int) {
  * Provider usage is the only source for totals. Prompt composition is diagnostic only and lives in
  * request detail, so injected prompts/cache/reasoning can never be counted twice.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun UsageCalculationPage(
     usage: DeepSeekUsageSnapshot,
@@ -114,6 +116,9 @@ internal fun UsageCalculationPage(
     var modelMenuExpanded by remember { androidx.compose.runtime.mutableStateOf(false) }
     var modeIndex by rememberSaveable { mutableIntStateOf(0) }
     var rangeIndex by rememberSaveable { mutableIntStateOf(0) }
+    var customStart by rememberSaveable { mutableStateOf<Long?>(null) }
+    var customEnd by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectingRange by rememberSaveable { mutableStateOf(false) }
     var showAllGroups by rememberSaveable(modeIndex) {
         androidx.compose.runtime.mutableStateOf(false)
     }
@@ -121,9 +126,16 @@ internal fun UsageCalculationPage(
     val mode = if (modeIndex == 0) LocalUsageMode.CHAT else LocalUsageMode.WORK
     val modeAnalytics = if (mode == LocalUsageMode.CHAT) visibleAnalytics.chat else visibleAnalytics.work
     val range = UsageRange.entries[rangeIndex.coerceIn(0, UsageRange.entries.lastIndex)]
-    val days = remember(visibleAnalytics.days, mode, range) {
-        dailyWindow(visibleAnalytics.days, mode, range.days)
+    val today = LocalDate.now().toEpochDay()
+    val customRange = customStart?.let { start -> customEnd?.let { end -> start..end } }
+    val presetStart = today - range.days + 1
+    val startDay = customRange?.first ?: presetStart
+    val endDay = customRange?.last ?: today
+    val days = remember(visibleAnalytics.days, mode, startDay, endDay) {
+        dailyWindow(visibleAnalytics.days, mode, startDay..endDay)
     }
+    val todayTokens = visibleAnalytics.days.firstOrNull { it.epochDay == today }
+        ?.forMode(mode)?.totalTokens ?: 0L
     val selectedDay = days.firstOrNull { it.first == selectedEpochDay } ?: days.lastOrNull()
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val allModelsLabel = stringResource(R.string.usage_model_all)
@@ -134,7 +146,7 @@ internal fun UsageCalculationPage(
     ) {
         Text(
             stringResource(R.string.usage_model_filter_label),
-            style = DsType.std14Strong.withReadingWeight(),
+            style = SyType.std14Strong.withReadingWeight(),
             color = colors.text,
             modifier = Modifier.weight(1f),
         )
@@ -160,7 +172,7 @@ internal fun UsageCalculationPage(
     if (selectedModel != null && analytics.modelHistoryPartial) {
         Text(
             stringResource(R.string.usage_model_history_partial),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
     }
@@ -186,7 +198,7 @@ internal fun UsageCalculationPage(
         firstLabel = stringResource(R.string.usage_calculation_total_tokens),
         firstValue = formatTokens(modeAnalytics.aggregate.totalTokens),
         secondLabel = stringResource(R.string.usage_today),
-        secondValue = formatTokens(todayAggregate(days).totalTokens),
+        secondValue = formatTokens(todayTokens),
         testTag = "usagePrimaryMetric",
     )
 
@@ -195,7 +207,7 @@ internal fun UsageCalculationPage(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
+            Text(stringResource(R.string.fluid_model_composition), style = SyType.std14Strong,
                 color = colors.text)
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
             androidx.compose.foundation.lazy.LazyColumn(
@@ -206,11 +218,11 @@ internal fun UsageCalculationPage(
                     item(key = entry.key) {
                         // Design #04: the model-composition rows are functional filter
                         // entrances backed by the same selectedModel source as the menu.
-                        Surface(
+                        SyFlatSurface(
                             onClick = { onSelectModel(entry.key) },
                             modifier = Modifier.fillMaxWidth()
                                 .testTag("usage-model-select:" + entry.key),
-                            shape = DsShapes.row,
+                            shape = SyShapes.row,
                             color = androidx.compose.ui.graphics.Color.Transparent,
                         ) {
                             Column(
@@ -220,13 +232,13 @@ internal fun UsageCalculationPage(
                                 Row {
                                     Text(
                                         entry.key,
-                                        style = DsType.small13Strong.withReadingWeight(),
+                                        style = SyType.small13Strong.withReadingWeight(),
                                         modifier = Modifier.weight(1f),
                                         color = colors.text,
                                     )
                                     Text(
                                         formatTokens(entry.value.tracked.totalTokens),
-                                        style = DsType.caption11.copy(fontFeatureSettings = "tnum"),
+                                        style = SyType.caption11.copy(fontFeatureSettings = "tnum"),
                                         color = colors.textSecondary,
                                     )
                                 }
@@ -249,13 +261,56 @@ internal fun UsageCalculationPage(
             Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 Text(
                     stringResource(R.string.usage_daily_title),
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 UsageRangeSelector(
-                    selectedIndex = rangeIndex,
-                    onSelect = { rangeIndex = it },
+                    selectedIndex = if (customRange == null) rangeIndex else -1,
+                    onSelect = {
+                        rangeIndex = it
+                        customStart = null
+                        customEnd = null
+                    },
+                )
+                SyButton(
+                    text = if (customRange == null) stringResource(R.string.usage_range_custom)
+                    else stringResource(
+                        R.string.usage_range_custom_value,
+                        LocalDate.ofEpochDay(startDay).toString(),
+                        LocalDate.ofEpochDay(endDay).toString(),
+                    ),
+                    onClick = { selectingRange = true },
+                    variant = SyButtonVariant.Outline,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (selectingRange) {
+                val firstAvailable = minOf(
+                    startDay, today - UsageRange.QUARTER.days + 1,
+                    visibleAnalytics.days.minOfOrNull(TokenUsageDailyBucket::epochDay) ?: today,
+                )
+                val selectableDates = remember(firstAvailable, today) {
+                    object : SelectableDates {
+                        override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                            Math.floorDiv(utcTimeMillis, 86_400_000L) in firstAvailable..today
+                    }
+                }
+                SyDateRangePickerDialog(
+                    visible = true,
+                    onDismiss = { selectingRange = false },
+                    onConfirm = { firstMillis, lastMillis ->
+                        customStart = Math.floorDiv(firstMillis, 86_400_000L)
+                        customEnd = Math.floorDiv(lastMillis, 86_400_000L)
+                        selectedEpochDay = Math.floorDiv(lastMillis, 86_400_000L)
+                        selectingRange = false
+                    },
+                    initialStartMillis = LocalDate.ofEpochDay(startDay)
+                        .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                    initialEndMillis = LocalDate.ofEpochDay(endDay)
+                        .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                    selectableDates = selectableDates,
+                    yearRange = LocalDate.ofEpochDay(firstAvailable).year..LocalDate.ofEpochDay(today).year,
                 )
             }
             UsageDayChart(
@@ -267,14 +322,14 @@ internal fun UsageCalculationPage(
                 Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                     Text(
                         formatEpochDay(day),
-                        style = DsType.small13Strong.withReadingWeight(),
+                        style = SyType.small13Strong.withReadingWeight(),
                         color = colors.text,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
                         "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
                             "${stringResource(R.string.usage_calculation_output)} ${formatTokens(aggregate.outputTokens)}",
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
@@ -332,9 +387,9 @@ internal fun UsageCalculationPage(
     }
 
     if (selectedModel == null && usage.totalTokens > analytics.tracked.totalTokens) {
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.row,
+            shape = SyShapes.row,
             color = colors.selected,
         ) {
             Column(
@@ -348,13 +403,13 @@ internal fun UsageCalculationPage(
                             DateFormat.getDateInstance(DateFormat.MEDIUM)
                                 .format(Date(analytics.trackedSince)),
                         ),
-                        style = DsType.small13Strong.withReadingWeight(),
+                        style = SyType.small13Strong.withReadingWeight(),
                         color = colors.text,
                     )
                 }
                 Text(
                     stringResource(R.string.usage_legacy_notice),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
             }
@@ -362,9 +417,9 @@ internal fun UsageCalculationPage(
     }
 
     if (visibleUsage.unreportedRequestCount > 0L || (selectedModel == null && usage.unpricedTokens > 0L)) {
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.row,
+            shape = SyShapes.row,
             color = colors.warning.copy(alpha = .18f),
         ) {
             Column(
@@ -373,20 +428,20 @@ internal fun UsageCalculationPage(
             ) {
                 Text(
                     stringResource(R.string.usage_calculation_partial),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.warningInk,
                 )
                 if (visibleUsage.unreportedRequestCount > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unreported, visibleUsage.unreportedRequestCount),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
                 if (selectedModel == null && usage.unpricedTokens > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unpriced, formatNumber(usage.unpricedTokens)),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
@@ -396,7 +451,7 @@ internal fun UsageCalculationPage(
 
     Text(
         stringResource(R.string.usage_calculation_disclaimer),
-        style = DsType.caption11.withReadingWeight(),
+        style = SyType.caption11.withReadingWeight(),
         color = colors.textTertiary,
     )
     SyButton(
@@ -436,7 +491,7 @@ internal fun UsageLogPage(
         }
     }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.usage_log_retention), style = DsType.caption11)
+        Text(stringResource(R.string.usage_log_retention), style = SyType.caption11)
         records.forEachIndexed { index, record ->
             UsageRequestRow(record = record, onClick = { onOpenRequest(record.requestId) })
             if (index != records.lastIndex) UsageDivider()
@@ -563,7 +618,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
                     R.string.usage_calculation_reasoning_note,
                     formatNumber(record.reasoningTokens),
                 ),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
         }
@@ -576,7 +631,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
     } ?: record.model
     Text(
         "$modelStep · ${formatTime(record.timestamp)}",
-        style = DsType.caption11.withReadingWeight(),
+        style = SyType.caption11.withReadingWeight(),
         color = colors.textTertiary,
     )
 }

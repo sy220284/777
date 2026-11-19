@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,10 +61,13 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.shenyan.designsystem.components.SyPill
+import com.shenyan.designsystem.components.SyMaterialFrame
+import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.components.SySwipeActionRow
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.EmptyHero
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -89,11 +91,12 @@ private fun TaskCardSurface(
         AutomationStatus.FAILED, AutomationStatus.BLOCKED -> colors.dangerInk.copy(alpha = 0.28f)
         else -> colors.border
     }
-    Column(
-        modifier = Modifier.fillMaxWidth()
-            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(SyMetric.radiusCard))
-            .padding(SyMetric.gapSection),
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    SyMaterialFrame(
+        modifier = Modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L3_CARD,
+        border = BorderStroke(1.dp, borderColor),
+        horizontalPadding = SyMetric.gapSection,
+        verticalPadding = SyMetric.gapSection,
         content = content,
     )
 }
@@ -164,7 +167,8 @@ internal fun TaskCard(
     }
     val timing = taskTiming(task)
 
-    TaskCardSurface(status = task.status) {
+    val cardContent: @Composable () -> Unit = {
+        TaskCardSurface(status = task.status) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -173,12 +177,12 @@ internal fun TaskCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 Text(
                     timing,
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                 )
             }
@@ -238,21 +242,21 @@ internal fun TaskCard(
                     },
                     task.failureStreak,
                 ),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.dangerInk,
             )
         }
         task.lastError?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_status, it.take(160)),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.dangerInk,
             )
         }
         task.lastResult?.takeIf(String::isNotBlank)?.let {
             Text(
                 stringResource(R.string.tasks_last_result, it.replace("\n", " ").take(180)),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textSecondary,
                 maxLines = 2,
             )
@@ -261,7 +265,7 @@ internal fun TaskCard(
         if (task.runReceipts.isNotEmpty()) {
             Text(
                 stringResource(R.string.tasks_run_history, task.runReceipts.size),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
             var historyExpanded by remember(task.id) { mutableStateOf(false) }
@@ -275,7 +279,7 @@ internal fun TaskCard(
                 for (receipt in task.runReceipts.asReversed()) {
                     Text(
                         stringResource(R.string.tasks_run_history_item, taskDateTime(receipt.finishedAt), receiptStatusLabel(receipt)),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                     receipt.sessionId?.takeIf(String::isNotBlank)?.let { sessionId ->
@@ -349,7 +353,14 @@ internal fun TaskCard(
                 )
             }
         }
+        }
     }
+    if (enabled) {
+        SySwipeActionRow(
+            actionLabel = stringResource(R.string.tasks_delete_confirm),
+            onAction = { confirmDelete = true },
+        ) { cardContent() }
+    } else cardContent()
 
     if (confirmApproval) {
         SyDialog(
@@ -358,12 +369,12 @@ internal fun TaskCard(
         ) {
             Text(
                 task.lastError.orEmpty().take(500),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Text(
                 stringResource(R.string.tasks_approve_resume_warning),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Row(
@@ -389,7 +400,7 @@ internal fun TaskCard(
                     if (task.mode == AutomationMode.CHAT) R.string.tasks_chat_delete_confirm_body
                     else R.string.tasks_delete_confirm_body,
                 ),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Row(
@@ -486,9 +497,9 @@ internal fun TaskSummaryRow(task: AutomationTask, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = DsType.std14Strong.withReadingWeight(), color = colors.text, maxLines = 2)
+                Text(task.prompt.lineSequence().firstOrNull().orEmpty(), style = SyType.std14Strong.withReadingWeight(), color = colors.text, maxLines = 2)
                 Text(taskTiming(task),
-                    style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
             }
             androidx.compose.material3.Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = colors.textTertiary)
         }

@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,7 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,7 +31,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
     val portrait by produceState<ImageBitmap?>(null, member.portraitPath) {
         value = withContext(Dispatchers.IO) { decodePersonaPortraitBitmap(member.portraitPath, maxEdgePx = 256) }
     }
-    Surface(
+    SyFlatSurface(
         modifier = Modifier.size(24.dp),
         shape = CircleShape,
         color = if (active) colors.lilac.copy(alpha = .18f) else Color.Transparent,
@@ -49,7 +49,7 @@ internal fun GroupChatMemberAvatar(member: LocalGroupChatMember, active: Boolean
             } else {
                 Text(
                     member.displayName.trim().take(1).ifBlank { "·" },
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = if (active) colors.lilac else colors.textSecondary,
                     maxLines = 1,
                 )
@@ -77,7 +77,7 @@ internal fun LocalPersonaHeaderAvatar(
             }
         }
     }
-    Surface(
+    SyFlatSurface(
         modifier = Modifier.size(34.dp),
         shape = CircleShape,
         color = colors.lilac.copy(alpha = .18f),
@@ -95,7 +95,7 @@ internal fun LocalPersonaHeaderAvatar(
             } else {
                 Text(
                     name.trim().take(1).ifBlank { "·" },
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.lilac,
                 )
             }

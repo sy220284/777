@@ -3,7 +3,6 @@ package com.labteto.dshmobile.ui.screens.settings
 import com.shenyan.designsystem.foundation.SyMetric
 
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -18,8 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,7 +32,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.core.wire.dto.LlmConfigurableProvider
@@ -60,8 +56,8 @@ import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -148,7 +144,7 @@ internal fun DeviceCapabilitiesCard(
             variant = SyButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth(),
         )
-        state.error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
+        state.error?.let { Text(it, style = SyType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
     }
 }
 
@@ -178,7 +174,7 @@ internal fun NotificationPostingPermissionCard(
         }
         Text(
             stringResource(R.string.settings_notifications_only_events),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
     }
@@ -205,14 +201,14 @@ private fun CapabilityRow(
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
             StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
             Text(label, modifier = Modifier.weight(1f),
-                style = DsType.std14.withReadingWeight(), color = colors.text)
+                style = SyType.std14.withReadingWeight(), color = colors.text)
         }
         Text(hint, modifier = Modifier.fillMaxWidth(),
-            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
         if (enabled) {
             Text(
                 successLabel ?: stringResource(R.string.advanced_available),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.successInk,
             )
         } else if (actionLabel != null && onAction != null) {
@@ -225,7 +221,7 @@ private fun CapabilityRow(
         } else {
             Text(
                 stringResource(R.string.advanced_not_authorized),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
         }

@@ -1,5 +1,11 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyProgressBar
+import com.shenyan.designsystem.foundation.SyPhase
+import androidx.compose.ui.Alignment
+import com.shenyan.designsystem.components.SySliderControl
+import com.shenyan.designsystem.components.SySwitch
+import com.shenyan.designsystem.components.SyTextField
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -19,13 +25,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import androidx.compose.ui.platform.testTag
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -116,7 +117,7 @@ internal fun NativeV6DocumentModalHost(
                 tint = colors.textSecondary,
             )
             Text(latest.document.title,
-                style = com.labteto.dshmobile.ui.theme.DsType.small13Strong,
+                style = com.labteto.dshmobile.ui.theme.SyType.small13Strong,
                 color = colors.text,
                 modifier = Modifier.weight(1f),
                 maxLines = 2,
@@ -129,7 +130,7 @@ internal fun NativeV6DocumentModalHost(
             )
         }
         summary?.let { text ->
-            Text(text, style = com.labteto.dshmobile.ui.theme.DsType.small13,
+            Text(text, style = com.labteto.dshmobile.ui.theme.SyType.small13,
                 color = colors.textSecondary,
                 modifier = Modifier.padding(start = 26.dp),
                 maxLines = 2,
@@ -137,7 +138,7 @@ internal fun NativeV6DocumentModalHost(
         }
         if (documents.size > 1) {
             Text("关联文档 ${documents.size} 份",
-                style = com.labteto.dshmobile.ui.theme.DsType.caption11,
+                style = com.labteto.dshmobile.ui.theme.SyType.caption11,
                 color = colors.textTertiary, modifier = Modifier.padding(start = 26.dp))
         }
     }
@@ -282,15 +283,17 @@ private fun NativeV6DocumentCard(
     }
     confirmation?.let { actionId ->
         SyDialog(title = "确认文档操作", onDismiss = { confirmation = null }) {
-    Text("该操作将提交当前填写内容，或回答待处理的审批。是否继续？")
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = { confirmation = null }) { Text("取消") }
-        TextButton(onClick = {
-                confirmation = null
-                perform(actionId, true)
-            }, enabled = !submitting && !submitted) { Text(if (submitting) "正在提交…" else "确认") }
-    }
-}
+            Text("该操作将提交当前填写内容，或回答待处理的审批。是否继续？")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                SyButton("取消", onClick = { confirmation = null }, variant = SyButtonVariant.Ghost)
+                SyButton(
+                    "确认", onClick = {
+                        confirmation = null
+                        perform(actionId, true)
+                    }, enabled = !submitted, loading = submitting,
+                )
+            }
+        }
     }
     if (confirmDelete) {
         SyDialog(title = "删除交互文档？", onDismiss = { confirmDelete = false }) {
@@ -359,9 +362,11 @@ private fun NativeV6DocumentNode(
             val peak = node.points.maxOfOrNull { kotlin.math.abs(it.value) }?.coerceAtLeast(1.0) ?: 1.0
             node.points.forEach { point ->
                 Text("${point.label}：${point.value} ${node.unit}", style = MaterialTheme.typography.bodySmall)
-                androidx.compose.material3.LinearProgressIndicator(
-                    progress = { (kotlin.math.abs(point.value) / peak).toFloat() },
-                    modifier = Modifier.fillMaxWidth())
+                SyProgressBar(
+                    progress = (kotlin.math.abs(point.value) / peak).toFloat(),
+                    phase = SyPhase.IDLE,
+                    tintOverride = com.shenyan.designsystem.foundation.LocalSyColors.current.primary,
+                )
             }
         }
         is UiDocumentNode.LineChart -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -402,28 +407,30 @@ private fun NativeV6DocumentNode(
                 Column(Modifier.weight(1f)) { NativeV6DocumentNode(child, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
             }
         }
-        is UiDocumentNode.Field -> OutlinedTextField(
+        is UiDocumentNode.Field -> SyTextField(
             value = fields[node.id].orEmpty(), onValueChange = { onFieldChange(node.id, it) },
             label = { Text(node.label) }, singleLine = !node.multiline, enabled = !readOnly,
             modifier = Modifier.fillMaxWidth())
         is UiDocumentNode.Select -> NativeV6CompactSelect(
             node = node, fields = fields, enabled = !readOnly, onFieldChange = onFieldChange,
         )
-        is UiDocumentNode.Switch -> Row {
-            Checkbox(checked = fields[node.id].toBoolean(), onCheckedChange = { onFieldChange(node.id, it.toString()) }, enabled = !readOnly)
-            Text(node.label, modifier = Modifier.padding(top = 12.dp))
-        }
+        is UiDocumentNode.Switch -> SySwitch(
+            label = node.label,
+            checked = fields[node.id].toBoolean(),
+            onCheckedChange = { onFieldChange(node.id, it.toString()) },
+            enabled = !readOnly,
+        )
         is UiDocumentNode.Slider -> Column {
             val value = fields[node.id]?.toDoubleOrNull()?.coerceIn(node.minimum, node.maximum) ?: node.initial
             Text("${node.label}：${value.toBigDecimal().stripTrailingZeros().toPlainString()}")
-            Slider(value = value.toFloat(),
+            SySliderControl(value = value.toFloat(),
                 onValueChange = { update ->
                     val steps = kotlin.math.round((update.toDouble() - node.minimum) / node.step)
                     val snapped = (node.minimum + steps * node.step).coerceIn(node.minimum, node.maximum)
                     onFieldChange(node.id, snapped.toString())
                 },
                 valueRange = node.minimum.toFloat()..node.maximum.toFloat(),
-                steps = kotlin.math.round((node.maximum - node.minimum) / node.step).toInt() - 1,
+                steps = (kotlin.math.round((node.maximum - node.minimum) / node.step).toInt() - 1).coerceAtLeast(0),
                 enabled = !readOnly)
         }
         is UiDocumentNode.Calculated -> Column {
@@ -431,15 +438,20 @@ private fun NativeV6DocumentNode(
             Text(calculateUiDocumentValue(node, fields) ?: "请输入有效数字",
                 style = MaterialTheme.typography.titleMedium)
         }
-        is UiDocumentNode.Button -> TextButton(onClick = { onAction(node.actionId) }, enabled = !readOnly) {
-            Text(nativeV6ActionLabel(node.label, actions.firstOrNull { it.id == node.actionId }))
-        }
+        is UiDocumentNode.Button -> SyButton(
+            text = nativeV6ActionLabel(node.label, actions.firstOrNull { it.id == node.actionId }),
+            onClick = { onAction(node.actionId) },
+            enabled = !readOnly,
+            variant = SyButtonVariant.Outline,
+        )
         is UiDocumentNode.Disclosure -> {
             var expanded by remember(node.id) { mutableStateOf(false) }
             Column {
-                TextButton(onClick = { expanded = !expanded }) {
-                    Text(if (expanded) "收起 · ${node.title}" else "展开 · ${node.title}")
-                }
+                SyButton(
+                    text = if (expanded) "收起 · ${node.title}" else "展开 · ${node.title}",
+                    onClick = { expanded = !expanded },
+                    variant = SyButtonVariant.Ghost,
+                )
                 if (expanded) node.children.forEach { NativeV6DocumentNode(it, bindings, fields, onFieldChange, readOnly, media, sessionId, actions, onAction) }
             }
         }

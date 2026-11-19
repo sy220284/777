@@ -22,7 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -64,8 +63,8 @@ import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -160,7 +159,7 @@ internal fun ChatAutomationScreen(
         observedSaveRevision = state.saveRevision
     }
 
-    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding(),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -226,7 +225,7 @@ internal fun ChatAutomationScreen(
                                     if (tasks.isEmpty()) R.string.tasks_chat_events_empty
                                     else R.string.tasks_chat_filter_empty,
                                 ),
-                                style = DsType.std14.withReadingWeight(),
+                                style = SyType.std14.withReadingWeight(),
                                 color = colors.textSecondary,
                             )
                         }
@@ -272,7 +271,7 @@ internal fun ChatAutomationScreen(
                 Text(
                     state.plannerFailureReason ?: stringResource(it.messageRes()),
                     modifier = Modifier.padding(horizontal = SyMetric.gapSection),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.dangerInk,
                 )
             }
@@ -312,13 +311,13 @@ internal fun ChatAutomationScreen(
                 if (state.planning) {
                     Text(
                         stringResource(R.string.tasks_chat_planning),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 } else if (editingTaskId != null) {
                     Text(
                         stringResource(R.string.tasks_chat_editing_hint),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
@@ -350,7 +349,7 @@ private fun AutomationCardSurface(
     }
     SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.block,
+        shape = SyShapes.block,
         tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
         tonalElevation = 0.dp,
@@ -370,8 +369,8 @@ private fun SectionTitle(title: String, subtitle: String) {
         Modifier.padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapXs),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(title, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
-        Text(subtitle, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+        Text(title, style = SyType.base16Strong.withReadingWeight(), color = colors.text)
+        Text(subtitle, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
     }
 }
 
@@ -404,7 +403,7 @@ private fun ChatAutomationEventRow(
             Text(
                 task.actorName?.takeIf(String::isNotBlank)
                     ?: stringResource(R.string.tasks_chat_character_fallback),
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.textSecondary,
             )
             SyStatusPill(
@@ -414,13 +413,13 @@ private fun ChatAutomationEventRow(
         }
         Text(
             task.prompt,
-            style = DsType.std14.withReadingWeight(),
+            style = SyType.std14.withReadingWeight(),
             color = colors.text,
             maxLines = 3,
         )
         Text(
             scheduleDescription,
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
         Row(
@@ -495,7 +494,7 @@ private fun ChatAutomationEventRow(
         ) {
             Text(
                 stringResource(R.string.tasks_chat_delete_confirm_body),
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
             Row(
@@ -573,7 +572,7 @@ private fun ChatAutomationPolicySheet(
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.tasks_chat_policy_quiet_hours),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 Text(
@@ -582,7 +581,7 @@ private fun ChatAutomationPolicySheet(
                         formatMinute(quietStartMinute),
                         formatMinute(quietEndMinute),
                     ),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                 )
             }
@@ -625,7 +624,7 @@ private fun ChatAutomationPolicySheet(
 
         Text(
             stringResource(R.string.tasks_chat_policy_min_gap),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = colors.text,
         )
         gapOptions.chunked(3).forEach { row ->
@@ -650,13 +649,13 @@ private fun ChatAutomationPolicySheet(
         }
         Text(
             stringResource(R.string.tasks_chat_policy_min_gap_hint),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
 
         Text(
             stringResource(R.string.tasks_chat_max_unanswered),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = colors.text,
         )
         Row(
@@ -679,7 +678,7 @@ private fun ChatAutomationPolicySheet(
         }
         Text(
             stringResource(R.string.tasks_chat_max_unanswered_hint, maxUnanswered),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
 
@@ -691,12 +690,12 @@ private fun ChatAutomationPolicySheet(
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.tasks_notify_title),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 Text(
                     stringResource(R.string.tasks_notify_hint),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                 )
             }
@@ -710,7 +709,7 @@ private fun ChatAutomationPolicySheet(
         saveError?.let {
             Text(
                 it,
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.dangerInk,
             )
         }

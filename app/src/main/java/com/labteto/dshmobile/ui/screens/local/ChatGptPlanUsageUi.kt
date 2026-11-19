@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,8 +16,8 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 internal fun isChatGptPlanUsageError(message: String?): Boolean {
@@ -54,9 +54,9 @@ internal fun LocalConversationErrorCard(
     val modelRecovery = sendRejectMessage == null && isChatGptModelRecoveryError(stateError)
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
-    Surface(
+    SyFlatSurface(
         color = colors.warning.copy(alpha = .18f),
-        shape = DsShapes.block,
+        shape = SyShapes.block,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = SyMetric.gapLg),
@@ -69,7 +69,7 @@ internal fun LocalConversationErrorCard(
         ) {
             Text(
                 message,
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.dangerInk,
             )
             when {

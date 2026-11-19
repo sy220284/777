@@ -16,6 +16,7 @@ import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.screens.local.LocalHarnessScreen
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
+import com.labteto.dshmobile.connection.ThemePreferenceValues
 
 /** Only the local product shell owns application navigation. */
 @Composable
@@ -26,8 +27,7 @@ fun AppRoot(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val themePreference = remember(settings.themePreference) {
-        runCatching { ThemePreference.valueOf(settings.themePreference.uppercase()) }
-            .getOrDefault(ThemePreference.SYSTEM)
+        ThemePreference.valueOf(ThemePreferenceValues.normalize(settings.themePreference).uppercase())
     }
     val updateInstallStatus by viewModel.updateInstallStatus.collectAsStateWithLifecycle()
     val updateCandidate by viewModel.updateCandidate.collectAsStateWithLifecycle()

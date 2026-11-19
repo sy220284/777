@@ -7,6 +7,7 @@ import android.content.Context
 import android.os.LocaleList
 import com.labteto.dshmobile.connection.HostsStore
 import com.labteto.dshmobile.connection.ThemeBootstrapPreferences
+import com.labteto.dshmobile.connection.ThemePreferenceValues
 import androidx.work.WorkManager
 import com.labteto.dshmobile.local.files.LocalWorkspaceIntermediateMaintenance
 import com.labteto.dshmobile.local.runtime.LocalRuntimeKernel
@@ -133,13 +134,13 @@ class DshApplication : Application() {
          * before MainActivity exists. That lets the system splash resolve the matching -night
          * resources instead of briefly following the phone's opposite scheme.
          *
-         * The System option mirrors the device's configured night policy. Matte black shares the platform's night qualifier with Dark; MainActivity applies the
-         * exact matte canvas colour during the splash-to-Compose hand-off.
+         * System follows the device policy and uses matte black for the night resources.
+         * The removed "dark" setting is normalized to matte black before platform selection.
          */
         fun applicationNightModeFor(themePreference: String?, systemNightMode: Int): Int =
-            when (themePreference) {
-                "light" -> UiModeManager.MODE_NIGHT_NO
-                "dark", "matte_black" -> UiModeManager.MODE_NIGHT_YES
+            when (ThemePreferenceValues.normalize(themePreference)) {
+                ThemePreferenceValues.LIGHT -> UiModeManager.MODE_NIGHT_NO
+                ThemePreferenceValues.MATTE_BLACK -> UiModeManager.MODE_NIGHT_YES
                 else -> when (systemNightMode) {
                     UiModeManager.MODE_NIGHT_AUTO,
                     UiModeManager.MODE_NIGHT_CUSTOM,

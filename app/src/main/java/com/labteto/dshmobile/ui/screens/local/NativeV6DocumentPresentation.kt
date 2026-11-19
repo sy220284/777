@@ -1,13 +1,15 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.labteto.dshmobile.ui.components.FeatherIcons
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
+import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.uicontract.UiDocumentAction
 import com.labteto.dshmobile.uicontract.UiDocumentNode
@@ -55,25 +56,21 @@ internal fun NativeV6CompactSelect(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
         Text(node.label, style = MaterialTheme.typography.labelMedium)
         Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
+            SyButton(
+                text = nativeV6SelectLabel(node, fields),
                 onClick = { expanded = true },
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("${nativeV6SelectLabel(node, fields)}  ▾", maxLines = 1,
-                    overflow = TextOverflow.Ellipsis)
-            }
-            SyPopupMenu(expanded = expanded, onDismiss = { expanded = false }) {
-                node.options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            expanded = false
-                            onFieldChange(node.id, option)
-                        },
-                    )
-                }
-            }
+                variant = SyButtonVariant.Outline,
+                icon = FeatherIcons.ChevronDown,
+            )
+            SyPopupMenu(
+                expanded = expanded,
+                onDismiss = { expanded = false },
+                items = node.options.map { option ->
+                    SyMenuItem(text = option, onClick = { onFieldChange(node.id, option) })
+                },
+            )
         }
     }
 }

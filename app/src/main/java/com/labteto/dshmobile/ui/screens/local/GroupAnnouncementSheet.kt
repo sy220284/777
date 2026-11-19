@@ -29,7 +29,7 @@ import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
@@ -52,21 +52,21 @@ internal fun GroupAnnouncementCard(
             ) {
                 Text(
                     stringResource(R.string.local_group_announcement_title),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.text,
                     modifier = Modifier.weight(1f),
                 )
                 if (announcement.isNotBlank()) {
                     Text(
                         stringResource(R.string.local_group_announcement_active_short),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.linkInk,
                     )
                 }
             }
             Text(
                 announcement.ifBlank { stringResource(R.string.local_group_announcement_empty) },
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -74,7 +74,7 @@ internal fun GroupAnnouncementCard(
             if (announcement.isNotBlank()) {
                 Text(
                     stringResource(R.string.local_group_announcement_active_hint),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                 )
             }
@@ -102,7 +102,7 @@ internal fun GroupAnnouncementSheet(
         scrollable = true,
     ) {
         Text(stringResource(R.string.local_group_announcement_hint),
-            style = DsType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+            style = SyType.small13.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
         SyTextField(
             value = draft,
             onValueChange = { draft = it.take(2_000); error = null },
@@ -112,7 +112,7 @@ internal fun GroupAnnouncementSheet(
             maxLines = 9,
             enabled = enabled && !saving,
         )
-        error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
+        error?.let { Text(it, style = SyType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
         SyButton(
             text = stringResource(
                 if (saving) R.string.local_group_announcement_saving

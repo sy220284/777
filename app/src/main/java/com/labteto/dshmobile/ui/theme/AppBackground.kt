@@ -280,8 +280,11 @@ fun AppBackgroundHost(
         canvas = surfaceBase,
         image = loaded?.image,
         veil = adaptiveGlobalVeil(state, surfaceBase),
+        // 典雅白只保留轻微环境光，避免整屏重新染回杏米色。
         glowColors = if (loaded == null && fluidGlass) listOf(
-            ambientPalette.primary, ambientPalette.mint, ambientPalette.lilac.copy(alpha = .18f),
+            if (darkTheme) ambientPalette.primary else ambientPalette.primary.copy(alpha = .16f),
+            if (darkTheme) ambientPalette.mint else ambientPalette.mint.copy(alpha = .10f),
+            ambientPalette.lilac.copy(alpha = if (darkTheme) .18f else .08f),
         ) else emptyList(),
         dark = darkTheme,
         regionColors = visibleAnalysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),
@@ -485,10 +488,10 @@ internal fun analyzeBackground(bitmap: Bitmap, viewport: IntSize? = null): Backg
  * The fill for a surface that covers the whole window.
  *
  * Transparent while a background image is in use, so the picture shows through; the plain
- * [DsColors.bgBase] otherwise.
+ * [SyHostColors.bgBase] otherwise.
  */
 @Composable
-fun DsColors.wallpaperSurface(
+fun SyHostColors.wallpaperSurface(
     level: WallpaperSurfaceLevel,
     region: BackgroundRegion = BackgroundRegion.ALL,
     base: Color = when (level) {
@@ -518,7 +521,7 @@ fun DsColors.wallpaperSurface(
 }
 
 @Composable
-fun DsColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)
+fun SyHostColors.rootSurface(): Color = wallpaperSurface(WallpaperSurfaceLevel.PAGE)
 
 /** V6 root surfaces preserve wallpaper visibility just like the legacy page contract. */
 @Composable

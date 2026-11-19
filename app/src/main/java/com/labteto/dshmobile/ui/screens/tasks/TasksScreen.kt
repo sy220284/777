@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
+import com.shenyan.designsystem.components.SySkeletonCard
+import com.shenyan.designsystem.components.SyPullRefresh
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +57,7 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import android.text.format.DateFormat
@@ -215,7 +217,7 @@ private fun WorkTasksScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+        SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -271,7 +273,10 @@ private fun WorkTasksScreen(
                         state, onRefresh = { viewModel.refresh() }, showNotice = false, showLoading = false,
                     )
                     when {
-                        state.loading && state.tasks.isEmpty() -> Text(stringResource(R.string.common_loading))
+                        state.loading && state.tasks.isEmpty() && !showCreate -> {
+                            Text(stringResource(R.string.common_loading), style = SyType.small13)
+                            SySkeletonCard(Modifier.fillMaxWidth(), includeImage = false)
+                        }
                         state.listLoadFailed && state.tasks.isEmpty() && !showCreate -> Unit
                         showCreate -> TaskEditorPane(
                             state = editorState,
@@ -280,10 +285,17 @@ private fun WorkTasksScreen(
                             saving = state.savingEditor,
                             onReset = ::resetEditor,
                         )
-                        visibleTasks.isEmpty() -> TaskEmptyState(
-                            onManualCreate = ::startCreate,
-                            onCreateViaChat = onCreateViaChat?.let { createFromChat },
-                        )
+                        visibleTasks.isEmpty() -> SyPullRefresh(
+                            refreshing = state.loading, onRefresh = { viewModel.refresh() },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        ) {
+                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                                TaskEmptyState(
+                                    onManualCreate = ::startCreate,
+                                    onCreateViaChat = onCreateViaChat?.let { createFromChat },
+                                )
+                            }
+                        }
                         selectedTask != null -> Column(
                             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                         ) {
@@ -326,29 +338,28 @@ private fun WorkTasksScreen(
                                 hapticOnChange = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            if (filteredTasks.isEmpty()) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                                ) {
-                                    Text(
-                                        stringResource(R.string.tasks_filter_empty),
-                                        style = DsType.small13.withReadingWeight(),
-                                        color = colors.textSecondary,
-                                    )
-                                    SyButton(
-                                        text = stringResource(R.string.tasks_filter_all),
-                                        onClick = { listFilter = WorkTaskListFilter.ALL },
-                                        variant = SyButtonVariant.Outline,
-                                    )
-                                }
-                            } else {
+                            SyPullRefresh(
+                                refreshing = state.loading, onRefresh = { viewModel.refresh() },
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                            ) {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = SyMetric.gapLg),
                                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
                                 ) {
+                                    if (filteredTasks.isEmpty()) item(key = "empty-filter") {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                                        ) {
+                                            Text(stringResource(R.string.tasks_filter_empty),
+                                                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
+                                            SyButton(stringResource(R.string.tasks_filter_all),
+                                                onClick = { listFilter = WorkTaskListFilter.ALL },
+                                                variant = SyButtonVariant.Outline)
+                                        }
+                                    }
                                     items(filteredTasks, key = AutomationTask::id) { task ->
                                         TaskSummaryRow(task = task, onClick = { selectedTaskId = task.id })
                                     }
@@ -384,13 +395,13 @@ private fun TaskEmptyState(
             )
             Text(
                 stringResource(R.string.tasks_empty_title),
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = colors.text,
                 textAlign = TextAlign.Center,
             )
             Text(
                 stringResource(R.string.tasks_empty_subtitle),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textTertiary,
                 textAlign = TextAlign.Center,
             )
@@ -400,35 +411,18 @@ private fun TaskEmptyState(
                 .padding(bottom = SyMetric.gapLg),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            Surface(
+            SyButton(
+                text = stringResource(R.string.tasks_create_manual),
                 onClick = onManualCreate,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = colors.primary,
-                contentColor = colors.onPrimary,
-                shape = RoundedCornerShape(SyMetric.radiusControl),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
-                    Text(
-                        stringResource(R.string.tasks_create_manual),
-                        style = DsType.std14Strong.withReadingWeight(),
-                        color = colors.onPrimary,
-                    )
-                }
-            }
-            if (onCreateViaChat != null) Surface(
-                onClick = onCreateViaChat,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = androidx.compose.ui.graphics.Color.Transparent,
-                shape = RoundedCornerShape(SyMetric.radiusControl),
-                border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
-                    Text(
-                        stringResource(R.string.tasks_create_via_chat),
-                        style = DsType.std14Strong.withReadingWeight(),
-                        color = colors.text,
-                    )
-                }
+            )
+            if (onCreateViaChat != null) {
+                SyButton(
+                    text = stringResource(R.string.tasks_create_via_chat),
+                    onClick = onCreateViaChat,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    variant = SyButtonVariant.Outline,
+                )
             }
         }
     }

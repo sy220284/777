@@ -37,7 +37,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.agentOperationLabelRes
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.MarkdownText
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** Only recognized service brands are user-visible, never raw tool identifiers. */
@@ -154,12 +154,12 @@ internal fun WorkTimelineStepRow(
             ) {
                 Icon(FeatherIcons.Sparkles, contentDescription = null,
                     tint = colors.textSecondary, modifier = Modifier.size(16.dp))
-                Text(action, style = DsType.small13.withReadingWeight(),
+                Text(action, style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary)
             }
         } else {
             SelectionContainer(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapSm)) {
-                MarkdownText(content, bodyStyle = DsType.workBody.withReadingWeight())
+                MarkdownText(content, bodyStyle = SyType.workBody.withReadingWeight())
             }
         }
         return
@@ -189,7 +189,7 @@ internal fun WorkTimelineStepRow(
         Text(
             findingText,
             modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 2.dp, bottom = 8.dp),
-            style = DsType.std14.withReadingWeight(),
+            style = SyType.std14.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             maxLines = 3,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -203,12 +203,12 @@ internal fun WorkTimelineStepRow(
                 SyButton("关闭", onClick = { detailsOpen = false }, size = SyButtonSize.Small,
                     variant = SyButtonVariant.Ghost)
             }) {
-            Text(workToolPhaseText(phase), style = DsType.std14Strong.withReadingWeight())
-            message.toolCallId?.let { Text("调用标识：$it", style = DsType.small13.withReadingWeight()) }
+            Text(workToolPhaseText(phase), style = SyType.std14Strong.withReadingWeight())
+            message.toolCallId?.let { Text("调用标识：$it", style = SyType.small13.withReadingWeight()) }
             activity?.argumentsPreview?.takeIf(String::isNotBlank)?.let { preview ->
-                Text("调用参数", style = DsType.small13.withReadingWeight())
+                Text("调用参数", style = SyType.small13.withReadingWeight())
                 SelectionContainer {
-                    Text(preview, style = DsType.std14.withReadingWeight(),
+                    Text(preview, style = SyType.std14.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
                 }
             }
@@ -217,10 +217,10 @@ internal fun WorkTimelineStepRow(
                     Text(if (operationGroup) "第 ${index + 1} 项 · " +
                         (userFacingWorkToolAction(receipt.toolName) ?: receipt.toolName.orEmpty())
                         else "第 ${index + 1} 次检查",
-                        style = DsType.small13.withReadingWeight())
+                        style = SyType.small13.withReadingWeight())
                 }
                 receipt.toolErrorCode?.let { code ->
-                    Text("错误代码：$code", style = DsType.small13.withReadingWeight(),
+                    Text("错误代码：$code", style = SyType.small13.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
                 }
                 receipt.blocks.filterIsInstance<com.labteto.dshmobile.local.session.LocalMessageBlock.Image>().forEach { image ->
@@ -228,7 +228,7 @@ internal fun WorkTimelineStepRow(
                 }
                 if (receipt.content.isNotBlank()) {
                     SelectionContainer {
-                        Text(receipt.content, style = DsType.std14.withReadingWeight(),
+                        Text(receipt.content, style = SyType.std14.withReadingWeight(),
                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
                     }
                 }
@@ -313,10 +313,10 @@ private fun WorkToolStatusRow(
         FlowRow(modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(label, style = DsType.small13.withReadingWeight(),
+            Text(label, style = SyType.small13.withReadingWeight(),
                 color = if (phase == LocalToolUiPhase.FAILED) tint else colors.textSecondary)
             if (phase != LocalToolUiPhase.COMPLETED) {
-                Text(status, style = DsType.small13.withReadingWeight(), color = tint)
+                Text(status, style = SyType.small13.withReadingWeight(), color = tint)
             }
         }
         if (onClick != null) {
@@ -341,12 +341,12 @@ internal fun WorkPendingToolRow(activity: com.labteto.dshmobile.local.presentati
                 SyButton("关闭", onClick = { detailsOpen = false }, size = SyButtonSize.Small,
                     variant = SyButtonVariant.Ghost)
             }) {
-            Text(workToolPhaseText(activity.phase), style = DsType.std14Strong.withReadingWeight())
-            Text("调用标识：${activity.callId}", style = DsType.small13.withReadingWeight())
+            Text(workToolPhaseText(activity.phase), style = SyType.std14Strong.withReadingWeight())
+            Text("调用标识：${activity.callId}", style = SyType.small13.withReadingWeight())
             activity.argumentsPreview?.takeIf(String::isNotBlank)?.let { preview ->
-                Text("调用参数", style = DsType.small13.withReadingWeight())
+                Text("调用参数", style = SyType.small13.withReadingWeight())
                 SelectionContainer {
-                    Text(preview, style = DsType.std14.withReadingWeight(),
+                    Text(preview, style = SyType.std14.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
                 }
             }
@@ -361,5 +361,5 @@ internal fun WorkToolStatusNotice(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Text(message,
         modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
-        style = DsType.std14.withReadingWeight(), color = colors.warningInk)
+        style = SyType.std14.withReadingWeight(), color = colors.warningInk)
 }

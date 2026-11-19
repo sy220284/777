@@ -6,11 +6,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 import androidx.compose.material3.Text
@@ -50,7 +50,7 @@ internal class LocalChatTurnUsageUi {
 @Composable
 internal fun LocalChatTurnUsageButton(aggregate: TokenUsageAggregate, onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Surface(
+        SyFlatSurface(
             onClick = onClick,
             modifier = Modifier.heightIn(min = 48.dp).testTag("chat-turn-usage"),
             shape = RoundedCornerShape(10.dp),
@@ -60,7 +60,7 @@ internal fun LocalChatTurnUsageButton(aggregate: TokenUsageAggregate, onClick: (
                 Text(
                     stringResource(if (aggregate.unreportedRequestCount > 0) R.string.local_chat_turn_usage_incomplete
                         else R.string.local_chat_turn_usage_known, aggregate.totalTokens),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = LocalSyColors.current.textTertiary,
                 )
             }

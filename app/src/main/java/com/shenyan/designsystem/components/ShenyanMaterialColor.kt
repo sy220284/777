@@ -23,7 +23,7 @@ internal fun syContrastRatio(ink: Color, background: Color): Float {
 
 /**
  * All five tiers draw from one root scene: the theme canvas, its static glow or the actual
- * wallpaper's sampled region. Tiers change opacity/contrast, never switch to a white palette.
+ * wallpaper's sampled region. Tiers follow the chosen palette, including white reading surfaces.
  * Colour sampling is cached by AppBackgroundHost; this resolver never reads bitmap pixels.
  */
 internal fun syResolveMaterialFill(
@@ -52,7 +52,7 @@ internal fun syResolveMaterialFill(
         scene.glowColors.size >= 3 -> {
             // FluidGlassBackdrop's matching top/middle/bottom light fields.
             lerp(scene.canvas, scene.glowColors[index].copy(alpha = 1f),
-                (if (scene.dark) .055f else if (index == 2) .045f else .14f) *
+                (if (scene.dark) .055f else if (index == 2) .020f else .035f) *
                     (scene.ambientGlow.coerceIn(0f, 1f) * 2f).coerceIn(0f, 2f))
         }
         else -> scene.canvas

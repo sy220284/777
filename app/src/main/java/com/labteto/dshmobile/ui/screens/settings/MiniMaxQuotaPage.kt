@@ -21,7 +21,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.local.model.MiniMaxProviderUsage
 import com.labteto.dshmobile.ui.shenyan.SyButton
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 
@@ -64,7 +64,7 @@ internal fun MiniMaxQuotaPage(
             ) {
                 Text(
                     stringResource(if (loadingProfile) R.string.minimax_quota_loading_profile else R.string.minimax_quota_no_profile),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.textSecondary,
+                    style = SyType.std14Strong.withReadingWeight(), color = colors.textSecondary,
                 )
                 if (!loadingProfile) {
                     SyButton(
@@ -84,9 +84,9 @@ internal fun MiniMaxQuotaPage(
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
         ) {
             Text(stringResource(R.string.minimax_quota_model, profile.model),
-                style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+                style = SyType.std14Strong.withReadingWeight(), color = colors.text)
             Text(stringResource(R.string.minimax_quota_disclaimer),
-                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
             SyButton(
                 text = stringResource(if (loading) R.string.minimax_quota_loading else R.string.minimax_quota_refresh),
                 onClick = { if (!loading) refresh++ },
@@ -95,11 +95,11 @@ internal fun MiniMaxQuotaPage(
             )
             if (loading) {
                 Text(stringResource(R.string.minimax_quota_querying),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.std14Strong.withReadingWeight(), color = colors.textSecondary)
             }
             if (error != null) {
                 Text(stringResource(R.string.minimax_quota_error, error.orEmpty()),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.dangerInk)
+                    style = SyType.std14Strong.withReadingWeight(), color = colors.dangerInk)
             }
         }
     }
@@ -108,7 +108,7 @@ internal fun MiniMaxQuotaPage(
         is MiniMaxProviderUsage.AccountBalance -> {
             AppSettingsSection {
                 Text(stringResource(R.string.minimax_quota_balance_title),
-                    style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+                    style = SyType.std14Strong.withReadingWeight(), color = colors.text)
                 Text(stringResource(R.string.minimax_quota_balance_available, result.available),
                     color = colors.text)
                 Text(stringResource(R.string.minimax_quota_balance_cash, result.cash),
@@ -144,7 +144,7 @@ internal fun MiniMaxQuotaCard(quota: MiniMaxProviderUsage.ModelQuota) {
                 if (quota.name.equals("general", ignoreCase = true)) {
                     stringResource(R.string.minimax_quota_shared)
                 } else quota.name,
-                style = DsType.headline17.withReadingWeight(), color = colors.text,
+                style = SyType.headline17.withReadingWeight(), color = colors.text,
             )
             MiniMaxQuotaWindow(
                 title = stringResource(R.string.minimax_quota_interval_label),
@@ -166,14 +166,14 @@ private fun MiniMaxQuotaWindow(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-        Text(title, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
-        Text(window.display(), style = DsType.title22.withReadingWeight(), color = colors.text)
+        Text(title, style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
+        Text(window.display(), style = SyType.title22.withReadingWeight(), color = colors.text)
         window.remainingFraction()?.let { fraction ->
             SyProgressBar(fraction, modifier = Modifier.fillMaxWidth(), color = colors.mint)
         }
         resetMillis?.takeIf { it >= 0 }?.let {
             Text(stringResource(R.string.minimax_quota_reset_after, it.durationDisplay()),
-                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         }
     }
 }

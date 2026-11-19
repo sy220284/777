@@ -8,7 +8,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProtocol
 import com.labteto.dshmobile.ui.shenyan.SyMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -26,7 +26,7 @@ internal fun LocalModelProtocolPicker(
         anchor = {
             Text(
                 stringResource(R.string.local_model_protocol_value, names.getValue(protocol)),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
         },

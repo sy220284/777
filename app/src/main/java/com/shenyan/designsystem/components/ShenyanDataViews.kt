@@ -120,15 +120,23 @@ fun SyValueRow(label: String, value: String?, modifier: Modifier = Modifier, hin
 }
 
 /** One shared icon palette for the expanded list and the collapsed rail. */
+@Composable
 internal fun syEntryTileTone(name: String): Color? {
     if (!name.startsWith("SyEntry.")) return null
+    val p = LocalSyColors.current
+    // Semantic families blend into the actual wallpaper/theme; no fixed blue/purple tiles.
     return when (name.removePrefix("SyEntry.")) {
-"Persona", "Search", "Account", "Gallery" -> Color(0xFFE2E7E9)
-        "NewSession", "WorkspaceFiles", "Quota", "Tools" -> Color(0xFFEEE4D8)
-        "Tasks", "Permissions", "Memory", "Connections" -> Color(0xFFDFE6DA)
-        "Settings", "Models", "Diary", "Plugins" -> Color(0xFFE8E2E9)
-        "GroupChat", "Appearance", "Notifications", "Skills" -> Color(0xFFF1DFD3)
-        else -> Color(0xFFE4E8E9)
+        "Persona", "Search", "Account", "Gallery" ->
+            androidx.compose.ui.graphics.lerp(p.materialL5, p.clay, .17f)
+        "NewSession", "WorkspaceFiles", "Quota", "Tools" ->
+            androidx.compose.ui.graphics.lerp(p.materialL5, p.primary, .18f)
+        "Tasks", "Permissions", "Memory", "Connections" ->
+            androidx.compose.ui.graphics.lerp(p.materialL5, p.mint, .17f)
+        "Settings", "Models", "Diary", "Plugins" ->
+            androidx.compose.ui.graphics.lerp(p.materialL5, p.warning, .14f)
+        "GroupChat", "Appearance", "Notifications", "Skills" ->
+            androidx.compose.ui.graphics.lerp(p.materialL5, p.clay, .23f)
+        else -> p.materialL3
     }
 }
 

@@ -4,7 +4,6 @@ import com.labteto.dshmobile.local.model.LocalModelProbe
 import com.shenyan.designsystem.foundation.SyMetric
 
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -20,7 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,8 +71,8 @@ import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -228,20 +227,20 @@ internal fun LocalModelSettingsCard(
                 apiProfiles.size,
                 selectedProfiles,
             ),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = colors.text,
         )
-        Text(stringResource(R.string.local_model_list_hint), style = DsType.small13.withReadingWeight(),
+        Text(stringResource(R.string.local_model_list_hint), style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary)
         if (apiProfiles.isEmpty()) {
-            Text(stringResource(R.string.advanced_model_unconfigured), style = DsType.small13.withReadingWeight(),
+            Text(stringResource(R.string.advanced_model_unconfigured), style = SyType.small13.withReadingWeight(),
                 color = colors.textTertiary)
         }
-        local.error?.let { Text(it, style = DsType.small13.withReadingWeight(), color = colors.dangerInk) }
+        local.error?.let { Text(it, style = SyType.small13.withReadingWeight(), color = colors.dangerInk) }
         apiProfiles.forEach { profile ->
             val isSelectedProfile = local.modelSelection.isActive(profile)
-            Surface(
-                shape = DsShapes.row,
+            SyFlatSurface(
+                shape = SyShapes.row,
                 color = if (isSelectedProfile) colors.selected.copy(alpha = .24f)
                     else androidx.compose.ui.graphics.Color.Transparent,
                 border = androidx.compose.foundation.BorderStroke(
@@ -266,7 +265,7 @@ internal fun LocalModelSettingsCard(
                         Text(
                             (profile.displayName ?: profile.model) +
                                 if (duplicated) " · ${profile.id.takeLast(4)}" else "",
-                            style = DsType.std14Strong.withReadingWeight(),
+                            style = SyType.std14Strong.withReadingWeight(),
                             color = colors.text,
                             modifier = Modifier.weight(1f),
                             maxLines = 1,
@@ -308,7 +307,7 @@ internal fun LocalModelSettingsCard(
                         }
                     }
                     SyMenu(
-                        anchor = { Text("⋯", style = DsType.large20.withReadingWeight(), color = colors.textSecondary,
+                        anchor = { Text("⋯", style = SyType.large20.withReadingWeight(), color = colors.textSecondary,
                             modifier = Modifier.padding(horizontal = SyMetric.gapMd)) },
                         items = listOfNotNull(
                             if (!local.modelSelection.isActive(profile))
@@ -353,7 +352,7 @@ internal fun LocalModelSettingsCard(
                     LocalImageInputMode.TOOL -> R.string.local_model_image_mode_tool_hint
                 },
             ),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
     }
@@ -413,11 +412,11 @@ internal fun LocalModelSettingsCard(
         ) {
             Column(Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                Text(stringResource(R.string.local_model_choose), style = DsType.small13Strong.withReadingWeight(),
+                Text(stringResource(R.string.local_model_choose), style = SyType.small13Strong.withReadingWeight(),
                     color = colors.text)
                 SyMenu(
                     anchor = {
-                        Surface(shape = DsShapes.row,
+                        SyFlatSurface(shape = SyShapes.row,
                             color = androidx.compose.ui.graphics.Color.Transparent,
                             modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
@@ -426,7 +425,7 @@ internal fun LocalModelSettingsCard(
                                     else LocalModelPresets.entries.firstOrNull {
                                         it.model == model && it.baseUrl == baseUrl
                                     }?.let { "${it.provider} · ${it.model}" } ?: model,
-                                    style = DsType.std14Strong.withReadingWeight(), color = colors.text,
+                                    style = SyType.std14Strong.withReadingWeight(), color = colors.text,
                                     modifier = Modifier.weight(1f))
                                 Icon(FeatherIcons.ChevronRight, contentDescription = null)
                             }
@@ -469,20 +468,20 @@ internal fun LocalModelSettingsCard(
                         }
                     }
                 } else {
-                    Text(baseUrl, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                    Text(baseUrl, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
                     selectedPreset?.let { preset ->
                         if (protocol in advertisedProtocols) {
                             Text(
                                 stringResource(R.string.local_model_request_endpoint,
                                     LocalModelPresets.editorRequestEndpointFor(model, baseUrl, protocol)),
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                                 color = colors.textTertiary,
                             )
                         }
                         preset.modelsEndpoint?.let { endpoint ->
                             Text(
                                 stringResource(R.string.local_model_models_endpoint, endpoint),
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                                 color = colors.textTertiary,
                             )
                         }
@@ -498,11 +497,11 @@ internal fun LocalModelSettingsCard(
                                     R.string.local_model_video_kimi_chat_only
                                 else -> R.string.local_model_video_input_unavailable
                             }
-                            Text(stringResource(status), style = DsType.caption11.withReadingWeight(),
+                            Text(stringResource(status), style = SyType.caption11.withReadingWeight(),
                                 color = colors.textTertiary)
                         } else if (LocalModelCapability.AUDIO in preset.capabilities) {
                             Text(stringResource(R.string.local_model_media_not_connected),
-                                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                                style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
                     }
                 }
@@ -523,11 +522,11 @@ internal fun LocalModelSettingsCard(
                         stretch = true,
                     )
                     Text("K3 / K3.1 Pro 可选择 256K 或 1M；1M 需相应会员权益。",
-                        style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
                 }
                 if (protocol !in advertisedProtocols) {
                     Text("当前保存的协议与官方模型不匹配，请在下方选择支持的协议并重新测试连接。",
-                        style = DsType.caption11.withReadingWeight(), color = colors.dangerInk)
+                        style = SyType.caption11.withReadingWeight(), color = colors.dangerInk)
                 }
                 LocalModelProtocolPicker(protocol, available = advertisedProtocols) { selected ->
                     baseUrl = LocalModelPresets.editorBaseUrlForProtocol(model, baseUrl, selected)
@@ -539,7 +538,7 @@ internal fun LocalModelSettingsCard(
                 }
                 if (recommendedProtocol != null && recommendedProtocol != protocol) {
                     Text("当前协议已偏离预置推荐值：${recommendedProtocol.name}。切换协议后请测试连接。",
-                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
                 SyTextField(apiKey, onValueChange = {
                     apiKey = it.take(8000); editorGeneration++; testStatus = null
@@ -564,7 +563,7 @@ internal fun LocalModelSettingsCard(
                     variant = SyButtonVariant.Outline,
                 )
                 catalogStatus?.let { status ->
-                    Text(status, style = DsType.small13.withReadingWeight(),
+                    Text(status, style = SyType.small13.withReadingWeight(),
                         color = if (catalogError) colors.dangerInk else colors.textSecondary)
                 }
                 if (discoveredModels.isNotEmpty()) {
@@ -574,18 +573,18 @@ internal fun LocalModelSettingsCard(
                             label = { Text(stringResource(R.string.local_model_catalog_search)) })
                         if (discoveredModels.size > 60) {
                             Text(stringResource(R.string.local_model_catalog_search_hint),
-                                style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                                style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
                         }
                     }
                     SyMenu(
                         anchor = {
-                            Surface(shape = DsShapes.row,
+                            SyFlatSurface(shape = SyShapes.row,
                                 color = androidx.compose.ui.graphics.Color.Transparent,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(SyMetric.gapSection),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     Text(stringResource(R.string.local_model_catalog_selector, discoveredModels.size),
-                                        style = DsType.std14Strong.withReadingWeight(),
+                                        style = SyType.std14Strong.withReadingWeight(),
                                         color = colors.text, modifier = Modifier.weight(1f))
                                     Icon(FeatherIcons.ChevronRight, contentDescription = null)
                                 }
@@ -603,9 +602,9 @@ internal fun LocalModelSettingsCard(
                         },
                     )
                     Text(stringResource(R.string.local_model_catalog_hint),
-                        style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
                 }
-                testStatus?.let { Text(it, style = DsType.small13.withReadingWeight(),
+                testStatus?.let { Text(it, style = SyType.small13.withReadingWeight(),
                     color = if (it.startsWith("连接成功")) colors.textSecondary else colors.dangerInk) }
                 if (testing) Text(stringResource(R.string.local_model_testing))
                 listOf(
@@ -710,19 +709,19 @@ internal fun DeepSeekPricingCard(
     SettingsCard(stringResource(R.string.pricing_deepseek_title)) {
         Text(
             stringResource(R.string.pricing_current_period, periodLabel),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = colors.text,
         )
-        Text(sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+        Text(sourceLabel, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
         Text(
             stringResource(R.string.pricing_source_official),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
 
         Text(
             "价格单位：人民币（元）/ 每百万 Token",
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         state.models.forEach { model ->
@@ -731,15 +730,15 @@ internal fun DeepSeekPricingCard(
                     modifier = Modifier.padding(SyMetric.gapLg),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
                 ) {
-                    Text(model.displayName, style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+                    Text(model.displayName, style = SyType.std14Strong.withReadingWeight(), color = colors.text)
                     Text(
                         "${model.modelId} · ${model.version}",
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textTertiary,
                     )
                     Text(
                         stringResource(R.string.pricing_same_thinking),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                     PriceComparisonTable(
@@ -764,13 +763,13 @@ internal fun DeepSeekPricingCard(
 
         Text(
             stringResource(R.string.pricing_holiday_hint),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
         state.error?.let { error ->
             Text(
                 stringResource(R.string.pricing_refresh_failed, error),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.dangerInk,
             )
         }

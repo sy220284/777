@@ -15,13 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.Color
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,10 +44,15 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SyEmptyState
+import com.shenyan.designsystem.components.SyInlineBanner
+import com.shenyan.designsystem.components.SyBannerKind
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SySwitchControl
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
@@ -64,7 +68,7 @@ private data class InventoryRow(
     val detail: String,
     val connectedService: Boolean,
     val icon: ImageVector = FeatherIcons.Globe,
-    val accent: Color = Color(0xFF62758A),
+    val group: ExtensionGroup,
     val documentIcon: Int? = null,
     val available: Boolean = true,
     val modelInvocable: Boolean = true,
@@ -186,7 +190,7 @@ internal fun PluginInventoryBrowser(
         }
         val copy = extensionPresentation(id, label, stringResource(hint), ExtensionKind.PLUGIN)
         InventoryRow("local:$id", copy.title, copy.description, connectedService = false,
-            icon = copy.icon, accent = copy.accent, documentIcon = copy.documentIcon,
+            icon = copy.icon, group = copy.group, documentIcon = copy.documentIcon,
             sourceLabel = "777 · 随应用安装",
             marketState = ExtensionMarketState(
                 ExtensionMarketStatus.BUILTIN, "已内置", "调用时核验实际授权",
@@ -203,13 +207,13 @@ internal fun PluginInventoryBrowser(
             sourceLabel = "MCP · ${server.transport.uppercase()}",
             marketState = connectorMarketState(server.registration, server.connection),
             icon = copy.icon,
-            accent = copy.accent,
+            group = copy.group,
         )
     }
     val installedSkills = skills.map { skill ->
         val copy = extensionPresentation(skill.name, skill.displayName, skill.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + skill.name, copy.title, copy.description,
-            connectedService = false, icon = copy.icon, accent = copy.accent,
+            connectedService = false, icon = copy.icon, group = copy.group,
             documentIcon = copy.documentIcon,
             available = true, modelInvocable = skill.modelInvocable, installedSkill = true,
             sourceUrl = skill.sourceUrl,
@@ -223,7 +227,7 @@ internal fun PluginInventoryBrowser(
     val availablePresets = presets.filterNot { it.installed || it.id in installedSkillIds }.map { preset ->
         val copy = extensionPresentation(preset.id, preset.title, preset.description, ExtensionKind.SKILL)
         InventoryRow("skill:" + preset.id, copy.title, copy.description,
-            connectedService = false, icon = copy.icon, accent = copy.accent,
+            connectedService = false, icon = copy.icon, group = copy.group,
             documentIcon = copy.documentIcon,
             available = false, installablePreset = true,
             sourceLabel = "777 · 内置精选",
@@ -237,7 +241,7 @@ internal fun PluginInventoryBrowser(
         connectedService = githubConfigured,
         available = false,
         icon = githubVisual.icon,
-        accent = githubVisual.accent,
+        group = githubVisual.group,
         documentIcon = githubVisual.documentIcon,
         sourceLabel = "777 · GitHub 连接器",
         marketState = if (githubConfigured)
@@ -252,7 +256,7 @@ internal fun PluginInventoryBrowser(
         connectedService = false,
         available = false,
         icon = FeatherIcons.Plus,
-        accent = addMcpVisual.accent,
+        group = addMcpVisual.group,
         sourceLabel = "777 · MCP",
         marketState = ExtensionMarketState(ExtensionMarketStatus.INSTALLABLE, "可添加"),
     )
@@ -303,7 +307,7 @@ internal fun PluginInventoryBrowser(
         ) else emptyList()
     }
 
-    Surface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
+    SyFlatSurface(Modifier.fillMaxSize(), color = colors.rootSurface()) {
         Column(if (embedded) Modifier.fillMaxSize() else Modifier.fillMaxSize().safeDrawingPadding()) {
             if (!embedded) SyTopBar(
                 title = stringResource(R.string.tools_catalog_title),
@@ -366,7 +370,7 @@ internal fun PluginInventoryBrowser(
             if (loading && visible.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.common_loading),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textTertiary,
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapSm),
@@ -383,22 +387,20 @@ internal fun PluginInventoryBrowser(
             ) {
                 if (error != null) {
                     item(key = "inventory-error") {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
-                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(error, style = DsType.std14.withReadingWeight(), color = colors.dangerInk)
-                            if (onRetry != null) {
-                                SyButton(text = stringResource(R.string.common_retry), onClick = onRetry)
-                            }
-                        }
+                        SyInlineBanner(
+                            message = error,
+                            kind = SyBannerKind.ERROR,
+                            actionLabel = if (onRetry != null) stringResource(R.string.common_retry) else null,
+                            onAction = onRetry,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
                 if (sections.none { it.entries.isNotEmpty() } && error == null && !loading) {
                     item(key = "inventory-empty") {
-                        Text(
-                            when {
+                        SyEmptyState(
+                            icon = FeatherIcons.Search,
+                            title = when {
                                 query.isNotEmpty() && !addedOnly && owned.isNotEmpty() &&
                                     !showOwnedInDiscover -> "可添加项目中没有匹配项；可展开下方已添加项目"
                                 query.isNotEmpty() -> stringResource(R.string.tools_catalog_no_match)
@@ -406,15 +408,14 @@ internal fun PluginInventoryBrowser(
                                 addedOnly -> "尚未添加技能、插件或连接器"
                                 else -> "暂无可添加的能力；可查看已添加的项目"
                             },
-                            style = DsType.std14.withReadingWeight(),
-                            color = colors.textSecondary,
-                            modifier = Modifier.fillMaxWidth().padding(SyMetric.gapPage),
+                            body = "可以调整查找条件、切换已添加／发现，或检查连接与授权状态。",
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
                 sections.filter { it.entries.isNotEmpty() }.forEach { section ->
                     item(key = "heading:" + section.id) {
-                        Text(section.title, style = DsType.small13Strong.withReadingWeight(),
+                        Text(section.title, style = SyType.small13Strong.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.fillMaxWidth()
                                 .padding(start = 6.dp, top = SyMetric.gapSm, bottom = SyMetric.gapXs))
@@ -425,7 +426,7 @@ internal fun PluginInventoryBrowser(
                             title = item.name,
                             description = item.detail,
                             icon = item.icon,
-                            accent = item.accent,
+                            accent = item.group.accent(colors),
                             documentIcon = item.documentIcon,
                             marketState = item.marketState,
                             onOpen = {
@@ -516,9 +517,9 @@ internal fun PluginInventoryBrowser(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                Surface(
+                SyFlatSurface(
                     modifier = Modifier.size(84.dp),
-                    color = item.accent.copy(alpha = 0.10f),
+                    color = androidx.compose.ui.graphics.lerp(colors.materialL4, item.group.accent(colors), .10f),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -527,40 +528,40 @@ internal fun PluginInventoryBrowser(
                                 painter = painterResource(item.documentIcon),
                                 contentDescription = null, modifier = Modifier.size(64.dp),
                             )
-                            else -> Icon(item.icon, contentDescription = null, tint = item.accent,
+                            else -> Icon(item.icon, contentDescription = null, tint = item.group.accent(colors),
                                 modifier = Modifier.size(44.dp))
                         }
                     }
                 }
                 Column(Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.detail, style = DsType.std14.withReadingWeight(),
+                    Text(item.detail, style = SyType.std14.withReadingWeight(),
                         color = colors.textSecondary)
                 }
             }
             if (item.sourceLabel.isNotBlank()) {
-                Text(item.sourceLabel, style = DsType.caption11.withReadingWeight(), color = colors.textTertiary)
+                Text(item.sourceLabel, style = SyType.caption11.withReadingWeight(), color = colors.textTertiary)
             }
-            Text(item.marketState.label, style = DsType.small13Strong.withReadingWeight(),
+            Text(item.marketState.label, style = SyType.small13Strong.withReadingWeight(),
                 color = if (item.marketState.status in setOf(ExtensionMarketStatus.NEEDS_SETUP,
                     ExtensionMarketStatus.FAILED, ExtensionMarketStatus.UNSUPPORTED))
                     colors.warningInk else colors.successInk)
             if (item.marketState.advice.isNotBlank() && item.requirements.isEmpty()) {
-                Text(item.marketState.advice, style = DsType.small13.withReadingWeight(),
+                Text(item.marketState.advice, style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary)
             }
             if (item.requirements.isNotEmpty()) {
-                Surface(
+                SyMaterialSurface(
                     modifier = Modifier.fillMaxWidth().testTag("skill-dependency-summary"),
-                    color = colors.materialL4,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                    tier = SyMaterialTier.L2_BAR,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(SyMetric.radiusControl),
                     onClick = { requirementsExpanded = !requirementsExpanded },
                 ) {
                     Row(Modifier.fillMaxWidth().padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
                         Text("运行依赖 · ${item.requirements.size} 项",
-                            style = DsType.std14Strong, color = colors.text)
+                            style = SyType.std14Strong, color = colors.text)
                         Icon(FeatherIcons.ChevronDown, contentDescription = "展开运行依赖",
                             tint = colors.textSecondary)
                     }
@@ -569,7 +570,7 @@ internal fun PluginInventoryBrowser(
                     item.requirements.forEach { requirement ->
                         Text(
                             "${if (requirement.registered) "已就绪" else if (requirement.type.equals("mcp", true)) "待连接或检查" else "待配置"} · ${requirement.description.ifBlank { requirement.value }}",
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = if (requirement.registered) colors.successInk else colors.warningInk,
                         )
                         val endpoint = if (!requirement.registered)
@@ -601,19 +602,19 @@ internal fun PluginInventoryBrowser(
                     }
                     if (item.requirements.any { !it.registered && skillMcpHttpsEndpoint(it) == null }) {
                         Text("部分依赖没有公开连接地址，可在连接器中查看本机可用的服务。",
-                            style = DsType.small13, color = colors.textSecondary)
+                            style = SyType.small13, color = colors.textSecondary)
                         SyButton(text = "查看连接器", variant = SyButtonVariant.Ghost,
                             onClick = { selectedRow = null; onManageConnections() })
                     }
                 }
             }
             if (item.installedSkill && !item.modelInvocable) {
-                Text(stringResource(R.string.skills_manual_only), style = DsType.small13.withReadingWeight(), color = colors.textTertiary)
+                Text(stringResource(R.string.skills_manual_only), style = SyType.small13.withReadingWeight(), color = colors.textTertiary)
             }
             item.sourceWarning?.let { warning ->
                 Text(
                     warning,
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                     modifier = Modifier.testTag("skill-source-warning"),
                 )
@@ -621,7 +622,7 @@ internal fun PluginInventoryBrowser(
             if (item.installedSkill && item.sourceUrl != null) {
                 Text(
                     "已固定 GitHub 来源版本：${item.sourceUrl.substringAfter("/tree/").substringBefore('/').take(12)}",
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 if (onCheckSkillUpdate != null) {
@@ -637,7 +638,7 @@ internal fun PluginInventoryBrowser(
                     if (revision != null && onUpgradeSkill != null) {
                         Text(
                             "发现新版本：${revision.take(12)}",
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("skill-update-available"),
                         )
@@ -654,7 +655,7 @@ internal fun PluginInventoryBrowser(
                     } else if (skillId in upToDateSkills) {
                         Text(
                             "当前已是最新版本",
-                            style = DsType.small13.withReadingWeight(),
+                            style = SyType.small13.withReadingWeight(),
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("skill-update-current"),
                         )
@@ -719,7 +720,7 @@ internal fun PluginInventoryBrowser(
                 ) {
                     Text(
                         stringResource(R.string.skills_auto_invocation),
-                        style = DsType.std14.withReadingWeight(),
+                        style = SyType.std14.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                     SySwitchControl(
@@ -874,7 +875,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 "将升级 $id 到版本 ${revision.take(12)}。安装前会验证新包，并保存当前完整技能作为上一版本；如果修改过本地规则，可通过“恢复上一版本”找回。",
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary,
             )
         }
     }
@@ -896,7 +897,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 "将 $id 恢复为上次升级前的完整技能内容。当前版本会保留，可再次恢复回来。",
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary,
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary,
             )
         }
     }
@@ -918,7 +919,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 "将导出 SKILL.md 及技能目录下的全部附属资料，请先确认其中没有需要保密的内容。",
-                style = DsType.std14.withReadingWeight(),
+                style = SyType.std14.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
@@ -941,7 +942,7 @@ internal fun PluginInventoryBrowser(
             },
         ) {
             Text(stringResource(R.string.skills_remove_message, id),
-                style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
         }
     }
 
@@ -965,7 +966,7 @@ internal fun PluginInventoryBrowser(
         ) {
             Text(
                 stringResource(R.string.skills_edit_hint),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
             SyTextField(

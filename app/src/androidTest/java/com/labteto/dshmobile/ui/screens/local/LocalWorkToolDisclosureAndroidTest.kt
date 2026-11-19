@@ -218,7 +218,7 @@ class LocalWorkToolDisclosureAndroidTest {
         }
         val scenarios = listOf(
             Triple(320, 2f, ThemePreference.LIGHT),
-            Triple(390, 2f, ThemePreference.DARK),
+            Triple(390, 2f, ThemePreference.SYSTEM),
             Triple(430, 1f, ThemePreference.LIGHT),
         )
         scenarios.forEach { (dp, fontScale, preference) ->

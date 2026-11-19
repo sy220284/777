@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.tools
 
+import com.shenyan.designsystem.components.SyDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -17,8 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -44,7 +44,7 @@ internal fun ExtensionDetailPage(
         derivedStateOf { (scroll.value / transitionDistance).coerceIn(0f, 1f) }
     }
     SyFullScreenDialog(onDismiss = onDismiss) {
-        Surface(Modifier.fillMaxSize(), color = colors.surfaceSolid) {
+        SyFlatSurface(Modifier.fillMaxSize(), color = colors.surfaceSolid) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 SyTopBar(title = title, onBack = onDismiss,
                     backContentDescription = "返回技能列表", titleAlpha = titleProgress)
@@ -59,7 +59,7 @@ internal fun ExtensionDetailPage(
                             .then(if (titleProgress >= .5f) Modifier.clearAndSetSemantics { } else Modifier))
                     content()
                 }
-                HorizontalDivider(color = colors.border)
+                SyDivider(color = colors.border)
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
                     content = footer,

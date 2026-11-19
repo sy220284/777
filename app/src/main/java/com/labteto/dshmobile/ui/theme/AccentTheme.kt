@@ -7,9 +7,9 @@ import androidx.compose.ui.graphics.luminance
 import com.shenyan.designsystem.foundation.syInkContrastRatio
 
 /**
- * 777 的交互色卡。流体杏为当前默认，历史传统色继续作为显式可选外观。
+ * 777 的交互色卡。当前默认色与历史色仅为用户可选入口；页面最终配色由语义对比、背景与场景共同决定。
  *
- * 每张卡提供亮 / 暗两档主色，只覆盖交互 accent 家族，不改变成功、警告、错误等语义色。
+ * 色卡只改变亮 / 暗操作强调色；浅色主题始终保持白色画布与黑色文字。
  */
 data class AccentPalette(
     val key: String,
@@ -24,20 +24,29 @@ object AccentPalettes {
 
     /** 流体杏为默认交互色；旧版默认 "celadon" 在 [of] 中跟随当前默认。 */
     val ALL = listOf(
-        AccentPalette("fluid_apricot", "流体杏", Color(0xFFD9926B), Color(0xFFE8A87C), onLight = Color(0xFF3A342D), onDark = Color(0xFF3A342D)),
-        AccentPalette("default_blue", "默认蓝", Color(0xFF1783FF), Color(0xFF5A9BFF), onDark = Color(0xFF07111F)),
-        AccentPalette("celadon_explicit", "青瓷", Color(0xFF3E8E8C), Color(0xFF63B3AC)),
-        AccentPalette("dailan", "黛蓝", Color(0xFF44618C), Color(0xFF8FB0D9), onDark = Color(0xFF0D1520)),
-        AccentPalette("zhusha", "朱砂", Color(0xFFA64B44), Color(0xFFDE8B84), onDark = Color(0xFF1C0D0C)),
-        AccentPalette("xianghuang", "缃黄", Color(0xFFA67C32), Color(0xFFD9BC7A), onDark = Color(0xFF1A150A)),
-        AccentPalette("zitang", "紫棠", Color(0xFF7458A8), Color(0xFFB3A0DC), onDark = Color(0xFF150F20)),
-        AccentPalette("yanzhi", "胭脂", Color(0xFFA34A5E), Color(0xFFDB8B99), onDark = Color(0xFF1F0D11)),
+        AccentPalette("fluid_apricot", "流体杏", Color(0xFFD9926B), Color(0xFFE8A87C),
+            onLight = Color.Black, onDark = Color(0xFF3A342D)),
+        AccentPalette("vermilion", "朱砂墨", Color(0xFFAA4235), Color(0xFFD87460)),
+        AccentPalette("forest", "森野", Color(0xFF276D4E), Color(0xFF8CA66B)),
+        AccentPalette("amber", "琥珀", Color(0xFFAA6A21), Color(0xFFE3AD57)),
+        AccentPalette("celadon_explicit", "青瓷", Color(0xFF307B67), Color(0xFF80B7A1)),
+        AccentPalette("graphite", "岩墨", Color(0xFF665E50), Color(0xFFB9A58B)),
+        AccentPalette("rose_copper", "玫铜", Color(0xFFA94C50), Color(0xFFD99283)),
+        AccentPalette("olive", "橄榄", Color(0xFF5B7240), Color(0xFFADBD79)),
+        AccentPalette("modern_coral", "珊瑚几何", Color(0xFFE44E34), Color(0xFFF2A44C)),
     )
 
     val DEFAULT = ALL.first()
 
     fun of(key: String?): AccentPalette = when (key) {
         null, "", "celadon" -> DEFAULT
+        // Persisted historical keys migrate into supported coordinated colour families.
+        "default_blue" -> ALL.first { it.key == "forest" }
+        "dailan" -> ALL.first { it.key == "graphite" }
+        "zhusha" -> ALL.first { it.key == "vermilion" }
+        "xianghuang" -> ALL.first { it.key == "amber" }
+        "zitang" -> ALL.first { it.key == "rose_copper" }
+        "yanzhi" -> ALL.first { it.key == "olive" }
         else -> ALL.firstOrNull { it.key == key } ?: DEFAULT
     }
 }
@@ -71,7 +80,7 @@ internal fun readableAccentForeground(preferred: Color, fills: List<Color>): Col
  * 把选中的色卡覆盖进语义色：accent 家族整体换血，其余语义（文字/画布/成功/警示）原样保留。
  * 换色面刻意收窄——整页只有交互色变，Functional 族与 Family 容器色不跟卡走，页面不会花。
  */
-fun DsColors.withAccent(palette: AccentPalette, dark: Boolean): DsColors {
+fun SyHostColors.withAccent(palette: AccentPalette, dark: Boolean): SyHostColors {
     val accent = if (dark) palette.darkAccent else palette.lightAccent
     val preferredOn = if (dark) palette.onDark else palette.onLight
     val tertiary = if (dark) accent.copy(alpha = 0.16f) else accent.copy(alpha = 0.12f)

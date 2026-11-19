@@ -1,5 +1,9 @@
 package com.shenyan.designsystem.components
 
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -74,6 +78,7 @@ fun SyIconButton(
     val tempo = LocalSyMotionTempo.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(
         if (pressed && enabled && !motion) SyMotion.pressedScale else 1f,
@@ -83,7 +88,7 @@ fun SyIconButton(
     val resolved = when {
         bare -> Color.Transparent
         selected -> syMaterialColor(SyMaterialTier.L3_CARD)
-        pressed -> syMaterialColor(SyMaterialTier.L2_BAR)
+        pressed || focused -> syMaterialColor(SyMaterialTier.L2_BAR)
         hovered -> syMaterialColor(SyMaterialTier.L1_SECTION)
         else -> containerColor
     }
@@ -98,6 +103,7 @@ fun SyIconButton(
         onClick = onClick, enabled = enabled, modifier = modifier.size(SyMetric.touch),
         interactionSource = interaction, color = fill,
         shadowElevation = if (bare) 0.dp else shadowElevation,
+        border = if (focused && enabled) androidx.compose.foundation.BorderStroke(1.dp, p.linkInk) else null,
         shape = if (tile != null) RoundedCornerShape(12.dp) else CircleShape,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -120,6 +126,39 @@ fun SyIconButton(
             }
         }
     }
+}
+
+/** A motion-aware indicator for a real running operation. */
+@Composable
+fun SyActivityIndicator(
+    modifier: Modifier = Modifier.size(28.dp),
+    strokeWidth: Dp = 2.dp,
+    progress: Float? = null,
+    color: Color = LocalSyColors.current.primary,
+) {
+    val track = LocalSyColors.current.textTertiary.copy(alpha = .20f)
+    if (progress != null || LocalSyReduceMotion.current) {
+        val amount = progress?.coerceIn(0f, 1f) ?: .25f
+        CircularProgressIndicator(
+            progress = { amount },
+            modifier = if (progress != null) modifier else modifier.clearAndSetSemantics {
+                progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+            },
+            color = color, trackColor = track, strokeWidth = strokeWidth,
+        )
+    } else {
+        CircularProgressIndicator(
+            modifier = modifier, color = color, trackColor = track, strokeWidth = strokeWidth,
+        )
+    }
+}
+
+@Composable
+fun SyDivider(
+    modifier: Modifier = Modifier,
+    color: Color = LocalSyColors.current.border,
+) {
+    androidx.compose.material3.HorizontalDivider(modifier = modifier, color = color)
 }
 
 /** Empty state is never a fake loading skeleton; recovery retains the real caller's callback. */
@@ -169,8 +208,7 @@ fun SyLoadingState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
         Icon(icon, contentDescription = null, tint = p.primary, modifier = Modifier.size(24.dp))
-        CircularProgressIndicator(color = p.primary, strokeWidth = 2.dp,
-            modifier = Modifier.size(22.dp))
+        SyActivityIndicator(modifier = Modifier.size(22.dp))
         Text(label, color = p.textSecondary, textAlign = TextAlign.Center)
     }
 }

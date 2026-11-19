@@ -33,7 +33,9 @@ permissions:
 
 concurrency:
   group: android-unified-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Let an expensive Android run finish; newer pushes replace only the pending run.
+  # This yields a complete verifiable snapshot while bounding queue and emulator cost.
+  cancel-in-progress: false
 
 jobs:
   plan:

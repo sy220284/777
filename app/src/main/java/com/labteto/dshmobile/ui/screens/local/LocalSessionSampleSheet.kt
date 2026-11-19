@@ -22,7 +22,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -59,7 +59,7 @@ internal fun LocalSessionSampleSheet(
     ) {
         Text(
             stringResource(R.string.local_session_sample_hint),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         SyTextField(
@@ -79,7 +79,7 @@ internal fun LocalSessionSampleSheet(
                 Text(
                     if (promptTooLong) "输入超出限制，请删减文字（$promptBytes/$LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES 字节）"
                     else "$promptBytes/$LOCAL_SESSION_SAMPLE_MAX_PROMPT_BYTES 字节",
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                 )
             },
         )
@@ -119,7 +119,7 @@ internal fun LocalSessionSampleSheet(
             )
         }
         error?.let {
-            Text(it, style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+            Text(it, style = SyType.small13.withReadingWeight(), color = colors.dangerInk)
         }
         result?.let { preview ->
             Column(
@@ -128,17 +128,17 @@ internal fun LocalSessionSampleSheet(
             ) {
                 Text(
                     stringResource(R.string.local_session_sample_result),
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                 )
-                Text(preview.content, style = DsType.std14.withReadingWeight(), color = colors.text)
+                Text(preview.content, style = SyType.std14.withReadingWeight(), color = colors.text)
                 Text(
                     if (preview.usageReported) {
                         val price = preview.estimatedCostCny?.let { " · 估算费用 ¥%.6f".format(it) }
                             ?: " · 价格未提供"
                         "${preview.model} · 输入 ${preview.inputTokens} / 输出 ${preview.outputTokens} tokens$price"
                     } else stringResource(R.string.local_session_sample_usage_unreported),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
             }

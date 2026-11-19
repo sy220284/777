@@ -73,7 +73,7 @@ class LocalReplyCompositionVisualTest {
 
     @Test fun threeImageGalleryHasBalancedLastRowInDarkTheme() {
         compose.setContent {
-            DshTheme(preference = ThemePreference.DARK) {
+            DshTheme(preference = ThemePreference.SYSTEM) {
                 Column(Modifier.width(320.dp).background(LocalSyColors.current.canvas)) {
                     ReplyMediaGrid(3) { index ->
                         Text("图片 ${index + 1}", modifier = Modifier.fillMaxWidth()
@@ -115,7 +115,7 @@ class LocalReplyCompositionVisualTest {
 
     @Test fun standaloneMediaPreservesTheOriginalNarrowerContentLayoutInDarkMode() {
         compose.setContent {
-            DshTheme(preference = ThemePreference.DARK) {
+            DshTheme(preference = ThemePreference.SYSTEM) {
                 Column(Modifier.width(320.dp)) {
                     MediaMessageCard(title = "视频处理中", subtitle = "创作记录",
                         modifier = Modifier.testTag("standalone-media")) {

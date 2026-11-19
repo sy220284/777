@@ -6,13 +6,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.FilterQuality
@@ -25,14 +26,18 @@ import androidx.compose.ui.unit.IntSize
 import kotlin.math.max
 import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -43,13 +48,59 @@ import androidx.compose.ui.unit.Dp
 import com.shenyan.designsystem.foundation.*
 
 /**
- * Five-tier material grammar. Alpha, border, rim highlight and elevation are native and real.
- * Compose cannot blur *already-drawn sibling content* with Modifier.blur: it blurs its own layer.
- * For true backdrop blur, caller may supply a spatially aligned `backdrop` composable. It is
- * drawn behind the fill, and only that backdrop is blurred. Never blur foreground text.
- * On old devices or when no backdrop is supplied use a clean semantic surface fallback.
+ * Five material tiers share the same scene. Optical chrome refracts a distinct backing;
+ * foreground text sits above it. Flat surfaces keep their readable material fill.
  */
 enum class SyMaterialTier { L1_SECTION, L2_BAR, L3_CARD, L4_OVERLAY, L5_SOLID }
+
+/**
+ * Flat chrome, reading surfaces and image masks keep a caller's semantic fill
+ * and geometry. Interactive panels share focus and press feedback without
+ * introducing a shadow or a backdrop effect.
+ */
+@Composable
+fun SyFlatSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = androidx.compose.ui.graphics.RectangleShape,
+    color: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = contentColorFor(color),
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp = 0.dp,
+    border: BorderStroke? = null,
+    onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
+    content: @Composable () -> Unit,
+) {
+    if (onClick == null) {
+        Surface(
+            modifier = modifier, shape = shape, color = color, contentColor = contentColor,
+            tonalElevation = tonalElevation, shadowElevation = shadowElevation,
+            border = border, content = content,
+        )
+    } else {
+        val palette = LocalSyColors.current
+        val source = interactionSource ?: remember { MutableInteractionSource() }
+        val pressed by source.collectIsPressedAsState()
+        val focused by source.collectIsFocusedAsState()
+        val tone by animateColorAsState(
+            targetValue = if (enabled && (pressed || focused)) {
+                palette.primary.copy(alpha = if (pressed) .12f else .07f).compositeOver(color)
+            } else color,
+            animationSpec = tween(SyMotion.duration(
+                SyMotion.interactionColorMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current,
+            )),
+            label = "syFlatSurfaceTone",
+        )
+        Surface(
+            onClick = onClick, modifier = modifier, enabled = enabled, shape = shape,
+            color = tone, contentColor = contentColor, tonalElevation = tonalElevation,
+            shadowElevation = shadowElevation,
+            border = if (focused && enabled) BorderStroke(1.dp, palette.linkInk) else border,
+            interactionSource = source, content = content,
+        )
+    }
+}
 
 @Composable
 fun SyMaterialFrame(
@@ -68,6 +119,28 @@ fun SyMaterialFrame(
         shape = shape, border = border) {
         Column(Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalArrangement = verticalArrangement, content = content)
+    }
+}
+
+/** Shared material and geometry for the actual Chat/Work and preview composers. */
+@Composable
+fun SyComposerSurface(
+    modifier: Modifier = Modifier,
+    tint: Color = Color.Unspecified,
+    shadowElevation: Dp = 0.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    SyMaterialSurface(
+        modifier = modifier,
+        tier = SyMaterialTier.L2_BAR,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
+        tint = tint,
+        // Let the canonical renderer draw the directional optical rim.
+        shadowElevation = shadowElevation,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+            content = content)
     }
 }
 
@@ -91,6 +164,11 @@ fun SyMaterialSurface(
     val c = LocalSyColors.current
     val scene = LocalSySceneBackdrop.current
     val view = LocalView.current
+    // A separated live underlay (when available) takes priority over wallpaper.
+    // View identity prevents replaying a GraphicsLayer into a separate dialog window.
+    val liveBacking = LocalSyLiveGlassBacking.current?.takeIf {
+        it.rootView === view.rootView && it.viewport.width > 0 && it.viewport.height > 0
+    }
     val windowOnScreen = remember { IntArray(2) }
     var materialOrigin by remember { mutableStateOf(IntOffset.Zero) }
     var materialSize by remember { mutableStateOf(IntSize.Zero) }
@@ -111,75 +189,107 @@ fun SyMaterialSurface(
     )
     // Without a spatial backing, use the same palette over its canvas rather than letting
     // unrelated content show through. Nested cards inherit their parent's backing.
-    val fill = if (scene == null && backdrop == null && nested == 0)
+    val fill = if (scene == null && backdrop == null && liveBacking == null && nested == 0)
         materialFill.compositeOver(c.canvas) else materialFill
-    // Opaque Matte surfaces must never sample or blur the supplied backdrop.
-    val blurRadius = if (resolved == SyMaterialTier.L5_SOLID || fill.alpha == 1f) 0.dp else when (resolved) {
-        SyMaterialTier.L1_SECTION -> 0.dp
-        SyMaterialTier.L2_BAR -> 24.dp
-        SyMaterialTier.L3_CARD -> 0.dp
-        SyMaterialTier.L4_OVERLAY -> 32.dp
-        SyMaterialTier.L5_SOLID -> 0.dp
+    val optics = syGlassOptics(
+        colors = c, tier = resolved, fill = fill,
+        reduceTransparency = LocalSyReduceTransparency.current,
+        nestedDepth = nested, hasBackdrop = scene != null || backdrop != null || liveBacking != null,
+    )
+    // One GPU lens for anchored chrome and overlays; list cards retain their
+    // inexpensive rim unless they explicitly own a live underlay.
+    val refract = optics.glass && syShouldRefract(resolved, nested, backdrop != null)
+    var lensPoint by remember { mutableStateOf(Offset.Zero) }
+    var lensDrag by remember { mutableStateOf(Offset.Zero) }
+    var lensDown by remember { mutableStateOf(false) }
+    val lensPressure by animateFloatAsState(
+        if (refract && lensDown && !LocalSyReduceMotion.current) 1f else 0f,
+        tween(SyMotion.duration(SyMotion.interactionColorMs,
+            LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
+        label = "liquidLensPressure",
+    )
+    val surfaceBorder = when {
+        refract -> null
+        optics.glass -> BorderStroke(1.dp, c.border.copy(alpha = c.border.alpha * .38f))
+        else -> border ?: BorderStroke(1.dp, c.border)
     }
-    val elevation = when (resolved) {
-        SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> 0.dp
-        SyMaterialTier.L2_BAR -> 2.dp
-        SyMaterialTier.L3_CARD -> 1.dp
-        SyMaterialTier.L4_OVERLAY -> 16.dp
-    }
-    val rim = if (materialFill.alpha < 1f && resolved in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY)) BorderStroke(1.dp, Brush.linearGradient(
-        listOf(c.materialSheen, c.border.copy(alpha = c.border.alpha * .45f), c.materialSheen.copy(alpha = .12f)),
-    )) else BorderStroke(1.dp, c.border)
     @Composable fun Interior() {
         Box(Modifier.clip(shape)) {
-            if (blurRadius > 0.dp && nested == 0) {
-                // An explicit caller backdrop wins. Otherwise sample the scene's actual wallpaper
-                // or global light fields at this material's window coordinates.
-                val sampled = backdrop ?: scene?.let { sample ->
-                    @Composable { SyPaintAlignedScene(sample, materialOrigin) }
-                }
-                if (sampled != null) {
-                    Box(Modifier.matchParentSize().blur(blurRadius, BlurredEdgeTreatment.Unbounded)) {
-                        sampled()
+            val sampled = if (refract) {
+                backdrop ?: if (liveBacking != null || scene != null) {
+                    @Composable {
+                        // The captured transcript has transparent gaps. Include the same
+                        // aligned scene below it so those gaps never refract as black.
+                        if (scene != null) SyPaintAlignedScene(scene, materialOrigin)
+                        else Box(Modifier.fillMaxSize().background(c.canvas))
+                        if (liveBacking != null) {
+                            SyPaintLiveGlassBacking(liveBacking, materialOrigin, Modifier.fillMaxSize())
+                        }
                     }
-                }
+                } else null
+            } else null
+            if (sampled != null && refract) {
+                SyLiquidRefractionLayer(
+                    modifier = Modifier.matchParentSize(),
+                    shape = shape,
+                    fill = syLiquidTint(fill, tint),
+                    tier = resolved,
+                    reflection = optics.reflection,
+                    touchPoint = lensPoint,
+                    pressure = lensPressure,
+                    drag = lensDrag * lensPressure,
+                    backdrop = sampled,
+                )
+            } else {
+                Box(Modifier.matchParentSize().background(fill))
             }
-            Box(Modifier.matchParentSize().background(fill))
-            if (tint.isSpecified) Box(Modifier.matchParentSize().background(tint.copy(alpha = tint.alpha.coerceAtMost(.22f))))
+            if (!refract && tint.isSpecified) {
+                Box(Modifier.matchParentSize().background(tint.copy(alpha = tint.alpha.coerceAtMost(.22f))))
+            }
             CompositionLocalProvider(LocalSyGlassDepth provides (nested + 1)) {
                 content()
             }
-            if (materialFill.alpha < 1f && resolved in setOf(SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY)) {
-                // A decorative highlight must never participate in Box measurement.
-                // fillMaxWidth() here made compact surfaces stretch to the entire Row,
-                // squeezing adjacent labels into single-character vertical columns.
-                Canvas(Modifier.matchParentSize()) {
-                    val y = 0.5.dp.toPx()
-                    drawLine(
-                        color = c.materialSheen,
-                        start = Offset(size.width * .035f, y),
-                        end = Offset(size.width * .965f, y),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                }
-            }
         }
     }
-    val outer = modifier.onGloballyPositioned { coordinates ->
+    val opticalPointer = if (refract) Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            // Observe in the Final pass without consuming the page's scroll/drag events.
+            val first = awaitFirstDown(requireUnconsumed = false)
+            lensPoint = first.position
+            lensDrag = Offset.Zero
+            lensDown = true
+            val motionHistory = java.util.ArrayDeque<Pair<Long, Offset>>()
+            motionHistory.addLast(first.uptimeMillis to first.position)
+            do {
+                val next = awaitPointerEvent(PointerEventPass.Final)
+                    .changes.firstOrNull { it.id == first.id }
+                if (next != null && next.pressed) {
+                    lensDrag = syWindowedGlassDrag(
+                        motionHistory, next.uptimeMillis, next.position,
+                    )
+                    lensPoint = next.position
+                }
+            } while (next != null && next.pressed)
+            lensDown = false
+        }
+    } else Modifier
+    val outer = modifier.then(opticalPointer).onGloballyPositioned { coordinates ->
         view.rootView.getLocationOnScreen(windowOnScreen)
         val point = coordinates.positionInWindow()
         val next = IntOffset(point.x.roundToInt() + windowOnScreen[0], point.y.roundToInt() + windowOnScreen[1])
         if (materialOrigin != next) materialOrigin = next
         if (materialSize != coordinates.size) materialSize = coordinates.size
-    }.graphicsLayer { scaleX = press; scaleY = press }.shadow(shadowElevation ?: elevation, shape).clip(shape)
+    }.graphicsLayer { scaleX = press; scaleY = press }
+        .then(if (optics.glass) Modifier else Modifier.shadow(shadowElevation ?: optics.elevation, shape))
+        .clip(shape)
     if (onClick != null) {
         Surface(onClick = onClick, enabled = enabled, interactionSource = interaction, modifier = outer, color = Color.Transparent, shape = shape,
             contentColor = contentColor, tonalElevation = tonalElevation,
-            border = border ?: rim) { Interior() }
+            border = surfaceBorder) { Interior() }
     } else {
         Surface(modifier = outer, color = Color.Transparent, shape = shape,
             contentColor = contentColor, tonalElevation = tonalElevation,
-            border = border ?: rim) { Interior() }
+            border = surfaceBorder) { Interior() }
     }
 }
 

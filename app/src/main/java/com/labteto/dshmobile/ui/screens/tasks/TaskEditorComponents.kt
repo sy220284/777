@@ -1,5 +1,10 @@
 package com.labteto.dshmobile.ui.screens.tasks
 
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import com.shenyan.designsystem.components.SyNumericStepper
+import com.shenyan.designsystem.components.SyDateCalendar
+import com.shenyan.designsystem.components.SyDatePickerField
 import com.shenyan.designsystem.foundation.SyMetric
 
 
@@ -13,9 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.TimeInput
+import com.shenyan.designsystem.components.SyTimeInput
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -38,7 +42,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyGroupCard
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.util.Calendar
 import java.util.TimeZone
@@ -68,7 +72,6 @@ internal fun ColumnScope.TaskEditorPane(
     var customHours by state.customHours
     var notify by state.notify
     var createError by state.createError
-    var showSchedulePicker by rememberSaveable { mutableStateOf(false) }
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
 
     Column(
@@ -80,7 +83,7 @@ internal fun ColumnScope.TaskEditorPane(
                 stringResource(
                     if (editingTaskId != null) R.string.tasks_edit else R.string.tasks_new,
                 ),
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = colors.text,
             )
             SyTextField(
@@ -101,7 +104,7 @@ internal fun ColumnScope.TaskEditorPane(
         SyGroupCard {
             Text(
                 stringResource(R.string.tasks_schedule_label),
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.textSecondary,
             )
             CadenceRow(
@@ -126,15 +129,17 @@ internal fun ColumnScope.TaskEditorPane(
                     createError = null
                 },
             )
-            SyButton(
-                text = stringResource(
-                    R.string.tasks_first_run_value,
-                    taskDateTime(firstRunAt),
-                ),
-                onClick = {
-                    showSchedulePicker = true
+            SyDatePickerField(
+                label = stringResource(R.string.tasks_first_run_label),
+                displayValue = taskDateTime(firstRunAt),
+                onDateSelected = {
+                    firstRunAt = it
+                    createError = null
                 },
-                variant = SyButtonVariant.Outline,
+                pickerContent = { onSelect, onDismiss ->
+                    TaskSchedulePicker(firstRunAt, onSelect, onDismiss)
+                },
+                enabled = !saving,
                 modifier = Modifier.fillMaxWidth(),
             )
             SyButton(
@@ -143,16 +148,31 @@ internal fun ColumnScope.TaskEditorPane(
                 variant = if (cadence == AutomationCadence.CUSTOM) SyButtonVariant.Outline else SyButtonVariant.Ghost,
             )
             if (cadence == AutomationCadence.CUSTOM) {
-                SyTextField(
-                    value = customHours,
+                SyNumericStepper(
+                    value = customHours.toIntOrNull() ?: 0,
                     onValueChange = {
-                        customHours = it.filter(Char::isDigit).take(5)
+                        customHours = it.toString()
                         createError = null
                     },
-                    label = { Text(stringResource(R.string.tasks_custom_hours)) },
-                    supportingText = { Text(stringResource(R.string.tasks_custom_hours_hint)) },
+                    minimum = 1,
+                    maximum = 99_999,
+                    enabled = !saving,
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    valueContent = {
+                        SyTextField(
+                            value = customHours,
+                            onValueChange = {
+                                customHours = it.filter(Char::isDigit).take(5)
+                                createError = null
+                            },
+                            label = { Text(stringResource(R.string.tasks_custom_hours)) },
+                            supportingText = { Text(stringResource(R.string.tasks_custom_hours_hint)) },
+                            modifier = Modifier.weight(1f),
+                            enabled = !saving,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                        )
+                    },
                 )
             }
         }
@@ -164,12 +184,12 @@ internal fun ColumnScope.TaskEditorPane(
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.tasks_notify_title),
-                        style = DsType.small13Strong.withReadingWeight(),
+                        style = SyType.small13Strong.withReadingWeight(),
                         color = colors.text,
                     )
                     Text(
                         stringResource(R.string.tasks_notify_hint),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textTertiary,
                     )
                 }
@@ -181,7 +201,7 @@ internal fun ColumnScope.TaskEditorPane(
             createError?.let {
                 Text(
                     it,
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.dangerInk,
                 )
             }
@@ -239,17 +259,6 @@ internal fun ColumnScope.TaskEditorPane(
 
                 )
             }
-    if (showSchedulePicker) {
-        TaskSchedulePicker(
-            initialMillis = firstRunAt,
-            onPicked = { picked ->
-                firstRunAt = picked
-                createError = null
-                showSchedulePicker = false
-            },
-            onDismiss = { showSchedulePicker = false },
-        )
-    }
 }
 
 @Composable
@@ -338,13 +347,7 @@ private fun TaskSchedulePicker(
         scrollable = true,
     ) {
         if (!choosingTime) {
-            DatePicker(
-                state = dateState,
-                modifier = Modifier.fillMaxWidth(),
-                title = null,
-                headline = null,
-                showModeToggle = false,
-            )
+            SyDateCalendar(dateState)
             SyButton(
                 text = stringResource(R.string.app_schedule_next),
                 onClick = { choosingTime = true },
@@ -356,12 +359,12 @@ private fun TaskSchedulePicker(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
             ) {
-                TimeInput(state = timeState)
+                SyTimeInput(state = timeState)
             }
             if (!validTime) {
                 Text(
                     stringResource(R.string.app_schedule_future_hint),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk,
                 )
             }
@@ -413,5 +416,5 @@ internal fun AutomationTimePickerSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
         },
-    ) { TimeInput(state = time) }
+    ) { SyTimeInput(state = time) }
 }

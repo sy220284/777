@@ -9,6 +9,11 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
 VIDEOS=OUT/'videos';VIDEOS.mkdir(exist_ok=True)
 CLASSES=[
+ 'com.shenyan.designsystem.components.ShenyanAtlasInteractionTest',
+ 'com.labteto.dshmobile.ui.screens.local.ShenyanAtlasClosureTest',
+ 'com.shenyan.designsystem.components.SyLiquidRefractionAndroidTest',
+ 'com.shenyan.designsystem.components.ShenyanAtlasVisualCaptureTest',
+ 'com.labteto.dshmobile.ui.screens.local.DeviceScrollFrameAndMemoryTest',
  'com.shenyan.designsystem.components.MobileActionReadabilityTest',
  'com.labteto.dshmobile.ui.screens.local.WorkspaceBrowseLayoutTest',
  'com.labteto.dshmobile.ui.screens.local.UiPolishInteractionRegressionTest',
@@ -20,6 +25,9 @@ CLASSES=[
  'com.labteto.dshmobile.ui.audit.ContentPagesAuditTest',
  'com.labteto.dshmobile.ui.screens.local.LocalSessionEntryRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalDrawerEntryVisibilityRegressionTest',
+ 'com.labteto.dshmobile.ui.screens.local.LocalModeDrawerRapidInteractionTest',
+ 'com.labteto.dshmobile.ui.screens.local.NativeV6DocumentModalHostTest',
+ 'com.labteto.dshmobile.ui.screens.settings.UsageCalculationPageTest',
  'com.labteto.dshmobile.ui.screens.local.LocalConversationComposerRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.LocalAgentTeamUiRegressionTest',
  'com.labteto.dshmobile.ui.screens.local.WorkBackgroundReplyAndroidTest',

@@ -49,7 +49,12 @@ class LocalSessionEntryRegressionTest {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         fun choose(label: Int) {
             compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
-            compose.onNodeWithTag("menu-item:" + ctx.getString(label)).performClick()
+            compose.onNodeWithTag("sy-action:" + when (label) {
+                R.string.common_rename -> "rename"
+                R.string.advanced_pin -> "pin"
+                R.string.local_delete_session -> "delete"
+                else -> error("Unexpected conversation action")
+            }).performClick()
         }
         choose(R.string.common_rename)
         compose.runOnIdle { assertEquals(1, renamed) }
@@ -82,11 +87,11 @@ class LocalSessionEntryRegressionTest {
         }
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
-        compose.onNodeWithTag("menu-item:" + ctx.getString(R.string.local_session_sample_title)).performClick()
+        compose.onNodeWithTag("sy-action:sample").performClick()
         compose.runOnIdle { assertEquals(1, opened) }
     }
 
-    @Test fun overflowMenuUsesCompactShortcutGridAndKeepsActionsReachable() {
+    @Test fun unifiedActionSheetKeepsAllConversationActionsReachable() {
         var searched = 0
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         compose.setContent {
@@ -104,23 +109,15 @@ class LocalSessionEntryRegressionTest {
             }
         }
         compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
-        captureUiAudit(compose, "conversation-header-action-menu")
-        val popup = compose.onNodeWithTag("conversation-action-popup").getUnclippedBoundsInRoot()
-        val search = compose.onNodeWithTag(
-            "menu-item:" + ctx.getString(R.string.sy_v6_search_messages),
-        ).getUnclippedBoundsInRoot()
-        val workEvidence = compose.onNodeWithTag(
-            "menu-item:" + ctx.getString(R.string.work_evidence_title),
-        ).getUnclippedBoundsInRoot()
-        val documents = compose.onNodeWithTag(
-            "menu-item:" + ctx.getString(R.string.local_session_documents),
-        ).getUnclippedBoundsInRoot()
-        assertEquals(search.top, workEvidence.top)
-        org.junit.Assert.assertTrue(documents.top > search.top)
-        org.junit.Assert.assertTrue(popup.right - popup.left <= 208.dp)
-        compose.onNodeWithTag(
-            "menu-item:" + ctx.getString(R.string.sy_v6_search_messages),
-        ).performClick()
+        captureUiAudit(compose, "conversation-header-action-sheet")
+        val search = compose.onNodeWithTag("sy-action:search").getUnclippedBoundsInRoot()
+        val evidence = compose.onNodeWithTag("sy-action:evidence").getUnclippedBoundsInRoot()
+        val documents = compose.onNodeWithTag("sy-action:documents").getUnclippedBoundsInRoot()
+        org.junit.Assert.assertTrue("The shared action sheet has accessible stacked rows",
+            evidence.top > search.top && documents.top > evidence.top)
+        org.junit.Assert.assertTrue("Action surfaces have a substantial touch width",
+            search.right - search.left >= 160.dp)
+        compose.onNodeWithTag("sy-action:search").performClick()
         compose.runOnIdle { assertEquals(1, searched) }
     }
 

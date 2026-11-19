@@ -23,7 +23,7 @@ import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -59,13 +59,13 @@ internal fun LocalChatEditMessageSheet(
     ) {
         Text(
             stringResource(R.string.local_edit_user_message_hint),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         if (workMode) {
             Text(
                 stringResource(R.string.local_edit_work_side_effect_notice),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
@@ -81,7 +81,7 @@ internal fun LocalChatEditMessageSheet(
             }
             Text(
                 stringResource(R.string.local_edit_user_message_keeps_attachments, retainedNames),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
@@ -97,7 +97,7 @@ internal fun LocalChatEditMessageSheet(
             enabled = !submitting,
         )
         error?.let { messageText ->
-            Text(messageText, style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+            Text(messageText, style = SyType.small13.withReadingWeight(), color = colors.dangerInk)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

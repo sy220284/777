@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SySliderControl
 import com.shenyan.designsystem.foundation.SyMetric
 
 
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,7 +38,7 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticTickFeedback
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
 
@@ -111,7 +110,7 @@ internal fun LocalComposerCapabilityActions(
             if (showLabels) {
                 Text(
                     text = stringResource(composerReasoningLabel(reasoningMode, modes, basicReasoning)),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.text,
                 )
             }
@@ -170,11 +169,11 @@ internal fun LocalComposerCapabilityPanel(
         if (panel == "reasoning") {
             Text(
                 stringResource(R.string.local_composer_reasoning_title),
-                style = DsType.std14Strong.withReadingWeight(), color = colors.text,
+                style = SyType.std14Strong.withReadingWeight(), color = colors.text,
             )
             if (modes.isEmpty()) {
                 Text(stringResource(R.string.local_composer_reasoning_unsupported),
-                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
             } else {
                 var chosen by remember(profile?.id, usageMode, reasoningMode, modes) {
                     mutableFloatStateOf(modes.indexOf(effectiveMode).toFloat())
@@ -184,7 +183,7 @@ internal fun LocalComposerCapabilityPanel(
                 val sliderState = stringResource(reasoningModeLabel(
                     modes[chosen.roundToInt().coerceIn(0, modes.lastIndex)], basicReasoning,
                 ))
-                Slider(
+                SySliderControl(
                     modifier = Modifier.semantics {
                         contentDescription = sliderTitle
                         stateDescription = sliderState
@@ -203,18 +202,18 @@ internal fun LocalComposerCapabilityPanel(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     modes.forEach { mode ->
                         Text(stringResource(reasoningModeLabel(mode, basicReasoning)),
-                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                     }
                 }
                 if (effectiveMode == LocalReasoningUiMode.DEFAULT) {
                     Text(stringResource(R.string.local_composer_reasoning_default_tip),
-                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
             }
             // Sampling is independently controlled but governed by the same model/reasoning route.
             Text(
                 stringResource(R.string.local_composer_temperature_title),
-                style = DsType.std14Strong.withReadingWeight(),
+                style = SyType.std14Strong.withReadingWeight(),
                 color = colors.text,
             )
             val range = profile?.let {
@@ -232,7 +231,7 @@ internal fun LocalComposerCapabilityPanel(
             if (range == null) {
                 Text(
                     stringResource(R.string.local_composer_temperature_unavailable),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
             } else {
@@ -268,10 +267,10 @@ internal fun LocalComposerCapabilityPanel(
                 val allowTemperature = temperatureEnabled && !thinkingBlocksSampling
                 Text(
                     temperatureState,
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
-                Slider(
+                SySliderControl(
                     modifier = Modifier
                         .testTag("local-composer-temperature-slider")
                         .semantics {
@@ -296,22 +295,22 @@ internal fun LocalComposerCapabilityPanel(
                         if (usageMode == LocalUsageMode.CHAT)
                             R.string.local_composer_temperature_chat_low
                         else R.string.local_composer_temperature_work_low,
-                    ), style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    ), style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                     Text(stringResource(R.string.local_composer_temperature_natural),
-                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                     Text(stringResource(
                         if (usageMode == LocalUsageMode.CHAT)
                             R.string.local_composer_temperature_chat_high
                         else R.string.local_composer_temperature_work_high,
-                    ), style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    ), style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
                 if (temperatureSaveFailed && usageMode == LocalUsageMode.CHAT) {
                     Text(stringResource(R.string.local_composer_temperature_save_failed),
-                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
                 if (thinkingBlocksSampling) {
                     Text(stringResource(R.string.local_composer_temperature_thinking),
-                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                 } else if (!temperatureEnabled && usageMode == LocalUsageMode.CHAT) {
                     val hint = when {
                         temperatureGroupChat -> R.string.local_composer_temperature_group_hint
@@ -319,7 +318,7 @@ internal fun LocalComposerCapabilityPanel(
                         else -> R.string.local_composer_temperature_busy
                     }
                     Text(stringResource(hint),
-                        style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                 }
             }
         }

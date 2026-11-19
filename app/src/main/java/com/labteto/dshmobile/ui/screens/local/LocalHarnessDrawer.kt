@@ -7,7 +7,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
@@ -26,7 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,7 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import com.labteto.dshmobile.ui.theme.DsMetrics
+import com.labteto.dshmobile.ui.theme.SyHostMetrics
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -77,8 +75,8 @@ import com.shenyan.designsystem.components.SyCategoryRow
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.sidebar.SidebarAvatarPicker
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.launch
 
@@ -363,7 +361,7 @@ internal fun LocalModeDrawer(
         windowInsets = WindowInsets(0, 0, 0, 0), // Edge-to-edge backdrop, inset content only.
         modifier = Modifier.fillMaxHeight().width(
             if (docked) SyDimensions.navigationExpanded
-            else LocalConfiguration.current.screenWidthDp.dp * DsMetrics.drawerWidthFraction
+            else LocalConfiguration.current.screenWidthDp.dp * SyHostMetrics.drawerWidthFraction
         ),
     ) {
         // The drawer continues the original background without a full-screen slab.
@@ -397,7 +395,7 @@ internal fun LocalModeDrawer(
                     Spacer(Modifier.width(SyMetric.gapMd))
                     Text(
                         stringResource(R.string.app_name),
-                        style = DsType.title22.withReadingWeight(),
+                        style = SyType.title22.withReadingWeight(),
                         color = colors.text,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
@@ -439,7 +437,7 @@ internal fun LocalModeDrawer(
                             Icon(SyEntryIcons.Search, contentDescription = null, tint = colors.textTertiary)
                         },
                         singleLine = true,
-                        shape = DsShapes.pillFull,
+                        shape = SyShapes.pillFull,
                         flat = true,
                     )
                 }
@@ -584,13 +582,11 @@ internal fun LocalModeDrawer(
                         ) {
                             Text(
                                 "会话分区",
-                                style = DsType.drawerSection.withReadingWeight(),
+                                style = SyType.drawerSection.withReadingWeight(),
                                 color = colors.textSecondary,
                                 modifier = Modifier.weight(1f),
                             )
-                            TextButton(onClick = { createSectionDialog = true }) {
-                                Text("新建分区")
-                            }
+                            SyButton("新建分区", onClick = { createSectionDialog = true }, variant = SyButtonVariant.Ghost)
                         }
                     }
                 }
@@ -604,7 +600,7 @@ internal fun LocalModeDrawer(
                         ) {
                             Text(
                                 section.title,
-                                style = DsType.drawerSection.withReadingWeight(),
+                                style = SyType.drawerSection.withReadingWeight(),
                                 color = colors.textSecondary,
                                 modifier = Modifier.weight(1f).padding(start = SyMetric.gapMd),
                                 maxLines = 1,
@@ -612,12 +608,10 @@ internal fun LocalModeDrawer(
                             )
                             Text(
                                 grouped.size.toString(),
-                                style = DsType.navigationSupporting.withReadingWeight(),
+                                style = SyType.navigationSupporting.withReadingWeight(),
                                 color = colors.textTertiary,
                             )
-                            TextButton(onClick = { menuOpen = true }) {
-                                Text("管理")
-                            }
+                            SyButton("管理", onClick = { menuOpen = true }, variant = SyButtonVariant.Ghost)
                             com.labteto.dshmobile.ui.shenyan.SyPopupMenu(
                                 expanded = menuOpen,
                                 onDismiss = { menuOpen = false },
@@ -740,7 +734,7 @@ internal fun LocalModeDrawer(
                     item(key = "drawer-no-sessions") {
                         Text(
                             stringResource(R.string.local_drawer_search_empty_both),
-                            style = DsType.navigationSupporting.withReadingWeight(),
+                            style = SyType.navigationSupporting.withReadingWeight(),
                             color = colors.textTertiary,
                             modifier = Modifier.padding(
                                 horizontal = SyMetric.gapMd,
@@ -770,7 +764,7 @@ internal fun LocalModeDrawer(
                         ) {
                             Text(
                                 stringResource(R.string.local_selected_count, selectedIds.size),
-                                style = DsType.navigationSupporting.withReadingWeight(),
+                                style = SyType.navigationSupporting.withReadingWeight(),
                                 color = colors.text,
                                 modifier = Modifier.weight(1f),
                             )
@@ -814,7 +808,7 @@ internal fun LocalModeDrawer(
                 title = "分区操作未完成",
                 onDismiss = { sectionError = null },
             ) {
-                Text(sectionError.orEmpty(), style = DsType.std14.withReadingWeight())
+                Text(sectionError.orEmpty(), style = SyType.std14.withReadingWeight())
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     SyButton(
                         text = "确定",
@@ -901,13 +895,13 @@ internal fun LocalModeDrawer(
             ) {
                 LazyColumn(modifier = Modifier.height(320.dp)) {
                     item(key = "none") {
-                        TextButton(onClick = { commitMove(null) }) { Text("移出分区（最近记录）") }
+                        SyButton("移出分区（最近记录）", onClick = { commitMove(null) }, variant = SyButtonVariant.Ghost)
                     }
                     items(sectionCatalog.sections, key = LocalSessionSection::id) { section ->
-                        TextButton(
-                            onClick = { commitMove(section.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        SyButton(
+                            text = section.title, onClick = { commitMove(section.id) },
+                            modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost,
+                        )
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

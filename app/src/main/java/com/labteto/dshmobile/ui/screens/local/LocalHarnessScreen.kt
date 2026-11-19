@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 
+import com.shenyan.designsystem.components.SyActivityIndicator
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,7 +12,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,7 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -105,14 +105,14 @@ import com.labteto.dshmobile.ui.components.rememberConversationScrollHint
 import com.labteto.dshmobile.local.model.canQueryMiniMaxQuota
 import com.labteto.dshmobile.ui.screens.settings.SettingsDestination
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
-import com.labteto.dshmobile.ui.theme.DsAnimations
+import com.labteto.dshmobile.ui.theme.SyAnimations
 import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import com.shenyan.designsystem.foundation.LocalSyReduceMotion
 import com.shenyan.designsystem.foundation.SyMotion
-import com.labteto.dshmobile.ui.theme.DsTheme
+import com.labteto.dshmobile.ui.theme.SyHostTheme
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.labteto.dshmobile.ui.shenyan.SyDimensions
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.LocalAppBackgroundState
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -932,7 +932,7 @@ fun LocalHarnessScreen(
                 } else {
                     predictiveBackProgress.animateTo(
                         targetValue = 0f,
-                        animationSpec = DsAnimations.predictiveBackSettle,
+                        animationSpec = SyAnimations.predictiveBackSettle,
                     )
                 }
             }
@@ -1022,13 +1022,13 @@ fun LocalHarnessScreen(
         if (waitingForSession != null) {
             // Cheap, read-only rendering of the selected session's SQLite tail.
             // This page is never connected to the outgoing Chat/Work send handlers.
-            Surface(modifier = Modifier.fillMaxSize()) {
+            SyFlatSurface(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Text(
                         text = shell.sessions.firstOrNull { it.id == waitingForSession }?.title
                             ?.ifBlank { "会话" } ?: "会话",
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        style = DsType.headline17,
+                        style = SyType.headline17,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1049,7 +1049,7 @@ fun LocalHarnessScreen(
                     ) {
                         if (previewItems.isEmpty()) {
                             item(key = "loading-conversation") {
-                                Text("正在读取最近消息…", style = DsType.std14)
+                                Text("正在读取最近消息…", style = SyType.std14)
                             }
                         }
                         items(previewItems, key = { it.id }) { message ->
@@ -1059,7 +1059,7 @@ fun LocalHarnessScreen(
                                 horizontalArrangement = if (fromUser)
                                     Arrangement.End else Arrangement.Start,
                             ) {
-                                Surface(
+                                SyFlatSurface(
                                     modifier = Modifier.fillMaxWidth(0.92f),
                                     shape = RoundedCornerShape(12.dp),
                                     tonalElevation = if (fromUser) 2.dp else 0.dp,
@@ -1067,7 +1067,7 @@ fun LocalHarnessScreen(
                                     Text(
                                         text = message.content.take(1_500),
                                         modifier = Modifier.padding(12.dp),
-                                        style = DsType.std14,
+                                        style = SyType.std14,
                                     )
                                 }
                             }
@@ -1076,7 +1076,7 @@ fun LocalHarnessScreen(
                     Text(
                         text = "正在恢复会话运行状态…",
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        style = DsType.std14,
+                        style = SyType.std14,
                     )
                 }
             }
@@ -1096,12 +1096,12 @@ fun LocalHarnessScreen(
     // Keep the conversation shell out of the hierarchy until that decision is
     // settled; otherwise the sidebar becomes interactive before onboarding appears.
     if (!onboardingDecided) {
-        Surface(
+        SyFlatSurface(
             modifier = Modifier.fillMaxSize(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface(),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator()
+                SyActivityIndicator()
             }
         }
     } else if (presentFirstLaunch) {
@@ -1133,23 +1133,23 @@ fun LocalHarnessScreen(
                     modifier = Modifier.width(SyDimensions.inspector).fillMaxHeight()
                         .padding(12.dp),
                 ) {
-                    Text(stringResource(R.string.sy_v5_session_current), color = syInk.text, style = DsType.headline17)
+                    Text(stringResource(R.string.sy_v5_session_current), color = syInk.text, style = SyType.headline17)
                     Text(
                         text = shell.chatPersona.name.ifBlank { stringResource(R.string.sy_v5_persona_unbound) },
                         color = syInk.secondaryText,
-                        style = DsType.std14,
+                        style = SyType.std14,
                     )
                     Text(
                         text = activeModelProfile?.displayName
                             ?: activeModelProfile?.model
                             ?: stringResource(R.string.sy_v5_model_unconfigured),
                         color = syInk.tertiaryText,
-                        style = DsType.small13,
+                        style = SyType.small13,
                     )
                     Text(
                         text = if (shell.usageMode == LocalUsageMode.CHAT) stringResource(R.string.sy_v5_chat_mode) else stringResource(R.string.sy_v5_work_mode),
                         color = syInk.secondaryText,
-                        style = DsType.small13,
+                        style = SyType.small13,
                     )
                     SyButton(
                         text = stringResource(R.string.sy_v5_persona_data),

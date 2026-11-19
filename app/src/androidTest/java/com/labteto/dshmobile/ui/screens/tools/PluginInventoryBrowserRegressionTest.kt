@@ -458,7 +458,7 @@ class PluginInventoryBrowserRegressionTest {
                 }
             }
         }
-        for (mode in listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.MATTE_BLACK)) {
+        for (mode in listOf(ThemePreference.LIGHT, ThemePreference.SYSTEM, ThemePreference.MATTE_BLACK)) {
             for (widthDp in listOf(320, 360, 393, 412)) {
                 compose.runOnIdle {
                     appearance.value = mode

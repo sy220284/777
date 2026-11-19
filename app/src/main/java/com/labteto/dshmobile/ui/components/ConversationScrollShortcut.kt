@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.ui.components
 
+import com.shenyan.designsystem.foundation.LocalSyReduceTransparency
+import com.shenyan.designsystem.foundation.LocalSyColors
+import com.shenyan.designsystem.components.SyLiveGlassScene
+import androidx.compose.foundation.layout.padding
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.AnimatedContent
@@ -8,9 +12,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.border
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.foundation.LocalSyReduceMotion
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -87,6 +96,28 @@ fun rememberConversationScrollHint(
     return hint to connection
 }
 
+/** Record message pixels only while a translucent shortcut is visible. */
+@Composable
+internal fun ConversationTranscriptGlass(
+    target: ConversationScrollTarget?,
+    onClick: (ConversationScrollTarget) -> Unit,
+    transcript: @Composable () -> Unit,
+) {
+    val translucent = LocalSyColors.current.materialL3.alpha < 1f && !LocalSyReduceTransparency.current
+    SyLiveGlassScene(
+        modifier = Modifier.fillMaxSize(),
+        enabled = target != null && translucent,
+        underlay = { transcript() },
+        glass = {
+            ConversationScrollShortcut(
+                target = target,
+                onClick = onClick,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = SyMetric.gapMd),
+            )
+        },
+    )
+}
+
 /** Compact arrow-only affordance that adapts to the wallpaper under the composer area. */
 @Composable
 fun ConversationScrollShortcut(
@@ -95,13 +126,15 @@ fun ConversationScrollShortcut(
     modifier: Modifier = Modifier,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val reduceMotion = LocalSyReduceMotion.current
 
     AnimatedContent(
         targetState = target,
         modifier = modifier,
         transitionSpec = {
-            (fadeIn() + scaleIn(initialScale = 0.85f)) togetherWith
-                (fadeOut() + scaleOut(targetScale = 0.85f))
+            val duration = if (reduceMotion) 0 else 150
+            (fadeIn(tween(duration)) + scaleIn(tween(duration), initialScale = 0.85f)) togetherWith
+                (fadeOut(tween(duration)) + scaleOut(tween(duration), targetScale = 0.85f))
         },
         label = "conversationScrollShortcut",
     ) { direction ->
@@ -116,12 +149,12 @@ fun ConversationScrollShortcut(
                     .clickable { onClick(direction) },
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .border(1.dp, colors.border.copy(alpha = 0.28f), CircleShape),
-                    contentAlignment = Alignment.Center,
+                SyMaterialSurface(
+                    modifier = Modifier.size(40.dp).testTag("sy-conversation-liquid-shortcut"),
+                    tier = SyMaterialTier.L4_OVERLAY,
+                    shape = CircleShape,
                 ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(
                         if (direction == ConversationScrollTarget.START) FeatherIcons.ArrowUp
                         else FeatherIcons.ArrowDown,
@@ -129,6 +162,7 @@ fun ConversationScrollShortcut(
                         tint = colors.text,
                         modifier = Modifier.size(19.dp),
                     )
+                    }
                 }
             }
         }

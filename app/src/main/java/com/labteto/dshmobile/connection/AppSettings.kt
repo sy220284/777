@@ -19,7 +19,7 @@ data class AppSettings(
     val notificationQuietHoursEnabled: Boolean = false,
     val notificationQuietStartMinute: Int = 23 * 60,
     val notificationQuietEndMinute: Int = 7 * 60,
-    val themePreference: String = "system", // light | dark | matte_black | system
+    val themePreference: String = "system", // light | matte_black | system (legacy "dark" migrates to matte_black)
     val accentTheme: String = "celadon", // 中国风传统色卡 key，见 ui/theme/AccentPalettes
     /**
      * Absolute path of the copied background image inside app storage, or null for the plain theme

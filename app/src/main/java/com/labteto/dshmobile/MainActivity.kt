@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.labteto.dshmobile.connection.HostsStore
+import com.labteto.dshmobile.connection.ThemePreferenceValues
 import com.labteto.dshmobile.local.presentation.ChatGptSettingsController
 import com.labteto.dshmobile.notify.DshNotifications
 import com.labteto.dshmobile.ui.AppRoot
@@ -93,10 +94,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Match the post-splash window to the exact Compose canvas, including Matte black. */
     private fun applyWindowBackground(themePreference: String?) {
-        val color = when (themePreference) {
-            "light" -> getColor(R.color.window_background_light)
-            "dark" -> getColor(R.color.window_background_dark)
-            "matte_black" -> getColor(R.color.window_background_matte_black)
+        val color = when (ThemePreferenceValues.normalize(themePreference)) {
+            ThemePreferenceValues.LIGHT -> getColor(R.color.window_background_light)
+            ThemePreferenceValues.MATTE_BLACK -> getColor(R.color.window_background_matte_black)
             else -> getColor(R.color.window_background)
         }
         window.setBackgroundDrawable(ColorDrawable(color))

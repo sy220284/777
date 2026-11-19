@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import com.shenyan.designsystem.components.SyCheckboxControl
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,8 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,7 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
@@ -144,7 +144,7 @@ internal fun PermissionSetupFlow(
         }
     }
     val colors = LocalSyColors.current
-    Surface(modifier = Modifier.fillMaxSize().testTag("permissionSetupFlow"), color = colors.rootSurface()) {
+    SyFlatSurface(modifier = Modifier.fillMaxSize().testTag("permissionSetupFlow"), color = colors.rootSurface()) {
         Column(
             modifier = Modifier.fillMaxSize().safeDrawingPadding()
                 .verticalScroll(rememberScrollState()).padding(SyMetric.gapSection),
@@ -152,10 +152,10 @@ internal fun PermissionSetupFlow(
         ) {
             when (page) {
                 0 -> {
-                    Text(stringResource(R.string.permission_setup_choose), style = DsType.large20.withReadingWeight())
+                    Text(stringResource(R.string.permission_setup_choose), style = SyType.large20.withReadingWeight())
                     Spacer(Modifier.height(12.dp))
                     Text(stringResource(R.string.permission_setup_choose_hint),
-                        style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
                     Spacer(Modifier.height(20.dp))
                     for (feature in PermissionSetupFeature.entries) {
                         Row(
@@ -171,11 +171,11 @@ internal fun PermissionSetupFlow(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Checkbox(checked = feature.name in chosenNames, onCheckedChange = null)
+                            SyCheckboxControl(checked = feature.name in chosenNames, onCheckedChange = null)
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(stringResource(feature.titleRes()), style = DsType.std14.withReadingWeight())
+                                Text(stringResource(feature.titleRes()), style = SyType.std14.withReadingWeight())
                                 Text(stringResource(feature.reasonRes()), color = colors.textSecondary,
-                                    style = DsType.small13.withReadingWeight())
+                                    style = SyType.small13.withReadingWeight())
                             }
                         }
                     }
@@ -195,31 +195,31 @@ internal fun PermissionSetupFlow(
                     if (feature != null) {
                         val status = permissionSetupStatus(feature, state, feature in visited)
                         Text(stringResource(R.string.permission_setup_step_count, currentIndex + 1, chosen.size),
-                            style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                            style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
                         Spacer(Modifier.height(12.dp))
-                        Text(stringResource(feature.titleRes()), style = DsType.large20.withReadingWeight())
+                        Text(stringResource(feature.titleRes()), style = SyType.large20.withReadingWeight())
                         Spacer(Modifier.height(8.dp))
                         Text(stringResource(feature.reasonRes()),
-                            style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                            style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
                         Spacer(Modifier.height(20.dp))
                         Text(stringResource(status.labelRes(feature)), modifier = Modifier.testTag("permissionSetupStatus"),
-                            style = DsType.std14.withReadingWeight(),
+                            style = SyType.std14.withReadingWeight(),
                             color = if (status == PermissionSetupStatus.READY) colors.successInk else colors.textSecondary)
                         if (status == PermissionSetupStatus.AUTHORIZED_WAITING) {
                             Spacer(Modifier.height(8.dp))
                             Text(stringResource(R.string.permission_setup_reconnect_hint),
-                                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
                         }
                         if (feature == PermissionSetupFeature.SCREEN_CONTROL && feature in visited &&
                             !state.accessibilityGranted && Build.VERSION.SDK_INT >= 33) {
                             Spacer(Modifier.height(8.dp))
                             Text(stringResource(R.string.permission_setup_restricted_hint),
-                                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
                         }
                         if (openError != null) {
                             Spacer(Modifier.height(8.dp))
                             Text(stringResource(R.string.permission_setup_open_failed) + "：" + openError,
-                                style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+                                style = SyType.small13.withReadingWeight(), color = colors.dangerInk)
                         }
                         Spacer(Modifier.height(24.dp))
                         SyButton(
@@ -271,10 +271,10 @@ internal fun PermissionSetupFlow(
                     }
                 }
                 else -> {
-                    Text(stringResource(R.string.permission_setup_summary), style = DsType.large20.withReadingWeight())
+                    Text(stringResource(R.string.permission_setup_summary), style = SyType.large20.withReadingWeight())
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(R.string.permission_setup_summary_hint),
-                        style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
                     Spacer(Modifier.height(16.dp))
                     for ((index, feature) in chosen.withIndex()) {
                         val status = permissionSetupStatus(feature, state, feature in visited)
@@ -286,9 +286,9 @@ internal fun PermissionSetupFlow(
                                 page = 1
                             }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(stringResource(feature.titleRes()), modifier = Modifier.weight(1f),
-                                style = DsType.std14.withReadingWeight())
+                                style = SyType.std14.withReadingWeight())
                             Text(stringResource(status.labelRes(feature)),
-                                style = DsType.small13.withReadingWeight(),
+                                style = SyType.small13.withReadingWeight(),
                                 color = if (status == PermissionSetupStatus.READY) colors.successInk
                                     else colors.textSecondary)
                         }

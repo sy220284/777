@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""Keep high-level Compose screens on shared overlay/card primitives.
-
-This is intentionally a narrow ratchet: full-screen Dialog surfaces remain allowed, while the
-small modal/menu/card primitives that already have Design System wrappers may not be reintroduced
-directly in feature screens.
-"""
+"""Keep production Compose UI on the shared Shenyan visual and interaction primitives."""
 
 from pathlib import Path
 import re
 import json
 import sys
-import subprocess
 import subprocess
 import tempfile
 import zipfile
@@ -47,6 +41,39 @@ RULES = (
         "use SyMaterialFrame/SyGlassCard",
     ),
 )
+
+# Platform primitives belong inside the system or its overlay adapters. Feature screens
+# may still compose ordinary layout, Text/Icon, gestures and accessible domain content.
+RAW_MATERIAL_COMPONENTS = {
+    "Surface": "SyFlatSurface/SyMaterialSurface",
+    "Button": "SyButton",
+    "TextButton": "SyButton",
+    "OutlinedButton": "SyButton",
+    "FilledTonalButton": "SyButton",
+    "IconButton": "SyIconButton",
+    "Card": "SyMaterialFrame",
+    "ElevatedCard": "SyMaterialFrame",
+    "OutlinedCard": "SyMaterialFrame",
+    "TextField": "SyTextField",
+    "OutlinedTextField": "SyTextField",
+    "Switch": "SySwitchControl",
+    "Checkbox": "SyCheckboxControl",
+    "RadioButton": "SyRadioControl",
+    "Slider": "SySliderControl",
+    "DatePicker": "SyDateCalendar",
+    "DatePickerDialog": "SyDatePickerField/SyDateRangePickerDialog",
+    "DateRangePicker": "SyDateRangePickerDialog",
+    "TimeInput": "SyTimeInput",
+    "CircularProgressIndicator": "SyActivityIndicator",
+    "LinearProgressIndicator": "SyProgressBar",
+    "DropdownMenuItem": "SyMenuRow",
+    "HorizontalDivider": "SyDivider",
+    "SnackbarHost": "SyUndoSnackbarHost",
+    "FilterChip": "SyFilterChip",
+    "AssistChip": "SyPill",
+}
+MATERIAL_IMPORT = re.compile(r"^import androidx\.compose\.material3\.(\w+)(?: as (\w+))?\s*$", re.M)
+
 
 def mask_non_code(source: str) -> str:
     """Mask comments, Kotlin strings and character literals, retaining line positions."""
@@ -127,6 +154,24 @@ for path in UI.rglob("*.kt"):
             line = text.count("\n", 0, match.start()) + 1
             violations.append(f"{relative}:{line}: {match.group(0).strip()} -> {hint}")
 
+    for original, alias in MATERIAL_IMPORT.findall(text):
+        if original not in RAW_MATERIAL_COMPONENTS or (
+            original == "DropdownMenuItem" and relative == "shenyan/SyOverlays.kt"
+        ):
+            continue
+        if re.search(r"\b" + re.escape(alias or original) + r"\s*\(", text):
+            violations.append(f"{relative}: route {original} through {RAW_MATERIAL_COMPONENTS[original]}")
+    for name in re.findall(r"\bandroidx\.compose\.material3\.(\w+)\s*\(", text):
+        if name in RAW_MATERIAL_COMPONENTS:
+            violations.append(f"{relative}: route {name} through {RAW_MATERIAL_COMPONENTS[name]}")
+
+# Feedback, date actions and transport belong to the canonical button family too.
+DESIGN_COMPONENTS = ROOT / "app/src/main/java/com/shenyan/designsystem/components"
+for path in DESIGN_COMPONENTS.glob("*.kt"):
+    source = mask_non_code(path.read_text(encoding="utf-8"))
+    if re.search(r"\bTextButton\s*\(", source):
+        violations.append(f"{path.name}: use SyButton for design-system text actions")
+
 
 # Keep the main V6 transition owners on one SyMotion vocabulary. Other feature
 # delays (network, debounce, accessibility speech) are intentionally not animation tokens.
@@ -152,6 +197,12 @@ if "SySceneBackgroundSurface(" not in mask_non_code(background_host):
     violations.append("theme/AppBackground.kt: root is no longer using the shared scene painter")
 
 # V6 hardening: prevent deleted visual APIs and retired design references from returning.
+# Migration ratchet: the actively used Ds text/shape/motion/layout/theme APIs have
+# moved to Sy. New production UI must consume the current Shenyan vocabulary.
+# Match identifiers in Kotlin code only; allow documentation and historical storage keys.
+RETIRED_VISUAL_TOKEN = re.compile(
+    r"\b(?:LocalDs(?:Colors|ReadingPreferences)|Ds(?:Type|Shapes|MaterialShapes|Metrics|Animations|Colors|ThemeTokens|Theme|ReadingPreferences|Typography|Light|Dark)|dsTypography)\b"
+)
 RETIRED_DRAWING_CALL = re.compile(
     r"\bDs(?:Button|Card|Segmented|Checkbox|BottomSheet|SearchField|ToastHost|TopBar|ProgressBar)\s*\("
 )
@@ -163,10 +214,50 @@ for path in UI.rglob("*.kt"):
     source = mask_non_code(path.read_text(encoding="utf-8"))
     for match in RETIRED_DRAWING_CALL.finditer(source):
         violations.append(f"{relative}: retired Ds drawing component {match.group(0)}")
+    for match in RETIRED_VISUAL_TOKEN.finditer(source):
+        line = source.count("\n", 0, match.start()) + 1
+        violations.append(f"{relative}:{line}: retired Ds visual token {match.group(0)} -> migrate to Sy")
+
     if re.search(r"\bDsTheme\.colors\b", source):
         actual.add(relative)
     if re.search(r"\bDsSpacing\b", source):
         violations.append(f"{relative}: retired DsSpacing token; use canonical SyMetric")
+
+# The atlas is only complete when a real feature uses each interaction owner.
+# This is a regression gate against a green component demo with unchanged app screens.
+REQUIRED_ATLAS_FEATURES = {
+    "screens/local/LocalConversationActionsMenu.kt": ("SyActionSheet",),
+    "screens/local/GroupChatMemberPicker.kt": ("SyMultiSelectSheet",),
+    "screens/local/FirstLaunchOnboarding.kt": ("SyOnboardingCarousel",),
+    "screens/local/LocalWorkCapabilitySheet.kt": ("SyCoachMark",),
+    "screens/local/LocalGeneratedMediaMessage.kt": ("SyMediaTransport", "SyMiniPlayer", "SyRadialActionMenu", "InlineVideoPlayer"),
+    "screens/local/LocalInlineVideoPlayer.kt": ("SyMediaTransport",),
+    "screens/local/LocalQueuedUserQueueSheet.kt": ("detectVerticalDragGestures", "SyResponsiveSheet"),
+    "shenyan/SyResponsiveSheet.kt": ("SySnapBottomSheet",),
+    "screens/tasks/TaskCardComponents.kt": ("SySwipeActionRow",),
+    "shenyan/SyConversation.kt": ("SyChatComposer",),
+    "screens/local/LocalConversationSurface.kt": ("SyUndoSnackbarHost", "ConversationTranscriptGlass"),
+    "components/ConversationScrollShortcut.kt": ("SyLiveGlassScene",),
+    "screens/tasks/TasksScreen.kt": ("SySkeletonCard", "SyPullRefresh"),
+    "screens/tasks/TaskEditorComponents.kt": ("SyDatePickerField", "SyDateCalendar", "SyTimeInput", "SyNumericStepper"),
+    "screens/settings/UsageCalculationPage.kt": ("SyDateRangePickerDialog",),
+}
+REQUIRED_MATERIAL_FEATURES = {
+    "screens/tools/ToolsScreen.kt": ("SyMaterialSurface",),
+    "screens/tools/ExtensionCatalogCard.kt": ("SyMaterialSurface",),
+    "screens/local/LocalWorkspaceFilesDialog.kt": ("SyMaterialSurface",),
+    "screens/local/PersonaGalleryComponents.kt": ("SyMaterialFrame", "SyMaterialSurface"),
+    "screens/settings/SettingsScreen.kt": ("SyMaterialFrame",),
+}
+for relative, components in {**REQUIRED_ATLAS_FEATURES, **REQUIRED_MATERIAL_FEATURES}.items():
+    source_path = UI / relative
+    if not source_path.is_file():
+        violations.append(f"{relative}: missing real feature owner")
+        continue
+    actual_code = mask_non_code(source_path.read_text(encoding="utf-8"))
+    for component in components:
+        if not re.search(r"\b" + re.escape(component) + r"\s*\(", actual_code):
+            violations.append(f"{relative}: shared component {component} is no longer in production")
 
 # Debug previews must follow the same spacing tokens as production Compose UI.
 for path in (ROOT / "app/src/debug/java").rglob("*.kt"):
@@ -241,7 +332,7 @@ def read_primitive_style(css, selector, name):
         return None
     val = re.search(r"--" + re.escape(name) + r"\s*:\s*([^;]+)\s*;", m.group(1))
     return val.group(1).strip() if val else None
-for theme, selector in (("Light", ":root"), ("Dark", 'body[data-theme="dark"]'), ("Matte", 'body[data-theme="matte"]')):
+for theme, selector in (("Light", ":root"), ("Matte", 'body[data-theme="matte"]')):
     palette = re.search(r"private val " + theme + r" = SyColors\((.*?)\n\)", v6_foundation, re.S)
     if not palette:
         violations.append(f"V6 palette missing from Compose: {theme}")

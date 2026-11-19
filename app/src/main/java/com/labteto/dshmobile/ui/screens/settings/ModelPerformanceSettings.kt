@@ -38,8 +38,8 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.presentation.LocalModelPerformanceControls
 import com.labteto.dshmobile.local.model.ModelReasoningCeiling
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlin.math.roundToInt
 
@@ -68,16 +68,16 @@ internal fun ModelPerformanceSettingsPage() {
                 catch (failure: Exception) { summaryError = failure.message ?: "摘要设置保存失败" }
             }
         }
-        summaryError?.let { Text(it, style = DsType.small13, color = colors.textSecondary) }
+        summaryError?.let { Text(it, style = SyType.small13, color = colors.textSecondary) }
         Text("紧急上下文溢出仍使用本地压缩，避免在请求占用模型资源时再排队调用模型。",
-            style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+            style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
     }
 
 
     SettingsSeamlessGroup(stringResource(R.string.settings_model_performance_reasoning)) {
         Text(
             stringResource(R.string.settings_model_performance_reasoning_hint),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         val choices = listOf(
@@ -92,7 +92,7 @@ internal fun ModelPerformanceSettingsPage() {
             Row(
                 Modifier.fillMaxWidth()
                     .heightIn(min = 48.dp)
-                    .clip(DsShapes.row)
+                    .clip(SyShapes.row)
                     .background(if (limits.reasoningCeiling == ceiling) colors.selected.copy(alpha = 0.45f)
                         else androidx.compose.ui.graphics.Color.Transparent)
                     .selectable(selected = limits.reasoningCeiling == ceiling, role = Role.RadioButton,
@@ -105,19 +105,19 @@ internal fun ModelPerformanceSettingsPage() {
                     selected = limits.reasoningCeiling == ceiling,
                     onClick = null,
                 )
-                Text(stringResource(label), style = DsType.small13.withReadingWeight(), color = colors.text)
+                Text(stringResource(label), style = SyType.small13.withReadingWeight(), color = colors.text)
             }
         }
         Text(
             stringResource(R.string.settings_model_performance_restoration),
-            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary,
+            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary,
         )
     }
 
     SettingsSeamlessGroup(stringResource(R.string.settings_model_performance_temperature)) {
         Text(
             stringResource(R.string.settings_model_performance_temperature_hint),
-            style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
+            style = SyType.small13.withReadingWeight(), color = colors.textSecondary,
         )
         var draft by remember(limits.temperatureCeiling) {
             mutableFloatStateOf(limits.temperatureCeiling.toFloat())
@@ -125,7 +125,7 @@ internal fun ModelPerformanceSettingsPage() {
         val rounded = (draft * 20).roundToInt() / 20f
         Text(
             stringResource(R.string.settings_model_performance_temperature_value, rounded),
-            style = DsType.std14Strong.withReadingWeight(), color = colors.text,
+            style = SyType.std14Strong.withReadingWeight(), color = colors.text,
         )
         SySlider(
             value = draft,
@@ -139,8 +139,8 @@ internal fun ModelPerformanceSettingsPage() {
             modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("1.00", style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
-            Text("2.00", style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+            Text("1.00", style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
+            Text("2.00", style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
         }
     }
 }

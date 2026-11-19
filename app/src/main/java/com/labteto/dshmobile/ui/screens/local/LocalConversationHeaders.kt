@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,9 +41,9 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
-import com.labteto.dshmobile.ui.theme.DsMetrics
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyHostMetrics
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -68,7 +67,7 @@ internal fun ChatSurfaceHeader(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
-        Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
+        Modifier.fillMaxWidth().heightIn(min = SyHostMetrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
@@ -79,7 +78,7 @@ internal fun ChatSurfaceHeader(
                 modifier = Modifier
                     .widthIn(max = 188.dp)
                     .heightIn(min = SyMetric.touch)
-                    .clip(DsShapes.row)
+                    .clip(SyShapes.row)
                     .clickable(enabled = !running, role = Role.Button, onClick = onContextClick)
                     .semantics(mergeDescendants = true) { }
                     .padding(horizontal = SyMetric.gapMd),
@@ -92,7 +91,7 @@ internal fun ChatSurfaceHeader(
                 Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
-                        style = DsType.base16Strong.withReadingWeight(),
+                        style = SyType.base16Strong.withReadingWeight(),
                         color = colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -112,7 +111,7 @@ internal fun ChatSurfaceHeader(
                                 activeSpeakerName?.let { speaker ->
                                     stringResource(R.string.local_group_chat_active_speaker, speaker)
                                 } ?: stringResource(R.string.local_group_chat_member_count, groupMembers.size),
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                                 color = colors.textSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -122,7 +121,7 @@ internal fun ChatSurfaceHeader(
                     } else if (secondary.isNotBlank()) {
                         Text(
                             secondary,
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -180,7 +179,7 @@ internal fun WorkSurfaceHeader(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(
-        Modifier.fillMaxWidth().heightIn(min = DsMetrics.topBarHeight),
+        Modifier.fillMaxWidth().heightIn(min = SyHostMetrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
@@ -196,7 +195,7 @@ internal fun WorkSurfaceHeader(
         ) {
             Text(
                 sessionTitle.ifBlank { "工作会话" },
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = colors.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -217,7 +216,7 @@ internal fun WorkSurfaceHeader(
                 ) { status ->
                     Text(
                         status,
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                         color = if (status.startsWith("执行异常") ||
                             status.startsWith("执行状态读取异常") ||
                             status.startsWith("任务步骤失败")) colors.dangerInk else colors.textSecondary,

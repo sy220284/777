@@ -25,10 +25,12 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -64,12 +66,12 @@ internal fun LocalModelPickerSheet(
             if (profiles.isEmpty()) {
                 Text(
                     stringResource(R.string.local_model_picker_empty_title),
-                    style = DsType.base16Strong.withReadingWeight(),
+                    style = SyType.base16Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 Text(
                     stringResource(R.string.local_model_picker_empty_body),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                 )
             }
@@ -82,21 +84,23 @@ internal fun LocalModelPickerSheet(
                     )
                     else -> stringResource(R.string.app_model_available)
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 60.dp)
-                        .clip(DsShapes.row)
-                        .background(if (selected) colors.selected.copy(alpha = .35f)
-                            else androidx.compose.ui.graphics.Color.Transparent)
-                        .clickable {
-                            onSelect(profile.id)
-                            onDismiss()
-                        }
-                        .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                SyMaterialSurface(
+                    onClick = {
+                        onSelect(profile.id)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp),
+                    tier = SyMaterialTier.L3_CARD,
+                    shape = SyShapes.row,
+                    tint = if (selected) colors.selected.copy(alpha = .35f)
+                        else androidx.compose.ui.graphics.Color.Unspecified,
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                    ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_ui_model),
                         contentDescription = null,
@@ -106,14 +110,14 @@ internal fun LocalModelPickerSheet(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             profile.displayName ?: profile.model,
-                            style = (if (selected) DsType.std14Strong else DsType.std14).withReadingWeight(),
+                            style = (if (selected) SyType.std14Strong else SyType.std14).withReadingWeight(),
                             color = colors.text,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             detail,
-                            style = DsType.caption11.withReadingWeight(),
+                            style = SyType.caption11.withReadingWeight(),
                             color = colors.textTertiary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -126,6 +130,7 @@ internal fun LocalModelPickerSheet(
                             tint = colors.linkInk,
                             modifier = Modifier.size(18.dp),
                         )
+                    }
                     }
                 }
             }

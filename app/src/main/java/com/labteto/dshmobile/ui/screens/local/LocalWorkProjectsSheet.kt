@@ -19,7 +19,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.foundation.SyMetric
 import kotlinx.coroutines.flow.StateFlow
@@ -88,7 +88,7 @@ internal fun LocalWorkProjectsSheet(
         },
         scrollable = true,
     ) {
-        error?.let { Text(it, color = colors.dangerInk, style = DsType.caption11) }
+        error?.let { Text(it, color = colors.dangerInk, style = SyType.caption11) }
         if (creating || editing != null) {
             SyTextField(
                 value = name,
@@ -106,7 +106,7 @@ internal fun LocalWorkProjectsSheet(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text("重新关联只修改项目指向；下面的“移动实际文件夹”会迁移文件及 Git 历史。",
-                    style = DsType.caption11, color = colors.textSecondary)
+                    style = SyType.caption11, color = colors.textSecondary)
                 SyButton(
                     text = "使用当前目录",
                     onClick = { folder = currentFolder },
@@ -131,12 +131,12 @@ internal fun LocalWorkProjectsSheet(
                     )
                     Text(
                         "目标目录需尚不存在，上级文件夹已创建；文件、子目录和 Git 历史将一起移动。",
-                        style = DsType.caption11, color = colors.textSecondary,
+                        style = SyType.caption11, color = colors.textSecondary,
                     )
                 }
             } else {
                 Text("将自动创建独立的本地项目文件夹，直接保存即可。",
-                    style = DsType.caption11, color = colors.textSecondary)
+                    style = SyType.caption11, color = colors.textSecondary)
             }
             SyButton(
                 text = if (creating) "保存项目" else "保存修改",
@@ -175,7 +175,7 @@ internal fun LocalWorkProjectsSheet(
             )
             if (snapshot.projects.isEmpty()) {
                 Text("尚无项目。新建一个项目后即可关联工作会话与文件夹。",
-                    style = DsType.small13, color = colors.textSecondary)
+                    style = SyType.small13, color = colors.textSecondary)
             }
             snapshot.projects.forEachIndexed { index, project ->
                 Column(
@@ -183,10 +183,10 @@ internal fun LocalWorkProjectsSheet(
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                 ) {
                     val associated = snapshot.sessionProjects[sessionId] == project.id
-                    Text(project.name, style = DsType.base16Strong, color = colors.text)
+                    Text(project.name, style = SyType.base16Strong, color = colors.text)
                     Text("文件夹：" + project.root +
                         if (associated) " · 当前会话已关联" else "",
-                        style = DsType.caption11, color = colors.textSecondary)
+                        style = SyType.caption11, color = colors.textSecondary)
                     SyButton(
                         text = "打开项目文件",
                         onClick = { onOpenProject(project.root) },

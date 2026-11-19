@@ -136,7 +136,7 @@ class WorkReplyTimelineVisualTest {
     }
 
     @Test fun darkLargeTextKeepsFailureAndRunningStatusReadable() {
-        compose.setContent { DshTheme(preference = ThemePreference.DARK, textScale = 1.3f) { Timeline() } }
+        compose.setContent { DshTheme(preference = ThemePreference.SYSTEM, textScale = 1.3f) { Timeline() } }
         compose.onNodeWithText("结果待确认").assertIsDisplayed()
         compose.onNodeWithText("执行中").assertIsDisplayed()
         saveScreenshot("dark-320dp-large-text")

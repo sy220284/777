@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaGalleryStory
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,19 +48,19 @@ internal fun FluidPersonaIdentity(entry: PersonaGalleryEntry, subtitle: String,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
-            Surface(color = colors.lilac.copy(alpha = .18f), shape = RoundedCornerShape(20.dp),
+            SyFlatSurface(color = colors.lilac.copy(alpha = .18f), shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.size(80.dp).clickable(enabled = enabled, onClick = onPortrait)) {
                 val picture = portrait
                 if (picture != null) Image(picture, entry.persona.name, contentScale = ContentScale.Fit)
                 else Box(contentAlignment = Alignment.Center) {
-                    Text(entry.persona.name.take(1), style = DsType.title22,
+                    Text(entry.persona.name.take(1), style = SyType.title22,
                         color = colors.lilac)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
-                Text(entry.persona.name, style = DsType.title22.withReadingWeight(), color = colors.text)
+                Text(entry.persona.name, style = SyType.title22.withReadingWeight(), color = colors.text)
                 Text(entry.persona.coreIdentity.takeIf(String::isNotBlank)?.take(110) ?: subtitle,
-                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
             }
         }
     }
@@ -84,7 +84,7 @@ internal fun FluidPersonaStorySection(story: PersonaGalleryStory?, section: Int)
                 FluidPersonaFactRow(stringResource(R.string.fluid_persona_unfinished),
                     state?.unresolvedThreads?.joinToString("\n").orEmpty())
                 state?.currentFocus?.takeIf(String::isNotBlank)?.let {
-                    Text(it, style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+                    Text(it, style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
                 }
             }
             1 -> {
@@ -93,8 +93,8 @@ internal fun FluidPersonaStorySection(story: PersonaGalleryStory?, section: Int)
                 if (events.isEmpty()) Text(stringResource(R.string.fluid_persona_no_events), color = colors.textSecondary)
                 events.forEachIndexed { index, event ->
                     Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                        Text((index + 1).toString().padStart(2, '0'), style = DsType.caption11, color = colors.textTertiary)
-                        Text(event, style = DsType.std14.withReadingWeight(), color = colors.text)
+                        Text((index + 1).toString().padStart(2, '0'), style = SyType.caption11, color = colors.textTertiary)
+                        Text(event, style = SyType.std14.withReadingWeight(), color = colors.text)
                     }
                 }
             }
@@ -102,7 +102,7 @@ internal fun FluidPersonaStorySection(story: PersonaGalleryStory?, section: Int)
                 val memories = (state?.dynamics?.facts.orEmpty().map { it.text } +
                     state?.dynamics?.sharedObjects.orEmpty()).filter(String::isNotBlank).distinct()
                 if (memories.isEmpty()) Text(stringResource(R.string.fluid_persona_no_memories), color = colors.textSecondary)
-                memories.forEach { Text(it, style = DsType.std14.withReadingWeight(), color = colors.text) }
+                memories.forEach { Text(it, style = SyType.std14.withReadingWeight(), color = colors.text) }
             }
         }
     }
@@ -113,8 +113,8 @@ private fun FluidPersonaFactRow(label: String, value: String) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     Row(Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapLg)) {
-        Text(label, style = DsType.small13, color = colors.textSecondary)
+        Text(label, style = SyType.small13, color = colors.textSecondary)
         Text(value.ifBlank { "—" }, modifier = Modifier.weight(1f),
-            style = DsType.std14.withReadingWeight(), color = colors.text)
+            style = SyType.std14.withReadingWeight(), color = colors.text)
     }
 }

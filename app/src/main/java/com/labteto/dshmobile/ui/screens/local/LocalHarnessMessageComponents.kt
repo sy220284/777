@@ -38,7 +38,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -102,9 +102,9 @@ import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.ThinkingRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
-import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyAnimations
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -310,7 +310,7 @@ internal fun LocalMessageRow(
 
         "system" -> if (!chatMode) Text(
             text = message.content,
-            style = DsType.workBody.withReadingWeight(),
+            style = SyType.workBody.withReadingWeight(),
             color = if (message.content.startsWith("执行失败：")) colors.dangerInk else colors.textSecondary,
             modifier = Modifier.fillMaxWidth().padding(vertical = SyMetric.gapMd),
         )
@@ -376,7 +376,7 @@ internal fun LocalMessageRow(
                     message.speakerName?.takeIf(String::isNotBlank)?.let { speaker ->
                         Text(
                             speaker,
-                            style = DsType.small13Strong.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                            style = SyType.small13Strong.withReadingWeight().copy(fontFamily = SyType.contentFont),
                             color = colors.personaInk,
                         )
                     }
@@ -582,7 +582,7 @@ private fun LocalAssistantMessageContent(
                 if (innerThought != null) {
                     Text(
                         text = stringResource(R.string.local_character_inner_thought) + " · " + innerThought,
-                        style = DsType.small13.withReadingWeight().copy(fontFamily = DsType.contentFont),
+                        style = SyType.small13.withReadingWeight().copy(fontFamily = SyType.contentFont),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                     )
                 }
@@ -590,7 +590,7 @@ private fun LocalAssistantMessageContent(
                     SelectionContainer {
                         MarkdownText(
                             body,
-                            bodyStyle = if (chatMode) DsType.chatBody else DsType.workBody,
+                            bodyStyle = if (chatMode) SyType.chatBody else SyType.workBody,
                             preserveSoftLineBreaks = chatMode,
                             streaming = streaming,
                         )
@@ -646,9 +646,9 @@ internal fun LocalTranscriptImage(
         .fillMaxWidth(0.72f)
         .widthIn(max = 440.dp)
         .aspectRatio(ratio)
-        .clip(DsShapes.block)
+        .clip(SyShapes.block)
         .background(colors.wallpaperSurface(WallpaperSurfaceLevel.CARD))
-        .border(1.dp, colors.border, DsShapes.block)
+        .border(1.dp, colors.border, SyShapes.block)
         .clickable(enabled = file != null) { showingImage = true }
     val loaded = bitmap
     if (loaded != null) {
@@ -677,7 +677,7 @@ internal fun LocalTranscriptImage(
                     stringResource(if (loading) R.string.media_chat_preview_pending
                         else R.string.media_chat_preview_unavailable),
                     color = colors.textSecondary,
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                 )
             }
         }
@@ -695,14 +695,14 @@ internal fun LocalTranscriptImage(
 private fun LocalTranscriptUnknown(block: LocalMessageBlock.Unknown) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     SyMaterialSurface(
-        shape = DsShapes.block,
+        shape = SyShapes.block,
         tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
         Text(
             text = stringResource(R.string.local_unknown_message_block, block.kind),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
     }
@@ -723,7 +723,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File, workspacePath: Str
                 }
             }
         },
-        shape = DsShapes.block,
+        shape = SyShapes.block,
         tier = SyMaterialTier.L3_CARD,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
     ) {
@@ -742,7 +742,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File, workspacePath: Str
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     file.name,
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -750,7 +750,7 @@ private fun LocalTranscriptFile(file: LocalMessageBlock.File, workspacePath: Str
                 Text(
                     if (localFile == null) stringResource(R.string.media_chat_work_file_missing)
                     else "${file.name.substringAfterLast('.', "").uppercase().take(7)} · ${localAttachmentDisplaySize(file.bytes)}",
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -785,7 +785,7 @@ private fun MessageVariantControls(
     )
     Text(
         text = stringResource(R.string.local_variant_position, info.index + 1, info.count),
-        style = DsType.caption11.withReadingWeight(),
+        style = SyType.caption11.withReadingWeight(),
         color = colors.textTertiary,
     )
     CompactMessageAction(
@@ -806,7 +806,7 @@ internal fun CompactMessageAction(
     iconRotation: Float = 0f,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Surface(
+    SyFlatSurface(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.size(SyMetric.touch),
@@ -838,7 +838,7 @@ internal fun ChatThinkingRow(
         StateDot(if (streaming) StateDotState.Running else StateDotState.Done, size = 8.dp)
         Text(
             stringResource(if (streaming) R.string.local_process_thinking else R.string.local_work_thought),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
     }

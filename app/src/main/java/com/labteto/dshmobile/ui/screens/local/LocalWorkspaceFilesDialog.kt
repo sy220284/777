@@ -1,5 +1,6 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import com.shenyan.designsystem.components.SyActivityIndicator
 import com.shenyan.designsystem.foundation.SyMetric
 
 import android.content.Intent
@@ -25,9 +26,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -70,14 +70,16 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyCheckboxControl
 import com.shenyan.designsystem.components.SyEmptyState
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.NonCancellable
@@ -797,7 +799,7 @@ internal fun LocalWorkspaceFilesDialog(
             selecting || query.isNotBlank()
     BackHandler(enabled = hasInternalBackLayer, onBack = ::navigateBack)
 
-    Surface(Modifier.fillMaxSize(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface()) {
+    SyFlatSurface(Modifier.fillMaxSize(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.rootSurface()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 val headerTitle = when {
                     preview != null -> preview?.file?.path?.substringAfterLast('/').orEmpty()
@@ -899,7 +901,7 @@ internal fun LocalWorkspaceFilesDialog(
                 if (preview == null && query.isNotBlank() && mode == LocalFilesMode.WORKSPACE) {
                     Text(stringResource(R.string.local_workspace_search_scope),
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
                 }
                 if (preview == null && !loading && error == null && visibleSharePaths.isNotEmpty()) {
@@ -912,7 +914,7 @@ internal fun LocalWorkspaceFilesDialog(
                             Text(
                                 stringResource(R.string.local_files_selected_count, selected.size),
                                 modifier = Modifier.weight(1f),
-                                style = DsType.small13Strong.withReadingWeight(),
+                                style = SyType.small13Strong.withReadingWeight(),
                                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                             )
                             SyButton(
@@ -997,7 +999,7 @@ internal fun LocalWorkspaceFilesDialog(
                         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
                     ) {
                         Text(location, modifier = Modifier.weight(1f),
-                            style = DsType.small13.withReadingWeight())
+                            style = SyType.small13.withReadingWeight())
                         SyButton(
                             text = "查看下载",
                             onClick = ::openDownloads,
@@ -1010,14 +1012,14 @@ internal fun LocalWorkspaceFilesDialog(
                     Text(
                         message,
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm),
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                     )
                 }
                 shareError?.let {
                     Text(
                         it,
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapSm),
-                        style = DsType.small13.withReadingWeight(),
+                        style = SyType.small13.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                     )
                 }
@@ -1252,7 +1254,7 @@ internal fun LocalWorkspaceFilesDialog(
             // ModalBottomSheet/Dialog owns a separate focus tree from the workspace.
             val sheetFocusManager = LocalFocusManager.current
             val sheetKeyboardController = LocalSoftwareKeyboardController.current
-            Text("审查范围", style = DsType.small13Strong, color = colors.text)
+            Text("审查范围", style = SyType.small13Strong, color = colors.text)
             androidx.compose.foundation.layout.FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
@@ -1283,7 +1285,7 @@ internal fun LocalWorkspaceFilesDialog(
                     modifier = Modifier.testTag("work_git_commit_review_open"),
                 )
             }
-            Text("仓库目录：$gitRepository", style = DsType.small13, color = colors.textSecondary)
+            Text("仓库目录：$gitRepository", style = SyType.small13, color = colors.textSecondary)
             if (gitIsCommit && compareCommitGit != null) {
                 SySearchField(
                     gitCommitInput, { gitCommitInput = it.take(64) },
@@ -1302,7 +1304,7 @@ internal fun LocalWorkspaceFilesDialog(
                     modifier = Modifier.fillMaxWidth().testTag("work_git_commit_load"),
                 )
                 Text("只接受仓库中已有的提交哈希，支持首次提交；提交内容变化时历史审查不会误复用。",
-                    style = DsType.caption11, color = colors.textSecondary)
+                    style = SyType.caption11, color = colors.textSecondary)
             }
             if (gitIsLocal && compareLocalGit != null) {
                 Row(verticalAlignment = Alignment.CenterVertically,
@@ -1318,13 +1320,13 @@ internal fun LocalWorkspaceFilesDialog(
                             }
                         },
                     )
-                    Text("同时审查新建文件", style = DsType.small13, color = colors.text,
+                    Text("同时审查新建文件", style = SyType.small13, color = colors.text,
                         modifier = Modifier.testTag("work_git_include_untracked"))
                 }
                 gitResult?.let { snapshot ->
                     if (snapshot.untrackedFileCount > 0) Text(
                         "发现 " + snapshot.untrackedFileCount + " 个未跟踪文件。新文件可能包含密钥；选择后才会纳入模型审查。",
-                        style = DsType.caption11, color = colors.warningInk)
+                        style = SyType.caption11, color = colors.warningInk)
                 }
             }
             if (gitLoading) Text("正在读取 Git 结果…", color = colors.textSecondary)
@@ -1348,16 +1350,16 @@ internal fun LocalWorkspaceFilesDialog(
             }
             if (visibleGitBranches.size > 20) Text(
                 "还有 ${visibleGitBranches.size - 20} 条分支，请缩小搜索范围。",
-                style = DsType.caption11, color = colors.textSecondary,
+                style = SyType.caption11, color = colors.textSecondary,
             )
             gitResult?.let { result ->
-                Text(result.trackingRef, style = DsType.small13Strong, color = colors.text)
+                Text(result.trackingRef, style = SyType.small13Strong, color = colors.text)
                 SelectionContainer {
                     Text(result.statistics.ifBlank { "没有已跟踪文件的变化" },
-                        style = DsType.small13, color = colors.textSecondary)
+                        style = SyType.small13, color = colors.textSecondary)
                 }
                 if (result.patch.isNotEmpty()) {
-                    Text("差异预览", style = DsType.small13Strong, color = colors.text)
+                    Text("差异预览", style = SyType.small13Strong, color = colors.text)
                     LocalGitDiffPreview(result.patch)
                     SyButton(
                         text = "复制差异内容",
@@ -1368,7 +1370,7 @@ internal fun LocalWorkspaceFilesDialog(
                 }
                 if (result.truncated) {
                     Text("差异超过 128KB，当前结果仅包含前 128KB。",
-                        style = DsType.caption11, color = colors.warningInk)
+                        style = SyType.caption11, color = colors.warningInk)
                 }
                 if (mode == LocalFilesMode.WORKSPACE && result.patch.isNotBlank() &&
                     (runIndependentCodeReview != null || codeReview != null || codeReviewError != null)) {
@@ -1401,7 +1403,7 @@ internal fun LocalWorkspaceFilesDialog(
                     codeReviewError?.let { Text(it, color = colors.dangerInk) }
                     codeReview?.let { saved ->
                         Text("审查结论 · " + saved.trackingRef,
-                            style = DsType.small13Strong, color = colors.text)
+                            style = SyType.small13Strong, color = colors.text)
                         SelectionContainer {
                             Column(
                                 Modifier.fillMaxWidth().heightIn(max = 360.dp)
@@ -1413,9 +1415,9 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                         Text("模型审查：已形成报告 · 人工接纳：" +
                             (if (saved.humanAccepted) "已确认" else "待确认"),
-                            style = DsType.caption11, color = colors.textSecondary)
+                            style = SyType.caption11, color = colors.textSecondary)
                         Text("实际构建与测试：此处没有关联回执；请在 Work 任务结果中查看真实执行状态。",
-                            style = DsType.caption11, color = colors.textSecondary)
+                            style = SyType.caption11, color = colors.textSecondary)
                         if (!saved.humanAccepted && acceptIndependentCodeReview != null) {
                             SyButton(
                                 text = "人工接纳审查结论",
@@ -1463,7 +1465,7 @@ internal fun LocalWorkspaceFilesDialog(
                     securityReviewError?.let { Text(it, color = colors.dangerInk) }
                     securityReview?.let { saved ->
                         Text("安全审查 · " + saved.trackingRef,
-                            style = DsType.small13Strong, color = colors.text)
+                            style = SyType.small13Strong, color = colors.text)
                         SelectionContainer {
                             Column(Modifier.fillMaxWidth().heightIn(max = 360.dp)
                                 .verticalScroll(rememberScrollState())) {
@@ -1473,10 +1475,10 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                         if (saved.verdict == "block") {
                             Text("审核存在待处理风险，当前版本不可放行。修复后重新检查。",
-                                style = DsType.caption11, color = colors.warningInk)
+                                style = SyType.caption11, color = colors.warningInk)
                         } else if (saved.humanApproved) {
                             Text("当前版本已人工批准；修改代码后需重新审核。",
-                                style = DsType.caption11, color = colors.successInk)
+                                style = SyType.caption11, color = colors.successInk)
                         } else if (approveIndependentSecurityReview != null) {
                             SyButton(
                                 text = "人工批准当前变更",
@@ -1488,9 +1490,9 @@ internal fun LocalWorkspaceFilesDialog(
                         }
                         Text("模型安全裁决：" + (if (saved.verdict == "allow") "未发现明确风险" else "已阻断风险") +
                             " · 人工确认：" + (if (saved.humanApproved) "已记录" else "未通过"),
-                            style = DsType.caption11, color = colors.textSecondary)
+                            style = SyType.caption11, color = colors.textSecondary)
                         Text("实际工具授权与测试：由原工具审批和 Work 执行记录分别判断；本页的模型裁决不会替代。",
-                            style = DsType.caption11, color = colors.textSecondary)
+                            style = SyType.caption11, color = colors.textSecondary)
                     }
                 }
                 Text(when {
@@ -1502,7 +1504,7 @@ internal fun LocalWorkspaceFilesDialog(
                         "已纳入所选新建文件；忽略规则仍生效，超出范围时会停止完整审查。"
                     else ->
                         "当前仅检查已跟踪文件；需要检查新建文件时可开启上方选项。"
-                }, style = DsType.caption11, color = colors.textSecondary)
+                }, style = SyType.caption11, color = colors.textSecondary)
             }
         }
     }
@@ -1601,12 +1603,12 @@ internal fun LocalWorkspacePathBreadcrumb(
     ) {
         segments.forEachIndexed { index, part ->
             if (index > 0) {
-                Text("›", color = colors.textTertiary, style = DsType.small13)
+                Text("›", color = colors.textTertiary, style = SyType.small13)
             }
             if (index == segments.lastIndex) {
                 SelectionContainer {
                     Text(part.name, color = colors.text,
-                        style = DsType.std14Strong.withReadingWeight(),
+                        style = SyType.std14Strong.withReadingWeight(),
                         modifier = Modifier.testTag("workspace_breadcrumb_$index"))
                 }
             } else {
@@ -1688,7 +1690,7 @@ private fun LocalWorkspaceDirectoryList(
                 Column {
                     Text("部分文件暂未显示：$pageError",
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
                     SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
                         size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
@@ -1713,14 +1715,14 @@ private fun LocalFilesEmpty(title: String, body: String) {
         )
         Text(
             title,
-            style = DsType.base16Strong.withReadingWeight(),
+            style = SyType.base16Strong.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = SyMetric.gapMd),
         )
         Text(
             body,
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = SyMetric.gapSm),
@@ -1739,7 +1741,7 @@ private fun ConversationLocalFileList(
             item(key = "local-artifacts-header") {
                 Text(
                     stringResource(R.string.panel_artifacts),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                 )
@@ -1752,7 +1754,7 @@ private fun ConversationLocalFileList(
             item(key = "local-involved-header") {
                 Text(
                     stringResource(R.string.app_project_context),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
                 )
@@ -1789,7 +1791,7 @@ private fun LocalFlatFileList(
             item(key = "search-discovery-in-progress") {
                 Text("正在查找文件名…",
                     modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
             }
         }
@@ -1801,7 +1803,7 @@ private fun LocalFlatFileList(
                 Column {
                     Text("部分搜索结果暂未显示：$pageError",
                         modifier = Modifier.padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapMd),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
                     SyButton(text = stringResource(R.string.common_retry), onClick = onRetry,
                         size = SyButtonSize.Small, variant = SyButtonVariant.Outline)
@@ -1870,13 +1872,12 @@ private fun LocalDirectoryRow(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val dark = colors.canvas.luminance() < 0.5f
-    Surface(
+    SyMaterialSurface(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = SyMetric.gapLg),
-        shape = DsShapes.row,
-        color = androidx.compose.ui.graphics.Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
+        tier = SyMaterialTier.L3_CARD,
+        shape = SyShapes.row,
     ) {
         Row(
             modifier = Modifier
@@ -1900,14 +1901,14 @@ private fun LocalDirectoryRow(
             ) {
                 Text(
                     name,
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     subtitle ?: stringResource(R.string.panel_folder),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
                     maxLines = 1,
                 )
@@ -1937,17 +1938,17 @@ private fun LocalFileRow(
     val fileName = file.path.substringAfterLast('/')
     val dark = colors.canvas.luminance() < 0.5f
     val fileIconRes = workspaceFileIcon(fileName, dark)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = SyMetric.gapLg)
+    SyMaterialSurface(
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
             .combinedClickable(
                 onClick = { if (selecting) controls?.toggle?.invoke(file.path) else onClick() },
                 onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
             ),
-        shape = DsShapes.row,
-        color = if (selected) colors.selected.copy(alpha = .20f)
-            else androidx.compose.ui.graphics.Color.Transparent,
+        tier = SyMaterialTier.L3_CARD,
+        shape = SyShapes.row,
+        tint = if (selected) colors.selected.copy(alpha = .28f)
+            else androidx.compose.ui.graphics.Color.Unspecified,
     ) {
         Row(
             modifier = Modifier
@@ -1968,7 +1969,7 @@ private fun LocalFileRow(
             ) {
                 Text(
                     fileName,
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1976,9 +1977,9 @@ private fun LocalFileRow(
                 Text(
                     if (showPath) "${file.path} · ${formatBytes(file.bytes)}"
                     else formatBytes(file.bytes),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -2014,7 +2015,7 @@ private fun LocalFilePreviewBody(
         SelectionContainer {
             Text(
                 "${preview.file.path} · ${formatBytes(preview.file.bytes)}",
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 modifier = Modifier.testTag("workspace_preview_full_path"),
             )
@@ -2029,7 +2030,7 @@ private fun LocalFilePreviewBody(
             if (preview.truncated) {
                 Text(
                     "文件仍有后续内容。当前起点：" + formatBytes(preview.offset),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
@@ -2040,7 +2041,7 @@ private fun LocalFilePreviewBody(
             LazyColumn(Modifier.fillMaxSize()) {
                 items(previewChunks.size) { index ->
                     SelectionContainer {
-                        Text(previewChunks[index], style = DsType.mdCode)
+                        Text(previewChunks[index], style = SyType.mdCode)
                     }
                 }
                 item(key = "preview-paging-actions") {
