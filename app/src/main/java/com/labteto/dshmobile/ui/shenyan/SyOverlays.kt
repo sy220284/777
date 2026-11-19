@@ -127,7 +127,7 @@ fun SyDialog(
                     .pointerInput(Unit) { detectTapGestures { } },
                 shape = RoundedCornerShape(SyMetric.radiusSheet),
                 tier = SyMaterialTier.L4_OVERLAY,
-                border = BorderStroke(1.dp, p.border),
+                // Optical rim is owned by the canonical renderer, not this screen.
                 shadowElevation = 16.dp,
             ) {
                 Column(

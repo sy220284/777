@@ -39,6 +39,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 import com.shenyan.designsystem.foundation.*
 
@@ -273,11 +275,41 @@ fun SyModalSheet(
 
 @Composable
 fun SyConfirmDialog(title: String, body: String, dangerous: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(onDismissRequest = { if (!dangerous) onDismiss() }, title = { Text(title) }, text = { Text(body) },
-        confirmButton = { SyButton(if (dangerous) "确认执行" else "确认", onConfirm, style = if (dangerous) SyButtonStyle.DANGER else SyButtonStyle.PRIMARY) },
-        dismissButton = { SyButton("取消", onDismiss, style = SyButtonStyle.GHOST) },
-        containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY),
-        shape = RoundedCornerShape(SyMetric.radiusSheet))
+    val palette = LocalSyColors.current
+    val maxBodyHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * .50f
+    Dialog(
+        onDismissRequest = { if (!dangerous) onDismiss() },
+        properties = DialogProperties(
+            dismissOnBackPress = !dangerous,
+            dismissOnClickOutside = !dangerous,
+        ),
+    ) {
+        SyMaterialSurface(
+            modifier = Modifier.fillMaxWidth(),
+            tier = SyMaterialTier.L4_OVERLAY,
+            shape = RoundedCornerShape(SyMetric.radiusSheet),
+        ) {
+            Column(
+                Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleLarge, color = palette.text)
+                Text(body,
+                    modifier = Modifier.heightIn(max = maxBodyHeight).verticalScroll(rememberScrollState()),
+                    style = MaterialTheme.typography.bodyMedium, color = palette.textSecondary,
+                )
+                Row(Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SyButton("取消", onDismiss, style = SyButtonStyle.GHOST)
+                    Spacer(Modifier.width(SyMetric.gapSm))
+                    SyButton(if (dangerous) "确认执行" else "确认", onConfirm,
+                        style = if (dangerous) SyButtonStyle.DANGER else SyButtonStyle.PRIMARY)
+                }
+            }
+        }
+    }
 }
 
 /** Search glyph is generated with the same 24dp, 1.75 outline as V6.3 actions. */
