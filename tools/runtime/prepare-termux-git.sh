@@ -305,7 +305,7 @@ prepare_arch() {
   fi
 
   mapfile -t runtime_packages < <(
-    resolve_runtime_packages "$packages_file" "$GIT_PACKAGE" "ca-certificates"
+    resolve_runtime_packages "$packages_file" "$GIT_PACKAGE" "ca-certificates" "curl" "jq" "ripgrep"
   )
 
   local jni_dir="$OUT_ROOT/jniLibs/$android_abi"
@@ -385,6 +385,21 @@ prepare_arch() {
       fi
     fi
 
+    # Android target 29+ executes app-owned ELF only from nativeLibraryDir.
+    # Keep the command bytes in jniLibs and create executable aliases after startup.
+    case "$pkg" in
+      curl|jq|ripgrep)
+        local command="$pkg"
+        [ "$command" = "ripgrep" ] && command="rg"
+        [ -f "$prefix/bin/$command" ] || {
+          echo "Termux $pkg 缺少 bin/$command" >&2
+          exit 1
+        }
+        cp -L "$prefix/bin/$command" "$jni_dir/libdsh_$command.so"
+        chmod 0755 "$jni_dir/libdsh_$command.so"
+        ;;
+    esac
+
     if [ -d "$prefix/lib" ]; then
       while IFS= read -r -d '' library; do
         local name
@@ -422,6 +437,12 @@ prepare_arch() {
     echo "Git CA 证书未生成：$android_abi" >&2
     exit 1
   }
+
+  for command in curl jq rg; do
+    [ -s "$jni_dir/libdsh_$command.so" ] || { echo "缺少 Android CLI：$command" >&2; exit 1; }
+    verify_elf_alignment "$jni_dir/libdsh_$command.so"
+    verify_dependencies "$jni_dir/libdsh_$command.so" "$lib_dir"
+  done
 
   verify_elf_alignment "$jni_dir/libdsh_git.so"
   verify_dependencies "$jni_dir/libdsh_git.so" "$lib_dir"
