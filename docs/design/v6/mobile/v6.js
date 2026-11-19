@@ -73,3 +73,15 @@ function dispatch(code){let [verb,arg]=code.split(':');switch(verb){case'route':
 document.addEventListener('click',e=>{const control=e.target.closest('[data-action]');if(control){dispatch(control.dataset.action)}const t=e.target.closest('[data-theme-option]');if(t)dispatch('theme:'+t.dataset.themeOption)});document.addEventListener('keydown',e=>{if(e.key==='Tab'&&state.sheet){const f=[...$('sheet').querySelectorAll('button:not(:disabled),input:not(:disabled),[tabindex]:not([tabindex="-1"])')];if(f.length){const first=f[0],last=f.at(-1);if(e.shiftKey&&(document.activeElement===first||!$('sheet').contains(document.activeElement))){last.focus();e.preventDefault()}else if(!e.shiftKey&&(document.activeElement===last||!$('sheet').contains(document.activeElement))){first.focus();e.preventDefault()}}return;}if(e.key==='Escape'){if(state.sheet)dispatch('close-sheet');else if(state.drawer)dispatch('close-drawer');else if(state.route==='SETTINGS'&&state.settings!=='ROOT')backSettings();else if(state.route==='TOOLS'&&state.toolPane==='settings')dispatch('tool:back');}});document.addEventListener('input',e=>{if(e.target.dataset.setting==='tempo'){state.tempo=Number(e.target.value);document.documentElement.style.setProperty('--duration',String(.28*state.tempo)+'s')}});$('drawer-search').addEventListener('input',renderDrawer);
 function init(){if(state.route==='SETTINGS'&&state.settings!=='ROOT')state.settingsStack=['ROOT',state.settings];drawPage();if(state.drawer)renderDrawer();if(state.sheet)renderSheet();}
 init();
+
+/* Native Compose samples PressInteraction.pressPosition; this offline projection
+ * only mirrors that visible state, and never captures pointer or drag input. */
+document.addEventListener('pointerdown',event=>{
+    const glass=event.target.closest('.composer,.card,.bottom-sheet');
+    if(!glass||document.body.dataset.theme!=='light')return;
+    const bounds=glass.getBoundingClientRect();
+    const x=Math.max(0,Math.min(100,(event.clientX-bounds.left)/Math.max(1,bounds.width)*100));
+    const y=Math.max(0,Math.min(100,(event.clientY-bounds.top)/Math.max(1,bounds.height)*100));
+    glass.style.setProperty('--sy-touch-x',x.toFixed(1)+'%');
+    glass.style.setProperty('--sy-touch-y',y.toFixed(1)+'%');
+},{passive:true});
