@@ -101,6 +101,7 @@ class BundledNodeRuntime @Inject constructor(
             "TMPDIR" to context.cacheDir.path,
             "NODE_EXTRA_CA_CERTS" to checkNotNull(platformCaBundle).absolutePath,
             "DSH_NPM_CLI" to checkNotNull(activeNpmCli).absolutePath,
+            "DSH_NPM_HOME" to checkNotNull(activeNpmCli).parentFile.parentFile.parentFile.absolutePath,
             "npm_config_cache" to File(context.cacheDir, "npm-cache").absolutePath,
             "npm_config_ignore_scripts" to "true",
             "npm_config_audit" to "false",
