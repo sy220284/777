@@ -17,7 +17,7 @@ import com.labteto.dshmobile.local.model.DeepSeekProviderBalance
 import com.labteto.dshmobile.local.model.LocalModelProfile
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
@@ -54,10 +54,10 @@ internal fun DeepSeekBalanceCard(
             modifier = Modifier.fillMaxWidth().padding(SyMetric.gapSection),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            Text("DeepSeek 官方账户余额", style = DsType.std14Strong.withReadingWeight(),
+            Text("DeepSeek 官方账户余额", style = SyType.std14Strong.withReadingWeight(),
                 color = colors.text)
             Text("使用已保存的官方 API Key 查询。金额来自服务商账户，不以本机用量推算。",
-                style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
             SyButton(
                 text = if (loading) "正在查询余额…" else "刷新真实余额",
                 onClick = { if (!loading) refresh++ },
@@ -66,23 +66,23 @@ internal fun DeepSeekBalanceCard(
                 modifier = Modifier.fillMaxWidth(),
             )
             error?.let {
-                Text("余额查询失败：$it", style = DsType.small13.withReadingWeight(),
+                Text("余额查询失败：$it", style = SyType.small13.withReadingWeight(),
                     color = colors.dangerInk)
             }
             balance?.let { latest ->
                 Text(
                     if (latest.available) "服务商状态：账户可调用" else "服务商状态：余额不足或不可调用",
-                    style = DsType.small13Strong.withReadingWeight(), color = colors.text,
+                    style = SyType.small13Strong.withReadingWeight(), color = colors.text,
                 )
                 if (latest.amounts.isEmpty()) {
                     Text("服务商未提供余额币种详情",
-                        style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
                 }
                 latest.amounts.forEach { amount ->
                     Text("${amount.currency} 可用余额：${amount.total}",
-                        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+                        style = SyType.std14Strong.withReadingWeight(), color = colors.text)
                     Text("赠金 ${amount.granted} · 充值 ${amount.toppedUp}",
-                        style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
                 }
             }
         }

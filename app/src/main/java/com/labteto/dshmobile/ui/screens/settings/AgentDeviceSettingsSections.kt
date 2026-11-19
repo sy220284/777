@@ -60,8 +60,8 @@ import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.StateDot
 import com.labteto.dshmobile.ui.components.StateDotState
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -148,7 +148,7 @@ internal fun DeviceCapabilitiesCard(
             variant = SyButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth(),
         )
-        state.error?.let { Text(it, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
+        state.error?.let { Text(it, style = SyType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk) }
     }
 }
 
@@ -178,7 +178,7 @@ internal fun NotificationPostingPermissionCard(
         }
         Text(
             stringResource(R.string.settings_notifications_only_events),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
     }
@@ -205,14 +205,14 @@ private fun CapabilityRow(
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
             StateDot(if (enabled) StateDotState.Done else StateDotState.Idle)
             Text(label, modifier = Modifier.weight(1f),
-                style = DsType.std14.withReadingWeight(), color = colors.text)
+                style = SyType.std14.withReadingWeight(), color = colors.text)
         }
         Text(hint, modifier = Modifier.fillMaxWidth(),
-            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
         if (enabled) {
             Text(
                 successLabel ?: stringResource(R.string.advanced_available),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.successInk,
             )
         } else if (actionLabel != null && onAction != null) {
@@ -225,7 +225,7 @@ private fun CapabilityRow(
         } else {
             Text(
                 stringResource(R.string.advanced_not_authorized),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
         }

@@ -52,8 +52,8 @@ import com.labteto.dshmobile.ui.shenyan.SySegmented
 import com.labteto.dshmobile.ui.components.ToggleRow
 import com.labteto.dshmobile.ui.shenyan.SyUserBubble
 import com.labteto.dshmobile.ui.theme.AccentPalettes
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.wallpaperDecodeSample
@@ -71,7 +71,7 @@ internal fun AppearanceReadingPreview() {
     ) {
         Text(
             stringResource(R.string.settings_appearance_preview_assistant),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.text,
         )
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
@@ -90,7 +90,7 @@ internal fun ReadingPreferencesRow(
     Text(
         stringResource(R.string.settings_text_size),
         modifier = Modifier.settingsSearchAnchor(stringResource(R.string.settings_text_size)),
-        style = DsType.std14Strong.withReadingWeight(),
+        style = SyType.std14Strong.withReadingWeight(),
         color = colors.text,
     )
     Row(
@@ -98,7 +98,7 @@ internal fun ReadingPreferencesRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     ) {
-        Text(stringResource(R.string.settings_text_smaller), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+        Text(stringResource(R.string.settings_text_smaller), style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         SySlider(
             value = settings.textScale,
             onValueChange = onTextScaleChange,
@@ -109,14 +109,14 @@ internal fun ReadingPreferencesRow(
         )
         Text(
             stringResource(R.string.settings_text_scale_value, (settings.textScale * 100).toInt()),
-            style = DsType.small13Strong.withReadingWeight(),
+            style = SyType.small13Strong.withReadingWeight(),
             color = colors.text,
         )
     }
 
     Text(
         stringResource(R.string.settings_text_weight),
-        style = DsType.std14Strong.withReadingWeight(),
+        style = SyType.std14Strong.withReadingWeight(),
         color = colors.text,
     )
     SySegmented(
@@ -147,7 +147,7 @@ internal fun AppearanceAdvancedControls(
 ) {
     val colors = LocalSyColors.current
     Text(stringResource(R.string.settings_advanced_color_background),
-        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+        style = SyType.std14Strong.withReadingWeight(), color = colors.text)
     AppearanceAdvancedSlider(
         stringResource(R.string.settings_advanced_ambient), settings.ambientGlow, 0f..1f, onAmbientChange,
         enabled = settings.backgroundImagePath == null,
@@ -159,7 +159,7 @@ internal fun AppearanceAdvancedControls(
 
     Spacer(Modifier.height(SyMetric.gapSm))
     Text(stringResource(R.string.settings_advanced_material),
-        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+        style = SyType.std14Strong.withReadingWeight(), color = colors.text)
     AppearanceAdvancedSlider(
         stringResource(R.string.settings_component_transparency),
         settings.wallpaperSurfaceTransparency, 0f..1f, onTransparencyChange,
@@ -168,7 +168,7 @@ internal fun AppearanceAdvancedControls(
     Spacer(Modifier.height(SyMetric.gapSm))
     Text(stringResource(R.string.settings_advanced_motion),
         modifier = Modifier.settingsSearchAnchor(stringResource(R.string.settings_advanced_motion)),
-        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+        style = SyType.std14Strong.withReadingWeight(), color = colors.text)
     AppearanceAdvancedSlider(
         stringResource(R.string.settings_advanced_motion_tempo),
         settings.motionDurationScale, .7f..1.3f, onMotionChange,
@@ -176,7 +176,7 @@ internal fun AppearanceAdvancedControls(
 
     Spacer(Modifier.height(SyMetric.gapSm))
     Text(stringResource(R.string.settings_advanced_components),
-        style = DsType.std14Strong.withReadingWeight(), color = colors.text)
+        style = SyType.std14Strong.withReadingWeight(), color = colors.text)
     AppearanceAdvancedSlider(
         stringResource(R.string.settings_advanced_emphasis), settings.componentEmphasis, 0f..1f,
         onEmphasisChange,
@@ -198,9 +198,9 @@ private fun AppearanceAdvancedSlider(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+        Text(label, style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         Text("${(value * 100).toInt()}%",
-            style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+            style = SyType.small13Strong.withReadingWeight(), color = colors.text)
     }
     SySlider(
         value = value, onValueChange = onChange,
@@ -233,7 +233,7 @@ internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
 @Composable
 internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    val labelStyle = DsType.caption11.withReadingWeight()
+    val labelStyle = SyType.caption11.withReadingWeight()
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val swatchWidth = AccentPalettes.ALL.maxOf { palette ->
@@ -251,15 +251,15 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .width(swatchWidth)
-                        .clip(DsShapes.cube)
+                        .clip(SyShapes.cube)
                         .background(
                             if (selected) colors.selected else Color.Transparent,
-                            DsShapes.cube,
+                            SyShapes.cube,
                         )
                         .border(
                             width = if (selected) 1.5.dp else 1.dp,
                             color = if (selected) colors.primary else colors.border,
-                            shape = DsShapes.cube,
+                            shape = SyShapes.cube,
                         )
                         .selectable(
                             selected = selected,
@@ -269,7 +269,7 @@ internal fun AccentThemeRow(settings: AppSettings, onSelect: (String) -> Unit) {
                         .padding(8.dp),
                 ) {
                     // 色卡本体：亮档/暗档/浅衬 三段色条
-                    Row(Modifier.fillMaxWidth().height(24.dp).clip(DsShapes.row)) {
+                    Row(Modifier.fillMaxWidth().height(24.dp).clip(SyShapes.row)) {
                         Box(Modifier.weight(1f).fillMaxHeight().background(palette.lightAccent))
                         Box(Modifier.weight(1f).fillMaxHeight().background(palette.darkAccent))
                         Box(
@@ -306,15 +306,15 @@ private fun AppearanceChip(label: String, selected: Boolean, onClick: () -> Unit
     Box(
         modifier = Modifier
             .heightIn(min = SyMetric.touch)
-            .clip(DsShapes.cube)
+            .clip(SyShapes.cube)
             .background(if (selected) colors.selected else Color.Transparent)
-            .border(1.dp, colors.border.copy(alpha = .6f), DsShapes.cube)
+            .border(1.dp, colors.border.copy(alpha = .6f), SyShapes.cube)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = SyMetric.gapMd),
     ) {
         Text(
             label,
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = if (selected) colors.primary else colors.textSecondary,
         )
     }
@@ -361,7 +361,7 @@ internal fun BackgroundRow(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(width = 96.dp, height = 56.dp)
-                        .clip(DsShapes.cube),
+                        .clip(SyShapes.cube),
                 )
                 Spacer(Modifier.height(SyMetric.gapMd))
             }
@@ -374,7 +374,7 @@ internal fun BackgroundRow(
                     R.string.settings_background_image_active
                 },
             ),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textTertiary,
         )
         Spacer(Modifier.height(SyMetric.gapMd))

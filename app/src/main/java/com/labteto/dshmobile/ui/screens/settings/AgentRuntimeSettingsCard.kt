@@ -42,8 +42,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -178,7 +178,7 @@ private fun StepperRow(
         ) {
             Text(
                 label,
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.text,
                 modifier = Modifier.weight(1f),
             )
@@ -192,7 +192,7 @@ private fun StepperRow(
             )
             SyMaterialSurface(
                 modifier = Modifier.width(64.dp),
-                shape = DsShapes.buttonSmall,
+                shape = SyShapes.buttonSmall,
                 tier = SyMaterialTier.L4_OVERLAY,
             ) {
                 Box(
@@ -211,7 +211,7 @@ private fun StepperRow(
                             }
                             .padding(horizontal = SyMetric.gapSm),
                         singleLine = true,
-                        textStyle = DsType.std14Strong.withReadingWeight().copy(
+                        textStyle = SyType.std14Strong.withReadingWeight().copy(
                             color = colors.text,
                             textAlign = TextAlign.Center,
                         ),
@@ -253,7 +253,7 @@ private fun StepperRow(
         hint?.let {
             Text(
                 it,
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
                 modifier = Modifier.padding(top = SyMetric.gapXs),
             )

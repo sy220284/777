@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /**
@@ -116,18 +116,18 @@ internal fun AppSettingsRow(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
             Text(
                 title,
-                style = (if (compact) DsType.settingsItem else DsType.navigationItem).withReadingWeight(),
+                style = (if (compact) SyType.settingsItem else SyType.navigationItem).withReadingWeight(),
                 color = colors.text,
             )
             subtitle?.takeIf(String::isNotBlank)?.let {
                 Text(
                     it,
-                    style = DsType.navigationSupporting.withReadingWeight(),
+                    style = SyType.navigationSupporting.withReadingWeight(),
                     color = colors.textSecondary,
                 )
             }
             if (stackedValue && !value.isNullOrBlank()) {
-                Text(value, style = DsType.navigationSupporting.withReadingWeight(),
+                Text(value, style = SyType.navigationSupporting.withReadingWeight(),
                     color = colors.textSecondary)
             }
         }
@@ -135,7 +135,7 @@ internal fun AppSettingsRow(
             Text(
                 it,
                 modifier = Modifier.widthIn(max = 108.dp),
-                style = DsType.navigationSupporting.withReadingWeight(),
+                style = SyType.navigationSupporting.withReadingWeight(),
                 color = colors.textSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
