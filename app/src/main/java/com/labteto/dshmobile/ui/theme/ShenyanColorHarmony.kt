@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.theme
 
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import com.shenyan.designsystem.foundation.SyColors
 
 /**
@@ -34,11 +35,11 @@ internal fun SyHostColors.harmonizeV6(p: SyColors, preserveAccent: Boolean = fal
         labelSecondary = p.textSecondary,
         labelTertiary = p.textTertiary,
         sidebar = bar,
-        sidebarNavActive = card,
+        sidebarNavActive = if (p.text.luminance() < .5f) p.selected else card,
         sidebarNavAccent = p.selected,
-        sidebarNavHover = card,
+        sidebarNavHover = if (p.text.luminance() < .5f) p.text.copy(alpha = .04f).compositeOver(bar) else card,
         composerCard = bar,
-        userBubble = card,
+        userBubble = if (p.text.luminance() < .5f) p.selected else card,
         userBubbleHighlight = overlay,
         tipSurface = card,
     )
