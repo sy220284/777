@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.ShenyanTheme
+import com.shenyan.designsystem.foundation.ShenyanMode
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -207,4 +208,41 @@ class SyLiquidRefractionAndroidTest {
         val pixelTwo = frameTwo.toPixelMap()[frameTwo.width / 2, frameTwo.height / 2]
         assertNotEquals("Live underlay must update through the AGSL compositor", pixelOne, pixelTwo)
     }
+    @Test fun liveGlassRetainsVisibleBackgroundResponseAcrossBothThemeModes() {
+        var mode by mutableStateOf(ShenyanMode.LIGHT)
+        var source by mutableStateOf(Color.White)
+        compose.setContent {
+            ShenyanTheme(mode = mode) {
+                SyLiveGlassScene(
+                    modifier = Modifier.size(width = 220.dp, height = 130.dp),
+                    underlay = { Box(Modifier.fillMaxSize().background(source)) },
+                    glass = {
+                        SyMaterialSurface(
+                            modifier = Modifier.fillMaxSize().testTag("all-background-glass"),
+                            tier = SyMaterialTier.L2_BAR,
+                        ) {}
+                    },
+                )
+            }
+        }
+        fun sample(): Color {
+            compose.waitForIdle()
+            val img = compose.onNodeWithTag("all-background-glass").captureToImage()
+            return img.toPixelMap()[img.width / 2, img.height / 2]
+        }
+        val lightWhite = sample()
+        compose.runOnIdle { source = Color(0xFF292929) }
+        val lightBlack = sample()
+        compose.runOnIdle { source = Color(0xFFBE5034) }
+        val lightCoral = sample()
+        compose.runOnIdle { mode = ShenyanMode.MATTE }
+        val matteCoral = sample()
+        compose.runOnIdle { source = Color(0xFF26684E) }
+        val matteGreen = sample()
+        assertNotEquals("Bright/dark scenes must change live glass pixels", lightWhite, lightBlack)
+        assertNotEquals("Colored scenes must remain visible through glass", lightBlack, lightCoral)
+        assertNotEquals("Switching palettes must regenerate the optical material", lightCoral, matteCoral)
+        assertNotEquals("Dark glass must still transmit wallpaper changes", matteCoral, matteGreen)
+    }
+
 }
