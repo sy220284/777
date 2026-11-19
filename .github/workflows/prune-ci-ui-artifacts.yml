@@ -14,6 +14,7 @@ name: 777 CI 测试证据只保留最新版
       - 'tools/ci/test_prune_ui_artifacts.py'
   workflow_run:
     workflows:
+      - 'Android 能力契约回归'
       - '777 聊天与工作真实设备交互回归'
       - '777 扩展市场 Android 交互验证'
       - '本地会话存储 Android 迁移实测'

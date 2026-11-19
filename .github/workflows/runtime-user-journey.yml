@@ -1,27 +1,6 @@
 name: 777 聊天与工作真实设备交互回归
 
 'on':
-  pull_request:
-    paths:
-      - 'app/src/main/java/com/labteto/dshmobile/notify/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/notify/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/chat/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/work/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/model/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/tools/**'
-      - 'app/src/main/java/com/labteto/dshmobile/ui/screens/local/**'
-      - 'app/src/main/java/com/labteto/dshmobile/ui/screens/settings/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/local/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/settings/**'
-      - 'app/src/androidTest/java/com/shenyan/designsystem/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/audit/**'
-      - 'app/src/main/java/com/shenyan/designsystem/**'
-      - 'app/src/main/java/com/labteto/dshmobile/ui/shenyan/**'
-      - 'harness-core/src/**'
-      - 'harness-interop/src/**'
-      - 'harness-device-android/src/**'
-      - 'tools/ui/**'
-      - '.github/workflows/runtime-user-journey.yml'
   workflow_dispatch:
 
 permissions:

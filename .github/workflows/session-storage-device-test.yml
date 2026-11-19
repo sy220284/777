@@ -1,20 +1,6 @@
 name: 本地会话存储 Android 迁移实测
 
 'on':
-  pull_request:
-    paths:
-      - 'app/src/main/java/com/labteto/dshmobile/local/model/LocalRequestMessageSurface.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/LocalRequestEvidenceSurfaceMemo.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/LocalModelRequestCoordinator.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/session/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/usage/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/local/usage/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/runtime/LocalSessionStorageRuntime.kt'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/local/session/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/local/attachment/LocalPdfScopedRequestAndroidTest.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/attachment/LocalPdfRenderer.kt'
-      - 'app/src/main/java/com/labteto/dshmobile/local/model/LocalMultimodal.kt'
-      - '.github/workflows/session-storage-device-test.yml'
   workflow_dispatch:
 
 permissions:
