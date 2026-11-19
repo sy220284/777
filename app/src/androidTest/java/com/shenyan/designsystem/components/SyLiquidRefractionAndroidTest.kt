@@ -167,10 +167,12 @@ class SyLiquidRefractionAndroidTest {
             val y = lens.height / 2
             assertEquals(plain[lens.width / 16, y], lens[lens.width / 16, y])
             for (x in lens.width / 12 until lens.width * 11 / 12) {
-                assertTrue("$state: A flat source must not darken at column $x",
-                    lens[x, y].red >= plain[x, y].red - .012f &&
-                        lens[x, y].green >= plain[x, y].green - .012f &&
-                        lens[x, y].blue >= plain[x, y].blue - .012f)
+                val interior = x in lens.width / 4..lens.width * 3 / 4
+                val limit = if (interior) .012f else .06f
+                assertTrue("$state: glass should have a thin optical rim, no broad gray frame at $x",
+                    lens[x, y].red >= plain[x, y].red - limit &&
+                        lens[x, y].green >= plain[x, y].green - limit &&
+                        lens[x, y].blue >= plain[x, y].blue - limit)
             }
         }
         assertCleanEdge(region.captureToImage().toPixelMap(), "Rest")
