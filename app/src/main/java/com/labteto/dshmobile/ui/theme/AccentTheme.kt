@@ -9,7 +9,7 @@ import com.shenyan.designsystem.foundation.syInkContrastRatio
 /**
  * 777 的交互色卡。当前默认色与历史色仅为用户可选入口；页面最终配色由语义对比、背景与场景共同决定。
  *
- * 每张卡提供亮 / 暗两档强调色与对应画布/卡片色；成功、警告、错误保留稳定语义。
+ * 色卡只改变亮 / 暗操作强调色；浅色主题始终保持白色画布与黑色文字。
  */
 data class AccentPalette(
     val key: String,
@@ -18,8 +18,6 @@ data class AccentPalette(
     val darkAccent: Color,
     val onLight: Color = Color(0xFFFFFFFF),
     val onDark: Color = Color(0xFF0C1A19),
-    val lightCanvas: Color = Color(0xFFEDE6DA),
-    val lightSurface: Color = Color(0xFFF1E8DC),
     val darkCanvas: Color = Color(0xFF24211E),
     val darkSurface: Color = Color(0xFF35312D),
 )
@@ -29,30 +27,22 @@ object AccentPalettes {
     /** 流体杏为默认交互色；旧版默认 "celadon" 在 [of] 中跟随当前默认。 */
     val ALL = listOf(
         AccentPalette("fluid_apricot", "流体杏", Color(0xFFD9926B), Color(0xFFE8A87C),
-            onLight = Color(0xFF3A342D), onDark = Color(0xFF3A342D)),
+            onLight = Color.Black, onDark = Color(0xFF3A342D)),
         AccentPalette("vermilion", "朱砂墨", Color(0xFFAA4235), Color(0xFFD87460),
-            lightCanvas = Color(0xFFF4ECE3), lightSurface = Color(0xFFFCF5E9),
             darkCanvas = Color(0xFF291F1C), darkSurface = Color(0xFF372A24)),
         AccentPalette("forest", "森野", Color(0xFF276D4E), Color(0xFF8CA66B),
-            lightCanvas = Color(0xFFE8EDE5), lightSurface = Color(0xFFF3F5ED),
             darkCanvas = Color(0xFF1D2721), darkSurface = Color(0xFF2C392F)),
         AccentPalette("amber", "琥珀", Color(0xFFAA6A21), Color(0xFFE3AD57),
-            lightCanvas = Color(0xFFF4EAD9), lightSurface = Color(0xFFFFF6E7),
             darkCanvas = Color(0xFF29231B), darkSurface = Color(0xFF3B3024)),
         AccentPalette("celadon_explicit", "青瓷", Color(0xFF307B67), Color(0xFF80B7A1),
-            lightCanvas = Color(0xFFE6EFEB), lightSurface = Color(0xFFF1F7F3),
             darkCanvas = Color(0xFF1D2928), darkSurface = Color(0xFF2C3A37)),
         AccentPalette("graphite", "岩墨", Color(0xFF665E50), Color(0xFFB9A58B),
-            lightCanvas = Color(0xFFECEAE4), lightSurface = Color(0xFFF8F7F2),
             darkCanvas = Color(0xFF222323), darkSurface = Color(0xFF343432)),
         AccentPalette("rose_copper", "玫铜", Color(0xFFA94C50), Color(0xFFD99283),
-            lightCanvas = Color(0xFFF5E9E5), lightSurface = Color(0xFFFCF3EC),
             darkCanvas = Color(0xFF2B2123), darkSurface = Color(0xFF3D2E2D)),
         AccentPalette("olive", "橄榄", Color(0xFF5B7240), Color(0xFFADBD79),
-            lightCanvas = Color(0xFFEEF0E1), lightSurface = Color(0xFFF8F7EC),
             darkCanvas = Color(0xFF24291F), darkSurface = Color(0xFF363C2C)),
         AccentPalette("modern_coral", "珊瑚几何", Color(0xFFE44E34), Color(0xFFF2A44C),
-            lightCanvas = Color(0xFFF8F3E8), lightSurface = Color(0xFFFFF9EF),
             darkCanvas = Color(0xFF29231E), darkSurface = Color(0xFF3B3229)),
     )
 

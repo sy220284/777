@@ -280,8 +280,11 @@ fun AppBackgroundHost(
         canvas = surfaceBase,
         image = loaded?.image,
         veil = adaptiveGlobalVeil(state, surfaceBase),
+        // 典雅白只保留轻微环境光，避免整屏重新染回杏米色。
         glowColors = if (loaded == null && fluidGlass) listOf(
-            ambientPalette.primary, ambientPalette.mint, ambientPalette.lilac.copy(alpha = .18f),
+            if (darkTheme) ambientPalette.primary else ambientPalette.primary.copy(alpha = .16f),
+            if (darkTheme) ambientPalette.mint else ambientPalette.mint.copy(alpha = .10f),
+            ambientPalette.lilac.copy(alpha = if (darkTheme) .18f else .08f),
         ) else emptyList(),
         dark = darkTheme,
         regionColors = visibleAnalysis?.let { listOf(it.top.averageColor, it.middle.averageColor, it.bottom.averageColor) } ?: emptyList(),

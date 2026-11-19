@@ -109,7 +109,7 @@ object SyHostThemeTokens {
         warnTertiary = SyHostLight.warnTertiary,
         progressFailedStart = SyHostLight.progressFailedStart,
         progressFailedEnd = SyHostLight.progressFailedEnd,
-        toastBg = SyHostLight.toastBg, onToast = Color(0xFFFAF6EC), tooltipBg = SyHostLight.tooltipBg,
+        toastBg = SyHostLight.toastBg, onToast = Color.White, tooltipBg = SyHostLight.tooltipBg,
         userBubble = SyHostLight.userBubble, userBubbleHighlight = SyHostLight.userBubbleHighlight,
         composerCard = SyHostLight.composerCard,
         sidebar = SyHostLight.sidebar, sidebarNavActive = SyHostLight.sidebarNavActive,
@@ -289,7 +289,8 @@ internal fun resolveV6ThemePalette(
         }
     )
     val defaultAccent = palette.key == AccentPalettes.DEFAULT.key
-    val atmosphere = if (defaultAccent) canonical else canonical.withAtmosphere(
+    // 显式选色只改变浅色交互色，典雅白背景不会随色卡重新染色。
+    val atmosphere = if (!dark || defaultAccent) canonical else canonical.withAtmosphere(
         canvasTone = if (dark) palette.darkCanvas else palette.lightCanvas,
         readingSurface = if (dark) palette.darkSurface else palette.lightSurface,
     )

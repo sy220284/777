@@ -85,15 +85,15 @@ fun syReadableInk(accent: Color, background: Color, minimumRatio: Float = 4.5f):
 }
 
 private val Light = SyColors(
-    canvas = Color(0xFFEDE6DA), topBar = Color(0xFFF6F1E9),
-    // All material tiers share the warm canvas hue; increasing opacity, not whiteness, adds depth.
-    materialL1 = Color(0x4DEDE6DA), materialL2 = Color(0x75F1E8DC),
-    materialL3 = Color(0xA3F1E8DC), materialL4 = Color(0xE0F1E8DC),
-    materialL5 = Color(0xFFF1E8DC), materialSheen = Color(0x66F6F0E6),
-    surface = Color(0xA3F1E8DC), surfaceRaised = Color(0x75F1E8DC), surfaceSolid = Color(0xFFF1E8DC),
-    border = Color(0x66D3C5B5), text = Color(0xFF3A342D),
-    textSecondary = Color(0xFF6A6156), textTertiary = Color(0xFF70665A),
-    selected = Color(0xFFF2C7A8), overlay = Color(0x335A4837)
+    // 典雅白：亮白画布、白色卡片与黑色文字，通过细描边区分层次。
+    canvas = Color(0xFFFCFCFB), topBar = Color.White,
+    materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0xC2FFFFFF),
+    materialL3 = Color(0xE6FFFFFF), materialL4 = Color(0xF7FFFFFF),
+    materialL5 = Color.White, materialSheen = Color(0xB3FFFFFF),
+    surface = Color(0xE6FFFFFF), surfaceRaised = Color(0xC2FFFFFF), surfaceSolid = Color.White,
+    border = Color(0x38777777), text = Color.Black,
+    textSecondary = Color(0xFF353535), textTertiary = Color(0xFF595959),
+    onPrimary = Color.Black, selected = Color(0xFFF9EDE5), overlay = Color(0x33000000)
 )
 private val Dark = SyColors(
     canvas = Color(0xFF24211E), topBar = Color(0xFF292521),
