@@ -65,6 +65,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.uicontract.UiMcpServerSnapshot as McpServerSnapshot
 import com.labteto.dshmobile.uicontract.ToolsManagementUiPort
@@ -1743,12 +1745,11 @@ private fun ToolCapabilityRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
-    Surface(
+    SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
-        onClick = { onClick?.invoke() },
-        enabled = onClick != null,
+        onClick = onClick,
+        tier = SyMaterialTier.L2_BAR,
         shape = SyShapes.row,
-        color = colors.materialL2,
     ) {
         Row(
             modifier = Modifier
