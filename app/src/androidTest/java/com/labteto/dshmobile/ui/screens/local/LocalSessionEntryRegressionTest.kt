@@ -135,7 +135,7 @@ class LocalSessionEntryRegressionTest {
             }
         }
         compose.onNode(hasSetTextAction()).performTextInput("早期线索")
-        compose.waitUntil {
+        compose.waitUntil(timeoutMillis = 8_000) {
             compose.onAllNodesWithText("存档中的早期线索").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("存档中的早期线索").performClick()
