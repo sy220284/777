@@ -70,6 +70,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyCheckboxControl
 import com.shenyan.designsystem.components.SyEmptyState
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.components.SyLoadingState
 import com.labteto.dshmobile.ui.shenyan.SySearchField
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
@@ -1870,13 +1872,12 @@ private fun LocalDirectoryRow(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val dark = colors.canvas.luminance() < 0.5f
-    Surface(
+    SyMaterialSurface(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = SyMetric.gapLg),
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
+        tier = SyMaterialTier.L2_BAR,
         shape = SyShapes.row,
-        color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Row(
             modifier = Modifier
@@ -1937,17 +1938,17 @@ private fun LocalFileRow(
     val fileName = file.path.substringAfterLast('/')
     val dark = colors.canvas.luminance() < 0.5f
     val fileIconRes = workspaceFileIcon(fileName, dark)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = SyMetric.gapLg)
+    SyMaterialSurface(
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
             .combinedClickable(
                 onClick = { if (selecting) controls?.toggle?.invoke(file.path) else onClick() },
                 onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
             ),
+        tier = SyMaterialTier.L2_BAR,
         shape = SyShapes.row,
-        color = if (selected) colors.selected.copy(alpha = .20f)
-            else androidx.compose.ui.graphics.Color.Transparent,
+        tint = if (selected) colors.selected.copy(alpha = .28f)
+            else androidx.compose.ui.graphics.Color.Unspecified,
     ) {
         Row(
             modifier = Modifier
@@ -1978,7 +1979,7 @@ private fun LocalFileRow(
                     else formatBytes(file.bytes),
                     style = SyType.caption11.withReadingWeight(),
                     color = colors.textTertiary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
