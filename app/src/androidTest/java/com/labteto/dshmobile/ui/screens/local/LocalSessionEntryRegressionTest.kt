@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -109,7 +110,8 @@ class LocalSessionEntryRegressionTest {
             }
         }
         compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
-        captureUiAudit(compose, "conversation-header-action-sheet")
+        compose.onNodeWithTag("sy-action:search").assertIsDisplayed()
+        captureUiAudit(compose, "conversation-header-action-sheet", "sy-modal-sheet-surface")
         val search = compose.onNodeWithTag("sy-action:search").getUnclippedBoundsInRoot()
         val evidence = compose.onNodeWithTag("sy-action:evidence").getUnclippedBoundsInRoot()
         val documents = compose.onNodeWithTag("sy-action:documents").getUnclippedBoundsInRoot()

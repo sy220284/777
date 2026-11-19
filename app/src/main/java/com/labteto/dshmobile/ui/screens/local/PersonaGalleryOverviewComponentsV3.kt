@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +43,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
@@ -58,6 +63,8 @@ import com.shenyan.designsystem.components.SyCheckboxControl
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
+import com.labteto.dshmobile.ui.shenyan.SyMenuItem
+import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.rememberHapticPulse
@@ -261,23 +268,29 @@ internal fun PersonaGalleryAddPanel(
                 )
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-        ) {
-            SyButton(
-                text = stringResource(R.string.local_persona_picker_new),
-                onClick = onCreate,
-                modifier = Modifier.weight(1f),
-                enabled = !busy,
-            )
-            SyButton(
-                text = stringResource(R.string.persona_gallery_import_file),
-                onClick = onImport,
-                modifier = Modifier.weight(1f),
-                enabled = !busy,
-                variant = SyButtonVariant.Outline,
-            )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val create = stringResource(R.string.local_persona_picker_new)
+            val importLabel = stringResource(R.string.persona_gallery_import_file)
+            val measurer = rememberTextMeasurer()
+            val style = SyType.std14Strong.withReadingWeight()
+            val density = LocalDensity.current
+            val widest = with(density) {
+                maxOf(measurer.measure(create, style, softWrap = false).size.width,
+                    measurer.measure(importLabel, style, softWrap = false).size.width).toDp()
+            }
+            if (maxWidth < (widest + SyMetric.gapLg * 2) * 2 + SyMetric.gapMd) {
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                    SyButton(create, onCreate, Modifier.fillMaxWidth(), enabled = !busy)
+                    SyButton(importLabel, onImport, Modifier.fillMaxWidth(), enabled = !busy,
+                        variant = SyButtonVariant.Outline)
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                    SyButton(create, onCreate, Modifier.weight(1f), enabled = !busy)
+                    SyButton(importLabel, onImport, Modifier.weight(1f), enabled = !busy,
+                        variant = SyButtonVariant.Outline)
+                }
+            }
         }
         if (presets.isNotEmpty()) {
             PersonaGallerySectionLabel(stringResource(R.string.persona_gallery_presets_title))
@@ -286,59 +299,109 @@ internal fun PersonaGalleryAddPanel(
                 verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
                 items(presets, key = PersonaPreset::id) { preset ->
-                    val installed = preset.id in installedPresetIds
-                    SyFlatSurface(
-                        shape = SyShapes.row,
-                        color = Color.Transparent,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                        ) {
-                            LocalPersonaHeaderAvatar(
-                                name = preset.persona.name,
-                                portraitPath = "",
-                                presetAssetPath = preset.artwork?.assetPath,
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    preset.persona.name,
-                                    style = SyType.std14Strong.withReadingWeight().copy(fontFamily = SyType.contentFont),
-                                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    preset.franchise + " · " + preset.summary,
-                                    style = SyType.caption11.withReadingWeight().copy(fontFamily = SyType.contentFont),
-                                    color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            SyButton(
-                                text = stringResource(
-                                    if (installed) R.string.persona_gallery_preset_taken
-                                    else R.string.persona_gallery_preset_add,
-                                ),
-                                onClick = {
-                                    if (!installed) onInstallPreset(preset.id)
-                                },
-                                enabled = !busy && !installed,
-                                variant = SyButtonVariant.Ghost,
-                                size = SyButtonSize.Small,
-                            )
-                            SyIconButton(
-                                icon = FeatherIcons.X,
-                                contentDescription = stringResource(R.string.persona_gallery_preset_hide),
-                                onClick = { onRequestHidePreset(preset.id) },
-                                enabled = !busy,
-                            )
-                        }
-                    }
+                    PersonaPresetRow(
+                        preset = preset,
+                        installed = preset.id in installedPresetIds,
+                        busy = busy,
+                        onInstall = { onInstallPreset(preset.id) },
+                        onHide = { onRequestHidePreset(preset.id) },
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonaPresetRow(
+    preset: PersonaPreset,
+    installed: Boolean,
+    busy: Boolean,
+    onInstall: () -> Unit,
+    onHide: () -> Unit,
+) {
+    val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val nameStyle = SyType.std14Strong.withReadingWeight().copy(fontFamily = SyType.contentFont)
+    val addLabel = stringResource(if (installed) R.string.persona_gallery_preset_taken
+        else R.string.persona_gallery_preset_add)
+    var menuOpen by remember { mutableStateOf(false) }
+    val triggerFocus = remember { FocusRequester() }
+
+    // The identity always owns the readable row width. Actions have their own line;
+    // shrinking or enlarging text can no longer squeeze the persona name.
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(
+            horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm,
+        ),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        ) {
+            LocalPersonaHeaderAvatar(
+                name = preset.persona.name, portraitPath = "",
+                presetAssetPath = preset.artwork?.assetPath,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+            ) {
+                Text(
+                    text = preset.persona.name,
+                    modifier = Modifier.fillMaxWidth().testTag("persona-preset-name:" + preset.id),
+                    color = colors.text,
+                    style = nameStyle,
+                    softWrap = true,
+                )
+                Text(
+                    text = preset.franchise + " · " + preset.summary,
+                    color = colors.textTertiary,
+                    style = SyType.caption11.withReadingWeight().copy(fontFamily = SyType.contentFont),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.End),
+        ) {
+            if (installed) {
+                Text(
+                    addLabel,
+                    style = SyType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+            } else {
+                SyButton(
+                    addLabel, onInstall,
+                    enabled = !busy,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                )
+            }
+            Box {
+                SyIconButton(
+                    FeatherIcons.MoreVertical,
+                    contentDescription = stringResource(R.string.persona_gallery_preset_more, preset.persona.name),
+                    onClick = { menuOpen = true },
+                    enabled = !busy,
+                    modifier = Modifier.focusRequester(triggerFocus),
+                )
+                SyPopupMenu(
+                    expanded = menuOpen,
+                    onDismiss = {
+                        menuOpen = false
+                        triggerFocus.requestFocus()
+                    },
+                    items = listOf(SyMenuItem(
+                        text = stringResource(R.string.persona_gallery_preset_hide),
+                        onClick = onHide,
+                    )),
+                )
             }
         }
     }

@@ -51,6 +51,8 @@ import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyTopBar
 import com.shenyan.designsystem.components.SySwitchControl
+import com.labteto.dshmobile.ui.components.SyEntryIcons
+import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.rootSurface
@@ -319,31 +321,23 @@ internal fun PluginInventoryBrowser(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
-                SyButton(
-                    text = stringResource(R.string.capability_add_action),
-                    icon = FeatherIcons.Plus,
-                    onClick = { showMarketActions = true },
-                    modifier = Modifier.weight(1f).testTag("plugin-inventory-more"),
-                    variant = SyButtonVariant.Primary,
+                SySegmented(
+                    segments = listOf(
+                        SySegment("added", stringResource(R.string.extension_added)),
+                        SySegment("discover", stringResource(R.string.extension_discover)),
+                    ),
+                    selectedKey = if (addedOnly) "added" else "discover",
+                    onSelect = { addedOnly = it == "added" },
+                    modifier = Modifier.weight(1f).testTag("plugin-ownership-tabs"),
+                    stretch = true,
                 )
-                SyButton(
-                    text = stringResource(R.string.capability_settings_action),
+                SyIconButton(
+                    icon = SyEntryIcons.Settings,
+                    contentDescription = stringResource(R.string.capability_settings_action),
                     onClick = onOpenSettings,
-                    variant = SyButtonVariant.Ghost,
-                    modifier = Modifier.weight(1f).testTag("capability-settings-entry"),
+                    modifier = Modifier.testTag("capability-settings-entry"),
                 )
             }
-            SySegmented(
-                segments = listOf(
-                    SySegment("added", stringResource(R.string.extension_added)),
-                    SySegment("discover", stringResource(R.string.extension_discover)),
-                ),
-                selectedKey = if (addedOnly) "added" else "discover",
-                onSelect = { addedOnly = it == "added" },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection)
-                    .testTag("plugin-ownership-tabs"),
-                stretch = true,
-            )
             SyTextField(
                 value = catalogueQuery,
                 onValueChange = { catalogueQuery = it.take(128) },
@@ -367,6 +361,15 @@ internal fun PluginInventoryBrowser(
                 modifier = Modifier.padding(horizontal = SyMetric.gapSection)
                     .testTag(if (kindFilter == null) "capability-filter-skills" else "capability-clear-kind-filter"),
             )
+            if (!addedOnly) {
+                SyButton(
+                    text = stringResource(R.string.capability_add_action),
+                    icon = FeatherIcons.Plus,
+                    onClick = { showMarketActions = true },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection)
+                        .testTag("plugin-inventory-more"),
+                )
+            }
             if (loading && visible.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.common_loading),
