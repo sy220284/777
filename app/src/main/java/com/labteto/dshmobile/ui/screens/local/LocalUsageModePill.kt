@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import com.shenyan.designsystem.components.SyFlatSurface
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,9 +47,6 @@ internal fun localHarnessModeSwitchEnabled(
 
 /** Resolve track and thumb from the active palette and a sampled wallpaper hue. */
 internal fun drawerModeSurfaceColors(colors: SyColors, wallpaperTone: Color?): Pair<Color, Color> {
-    if (colors.materialL3.alpha >= .999f) {
-        return colors.materialL1 to colors.materialL4
-    }
     val neutral = lerp(colors.canvas, colors.selected, .42f)
     val track = wallpaperTone?.let { lerp(neutral, it, .22f) } ?: neutral
     return track to lerp(track, colors.materialL5, .62f)
@@ -65,13 +64,14 @@ internal fun LocalUsageModePill(
         colors, scene?.takeIf { it.image != null }?.regionColors?.firstOrNull(),
     )
     val pulse = com.labteto.dshmobile.ui.components.rememberHapticPulse()
-    SyFlatSurface(
+    SyMaterialSurface(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 216.dp)
             .heightIn(min = SyMetric.touch),
+        tier = SyMaterialTier.L2_BAR,
         shape = SyShapes.row,
-        color = track,
+        tint = track.copy(alpha = .14f),
     ) {
         BoxWithConstraints(Modifier.padding(3.dp)) {
             val segmentWidth = maxWidth / 2
