@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
 
@@ -149,17 +149,17 @@ internal fun LocalGitDiffPreview(patch: String) {
     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
         Text("变更文件 · ${summary.files.size}" +
             if (summary.omittedFiles > 0) "（还有 ${summary.omittedFiles} 个未展示）" else "",
-            style = DsType.small13Strong, color = colors.textSecondary)
+            style = SyType.small13Strong, color = colors.textSecondary)
         summary.files.forEachIndexed { index, file ->
             Column(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(file.path, style = DsType.small13Strong, color = colors.text,
+                    Text(file.path, style = SyType.small13Strong, color = colors.text,
                         modifier = Modifier.weight(1f))
                     Text("+${file.added}  −${file.removed}",
-                        style = DsType.caption11, color = colors.textSecondary)
+                        style = SyType.caption11, color = colors.textSecondary)
                 }
                 val visibleCount = if (index in expanded) 120 else 20
                 SelectionContainer {
@@ -171,7 +171,7 @@ internal fun LocalGitDiffPreview(patch: String) {
                                 GitDiffLineKind.HUNK -> colors.textSecondary
                                 else -> colors.text
                             }
-                            Text(line.content, color = tint, style = DsType.caption11,
+                            Text(line.content, color = tint, style = SyType.caption11,
                                 fontFamily = FontFamily.Monospace, softWrap = false)
                         }
                     }
@@ -190,7 +190,7 @@ internal fun LocalGitDiffPreview(patch: String) {
         }
         if (summary.omittedLines > 0 || summary.files.any { it.lines.size > 120 }) {
             Text("预览按文件与行数限制展示，完整内容请使用“复制差异内容”。",
-                style = DsType.caption11, color = colors.textSecondary)
+                style = SyType.caption11, color = colors.textSecondary)
         }
     }
 }
