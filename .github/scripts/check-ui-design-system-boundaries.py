@@ -178,6 +178,33 @@ for path in UI.rglob("*.kt"):
     if re.search(r"\bDsSpacing\b", source):
         violations.append(f"{relative}: retired DsSpacing token; use canonical SyMetric")
 
+# The atlas is only complete when a real feature uses each interaction owner.
+# This is a regression gate against a green component demo with unchanged app screens.
+REQUIRED_ATLAS_FEATURES = {
+    "screens/local/LocalConversationActionsMenu.kt": ("SyActionSheet",),
+    "screens/local/GroupChatMemberPicker.kt": ("SyMultiSelectSheet",),
+    "screens/local/FirstLaunchOnboarding.kt": ("SyOnboardingCarousel",),
+    "screens/local/LocalWorkCapabilitySheet.kt": ("SyCoachMark",),
+    "screens/local/LocalGeneratedMediaMessage.kt": ("SyMediaTransport", "SyMiniPlayer"),
+    "screens/tasks/TaskCardComponents.kt": ("SySwipeActionRow",),
+    "shenyan/SyConversation.kt": ("SyChatComposer",),
+}
+REQUIRED_MATERIAL_FEATURES = {
+    "screens/tools/ExtensionCatalogCard.kt": ("SyMaterialSurface",),
+    "screens/local/LocalWorkspaceFilesDialog.kt": ("SyMaterialSurface",),
+    "screens/local/PersonaGalleryComponents.kt": ("SyMaterialFrame", "SyMaterialSurface"),
+    "screens/settings/SettingsScreen.kt": ("SyMaterialFrame",),
+}
+for relative, components in {**REQUIRED_ATLAS_FEATURES, **REQUIRED_MATERIAL_FEATURES}.items():
+    source_path = UI / relative
+    if not source_path.is_file():
+        violations.append(f"{relative}: missing real feature owner")
+        continue
+    actual_code = mask_non_code(source_path.read_text(encoding="utf-8"))
+    for component in components:
+        if not re.search(r"\\b" + re.escape(component) + r"\\s*\\(", actual_code):
+            violations.append(f"{relative}: shared component {component} is no longer in production")
+
 # Debug previews must follow the same spacing tokens as production Compose UI.
 for path in (ROOT / "app/src/debug/java").rglob("*.kt"):
     source = mask_non_code(path.read_text(encoding="utf-8"))
