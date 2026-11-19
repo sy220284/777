@@ -41,6 +41,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -512,9 +516,12 @@ fun SySwipeActionRow(
     actionLabel: String,
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
+    destructive: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val p = LocalSyColors.current
+    val haptic = LocalHapticFeedback.current
+    var confirmAction by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val travel = with(density) { 104.dp.toPx() }
     var open by rememberSaveable { mutableStateOf(false) }
@@ -526,18 +533,28 @@ fun SySwipeActionRow(
             LocalSyMotionTempo.current), easing = SyMotion.ease),
         label = "sySwipeSettle")
     val actual = if (dragging) drag else settled
+    LaunchedEffect(open) {
+        if (open) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
     Box(modifier.fillMaxWidth().clip(RoundedCornerShape(SyMetric.radiusControl))
         .semantics {
             stateDescription = if (open) "操作已展开" else "左滑展开操作"
+            customActions = listOf(CustomAccessibilityAction("展开" + actionLabel) {
+                open = true
+                true
+            })
         }) {
         if (open || dragging) {
-            Surface(onClick = { onAction(); open = false },
+            Surface(onClick = {
+                    if (destructive) confirmAction = true
+                    else { onAction(); open = false }
+                },
                 modifier = Modifier.align(Alignment.CenterEnd).width(104.dp)
                     .heightIn(min = SyMetric.touch),
-                color = p.selected) {
+                color = if (destructive) p.danger.copy(alpha = .14f) else p.selected) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(actionLabel, style = MaterialTheme.typography.labelMedium,
-                        color = p.text)
+                        color = if (destructive) p.dangerInk else p.text)
                 }
             }
         }
@@ -557,6 +574,11 @@ fun SySwipeActionRow(
             .background(p.materialL3, RoundedCornerShape(SyMetric.radiusControl))) {
             content()
         }
+    }
+    if (confirmAction) {
+        SyConfirmDialog("确认" + actionLabel, "执行后可能无法恢复。", dangerous = true,
+            onConfirm = { confirmAction = false; onAction(); open = false },
+            onDismiss = { confirmAction = false })
     }
 }
 
@@ -623,7 +645,15 @@ fun SyProgressRing(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (amount == null) {
+        if (amount == null && LocalSyReduceMotion.current) {
+            CircularProgressIndicator(
+                progress = { .25f },
+                modifier = Modifier.size(30.dp),
+                color = palette.primary,
+                trackColor = palette.textTertiary.copy(alpha = .2f),
+                strokeWidth = 3.dp,
+            )
+        } else if (amount == null) {
             CircularProgressIndicator(
                 modifier = Modifier.size(30.dp),
                 color = palette.primary,
