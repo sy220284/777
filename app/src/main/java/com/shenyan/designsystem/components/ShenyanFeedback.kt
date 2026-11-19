@@ -99,13 +99,7 @@ fun SyIconButton(
     val entryTone = if (!bare && iconPainter == null) syEntryTileTone(icon?.name.orEmpty()) else null
     val tile = entryTone?.let { if (p.text.luminance() > .5f) p.materialL4 else it }
     val foreground = if (selected) p.text else tint ?: if (tile != null) p.text else p.textSecondary
-    Surface(
-        onClick = onClick, enabled = enabled, modifier = modifier.size(SyMetric.touch),
-        interactionSource = interaction, color = fill,
-        shadowElevation = if (bare) 0.dp else shadowElevation,
-        border = if (focused && enabled) androidx.compose.foundation.BorderStroke(1.dp, p.linkInk) else null,
-        shape = if (tile != null) RoundedCornerShape(12.dp) else CircleShape,
-    ) {
+    val glyph: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(
                 modifier = if (tile != null) Modifier.requiredSize(32.dp)
@@ -125,6 +119,30 @@ fun SyIconButton(
                 }
             }
         }
+    }
+    val shape = if (tile != null) RoundedCornerShape(12.dp) else CircleShape
+    val focusBorder = if (focused && enabled) BorderStroke(1.dp, p.linkInk) else null
+    // Header navigation keeps its intentionally bare hit target. Neutral icon controls
+    // inherit the same adaptive optical surface as all other interactive glass.
+    if (!bare && (selected || containerColor.alpha < .999f)) {
+        SyMaterialSurface(
+            onClick = onClick, enabled = enabled,
+            modifier = modifier.size(SyMetric.touch),
+            interactionSource = interaction,
+            tier = SyMaterialTier.L3_CARD,
+            tint = if (fill.alpha > 0f) fill.copy(alpha = fill.alpha * .14f) else Color.Unspecified,
+            border = focusBorder,
+            shape = shape,
+            contentColor = foreground,
+        ) { glyph() }
+    } else {
+        Surface(
+            onClick = onClick, enabled = enabled, modifier = modifier.size(SyMetric.touch),
+            interactionSource = interaction, color = fill,
+            shadowElevation = if (bare) 0.dp else shadowElevation,
+            border = focusBorder,
+            shape = shape,
+        ) { glyph() }
     }
 }
 
