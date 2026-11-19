@@ -27,7 +27,7 @@ class ManagedProcessOutputTest {
         val script = command[3]
         assertTrue(script.startsWith("printf '%s\\n'"))
         assertTrue(script.indexOf("printf") < script.indexOf("export LD_LIBRARY_PATH"))
-        assertTrue(script.endsWith("exec \"\\$@\""))
+        assertTrue(script.endsWith("exec " + '"' + '$' + "@\""))
         for (key in listOf("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")) {
             assertFalse("$key must not affect the platform setsid/sh linker",
                 builder.environment().containsKey(key))
