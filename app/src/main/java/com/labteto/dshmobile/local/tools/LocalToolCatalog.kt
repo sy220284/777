@@ -49,7 +49,7 @@ object LocalToolCatalog {
             "offset" to integerRange("必须等于上次返回的 next_byte，首次 0", min = 0),
             "finish" to boolean("是否提交完整文件，默认 false"),
         ), listOf("path", "offset")))
-        add(tool("edit", "按唯一原文字面量精确替换。掌握最新的唯一 old_text 时直接编辑；需要确认原文时用 read 读取相关行", properties(
+        add(tool("edit", "按唯一原文字面量精确替换。掌握最新的唯一 old_text 时直接编辑。文件版本变化或需要确认原文时，用 read 读取相关行", properties(
             "path" to string("相对工作区的路径"),
             "old_text" to string("文件中仅出现一次的完整原文，包含匹配所需的缩进和上下文"),
             "new_text" to string("替换后的文字"),

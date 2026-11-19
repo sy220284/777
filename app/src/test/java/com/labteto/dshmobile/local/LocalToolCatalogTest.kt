@@ -2,6 +2,7 @@ package com.labteto.dshmobile.local
 
 import com.labteto.dshmobile.local.tools.LocalToolCatalog
 import com.labteto.dshmobile.local.model.WORK_TOOL_RECOVERY_PAGE_BYTES
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -12,16 +13,19 @@ import org.junit.Test
 
 class LocalToolCatalogTest {
     @Test
-    fun modelIsToldExactEditMaySkipRedundantReadAndMustRejectStaleContent() {
+    fun exactEditGuidanceUsesUniqueTextAndRefreshesChangedFiles() {
         val descriptor = LocalToolCatalog.specs.single {
             it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content == "edit"
         }.jsonObject["function"]!!.jsonObject
         val help = descriptor["description"]!!.jsonPrimitive.content
-        assertTrue(help.contains("无需先调用 read"))
-        assertTrue(help.contains("原文仅出现一次"))
-        assertTrue(help.contains("版本过期"))
+        val parameters = descriptor.getValue("parameters").jsonObject
+        val oldText = parameters.getValue("properties").jsonObject.getValue("old_text").jsonObject
+        assertTrue(help.contains("掌握最新的唯一 old_text 时直接编辑"))
+        assertTrue(help.contains("文件版本变化"))
+        assertTrue(help.contains("用 read 读取相关行"))
+        assertTrue(oldText.getValue("description").jsonPrimitive.content.contains("仅出现一次"))
         assertEquals(listOf("path", "old_text", "new_text"),
-            descriptor["parameters"]!!.jsonObject["required"]!!.jsonArray.map { it.jsonPrimitive.content })
+            parameters.getValue("required").jsonArray.map { it.jsonPrimitive.content })
     }
 
     @Test
@@ -32,10 +36,11 @@ class LocalToolCatalogTest {
         val description = gateway.getValue("description").jsonPrimitive.content
         val params = gateway.getValue("parameters").jsonObject
         val properties = params.getValue("properties").jsonObject
-        assertTrue(description.contains("arguments.command"))
-        assertTrue(description.contains("\"name\":\"bash\""))
+        val example = Json.parseToJsonElement(description.substringAfter("时传 ").removeSuffix("。")).jsonObject
+        assertEquals("bash", example.getValue("name").jsonPrimitive.content)
+        assertEquals("pwd", example.getValue("arguments").jsonObject.getValue("command").jsonPrimitive.content)
         assertTrue(properties.getValue("arguments").jsonObject
-            .getValue("description").jsonPrimitive.content.contains("\"command\""))
+            .getValue("description").jsonPrimitive.content.contains("schema.function.parameters"))
         assertEquals(listOf("name", "arguments"),
             params.getValue("required").jsonArray.map { it.jsonPrimitive.content })
     }
@@ -206,7 +211,7 @@ class LocalToolCatalogTest {
         assertTrue(byName.getValue("tool_call").jsonObject["function"]!!
             .jsonObject.getValue("description").jsonPrimitive.content.contains("直接调用"))
         assertTrue(byName.getValue("tool_search").jsonObject["function"]!!
-            .jsonObject.getValue("description").jsonPrimitive.content.contains("不加载"))
+            .jsonObject.getValue("description").jsonPrimitive.content.contains("按名称查参数定义"))
     }
 
     @Test

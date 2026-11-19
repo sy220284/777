@@ -50,7 +50,7 @@ class LocalWorkToolArgumentsRepairTest {
         assertEquals(1, original.size)
         val repair = seen.last().last().getValue("content").jsonPrimitive.content
         assertTrue(repair.contains("工具尚未执行"))
-        assertTrue(repair.contains("不要重复"))
+        assertTrue(repair.contains("沿用已有工具回执，从尚未执行的动作继续"))
     }
 
     @Test fun actualMiniMaxToolJsonErrorFeedsSpecificCauseBackToTheModel() = runTest {

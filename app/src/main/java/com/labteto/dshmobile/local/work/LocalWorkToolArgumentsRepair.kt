@@ -61,7 +61,7 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
                 if (safeTool == "tool_call" || safeTool?.startsWith("tool_call/") == true) {
                     append("需要核对目标工具参数时，用 tool_search 查询目标工具名，再按返回的参数定义填写 arguments。")
                 }
-                append("沿用已有工具回执，从本轮需要执行的动作继续。")
+                append("沿用已有工具回执，从尚未执行的动作继续。")
             }
             messages = originalMessages + buildJsonObject {
                 put("role", "user")
