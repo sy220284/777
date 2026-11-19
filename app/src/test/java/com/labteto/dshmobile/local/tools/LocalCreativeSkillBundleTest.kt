@@ -116,4 +116,65 @@ class LocalCreativeSkillBundleTest {
             assertEquals(4, reads.values.sum())
         } finally { root.deleteRecursively() }
     }
+
+    @Test fun chineseNamesSummariesAndGuidesAreVisibleToTheModelAndSkillCenter() {
+        val root = Files.createTempDirectory("creative-skills-chinese").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            val store = LocalSkillStore(workspace, creativeBundleFiles = ::bundle)
+            store.seedOnce()
+            for (preset in LocalCreativeSkillCatalog.entries) {
+                val registered = store.installed().single { it.name == preset.id }
+                assertEquals(preset.title, registered.displayName)
+                assertTrue(registered.description.startsWith("适用范围："))
+                assertTrue(registered.description.contains("使用方式："))
+                val source = workspace.readModelSkill(preset.id)
+                assertTrue(source.contains("display-name: \"${preset.title}\""))
+                assertTrue(source.contains("## 中文使用指南"))
+                assertTrue(source.contains("**适用范围：**"))
+                assertTrue(source.contains("**使用方式：**"))
+                assertTrue(source.contains("**使用边界：**"))
+                assertTrue(workspace.modelSkillCatalog(limit = 100).contains(preset.id))
+            }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun updatingOnlyChineseGuideDoesNotReloadAssetsOrOverrideUserSettings() {
+        val root = Files.createTempDirectory("creative-skills-guide-upgrade").toFile()
+        try {
+            val workspace = LocalWorkspace(root)
+            val reads = mutableMapOf<String, Int>()
+            fun load(id: String): Map<String, ByteArray> {
+                reads[id] = reads.getOrDefault(id, 0) + 1
+                return bundle(id)
+            }
+            val store = LocalSkillStore(workspace, creativeBundleFiles = ::load)
+            store.seedOnce()
+            assertEquals(4, reads.values.sum())
+
+            val preset = LocalCreativeSkillCatalog.entries.first { it.id == "finesse-ui" }
+            val modified = preset.copy(
+                title = "界面视觉与交互设计（升级）",
+                description = "适用范围：界面设计与审查。使用方式：提供目标页面与需求。",
+                instructions = preset.instructions + "\n新增中文指南条目。",
+            )
+            val original = File(root, ".dsh/skills/finesse-ui/UPSTREAM-SKILL.md").readBytes()
+            store.setModelInvocable(preset.id, false)
+            LocalCreativeSkillBundle(workspace, ::load).refresh(modified)
+            assertEquals(4, reads.values.sum())
+            assertEquals(modified.title, store.installed().single { it.name == preset.id }.displayName)
+            assertTrue(store.readDocument(preset.id).contains("新增中文指南条目"))
+            assertFalse(workspace.skillMetadata(preset.id).modelInvocable)
+            assertArrayEquals(original, File(root, ".dsh/skills/finesse-ui/UPSTREAM-SKILL.md").readBytes())
+            LocalCreativeSkillBundle(workspace, ::load).refresh(modified)
+            assertEquals(4, reads.values.sum())
+
+            store.setModelInvocable(preset.id, true)
+            store.updateDocument(preset.id, store.readDocument(preset.id) + "\n用户自己的说明\n")
+            val next = modified.copy(title = "又一版名称")
+            LocalCreativeSkillBundle(workspace, ::load).refresh(next)
+            assertTrue(store.readDocument(preset.id).contains("用户自己的说明"))
+            assertEquals(modified.title, store.installed().single { it.name == preset.id }.displayName)
+        } finally { root.deleteRecursively() }
+    }
 }

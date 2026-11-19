@@ -1,5 +1,8 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import com.shenyan.designsystem.foundation.SyMetric
 
 import androidx.compose.animation.AnimatedVisibility
@@ -53,6 +56,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.ui.components.rememberHapticPulse
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalGroupChatMember
@@ -124,7 +128,7 @@ internal fun LocalConversationComposer(
     onSend: (String, List<LocalImportedAttachment>) -> LocalSendResult,
     onSendTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult = onSend,
     teamDispatchSelected: Boolean = false,
-    onClearTeamDispatch: () -> Unit = {},
+    onTeamDispatchChange: (Boolean) -> Unit = {},
     onStop: () -> Unit,
     reasoningMode: LocalReasoningUiMode = LocalReasoningUiMode.DEFAULT,
     onReasoningModeChange: (LocalReasoningUiMode) -> Unit = {},
@@ -253,7 +257,7 @@ internal fun LocalConversationComposer(
         groupRequestedSpeakerId = null
         capabilityPanel = null
         steerCurrentRun = false
-        onClearTeamDispatch()
+        onTeamDispatchChange(false)
         onInputChange("")
         onClearAttachments()
         focusManager.clearFocus(force = true)
@@ -365,32 +369,6 @@ internal fun LocalConversationComposer(
                     groupRequestedSpeakerId = member?.galleryId
                     groupSpeakerPickerOpen = false
                 }
-            }
-        }
-        if (state.usageMode == LocalUsageMode.WORK && teamDispatchSelected) {
-            // A compact icon-only indicator keeps team dispatch reversible without
-            // repeating its name or squeezing the adjacent text into vertical glyphs.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-            ) {
-                Text(stringResource(R.string.local_team_selected_hint),
-                    modifier = Modifier.weight(1f), style = SyType.small13.withReadingWeight(),
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, color = colors.textSecondary)
-                Icon(
-                    painter = painterResource(R.drawable.ic_ui_create_subagent),
-                    contentDescription = null,
-                    tint = colors.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                SyIconButton(
-                    icon = FeatherIcons.X,
-                    contentDescription = stringResource(R.string.local_team_mode_clear),
-                    onClick = onClearTeamDispatch,
-                    iconSize = 16.dp,
-                    tint = colors.textSecondary,
-                )
             }
         }
         if (state.usageMode == LocalUsageMode.WORK && state.planMode) {
@@ -513,12 +491,31 @@ internal fun LocalConversationComposer(
                     onFocusChanged(it)
                 },
             )
-            composerTransition.AnimatedVisibility(
-                visible = { !it },
-                enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
-                exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
-            ) {
-                PrimaryActionControl()
+            if (state.usageMode == LocalUsageMode.WORK) {
+                val modeLabel = stringResource(
+                    if (teamDispatchSelected) R.string.local_team_selected_hint else R.string.local_team_mode_single,
+                )
+                val pulse = rememberHapticPulse()
+                SyButton(
+                    text = stringResource(R.string.local_team_mode_short),
+                    icon = if (teamDispatchSelected) FeatherIcons.Check else FeatherIcons.Users,
+                    onClick = { pulse(); onTeamDispatchChange(!teamDispatchSelected) },
+                    enabled = !state.running,
+                    variant = if (teamDispatchSelected) SyButtonVariant.Outline else SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                    modifier = Modifier.testTag("composer-team-toggle").semantics {
+                        selected = teamDispatchSelected
+                        stateDescription = modeLabel
+                    },
+                )
+            } else {
+                composerTransition.AnimatedVisibility(
+                    visible = { !it },
+                    enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
+                    exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
+                ) {
+                    PrimaryActionControl()
+                }
             }
         }
 

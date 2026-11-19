@@ -31,30 +31,48 @@ internal class LocalCreativeSkillBundle(
         File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
             .writeText(fingerprint(document) + "\n")
         versionMarker(preset.id).writeText(LocalCreativeSkillCatalog.bundleRevisions.getValue(preset.id) + "\n")
+        guideMarker(preset.id).writeText(guideFingerprint(preset) + "\n")
     }
 
     fun refresh(preset: LocalPresetSkill) {
         val baseline = File(skillsDir, "${preset.id}/.bundled-baseline-sha256")
-        // A colliding user-imported skill without a bundled fingerprint is user-owned.
+        // An existing user-imported skill without a bundled baseline stays user-owned.
         if (!Files.isRegularFile(baseline.toPath(), LinkOption.NOFOLLOW_LINKS)) return
-        val revision = LocalCreativeSkillCatalog.bundleRevisions.getValue(preset.id)
-        val installedRevision = versionMarker(preset.id)
-        if (Files.isRegularFile(installedRevision.toPath(), LinkOption.NOFOLLOW_LINKS) &&
-            installedRevision.readText(Charsets.UTF_8).trim() == revision) return
+        val assetRevision = LocalCreativeSkillCatalog.bundleRevisions.getValue(preset.id)
+        val installedAssets = versionMarker(preset.id)
+        val installedGuide = guideMarker(preset.id)
+        val requiredGuide = guideFingerprint(preset)
+        val assetsCurrent = Files.isRegularFile(installedAssets.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            installedAssets.readText(Charsets.UTF_8).trim() == assetRevision
+        val guideCurrent = Files.isRegularFile(installedGuide.toPath(), LinkOption.NOFOLLOW_LINKS) &&
+            installedGuide.readText(Charsets.UTF_8).trim() == requiredGuide
+        if (assetsCurrent && guideCurrent) return
+
         val previous = baseline.readText(Charsets.UTF_8).trim()
         require(Regex("[0-9a-f]{64}").matches(previous)) {
             "内置技能升级基线损坏：${preset.id}"
         }
-        val files = validatedAssets(preset.id)
-        val original = files.getValue("SKILL.md").toString(Charsets.UTF_8)
-        val document = appDocument(preset, original)
-        materializeResources(preset.id, files, original)
 
+        // Chinese labels/guides change independently from the source resources.
+        // Reuse the saved upstream rules rather than reading megabytes of binary media.
+        val upstream = File(skillsDir, "${preset.id}/UPSTREAM-SKILL.md")
+        val original = if (assetsCurrent &&
+            Files.isRegularFile(upstream.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            upstream.readText(Charsets.UTF_8)
+        } else {
+            val files = validatedAssets(preset.id)
+            val source = files.getValue("SKILL.md").toString(Charsets.UTF_8)
+            materializeResources(preset.id, files, source)
+            source
+        }
+        val document = appDocument(preset, original)
         val current = workspace.readSkill(preset.id)
         val currentHash = fingerprint(current)
         val desiredHash = fingerprint(document)
         if (currentHash != previous && currentHash != desiredHash) {
-            installedRevision.writeText(revision + "\n")
+            // Preserve custom rules, including user-edited Chinese names.
+            installedAssets.writeText(assetRevision + "\n")
+            installedGuide.writeText(requiredGuide + "\n")
             return
         }
 
@@ -64,10 +82,17 @@ internal class LocalCreativeSkillBundle(
         } else document
         if (current != next) workspace.write(".dsh/skills/${preset.id}/SKILL.md", next)
         baseline.writeText(desiredHash + "\n")
-        installedRevision.writeText(revision + "\n")
+        installedAssets.writeText(assetRevision + "\n")
+        installedGuide.writeText(requiredGuide + "\n")
     }
 
     private fun versionMarker(id: String): File = File(skillsDir, "$id/.bundled-asset-version")
+
+    private fun guideMarker(id: String): File = File(skillsDir, "$id/.bundled-guide-version")
+
+    private fun guideFingerprint(preset: LocalPresetSkill): String =
+        fingerprint(listOf(preset.id, preset.title, preset.description, preset.whenToUse, preset.instructions)
+            .joinToString("\u0000").toByteArray(Charsets.UTF_8))
 
     private fun validatedAssets(id: String): Map<String, ByteArray> {
         require(id in LocalCreativeSkillCatalog.entries.map { it.id }) { "未知内置技能：$id" }
@@ -103,7 +128,9 @@ internal class LocalCreativeSkillBundle(
         header.removeAll { it.startsWith("display-name:") || it.startsWith("when-to-use:") }
         header += "display-name: \"${preset.title}\""
         header += "when-to-use: \"${preset.whenToUse}\""
-        return "---\n" + header.joinToString("\n") + "\n---\n" + original.substring(end + 5)
+        val chineseGuide = "## 中文使用指南\n\n" + preset.instructions.trim() + "\n\n---\n\n"
+        return "---\n" + header.joinToString("\n") + "\n---\n\n" +
+            chineseGuide + original.substring(end + 5).trimStart('\n')
     }
 
     private fun materializeResources(id: String, files: Map<String, ByteArray>, original: String) {

@@ -7,6 +7,9 @@ name: Refresh published release notes
       - '.github/scripts/generate-release-notes.py'
       - '.github/workflows/release.yml'
       - '.github/workflows/refresh-release-notes.yml'
+  workflow_run:
+    workflows: ['Release APK']
+    types: [completed]
 
 permissions:
   contents: write
@@ -18,13 +21,15 @@ concurrency:
 
 jobs:
   refresh-latest:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
       - name: Refresh latest published release notes when using old format
         env:
           GH_TOKEN: ${{ github.token }}
@@ -41,7 +46,7 @@ jobs:
           fi
 
           RELEASE_JSON="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_TAG")"
-          if ! printf '%s' "$RELEASE_JSON" | jq -e '(.body // "") | (contains("## 安装要求") or contains("## What\u0027s Changed"))' >/dev/null; then
+          if ! printf '%s' "$RELEASE_JSON" | jq -e '(.body // "") | (contains("## 安装要求") or contains("## What\u0027s Changed") or (startswith("## 本次更新") and (endswith("，") or endswith(","))))' >/dev/null; then
             echo "最新版已使用简洁说明或人工内容，不覆盖"
             exit 0
           fi

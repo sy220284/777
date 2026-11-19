@@ -1,18 +1,6 @@
 name: 777 扩展市场 Android 交互验证
 
 'on':
-  pull_request:
-    paths:
-      - 'app/src/main/java/com/labteto/dshmobile/ui/screens/tools/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/presentation/**'
-      - 'app/src/main/java/com/labteto/dshmobile/uicontract/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/ui/screens/tools/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/tools/ipc/**'
-      - 'app/src/main/java/com/labteto/dshmobile/local/tools/LocalMcpCredentialStore.kt'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/local/tools/**'
-      - 'app/src/androidTest/java/com/labteto/dshmobile/local/tools/ipc/**'
-      - 'tools/ui/**'
-      - '.github/workflows/extension-marketplace-device-test.yml'
   workflow_dispatch:
 
 permissions:

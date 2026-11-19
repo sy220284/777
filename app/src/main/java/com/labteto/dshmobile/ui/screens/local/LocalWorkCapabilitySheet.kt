@@ -1,6 +1,9 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import com.shenyan.designsystem.foundation.SyMetric
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import com.shenyan.designsystem.components.SyCheckboxControl
@@ -91,6 +94,94 @@ internal fun LocalWorkCapabilitySheet(
             modifier = Modifier.fillMaxWidth(),
             maxLines = 6,
         )
+        if (capabilities.isNotEmpty()) {
+            Text(stringResource(R.string.work_capability_readiness_title),
+                style = SyType.std14Strong.withReadingWeight(), color = colors.text)
+            capabilities.sortedBy { it.state == LocalTaskCapabilityState.CONFIGURED }.forEach { item ->
+                val name = when (item.kind) {
+                    LocalTaskCapabilityKind.GITHUB -> R.string.work_capability_readiness_github
+                    LocalTaskCapabilityKind.WEB_SEARCH -> R.string.work_capability_readiness_web
+                    LocalTaskCapabilityKind.MODEL -> R.string.work_capability_readiness_model
+                    LocalTaskCapabilityKind.MCP -> R.string.work_capability_readiness_mcp
+                    LocalTaskCapabilityKind.PLUGINS -> R.string.work_capability_readiness_plugins
+                    LocalTaskCapabilityKind.ACCESSIBILITY -> R.string.work_capability_readiness_accessibility
+                    LocalTaskCapabilityKind.NOTIFICATION_ACCESS -> R.string.work_capability_readiness_notification_access
+                    LocalTaskCapabilityKind.SCREEN_CAPTURE -> R.string.work_capability_readiness_screen_capture
+                }
+                val status = when (item.state) {
+                    LocalTaskCapabilityState.CONFIGURED -> R.string.work_capability_readiness_configured
+                    LocalTaskCapabilityState.CONNECTION_REQUIRED -> R.string.work_capability_readiness_needs_connection
+                    LocalTaskCapabilityState.DISABLED -> R.string.work_capability_readiness_disabled
+                    LocalTaskCapabilityState.UNKNOWN -> R.string.work_capability_readiness_unknown
+                }
+                val statusLabel = when {
+                    item.kind == LocalTaskCapabilityKind.MODEL &&
+                        item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
+                        stringResource(R.string.work_capability_readiness_model_missing)
+                    item.kind == LocalTaskCapabilityKind.SCREEN_CAPTURE ->
+                        stringResource(R.string.work_capability_readiness_screen_capture_prompt)
+                    (item.kind == LocalTaskCapabilityKind.ACCESSIBILITY ||
+                        item.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
+                        item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
+                        stringResource(R.string.work_capability_readiness_device_missing)
+                    else -> stringResource(status)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                    Text(stringResource(name), style = SyType.small13Strong.withReadingWeight(),
+                        color = colors.text)
+                    Text(statusLabel, style = SyType.small13.withReadingWeight(),
+                        color = colors.textSecondary)
+                    if (onConfigureCapabilities != null && item.state != LocalTaskCapabilityState.CONFIGURED &&
+                        (item.kind == LocalTaskCapabilityKind.GITHUB ||
+                            item.kind == LocalTaskCapabilityKind.MCP ||
+                            item.kind == LocalTaskCapabilityKind.PLUGINS ||
+                            item.kind == LocalTaskCapabilityKind.WEB_SEARCH)
+                    ) {
+                        SyButton(
+                            text = stringResource(R.string.work_capability_configure_item, stringResource(name)),
+                            onClick = { onConfigureCapabilities(item.kind) },
+                            enabled = !switching,
+                            size = SyButtonSize.Small,
+                            variant = SyButtonVariant.Outline,
+                        )
+                    }
+                }
+            }
+            if (onConfigureModel != null && capabilities.any {
+                    it.kind == LocalTaskCapabilityKind.MODEL &&
+                        it.state != LocalTaskCapabilityState.CONFIGURED
+                }) {
+                SyButton(
+                    text = stringResource(R.string.work_capability_configure_model),
+                    onClick = onConfigureModel,
+                    enabled = !switching,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = SyButtonVariant.Ghost,
+                )
+            }
+            if (onConfigureDevice != null && capabilities.any {
+                    (it.kind == LocalTaskCapabilityKind.ACCESSIBILITY ||
+                        it.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
+                        it.state != LocalTaskCapabilityState.CONFIGURED
+                }) {
+                SyButton(
+                    text = stringResource(R.string.work_capability_configure_device),
+                    onClick = onConfigureDevice,
+                    enabled = !switching,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = SyButtonVariant.Ghost,
+                )
+            }
+            if (onRefreshCapabilities != null) {
+                SyButton(
+                    text = stringResource(R.string.common_refresh),
+                    onClick = onRefreshCapabilities,
+                    enabled = !switching,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = SyButtonVariant.Ghost,
+                )
+            }
+        }
         Text(stringResource(R.string.work_handoff_scope), style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         if (selectableMessages.isNotEmpty() || hasEarlierMessages || messageSearch.isNotBlank()) {
             Text(stringResource(R.string.work_handoff_select_messages),
@@ -154,91 +245,6 @@ internal fun LocalWorkCapabilitySheet(
                     modifier = Modifier.fillMaxWidth().testTag("handoff_load_older"),
                     enabled = !switching && !loadingEarlierMessages,
                     loading = loadingEarlierMessages,
-                    variant = SyButtonVariant.Ghost,
-                )
-            }
-        }
-        if (capabilities.isNotEmpty()) {
-            Text(stringResource(R.string.work_capability_readiness_title),
-                style = SyType.std14.withReadingWeight(), color = colors.text)
-            capabilities.forEach { item ->
-                val name = when (item.kind) {
-                    LocalTaskCapabilityKind.GITHUB -> R.string.work_capability_readiness_github
-                    LocalTaskCapabilityKind.WEB_SEARCH -> R.string.work_capability_readiness_web
-                    LocalTaskCapabilityKind.MODEL -> R.string.work_capability_readiness_model
-                    LocalTaskCapabilityKind.MCP -> R.string.work_capability_readiness_mcp
-                    LocalTaskCapabilityKind.PLUGINS -> R.string.work_capability_readiness_plugins
-                    LocalTaskCapabilityKind.ACCESSIBILITY -> R.string.work_capability_readiness_accessibility
-                    LocalTaskCapabilityKind.NOTIFICATION_ACCESS -> R.string.work_capability_readiness_notification_access
-                    LocalTaskCapabilityKind.SCREEN_CAPTURE -> R.string.work_capability_readiness_screen_capture
-                }
-                val status = when (item.state) {
-                    LocalTaskCapabilityState.CONFIGURED -> R.string.work_capability_readiness_configured
-                    LocalTaskCapabilityState.CONNECTION_REQUIRED -> R.string.work_capability_readiness_needs_connection
-                    LocalTaskCapabilityState.DISABLED -> R.string.work_capability_readiness_disabled
-                    LocalTaskCapabilityState.UNKNOWN -> R.string.work_capability_readiness_unknown
-                }
-                val statusLabel = when {
-                    item.kind == LocalTaskCapabilityKind.MODEL &&
-                        item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
-                        stringResource(R.string.work_capability_readiness_model_missing)
-                    item.kind == LocalTaskCapabilityKind.SCREEN_CAPTURE ->
-                        stringResource(R.string.work_capability_readiness_screen_capture_prompt)
-                    (item.kind == LocalTaskCapabilityKind.ACCESSIBILITY ||
-                        item.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
-                        item.state == LocalTaskCapabilityState.CONNECTION_REQUIRED ->
-                        stringResource(R.string.work_capability_readiness_device_missing)
-                    else -> stringResource(status)
-                }
-                Text(stringResource(R.string.work_capability_readiness_row,
-                    stringResource(name), statusLabel),
-                    style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
-                if (onConfigureCapabilities != null && item.state != LocalTaskCapabilityState.CONFIGURED &&
-                    (item.kind == LocalTaskCapabilityKind.GITHUB ||
-                        item.kind == LocalTaskCapabilityKind.MCP ||
-                        item.kind == LocalTaskCapabilityKind.PLUGINS ||
-                        item.kind == LocalTaskCapabilityKind.WEB_SEARCH)
-                ) {
-                    SyButton(
-                        text = stringResource(R.string.work_capability_configure_item, stringResource(name)),
-                        onClick = { onConfigureCapabilities(item.kind) },
-                        enabled = !switching,
-                        modifier = Modifier.fillMaxWidth(),
-                        variant = SyButtonVariant.Ghost,
-                    )
-                }
-            }
-            if (onConfigureModel != null && capabilities.any {
-                    it.kind == LocalTaskCapabilityKind.MODEL &&
-                        it.state != LocalTaskCapabilityState.CONFIGURED
-                }) {
-                SyButton(
-                    text = stringResource(R.string.work_capability_configure_model),
-                    onClick = onConfigureModel,
-                    enabled = !switching,
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = SyButtonVariant.Ghost,
-                )
-            }
-            if (onConfigureDevice != null && capabilities.any {
-                    (it.kind == LocalTaskCapabilityKind.ACCESSIBILITY ||
-                        it.kind == LocalTaskCapabilityKind.NOTIFICATION_ACCESS) &&
-                        it.state != LocalTaskCapabilityState.CONFIGURED
-                }) {
-                SyButton(
-                    text = stringResource(R.string.work_capability_configure_device),
-                    onClick = onConfigureDevice,
-                    enabled = !switching,
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = SyButtonVariant.Ghost,
-                )
-            }
-            if (onRefreshCapabilities != null) {
-                SyButton(
-                    text = stringResource(R.string.common_refresh),
-                    onClick = onRefreshCapabilities,
-                    enabled = !switching,
-                    modifier = Modifier.fillMaxWidth(),
                     variant = SyButtonVariant.Ghost,
                 )
             }

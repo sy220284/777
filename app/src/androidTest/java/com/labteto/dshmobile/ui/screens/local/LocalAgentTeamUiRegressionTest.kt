@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -42,6 +43,7 @@ class LocalAgentTeamUiRegressionTest {
                 )
             }
         }
+        compose.onNodeWithText("1 个独立子智能体").assertIsDisplayed()
         compose.onNodeWithText("检索助手").performScrollTo().performClick()
         compose.onNodeWithText("暂停").performScrollTo().performClick()
         compose.waitUntil(5_000) { lastOperation == UiWorkAgentOperation.INTERRUPT }

@@ -666,7 +666,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         if (state.usageMode == LocalUsageMode.WORK) foldWorkToolsToTurnStart(withReplyAttachments)
         else withReplyAttachments
     }
-    // The running-status strip follows the current user turn only, not a prior turn's
+    // The running summary follows the current user turn only, not a prior turn's
     // still-cached tool receipts. The tool events remain the single source of truth.
     val currentWorkDisclosure = remember(transcriptItems, transcriptMessages, state.usageMode) {
         val currentUserTurn = transcriptMessages.lastOrNull { it.role == "user" }?.id
@@ -1030,10 +1030,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 state.pendingApproval != null -> "等待工具授权"
                                 state.pendingQuestion != null -> "等待确认"
                                 workToolReadFailures > 0 -> "执行状态读取异常"
-                                state.running -> workToolActivities.lastOrNull {
-                                    it.phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING ||
-                                        it.phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED
-                                }?.let { "正在执行 · " + (userFacingWorkToolAction(it.name) ?: "当前步骤") } ?: "正在执行"
+                                state.running && currentRunningTool != null -> {
+                                    val action = workToolActionLabel(
+                                        currentRunningTool.name, currentRunningTool.argumentsPreview,
+                                    )
+                                    if (currentRunningCount > 1) stringResource(
+                                        R.string.work_header_running_count, currentRunningCount, action,
+                                    ) else stringResource(R.string.work_header_running_action, action)
+                                }
+                                state.running -> stringResource(R.string.work_header_running)
                                 state.loading -> "正在加载"
                                 !state.error.isNullOrBlank() -> "执行异常 · " + state.error
                                 workToolActivities.lastOrNull()?.phase ==
@@ -1199,7 +1204,24 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                     }
                 }
-                if (showEmptyGuide) {
+                if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
+                    item(key = "connect-conversation-model") {
+                        Column(
+                            modifier = Modifier.fillParentMaxSize().padding(horizontal = SyMetric.gapLg),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.CenterVertically),
+                        ) {
+                            Text(stringResource(R.string.local_welcome_connect_title),
+                                style = SyType.large20.withReadingWeight(), color = colors.text,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            Text(stringResource(R.string.local_welcome_connect_body),
+                                style = SyType.small13.withReadingWeight(), color = colors.textSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.widthIn(max = 280.dp))
+                            SyButton(stringResource(R.string.local_welcome_connect_action), onConfigure)
+                        }
+                    }
+                } else if (showEmptyGuide) {
                     item(key = "local-empty-guide") {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             if (showChatPersonaWelcome) {
@@ -1539,38 +1561,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             )
         }
 
-        if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = SyMetric.gapLg,
-                    vertical = SyMetric.gapMd,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier.padding(SyMetric.gapLg),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.local_welcome_connect_title),
-                            style = SyType.std14Strong.withReadingWeight(),
-                            color = colors.text,
-                        )
-                        Text(
-                            stringResource(R.string.local_welcome_connect_body),
-                            style = SyType.small13.withReadingWeight(),
-                            color = colors.textSecondary,
-                        )
-                    }
-                    SyButton(
-                        text = stringResource(R.string.local_welcome_connect_action),
-                        onClick = onConfigure,
-                        size = SyButtonSize.Small,
-                    )
-                }
-            }
-        }
 
         val sendRejectMessage = sendFeedback.rejectReason
             ?.takeIf { sendFeedback.sessionId == state.sessionId }
@@ -1633,40 +1623,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             }
         }
 
-        if (state.usageMode == LocalUsageMode.WORK && state.running &&
-            currentRunningCount > 0 && currentRunningTool != null
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
-                    .heightIn(min = SyMetric.touch),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-            ) {
-                androidx.compose.material3.Icon(
-                    imageVector = FeatherIcons.Clock,
-                    contentDescription = null,
-                    tint = colors.successInk,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    "正在执行 · " + workToolActionLabel(
-                        currentRunningTool.name, currentRunningTool.argumentsPreview,
-                    ),
-                    modifier = Modifier.weight(1f),
-                    style = SyType.small13.withReadingWeight(),
-                    color = colors.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${currentRunningCount} 项进行中",
-                    style = SyType.small13.withReadingWeight(),
-                    color = colors.successInk,
-                )
-            }
-        }
-
         LocalAgentTeamStatusBar(
             team = state.team,
             launchPending = teamLaunchPending,
@@ -1726,7 +1682,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
             },
             teamDispatchSelected = teamDispatchSelected,
-            onClearTeamDispatch = { teamDispatchSelected = false },
+            onTeamDispatchChange = { teamDispatchSelected = it },
             onStop = onStop,
             reasoningMode = reasoningMode,
             temperatureLevel = if (state.usageMode == LocalUsageMode.WORK) {
@@ -2087,25 +2043,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     },
                 )
             }
-            if (state.usageMode == LocalUsageMode.WORK && teamCardDismissed && state.team.visible) {
-                SySheetChoiceRow(
-                    title = stringResource(R.string.local_team_reopen),
-                    icon = FeatherIcons.ChevronRight,
-                    onClick = {
-                        showAttachmentPicker = false
-                        showTeamPanel = true
-                    },
-                )
-            }
-            if (state.usageMode == LocalUsageMode.WORK) {
-                LocalAgentSwarmLaunchEntry(
-                    selected = teamDispatchSelected,
-                    onClick = {
-                        teamDispatchSelected = !teamDispatchSelected
-                        showAttachmentPicker = false
-                    },
-                )
-            }
         }
     }
 
@@ -2246,7 +2183,7 @@ private fun EmptyLocalHarness(
             SyButton(
                 text = stringResource(R.string.local_suggestions_title),
                 icon = FeatherIcons.Sparkles,
-                variant = SyButtonVariant.Info,
+                variant = SyButtonVariant.Outline,
                 onClick = { suggestionsOpen = true },
             )
             SyPopupMenu(

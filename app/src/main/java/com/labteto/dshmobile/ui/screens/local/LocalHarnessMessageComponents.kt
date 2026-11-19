@@ -203,7 +203,7 @@ internal fun LocalMessageRow(
         }
     }
 
-    val pressAnchor = remember(message.id) { MessagePressAnchor() }
+    val pressAnchor = remember(message.id) { ContextMenuPressAnchor() }
     var menuAnchor by remember(message.id) { mutableStateOf<IntOffset?>(null) }
     when (message.role) {
         "user" -> {
@@ -479,14 +479,14 @@ internal fun LocalMessageRow(
 }
 
 /** Records the active down position without taking the gesture from selection or scrolling. */
-private class MessagePressAnchor {
+internal class ContextMenuPressAnchor {
     private var coordinates: LayoutCoordinates? = null
     var point: IntOffset? = null
         private set
 
     fun observe(modifier: Modifier): Modifier = modifier
         .onGloballyPositioned { coordinates = it }
-        .pointerInput(this@MessagePressAnchor) {
+        .pointerInput(this@ContextMenuPressAnchor) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                 point = coordinates?.takeIf { it.isAttached }?.localToWindow(down.position)

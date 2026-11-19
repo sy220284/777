@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.settings
 
+import androidx.compose.foundation.selection.selectableGroup
+import com.shenyan.designsystem.components.SyRadioControl
 import com.shenyan.designsystem.foundation.SyMetric
 
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
@@ -1013,31 +1015,40 @@ fun SettingsScreen(
                                 style = SyType.small13.withReadingWeight(),
                                 color = colors.textSecondary,
                             )
-                            SySegmented(
-                                segments = listOf(
-                                    SySegment(LocalApprovalMode.DEFAULT.name, stringResource(R.string.settings_approval_mode_default)),
-                                    SySegment(LocalApprovalMode.MANUAL.name, stringResource(R.string.settings_approval_mode_manual)),
-                                    SySegment(LocalApprovalMode.AUTO.name, stringResource(R.string.settings_approval_mode_auto)),
-                                ),
-                                selectedKey = approvalMode.name,
-                                onSelect = { selected ->
-                                    LocalApprovalMode.entries.firstOrNull { it.name == selected }
-                                        ?.let(viewModel::configureApprovalMode)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                stretch = true,
-                            )
-                            Text(
-                                stringResource(
-                                    when (approvalMode) {
+                            Column(Modifier.selectableGroup()) {
+                                LocalApprovalMode.entries.forEach { mode ->
+                                    val title = when (mode) {
+                                        LocalApprovalMode.DEFAULT -> R.string.settings_approval_mode_default
+                                        LocalApprovalMode.MANUAL -> R.string.settings_approval_mode_manual
+                                        LocalApprovalMode.AUTO -> R.string.settings_approval_mode_auto
+                                    }
+                                    val detail = when (mode) {
                                         LocalApprovalMode.DEFAULT -> R.string.settings_approval_default_hint
                                         LocalApprovalMode.MANUAL -> R.string.settings_approval_manual_hint
                                         LocalApprovalMode.AUTO -> R.string.settings_approval_auto_hint
-                                    },
-                                ),
-                                style = SyType.caption11.withReadingWeight(),
-                                color = colors.textSecondary,
-                            )
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .heightIn(min = SyMetric.touch)
+                                            .clip(RoundedCornerShape(SyMetric.radiusControl))
+                                            .selectable(selected = mode == approvalMode, role = Role.RadioButton,
+                                                onClick = { viewModel.configureApprovalMode(mode) })
+                                            .padding(horizontal = SyMetric.gapSm, vertical = SyMetric.gapSm),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+                                    ) {
+                                        SyRadioControl(selected = mode == approvalMode, onClick = null)
+                                        Column(Modifier.weight(1f)) {
+                                            Text(stringResource(title), style = SyType.std14Strong.withReadingWeight(),
+                                                color = colors.text)
+                                            if (mode == approvalMode) {
+                                                Text(stringResource(detail), style = SyType.small13.withReadingWeight(),
+                                                    color = colors.textSecondary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                         DeviceCapabilitiesCard(
                             deviceCapabilities, viewModel, requestPostingPermission,

@@ -62,6 +62,18 @@ class ReleaseNotesTest(unittest.TestCase):
             "## 本次更新\n\n- 优化工作流程：现在可以按执行步骤查看处理进度。\n",
         )
 
+    def test_prioritize_user_change_over_packaging_and_complete_sentence(self):
+        body = """## 完成内容
+- 完整打包四套技能的 125 个原始文件，包含图像和脚本。
+- 使用现有安装与管理链路，首次安装及已有用户升级各自动执行一次预置注册；卸载后不重复自动恢复。
+## 验证
+- 测试全部通过。"""
+        self.assertEqual(
+            notes.summary(body, "内置四套技能"),
+            "首次安装及已有用户升级各自动执行一次预置注册；卸载后不重复自动恢复。",
+        )
+        self.assertFalse(notes.shorten("包含许多逗号，" * 20).endswith("，"))
+
     def test_direct_commit_without_pr(self):
         def fake_run(*args):
             if args[:2] in (("git", "rev-parse"), ("git", "merge-base")):

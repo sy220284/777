@@ -6,7 +6,7 @@
   "skills": [
     {
       "name": "finesse-ui",
-      "label": "UI 设计与交互",
+      "label": "界面视觉与交互设计",
       "upstream": "mouse-lin/finesse-skill",
       "ref": "c7a91448baf6e98fecf542915cdb7e3155bddc45",
       "upstream_path": "skills/finesse-ui",
@@ -15,7 +15,7 @@
     },
     {
       "name": "finesse-brief",
-      "label": "工作台架构师",
+      "label": "工作台产品规划",
       "upstream": "mouse-lin/finesse-brief",
       "ref": "d1f45618b605587b882a20d72eb0d8ec666990bd",
       "upstream_path": "skills/finesse-brief",
@@ -24,7 +24,7 @@
     },
     {
       "name": "frame-smith",
-      "label": "视频审美与动效",
+      "label": "视频分镜与动效设计",
       "upstream": "mouse-lin/frame-smith",
       "ref": "44b7e716971b46ab801f302d3ba34c5b61442e9f",
       "upstream_path": "skills/frame-smith",
@@ -33,7 +33,7 @@
     },
     {
       "name": "finesse-term",
-      "label": "专业术语",
+      "label": "界面术语与需求表达",
       "upstream": "mouse-lin/finesse-term",
       "ref": "e5abc56382ab0c393aa11f9d877c6db91d9956c",
       "upstream_path": "skills/finesse-term",

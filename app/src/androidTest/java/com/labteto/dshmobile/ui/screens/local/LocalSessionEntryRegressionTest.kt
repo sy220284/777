@@ -1,5 +1,7 @@
 package com.labteto.dshmobile.ui.screens.local
 
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
@@ -7,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasSetTextAction
 import com.labteto.dshmobile.uicontract.UiMessagePage
@@ -16,7 +19,11 @@ import com.labteto.dshmobile.uicontract.UiMessageSearchReceipt
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.ui.theme.DshTheme
+import com.labteto.dshmobile.ui.audit.captureUiAudit
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -77,6 +84,73 @@ class LocalSessionEntryRegressionTest {
         compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
         compose.onNodeWithTag("menu-item:" + ctx.getString(R.string.local_session_sample_title)).performClick()
         compose.runOnIdle { assertEquals(1, opened) }
+    }
+
+    @Test fun overflowMenuUsesCompactShortcutGridAndKeepsActionsReachable() {
+        var searched = 0
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        compose.setContent {
+            DshTheme {
+                ConversationActionsMenu(
+                    pinned = false,
+                    onTogglePin = {},
+                    onRename = {},
+                    onDelete = {},
+                    onOpenWorkEvidence = {},
+                    onOpenDocuments = {},
+                    onOpenSample = {},
+                    onSearchMessages = { searched++ },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription(ctx.getString(R.string.local_session_actions)).performClick()
+        captureUiAudit(compose, "conversation-header-action-menu")
+        val popup = compose.onNodeWithTag("conversation-action-popup").getUnclippedBoundsInRoot()
+        val search = compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.sy_v6_search_messages),
+        ).getUnclippedBoundsInRoot()
+        val workEvidence = compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.work_evidence_title),
+        ).getUnclippedBoundsInRoot()
+        val documents = compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.local_session_documents),
+        ).getUnclippedBoundsInRoot()
+        assertEquals(search.top, workEvidence.top)
+        org.junit.Assert.assertTrue(documents.top > search.top)
+        org.junit.Assert.assertTrue(popup.right - popup.left <= 208.dp)
+        compose.onNodeWithTag(
+            "menu-item:" + ctx.getString(R.string.sy_v6_search_messages),
+        ).performClick()
+        compose.runOnIdle { assertEquals(1, searched) }
+    }
+
+
+    @Test fun workHandoffOpensTheMissingCapabilityWithoutSubmittingTheDraft() {
+        var selected: LocalTaskCapabilityKind? = null
+        var continued = 0
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val github = LocalTaskCapabilityKind.GITHUB
+        val draft = "整理仓库本周的讨论"
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { continued++ }, onDismiss = {},
+                    prompt = draft,
+                    capabilities = listOf(LocalTaskCapabilityReadiness(
+                        github, LocalTaskCapabilityState.CONNECTION_REQUIRED,
+                    )),
+                    onConfigureCapabilities = { selected = it },
+                )
+            }
+        }
+        compose.onNodeWithText(draft).assertExists()
+        compose.onNodeWithText(context.getString(R.string.work_capability_configure_item, "GitHub"))
+            .performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(github, selected)
+            assertEquals(0, continued)
+        }
     }
 
     @Test fun modelConfigurationEntryClosesPickerThenOpensSettings() {
