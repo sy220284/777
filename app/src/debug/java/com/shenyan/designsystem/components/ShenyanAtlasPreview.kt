@@ -81,7 +81,6 @@ fun SyComponentAtlasGallery() {
     DshTheme(
         preference = when (theme) {
             ShenyanMode.LIGHT -> ThemePreference.LIGHT
-            ShenyanMode.DARK -> ThemePreference.DARK
             ShenyanMode.MATTE -> ThemePreference.MATTE_BLACK
         },
         accentKey = accentKey,
@@ -96,13 +95,10 @@ fun SyComponentAtlasGallery() {
                     style = MaterialTheme.typography.bodySmall)
                 SyTabs(atlasSections, section, onSelect = { section = it })
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SyButton("浅色", { theme = ShenyanMode.LIGHT }, compact = true,
+                    SyButton("典雅白", { theme = ShenyanMode.LIGHT }, compact = true,
                         style = if (theme == ShenyanMode.LIGHT) SyButtonStyle.PRIMARY
                         else SyButtonStyle.GHOST)
-                    SyButton("深色", { theme = ShenyanMode.DARK }, compact = true,
-                        style = if (theme == ShenyanMode.DARK) SyButtonStyle.PRIMARY
-                        else SyButtonStyle.GHOST)
-                    SyButton("哑光", { theme = ShenyanMode.MATTE }, compact = true,
+                    SyButton("磨砂黑", { theme = ShenyanMode.MATTE }, compact = true,
                         style = if (theme == ShenyanMode.MATTE) SyButtonStyle.PRIMARY
                         else SyButtonStyle.GHOST)
                 }

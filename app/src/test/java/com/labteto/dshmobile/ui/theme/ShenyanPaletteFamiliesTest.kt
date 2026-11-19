@@ -13,7 +13,7 @@ class ShenyanPaletteFamiliesTest {
         assertEquals(accents.size, accents.map { it.key }.toSet().size)
         for (accent in accents) {
             for (mode in listOf(
-                ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.MATTE_BLACK
+                ThemePreference.LIGHT, ThemePreference.MATTE_BLACK
             )) {
                 val theme = resolveV6ThemePalette(mode, accent.key, systemDark = false)
                 val colors = theme.controls
@@ -25,10 +25,9 @@ class ShenyanPaletteFamiliesTest {
                     syInkContrastRatio(colors.textSecondary, colors.materialL5) >= 4.5f)
                 assertEquals("Page and components must use the same canvas",
                     colors.canvas, theme.page.bgBase)
-                if (mode != ThemePreference.LIGHT && accent.key != "fluid_apricot") {
-                    assertEquals("Dark family must affect the entire surface system",
-                        accent.darkCanvas, colors.canvas)
-                }
+                assertEquals("主题画布由当前明暗模式统一管理",
+                    if (mode == ThemePreference.LIGHT) ShenyanPalettes.light.canvas
+                    else ShenyanPalettes.matte.canvas, colors.canvas)
             }
         }
     }
