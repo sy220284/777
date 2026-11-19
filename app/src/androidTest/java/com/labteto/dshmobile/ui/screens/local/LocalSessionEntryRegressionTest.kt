@@ -111,7 +111,7 @@ class LocalSessionEntryRegressionTest {
         ).getUnclippedBoundsInRoot()
         assertEquals(search.top, workEvidence.top)
         org.junit.Assert.assertTrue(documents.top > search.top)
-        org.junit.Assert.assertTrue(popup.width <= 242.dp)
+        org.junit.Assert.assertTrue(popup.width <= 226.dp)
         compose.onNodeWithTag(
             "menu-item:" + ctx.getString(R.string.sy_v6_search_messages),
         ).performClick()
