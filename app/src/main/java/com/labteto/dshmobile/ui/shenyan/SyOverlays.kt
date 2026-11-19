@@ -317,8 +317,16 @@ internal fun conversationMenuPosition(
     marginPx: Int,
     fingerGapPx: Int,
 ): IntOffset {
-    val maxX = (windowSize.width - menuSize.width - marginPx).coerceAtLeast(0)
-    val minX = marginPx.coerceAtMost(maxX)
+    val windowMaxX = (windowSize.width - menuSize.width - marginPx).coerceAtLeast(0)
+    // Drawer long-press menus stay within their drawer row. The header overflow
+    // keeps its normal window-relative anchor, and small viewports still clamp safely.
+    val fitInsideAnchor = touchOffset != null &&
+        anchorBounds.width >= menuSize.width + marginPx * 2
+    val minX = (if (fitInsideAnchor) anchorBounds.left + marginPx else marginPx)
+        .coerceIn(0, windowMaxX)
+    val maxX = (if (fitInsideAnchor)
+        minOf(windowMaxX, anchorBounds.right - menuSize.width - marginPx)
+        else windowMaxX).coerceAtLeast(minX)
     val preferredX = if (touchOffset != null) {
         anchorBounds.left + touchOffset.x.roundToInt() - (menuSize.width * .25f).roundToInt()
     } else if (layoutDirection == LayoutDirection.Ltr) {
@@ -347,6 +355,11 @@ internal fun conversationMenuPosition(
  * overflow is anchored to its icon, while drawer long-press is anchored to the touch.
  * The popup remains alive for its short exit animation and respects reduced motion.
  */
+/**
+ * Compact shared menu for both conversation surfaces. High-frequency header actions
+ * form a two-column shortcut group; destructive and session-management actions remain
+ * in a clear vertical list. Touch targets remain at least 48dp for accessibility.
+ */
 @Composable
 fun SyConversationActionPopup(
     expanded: Boolean,
@@ -361,8 +374,8 @@ fun SyConversationActionPopup(
 
     val palette = LocalSyColors.current
     val density = LocalDensity.current
-    val marginPx = with(density) { 12.dp.roundToPx() }
-    val gapPx = with(density) { 12.dp.roundToPx() }
+    val marginPx = with(density) { 10.dp.roundToPx() }
+    val gapPx = with(density) { 8.dp.roundToPx() }
     val positionProvider = remember(touchOffset, marginPx, gapPx) {
         object : PopupPositionProvider {
             override fun calculatePosition(
@@ -376,11 +389,19 @@ fun SyConversationActionPopup(
             )
         }
     }
-    val duration = SyMotion.duration(SyMotion.dialogMs,
+    val duration = SyMotion.duration(SyMotion.selectMs,
         LocalSyReduceMotion.current, LocalSyMotionTempo.current)
     val configuration = LocalConfiguration.current
-    val maxWidth = (configuration.screenWidthDp.dp - 24.dp).coerceAtMost(292.dp)
-    val maxHeight = (configuration.screenHeightDp.dp * .72f).coerceAtLeast(180.dp)
+    val shortcutCount = primaryActionCount.coerceIn(0, items.size)
+    val hasShortcutGrid = shortcutCount >= 2
+    val desiredWidth = if (hasShortcutGrid) 240.dp else 206.dp
+    val popupWidth = desiredWidth.coerceAtMost(
+        (configuration.screenWidthDp.dp - 20.dp).coerceAtLeast(1.dp),
+    )
+    val maxHeight = (configuration.screenHeightDp.dp * .64f).coerceAtLeast(160.dp)
+    val origin = if (touchOffset == null) TransformOrigin(.86f, 0f)
+        else TransformOrigin(.25f, .08f)
+
     Popup(
         popupPositionProvider = positionProvider,
         onDismissRequest = onDismiss,
@@ -394,70 +415,128 @@ fun SyConversationActionPopup(
         AnimatedVisibility(
             visibleState = transition,
             enter = fadeIn(tween(duration)) +
-                scaleIn(initialScale = .93f, transformOrigin = TransformOrigin(.25f, 0f),
-                    animationSpec = tween(duration)) +
-                slideInVertically(initialOffsetY = { -it / 14 }, animationSpec = tween(duration)),
+                scaleIn(initialScale = .96f, transformOrigin = origin,
+                    animationSpec = tween(duration)),
             exit = fadeOut(tween(duration / 2)) +
-                scaleOut(targetScale = .97f, transformOrigin = TransformOrigin(.25f, 0f),
+                scaleOut(targetScale = .98f, transformOrigin = origin,
                     animationSpec = tween(duration / 2)),
         ) {
             SyMaterialSurface(
-                modifier = Modifier.widthIn(min = 220.dp.coerceAtMost(maxWidth), max = maxWidth)
-                    .testTag("conversation-action-popup"),
-                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.width(popupWidth).testTag("conversation-action-popup"),
+                shape = RoundedCornerShape(15.dp),
                 tier = SyMaterialTier.L4_OVERLAY,
-                border = BorderStroke(1.dp, palette.border.copy(alpha = .72f)),
-                shadowElevation = 18.dp,
+                border = BorderStroke(1.dp, palette.border.copy(alpha = .48f)),
+                shadowElevation = 9.dp,
             ) {
-                Column(Modifier.heightIn(max = maxHeight)
-                    .verticalScroll(rememberScrollState())
-                    .padding(6.dp)) {
-                    items.forEachIndexed { index, item ->
-                        if ((primaryActionCount > 0 && index == primaryActionCount) ||
-                            (item.danger && index > 0)) {
-                            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp)
-                                .height(1.dp).background(palette.border.copy(alpha = .55f)))
-                        }
-                        val ink = if (item.danger) palette.dangerInk else palette.text
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .heightIn(min = SyMetric.touch)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (item.danger) palette.dangerInk.copy(alpha = .045f)
-                                    else Color.Transparent)
-                                .clickable {
-                                    onDismiss()
-                                    item.onClick()
+                Column(
+                    Modifier.heightIn(max = maxHeight)
+                        .verticalScroll(rememberScrollState())
+                        .padding(5.dp),
+                ) {
+                    val shortcuts = items.take(shortcutCount)
+                    val remaining = items.drop(shortcutCount)
+                    if (hasShortcutGrid) {
+                        shortcuts.chunked(2).forEachIndexed { rowIndex, pair ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                pair.forEach { item ->
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                            .heightIn(min = 62.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(palette.text.copy(alpha = .045f))
+                                            .clickable {
+                                                onDismiss()
+                                                item.onClick()
+                                            }
+                                            .testTag("menu-item:" + item.text)
+                                            .padding(horizontal = 5.dp, vertical = 7.dp),
+                                        verticalArrangement = Arrangement.spacedBy(
+                                            4.dp, Alignment.CenterVertically,
+                                        ),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        item.icon?.let { icon ->
+                                            Icon(icon, contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = palette.textSecondary)
+                                        }
+                                        Text(
+                                            item.text, color = palette.text,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
-                                .testTag("menu-item:" + item.text)
-                                .padding(horizontal = 12.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            if (item.icon != null) {
-                                Box(
-                                    modifier = Modifier.size(32.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(ink.copy(alpha = if (item.danger) .11f else .07f)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(item.icon, contentDescription = null,
-                                        tint = if (item.danger) palette.dangerInk
-                                            else palette.textSecondary,
-                                        modifier = Modifier.size(19.dp))
-                                }
+                                if (pair.size == 1) Box(Modifier.weight(1f))
                             }
-                            Text(
-                                item.text, color = ink,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
+                            if (rowIndex < (shortcuts.size - 1) / 2) {
+                                Box(Modifier.height(4.dp))
+                            }
                         }
+                    } else {
+                        shortcuts.forEach { item ->
+                            ConversationMenuListAction(item, onDismiss)
+                        }
+                    }
+                    if (shortcuts.isNotEmpty() && remaining.isNotEmpty()) {
+                        ConversationMenuDivider()
+                    }
+                    remaining.forEachIndexed { index, item ->
+                        if (index > 0 && item.danger) ConversationMenuDivider()
+                        ConversationMenuListAction(item, onDismiss)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ConversationMenuDivider() {
+    val colors = LocalSyColors.current
+    Box(Modifier.fillMaxWidth()
+        .padding(horizontal = 9.dp, vertical = 4.dp)
+        .height(1.dp)
+        .background(colors.border.copy(alpha = .5f)))
+}
+
+@Composable
+private fun ConversationMenuListAction(
+    item: SyMenuItem,
+    onDismiss: () -> Unit,
+) {
+    val colors = LocalSyColors.current
+    val ink = if (item.danger) colors.dangerInk else colors.text
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .heightIn(min = SyMetric.touch)
+            .clip(RoundedCornerShape(9.dp))
+            .clickable {
+                onDismiss()
+                item.onClick()
+            }
+            .testTag("menu-item:" + item.text)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        item.icon?.let { icon ->
+            Icon(icon, contentDescription = null,
+                tint = if (item.danger) ink else colors.textSecondary,
+                modifier = Modifier.size(19.dp))
+        }
+        Text(
+            item.text, color = ink,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
