@@ -137,14 +137,14 @@ class SettingsPageAuditTest(
             arrayOf<Any>(it, ThemePreference.LIGHT, 1f, 390)
         } + listOf(SettingsDestination.ROOT, SettingsDestination.APPEARANCE,
             SettingsDestination.PERMISSIONS, SettingsDestination.NOTIFICATIONS).flatMap { page ->
-            listOf(ThemePreference.DARK, ThemePreference.MATTE_BLACK).flatMap { theme ->
+            listOf(ThemePreference.SYSTEM, ThemePreference.MATTE_BLACK).flatMap { theme ->
                 listOf(1.3f, 2f).map { scale -> arrayOf<Any>(page, theme, scale, 320) }
             }
         } + SettingsDestination.entries.filterNot { it in setOf(
             SettingsDestination.ROOT, SettingsDestination.APPEARANCE,
             SettingsDestination.PERMISSIONS, SettingsDestination.NOTIFICATIONS,
         ) }.flatMap { page -> listOf(
-            arrayOf<Any>(page, ThemePreference.DARK, 2f, 320),
+            arrayOf<Any>(page, ThemePreference.SYSTEM, 2f, 320),
             arrayOf<Any>(page, ThemePreference.MATTE_BLACK, 1.3f, 320),
         ) }
     }

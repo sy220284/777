@@ -147,7 +147,7 @@ class ContentPagesAuditTest(
         @JvmStatic @Parameterized.Parameters(name = "{0}-{1}-{2}-{3}dp")
         fun cases(): List<Array<Any>> = listOf("persona-detail", "persona-presets", "diary-content", "task-content", "extension-content", "usage-content")
             .flatMap { page -> listOf(arrayOf<Any>(page, ThemePreference.LIGHT, 1f, 390)) +
-                listOf(ThemePreference.LIGHT, ThemePreference.DARK, ThemePreference.MATTE_BLACK)
+                listOf(ThemePreference.LIGHT, ThemePreference.SYSTEM, ThemePreference.MATTE_BLACK)
                     .map { arrayOf<Any>(page, it, 2f, 320) } }
     }
 }
