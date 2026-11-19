@@ -86,17 +86,20 @@ def select_checks(paths, manual=False):
     for path in paths:
         if matches(path, FULL):
             return dict.fromkeys(selected, True)
-        if matches(path, UI):
+        affects_ui = matches(path, UI)
+        affects_market = matches(path, MARKET)
+        affects_storage = matches(path, STORAGE)
+        if affects_ui:
             selected["ui"] = True
-        if matches(path, MARKET):
+        if affects_market:
             selected["market"] = True
-        if matches(path, STORAGE):
+        if affects_storage:
             selected["migration"] = True
             selected["ui"] = True
-        # 未被专项目录匹配的应用运行代码仍执行用户主路径回归。
-        if path.startswith("app/src/main/") and not any(selected.values()):
-            selected["ui"] = True
-        if path.startswith("app/src/androidTest/") and not any(selected.values()):
+        # 每个文件独立判断；同一 PR 的其他文件已触发市场测试时也不能漏掉 UI 回归。
+        if (path.startswith("app/src/main/") or path.startswith("app/src/androidTest/")) and not (
+            affects_ui or affects_market or affects_storage
+        ):
             selected["ui"] = True
     return selected
 
@@ -109,7 +112,7 @@ def changed_files():
     if not re.fullmatch(r"[0-9a-f]{40}", base) or not re.fullmatch(r"[0-9a-f]{40}", head):
         raise ValueError("缺少有效 PR base/head 提交 SHA")
     output = subprocess.check_output(
-        ["git", "diff", "--name-only", "--diff-filter=ACMRT", "-z", f"{base}...{head}"]
+        ["git", "diff", "--name-only", "--diff-filter=ACMRTD", "-z", f"{base}...{head}"]
     )
     return [file.decode("utf-8") for file in output.split(b"\0") if file]
 
