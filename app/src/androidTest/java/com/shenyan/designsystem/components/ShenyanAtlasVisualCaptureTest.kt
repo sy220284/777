@@ -27,7 +27,7 @@ class ShenyanAtlasVisualCaptureTest {
     @Test fun captureTenAtlasesAndNineAccentFamiliesInBothModes() {
         val dir = File(requireNotNull(compose.activity.getExternalFilesDir(null)),
             "ui-audit/atlas").apply { mkdirs() }
-        dir.listFiles()?.filter { it.extension == "png" }?.forEach(File::delete)
+        dir.listFiles()?.filter { it.extension == "png" }?.forEach { it.delete() }
         val sections = listOf(
             "01 基础组件", "02 弹窗", "03 底部面板", "04 手势",
             "05 反馈", "06 加载", "07 引导", "08 表单", "09 媒体", "10 对话",
