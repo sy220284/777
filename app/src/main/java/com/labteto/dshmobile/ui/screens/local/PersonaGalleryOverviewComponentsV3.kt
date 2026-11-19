@@ -324,42 +324,75 @@ private fun PersonaPresetRow(
     val nameStyle = SyType.std14Strong.withReadingWeight().copy(fontFamily = SyType.contentFont)
     val addLabel = stringResource(if (installed) R.string.persona_gallery_preset_taken
         else R.string.persona_gallery_preset_add)
-    val measurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val nameWidth = with(density) { measurer.measure(preset.persona.name, nameStyle,
-        softWrap = false).size.width.toDp() }
-    val actionWidth = with(density) { measurer.measure(addLabel, nameStyle,
-        softWrap = false).size.width.toDp() }
     var menuOpen by remember { mutableStateOf(false) }
     val triggerFocus = remember { FocusRequester() }
 
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(
-        horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm,
-    )) {
-        val inline = maxWidth >= nameWidth + actionWidth + SyMetric.touch * 2 + SyMetric.gapLg * 3
-        val avatar: @Composable () -> Unit = {
-            LocalPersonaHeaderAvatar(name = preset.persona.name, portraitPath = "",
-                presetAssetPath = preset.artwork?.assetPath)
+    // The identity always owns the readable row width. Actions have their own line;
+    // shrinking or enlarging text can no longer squeeze the persona name.
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(
+            horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm,
+        ),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        ) {
+            LocalPersonaHeaderAvatar(
+                name = preset.persona.name, portraitPath = "",
+                presetAssetPath = preset.artwork?.assetPath,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
+            ) {
+                Text(
+                    text = preset.persona.name,
+                    modifier = Modifier.fillMaxWidth().testTag("persona-preset-name:" + preset.id),
+                    color = colors.text,
+                    style = nameStyle,
+                    softWrap = true,
+                )
+                Text(
+                    text = preset.franchise + " · " + preset.summary,
+                    color = colors.textTertiary,
+                    style = SyType.caption11.withReadingWeight().copy(fontFamily = SyType.contentFont),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        val name: @Composable () -> Unit = {
-            Text(preset.persona.name, Modifier.testTag("persona-preset-name:" + preset.id),
-                color = colors.text, style = nameStyle)
-        }
-        val summary: @Composable () -> Unit = {
-            Text(preset.franchise + " · " + preset.summary,
-                color = colors.textTertiary, style = SyType.caption11.withReadingWeight()
-                    .copy(fontFamily = SyType.contentFont),
-                maxLines = if (inline) 2 else 3, overflow = TextOverflow.Ellipsis)
-        }
-        val actions: @Composable () -> Unit = {
-            if (installed) Text(addLabel, style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
-            else SyButton(addLabel, onInstall, enabled = !busy, variant = SyButtonVariant.Ghost)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.End),
+        ) {
+            if (installed) {
+                Text(
+                    addLabel,
+                    style = SyType.caption11.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+            } else {
+                SyButton(
+                    addLabel, onInstall,
+                    enabled = !busy,
+                    variant = SyButtonVariant.Ghost,
+                    size = SyButtonSize.Small,
+                )
+            }
             Box {
-                SyIconButton(FeatherIcons.MoreVertical,
+                SyIconButton(
+                    FeatherIcons.MoreVertical,
                     contentDescription = stringResource(R.string.persona_gallery_preset_more, preset.persona.name),
-                    onClick = { menuOpen = true }, enabled = !busy,
-                    modifier = Modifier.focusRequester(triggerFocus))
-                SyPopupMenu(expanded = menuOpen,
+                    onClick = { menuOpen = true },
+                    enabled = !busy,
+                    modifier = Modifier.focusRequester(triggerFocus),
+                )
+                SyPopupMenu(
+                    expanded = menuOpen,
                     onDismiss = {
                         menuOpen = false
                         triggerFocus.requestFocus()
@@ -367,29 +400,8 @@ private fun PersonaPresetRow(
                     items = listOf(SyMenuItem(
                         text = stringResource(R.string.persona_gallery_preset_hide),
                         onClick = onHide,
-                    )))
-            }
-        }
-        if (inline) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                avatar()
-                Column(Modifier.weight(1f)) {
-                    name()
-                    summary()
-                }
-                actions()
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-                    avatar()
-                    Box(Modifier.weight(1f)) { name() }
-                }
-                summary()
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) { actions() }
+                    )),
+                )
             }
         }
     }
