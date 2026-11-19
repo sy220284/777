@@ -210,6 +210,39 @@ class SyLiquidRefractionAndroidTest {
         val pixelTwo = frameTwo.toPixelMap()[frameTwo.width / 2, frameTwo.height / 2]
         assertNotEquals("Live underlay must update through the AGSL compositor", pixelOne, pixelTwo)
     }
+    @Test fun drawerGlassRefractsLiveConversationUnderlayWithoutReplicatingItsSemantics() {
+        var underlay by mutableStateOf(Color(0xFFB74730))
+        compose.setContent {
+            ShenyanTheme {
+                SyLiveGlassUnderlayHost(enabled = true) { captureModifier, backing ->
+                    Box(Modifier.size(220.dp, 130.dp)) {
+                        Box(Modifier.fillMaxSize().then(captureModifier)) {
+                            Box(Modifier.fillMaxSize().background(underlay))
+                        }
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalSyLiveGlassBacking provides backing,
+                        ) {
+                            SyMaterialSurface(
+                                modifier = Modifier.fillMaxSize().testTag("drawer-real-underlay"),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                tier = SyMaterialTier.L4_OVERLAY,
+                            ) {}
+                        }
+                    }
+                }
+            }
+        }
+        fun center(): Color {
+            compose.waitForIdle()
+            val image = compose.onNodeWithTag("drawer-real-underlay").captureToImage()
+            return image.toPixelMap()[image.width / 2, image.height / 2]
+        }
+        val first = center()
+        compose.runOnIdle { underlay = Color(0xFF247B4E) }
+        val second = center()
+        assertNotEquals("Drawer must refract the actual live underlay", first, second)
+    }
+
     @Test fun liveGlassRetainsVisibleBackgroundResponseAcrossBothThemeModes() {
         var mode by mutableStateOf(ShenyanMode.LIGHT)
         var source by mutableStateOf(Color.White)
