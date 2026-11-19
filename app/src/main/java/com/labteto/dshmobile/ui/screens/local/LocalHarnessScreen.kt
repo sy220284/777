@@ -43,6 +43,9 @@ import com.shenyan.designsystem.components.SyFlatSurface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import com.shenyan.designsystem.components.SyLiveGlassUnderlayHost
+import com.shenyan.designsystem.components.LocalSyLiveGlassBacking
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -1160,12 +1163,24 @@ fun LocalHarnessScreen(
             }
         }
     } else {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = syDrawerContent,
-            scrimColor = LocalSyPalette.current.scrim,
-        ) {
-            sySceneContent()
+        SyLiveGlassUnderlayHost(
+            enabled = drawerState.targetValue == DrawerValue.Open || drawerState.isOpen,
+        ) { underlayModifier, liveBacking ->
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    // The drawer samples the actual conversation without drawing itself
+                    // into the capture; otherwise the optical lens would recursively echo.
+                    CompositionLocalProvider(LocalSyLiveGlassBacking provides liveBacking) {
+                        syDrawerContent()
+                    }
+                },
+                scrimColor = LocalSyPalette.current.scrim,
+            ) {
+                Box(Modifier.fillMaxSize().then(underlayModifier)) {
+                    sySceneContent()
+                }
+            }
         }
     }
 
