@@ -27,7 +27,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import com.shenyan.designsystem.components.SyComposerSurface
+import com.shenyan.designsystem.components.SyChatComposer
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMaterialTier
 import androidx.compose.material3.Text
@@ -129,17 +129,12 @@ fun SyConversationComposer(
     animateSize: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val reduced = LocalSyReduceMotion.current
-    SyComposerSurface(
+    SyChatComposer(
         modifier = modifier.testTag(SY_CONVERSATION_COMPOSER_TAG)
-            .fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
-            .then(if (animateSize)
-                Modifier.animateContentSize(tween(SyMotion.duration(
-                    SyMotion.toolExpandMs, reduced, LocalSyMotionTempo.current
-                ), easing = SyMotion.ease))
-                else Modifier),
-        tint = surfaceColor.copy(alpha = surfaceColor.alpha.coerceAtMost(.06f)),
+            .fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+        surfaceColor = surfaceColor,
         shadowElevation = shadowElevation,
+        animateSize = animateSize,
         content = content,
     )
 }
