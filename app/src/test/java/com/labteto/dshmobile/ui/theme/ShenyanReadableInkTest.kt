@@ -18,9 +18,9 @@ class ShenyanReadableInkTest {
 
     @Test fun everySelectedAccentKeepsButtonTextReadableAcrossThemesAndStates() {
         val themes = listOf(
-            DsThemeTokens.light to false,
-            DsThemeTokens.dark to true,
-            DsThemeTokens.matteBlack to true,
+            SyHostThemeTokens.light to false,
+            SyHostThemeTokens.dark to true,
+            SyHostThemeTokens.matteBlack to true,
         )
         for (palette in AccentPalettes.ALL) {
             for ((base, dark) in themes) {

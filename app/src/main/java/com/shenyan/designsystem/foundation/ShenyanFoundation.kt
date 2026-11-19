@@ -179,10 +179,10 @@ object SyMetric {
     val gapSection = 22.dp
     val gapPage = 34.dp
     val gapHero = 54.dp
-    val radiusSm = 9.dp
-    val radiusControl = 13.dp
-    val radiusCard = 18.dp
-    val radiusSheet = 24.dp
+    val radiusSm = 10.dp
+    val radiusControl = 14.dp
+    val radiusCard = 20.dp
+    val radiusSheet = 28.dp
 }
 /** Opacity response shared by V6 glass and retained legacy surface adapters. */
 object SyMaterialPolicy {
@@ -195,16 +195,16 @@ object SyMotion {
     // One motion vocabulary for the current V6 UI pack. Timing variants belong here,
     // not in screens or a second DsAnimations token collection.
     val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
-    const val pressedScale = .985f
+    const val pressedScale = .975f
     const val reducedMotionMs = 0
     fun duration(ms: Int, reducedMotion: Boolean, tempo: Float = 1f): Int =
         if (reducedMotion) reducedMotionMs
         else (ms * tempo.coerceIn(.7f, 1.3f)).roundToInt()
     // Responsive V6 motion: input first, geometry second; all lengths in milliseconds.
-    const val pressMs = 70
-    const val selectMs = 150
+    const val pressMs = 85
+    const val selectMs = 165
     const val dialogMs = 220
-    const val sheetMs = 280
+    const val sheetMs = 290
     const val sheetDragSettleMs = 240
     const val swipeRevealMs = 220
     const val onboardingMs = 280

@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
@@ -78,15 +79,20 @@ fun SyButton(
         animationSpec = tween(SyMotion.duration(SyMotion.pressMs, reduceMotion, tempo)),
         label = "syButtonPress",
     )
-    val fill = if (!enabled) syMaterialColor(SyMaterialTier.L2_BAR) else when (style) {
-        SyButtonStyle.PRIMARY -> c.primary
-        SyButtonStyle.DANGER -> c.danger
-        // INFO is the visibly emphasized secondary action, not the unselected ghost style.
-        SyButtonStyle.INFO -> c.selected
+    val targetFill = if (!enabled) syMaterialColor(SyMaterialTier.L2_BAR) else when (style) {
+        SyButtonStyle.PRIMARY -> if (pressed) c.primaryPressed else c.primary
+        SyButtonStyle.DANGER -> if (pressed) c.danger.copy(alpha = .88f) else c.danger
+        SyButtonStyle.INFO -> if (pressed) c.primary.copy(alpha = .18f) else c.selected
         SyButtonStyle.SECONDARY -> syMaterialColor(SyMaterialTier.L2_BAR)
         SyButtonStyle.GHOST -> Color.Transparent
         SyButtonStyle.OUTLINE -> syMaterialColor(SyMaterialTier.L1_SECTION)
     }
+    val fill by animateColorAsState(
+        targetValue = targetFill,
+        animationSpec = tween(SyMotion.duration(SyMotion.interactionColorMs, reduceMotion, tempo),
+            easing = SyMotion.ease),
+        label = "syButtonFeedback",
+    )
     val foreground = if (!enabled) c.textTertiary else when (style) {
         SyButtonStyle.PRIMARY -> com.shenyan.designsystem.foundation.syReadableInk(c.onPrimary, fill)
         SyButtonStyle.DANGER -> com.shenyan.designsystem.foundation.syReadableInk(c.text, fill)
@@ -96,7 +102,8 @@ fun SyButton(
         onClick = onClick,
         enabled = enabled && !loading,
         interactionSource = interaction,
-        modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch)).scale(scale),
+        modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch))
+            .scale(scale).semantics { if (loading) stateDescription = "正在处理" },
         color = fill,
         contentColor = foreground,
         shape = RoundedCornerShape(SyMetric.radiusControl),
@@ -334,9 +341,14 @@ fun SySwitchControl(
 
 @Composable
 fun SyListItem(title: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    SyMaterialSurface(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch), tier = SyMaterialTier.L3_CARD,
-        shape = RoundedCornerShape(SyMetric.radiusControl)) {
-        Column(Modifier.padding(13.dp)) { Text(title); Text(description, style = MaterialTheme.typography.bodySmall, color = LocalSyColors.current.textSecondary) }
+    SyMaterialSurface(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch),
+        tier = SyMaterialTier.L3_CARD, shape = RoundedCornerShape(SyMetric.radiusControl)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = LocalSyColors.current.text)
+            Text(description, style = MaterialTheme.typography.bodySmall,
+                color = LocalSyColors.current.textSecondary)
+        }
     }
 }
 
@@ -344,7 +356,8 @@ fun SyListItem(title: String, description: String, onClick: () -> Unit, modifier
 fun SyStatusTag(label: String, phase: SyPhase, modifier: Modifier = Modifier) {
     val c = LocalSyColors.current
     val tint = when (phase) {
-        SyPhase.DONE, SyPhase.RUNNING -> c.successInk
+        SyPhase.DONE -> c.successInk
+        SyPhase.RUNNING -> c.linkInk
         SyPhase.FAILED -> c.dangerInk
         SyPhase.BLOCKED -> c.warningInk
         SyPhase.WAITING -> c.textSecondary
@@ -366,7 +379,13 @@ fun SyFileRow(fileName: String, detail: String, onOpen: () -> Unit, modifier: Mo
         tier = SyMaterialTier.L3_CARD, shape = RoundedCornerShape(SyMetric.radiusControl)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("▤", Modifier.padding(end = 12.dp))
-            Column(Modifier.weight(1f)) { Text(fileName, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(detail, style = MaterialTheme.typography.bodySmall) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(fileName, color = LocalSyColors.current.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail, color = LocalSyColors.current.textSecondary,
+                    style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

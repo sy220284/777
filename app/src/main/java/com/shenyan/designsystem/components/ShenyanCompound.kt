@@ -40,8 +40,8 @@ fun SyGroupCard(
 ) = SyMaterialFrame(
     modifier = modifier.fillMaxWidth(),
     tier = SyMaterialTier.L3_CARD,
-    horizontalPadding = 14.dp, verticalPadding = 8.dp,
-    verticalArrangement = Arrangement.spacedBy(8.dp),
+    horizontalPadding = 16.dp, verticalPadding = 14.dp,
+    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
     content = content,
 )
 
@@ -61,12 +61,12 @@ fun SyCategoryRow(
     val p = LocalSyColors.current
     val shape = RoundedCornerShape(SyMetric.radiusControl)
     val textMeasurer = rememberTextMeasurer()
-    val titleStyle = titleTextStyle ?: MaterialTheme.typography.bodyMedium
+    val titleStyle = titleTextStyle ?: MaterialTheme.typography.bodyLarge
     val valueStyle = MaterialTheme.typography.bodySmall
     val row: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 10.dp, vertical = 6.dp),
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (icon != null || iconPainter != null) {
                 if (iconPainter != null) Icon(iconPainter, contentDescription = null,
                     modifier = Modifier.size(20.dp), tint = p.textSecondary)
@@ -135,29 +135,39 @@ fun SyQuickActionTile(
     iconPainter: Painter? = null,
 ) {
     val p = LocalSyColors.current
-    Surface(
+    // Reference atlas: icon, label and touch affordance form one clear action unit.
+    SyMaterialSurface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier,
+        modifier = modifier.heightIn(min = 80.dp),
         shape = RoundedCornerShape(SyMetric.radiusControl),
-        color = Color.Transparent,
+        tier = SyMaterialTier.L2_BAR,
+        shadowElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp)
-                .padding(horizontal = 2.dp, vertical = 6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {
-            when {
-                iconPainter != null -> Icon(iconPainter, contentDescription = null,
-                    tint = if (enabled) p.text else p.textTertiary,
-                    modifier = Modifier.size(22.dp))
-                icon != null -> Icon(icon, contentDescription = null,
-                    tint = if (enabled) p.text else p.textTertiary,
-                    modifier = Modifier.size(22.dp))
+            SyMaterialSurface(
+                modifier = Modifier.size(38.dp),
+                tier = SyMaterialTier.L3_CARD,
+                shape = RoundedCornerShape(SyMetric.radiusControl),
+                shadowElevation = 0.dp,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    when {
+                        iconPainter != null -> Icon(iconPainter, contentDescription = null,
+                            tint = if (enabled) p.text else p.textTertiary,
+                            modifier = Modifier.size(21.dp))
+                        icon != null -> Icon(icon, contentDescription = null,
+                            tint = if (enabled) p.text else p.textTertiary,
+                            modifier = Modifier.size(21.dp))
+                    }
+                }
             }
             Text(label, color = if (enabled) p.text else p.textTertiary,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 textAlign = TextAlign.Center,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
