@@ -120,6 +120,11 @@ fun SyMaterialSurface(
     val c = LocalSyColors.current
     val scene = LocalSySceneBackdrop.current
     val view = LocalView.current
+    // A separated live underlay (when available) takes priority over wallpaper.
+    // View identity prevents replaying a GraphicsLayer into a separate dialog window.
+    val liveBacking = LocalSyLiveGlassBacking.current?.takeIf {
+        it.rootView === view.rootView && it.viewport.width > 0 && it.viewport.height > 0
+    }
     val windowOnScreen = remember { IntArray(2) }
     var materialOrigin by remember { mutableStateOf(IntOffset.Zero) }
     var materialSize by remember { mutableStateOf(IntSize.Zero) }
@@ -140,12 +145,12 @@ fun SyMaterialSurface(
     )
     // Without a spatial backing, use the same palette over its canvas rather than letting
     // unrelated content show through. Nested cards inherit their parent's backing.
-    val fill = if (scene == null && backdrop == null && nested == 0)
+    val fill = if (scene == null && backdrop == null && liveBacking == null && nested == 0)
         materialFill.compositeOver(c.canvas) else materialFill
     val optics = syGlassOptics(
         colors = c, tier = resolved, fill = fill,
         reduceTransparency = LocalSyReduceTransparency.current,
-        nestedDepth = nested, hasBackdrop = scene != null || backdrop != null,
+        nestedDepth = nested, hasBackdrop = scene != null || backdrop != null || liveBacking != null,
     )
     var touchOrigin by remember(interaction) { mutableStateOf<Offset?>(null) }
     if (optics.glass && onClick != null) {
@@ -193,7 +198,11 @@ fun SyMaterialSurface(
             // aligned wallpaper. Both are sampled on the GPU and remain current while
             // the scene or the glass moves. No sibling bitmap capture is assumed.
             val sampled = if (refract || (blurRadius > 0.dp && nested == 0)) {
-                backdrop ?: scene?.let { sample ->
+                backdrop ?: liveBacking?.let { captured ->
+                    @Composable {
+                        SyPaintLiveGlassBacking(captured, materialOrigin, Modifier.fillMaxSize())
+                    }
+                } ?: scene?.let { sample ->
                     @Composable { SyPaintAlignedScene(sample, materialOrigin) }
                 }
             } else null

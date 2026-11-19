@@ -153,3 +153,9 @@
 **画面来源边界**：Compose 不能通过 `Modifier.blur` 或 `RenderEffect` 自动读取此前绘制的兄弟控件。默认折射壁纸；需要折射聊天文字时，要将那部分文字作为与前景玻璃分离的实时 `backdrop` 传入同源图层。此实现提供了原生像素折射路径，整屏任意兄弟层捕获仍需在屏幕容器内明确拆分前后层。Android 最低 API 36，可直接使用 AGSL（系统 API 33 起支持）。
 
 验证：`SyGlassOpticsTest` 覆盖选层规则和 shader 关键输入；需要以 Android JVM/仪器化测试和可见 GPU 帧率确认编译、效果和性能后才判定视频同级效果完成。
+
+## 2026-11-19 · 真正的实时兄弟图层折射
+
+`SyLiveGlassScene.kt` 以 `underlay`（实际背景页面）和 `glass`（浮动控件）两个明确图层构成：前者由 `rememberGraphicsLayer` / `drawWithContent` 在 GPU 显示列表中逐帧记录一次，后者从同一 GPU 图层读取已渲染的文字或图像，在 AGSL 中做逐像素折射。两层互不包含，避免玻璃反射被再次采样出现无限重影。尺寸、窗口坐标同步更新，手动滑动镜片会改变覆盖的字符。默认材质优先选择此共享画面，其次才是同坐标壁纸；跨窗口对话框继续取壁纸，避免跨窗口 RenderNode 误用。
+
+调试组件实验室的「04 手势」使用这条共享 GPU 渲染链路，支持滑动镜片和刷新底层文字；`SyLiquidRefractionAndroidTest` 增加了真实同级图层像素变化验证，并纳入设备端 UI 自动巡检。

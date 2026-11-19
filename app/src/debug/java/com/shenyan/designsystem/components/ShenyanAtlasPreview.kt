@@ -238,25 +238,23 @@ private fun AtlasLiquidOptics() {
         }
     }
     AtlasHeading("真实像素折射 · 玻璃透过文字")
-    Box(Modifier.fillMaxWidth().height(192.dp).clip(RoundedCornerShape(22.dp))
-        .background(substrate)) {
-        backing(Modifier)
-        SyMaterialSurface(
-            modifier = Modifier.offset(x = left.dp, y = 37.dp)
-                .width(254.dp).height(115.dp).testTag("sy-liquid-optical-lens"),
-            tier = SyMaterialTier.L2_BAR,
-            backdrop = {
-                Box(Modifier.fillMaxSize()) {
-                    backing(Modifier.offset(x = (-left).dp, y = (-37).dp))
+    SyLiveGlassScene(
+        modifier = Modifier.fillMaxWidth().height(192.dp)
+            .clip(RoundedCornerShape(22.dp)).background(substrate),
+        underlay = { backing(Modifier) },
+        glass = {
+            SyMaterialSurface(
+                modifier = Modifier.align(Alignment.TopStart).offset(x = left.dp, y = 37.dp)
+                    .width(254.dp).height(115.dp).testTag("sy-liquid-optical-lens"),
+                tier = SyMaterialTier.L2_BAR,
+            ) {
+                Box(Modifier.fillMaxSize().padding(9.dp), contentAlignment = Alignment.BottomEnd) {
+                    Text("液态光学", color = ink,
+                        style = MaterialTheme.typography.labelSmall)
                 }
-            },
-        ) {
-            Box(Modifier.fillMaxSize().padding(9.dp), contentAlignment = Alignment.BottomEnd) {
-                Text("液态光学", color = ink,
-                    style = MaterialTheme.typography.labelSmall)
             }
-        }
-    }
+        },
+    )
     Slider(value = left, onValueChange = { left = it }, valueRange = 4f..112f)
     SyButton("刷新实时文字", { revision++ }, style = SyButtonStyle.SECONDARY)
 }

@@ -42,6 +42,32 @@ class SyLiquidRefractionAndroidTest {
         assertTrue(RenderEffect.createRuntimeShaderEffect(shader, SyLiquidShader.INPUT) != null)
     }
 
+    @Test fun sharedGpuSceneRefractsRealSiblingPixelsWithoutDuplicatingContent() {
+        var underlay by mutableStateOf(Color(0xFFB73A2D))
+        compose.setContent {
+            ShenyanTheme {
+                SyLiveGlassScene(
+                    modifier = Modifier.size(width = 220.dp, height = 130.dp),
+                    underlay = { Box(Modifier.fillMaxSize().background(underlay)) },
+                    glass = {
+                        SyMaterialSurface(
+                            modifier = Modifier.fillMaxSize().testTag("real-sibling-lens"),
+                            tier = SyMaterialTier.L2_BAR,
+                        ) {}
+                    },
+                )
+            }
+        }
+        compose.waitForIdle()
+        val first = compose.onNodeWithTag("real-sibling-lens").captureToImage()
+        val firstColor = first.toPixelMap()[first.width / 2, first.height / 2]
+        compose.runOnIdle { underlay = Color(0xFF317A4B) }
+        compose.waitForIdle()
+        val second = compose.onNodeWithTag("real-sibling-lens").captureToImage()
+        val secondColor = second.toPixelMap()[second.width / 2, second.height / 2]
+        assertNotEquals("A separate underlying GPU layer must remain live", firstColor, secondColor)
+    }
+
     @Test fun lensSamplesLiveBackdropOnItsOwnGpuLayer() {
         var source by mutableStateOf(Color(0xFFCC3322))
         compose.setContent {
