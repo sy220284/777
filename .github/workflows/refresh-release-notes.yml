@@ -46,7 +46,7 @@ jobs:
           fi
 
           RELEASE_JSON="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_TAG")"
-          if ! printf '%s' "$RELEASE_JSON" | jq -e '(.body // "") | (contains("## 安装要求") or contains("## What\u0027s Changed"))' >/dev/null; then
+          if ! printf '%s' "$RELEASE_JSON" | jq -e '(.body // "") | (contains("## 安装要求") or contains("## What\u0027s Changed") or (startswith("## 本次更新") and (endswith("，") or endswith(","))))' >/dev/null; then
             echo "最新版已使用简洁说明或人工内容，不覆盖"
             exit 0
           fi
