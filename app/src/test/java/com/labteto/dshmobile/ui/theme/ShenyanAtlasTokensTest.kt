@@ -18,7 +18,7 @@ class ShenyanAtlasTokensTest {
             Color(0xFF696057),
             Color(0xFFEAD5C5),
         )
-        val themes = listOf(ShenyanPalettes.light, ShenyanPalettes.dark, ShenyanPalettes.matte)
+        val themes = listOf(ShenyanPalettes.light, ShenyanPalettes.matte)
         for (base in themes) {
             for (accent in accents) {
                 val current = base.withAccent(accent)

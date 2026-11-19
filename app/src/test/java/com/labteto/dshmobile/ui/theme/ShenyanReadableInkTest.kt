@@ -10,7 +10,7 @@ import org.junit.Test
 
 class ShenyanReadableInkTest {
     @Test fun allThemeReadingInksMeetNormalTextContrast() {
-        listOf(ShenyanPalettes.light, ShenyanPalettes.dark, ShenyanPalettes.matte).forEach { palette ->
+        listOf(ShenyanPalettes.light, ShenyanPalettes.matte).forEach { palette ->
             assertTrue("link ink", syInkContrastRatio(palette.linkInk, palette.materialL5) >= 4.5f)
             assertTrue("persona ink", syInkContrastRatio(palette.personaInk, palette.materialL5) >= 4.5f)
         }
@@ -19,7 +19,6 @@ class ShenyanReadableInkTest {
     @Test fun everySelectedAccentKeepsButtonTextReadableAcrossThemesAndStates() {
         val themes = listOf(
             SyHostThemeTokens.light to false,
-            SyHostThemeTokens.dark to true,
             SyHostThemeTokens.matteBlack to true,
         )
         for (palette in AccentPalettes.ALL) {

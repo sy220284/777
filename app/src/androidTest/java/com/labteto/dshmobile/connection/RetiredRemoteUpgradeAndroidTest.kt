@@ -77,7 +77,7 @@ class RetiredRemoteUpgradeAndroidTest {
         assertNull(current[stringPreferencesKey("session_sort")])
 
         val upgraded = HostsStore(dataStore, context).settingsOnce()
-        assertEquals("dark", upgraded.themePreference)
+        assertEquals("matte_black", upgraded.themePreference)
         assertEquals("zhusha", upgraded.accentTheme)
         assertEquals("/data/local-background.jpg", upgraded.backgroundImagePath)
         assertEquals("asset:persona", upgraded.sidebarAvatarSource)

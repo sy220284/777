@@ -42,8 +42,18 @@ class ShenyanElegantLightThemeTest {
         }
     }
 
-    @Test fun darkAndMatteKeepTheirOriginalCanvases() {
-        assertEquals(Color(0xFF24211E), resolveV6ThemePalette(ThemePreference.DARK, null, false).controls.canvas)
-        assertEquals(Color(0xFF0F0F10), resolveV6ThemePalette(ThemePreference.MATTE_BLACK, null, false).controls.canvas)
+    @Test fun matteBlackIsTheOnlyNightAppearanceIncludingSystemNight() {
+        val matte = ShenyanPalettes.matte
+        val explicit = resolveV6ThemePalette(ThemePreference.MATTE_BLACK, null, false)
+        val systemNight = resolveV6ThemePalette(ThemePreference.SYSTEM, null, true)
+        val systemDay = resolveV6ThemePalette(ThemePreference.SYSTEM, null, false)
+        assertEquals(Color(0xFF0F0F10), matte.canvas)
+        assertEquals(matte.canvas, explicit.controls.canvas)
+        assertEquals(matte.canvas, systemNight.controls.canvas)
+        assertEquals(matte.materialL5, systemNight.controls.materialL5)
+        assertEquals(ShenyanPalettes.light.canvas, systemDay.controls.canvas)
+        assertTrue(explicit.dark)
+        assertTrue(systemNight.dark)
+        assertTrue(!systemDay.dark)
     }
 }
