@@ -15,6 +15,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -127,7 +128,7 @@ fun ConversationScrollShortcut(
                     tier = SyMaterialTier.L4_OVERLAY,
                     shape = CircleShape,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(
                         if (direction == ConversationScrollTarget.START) FeatherIcons.ArrowUp
                         else FeatherIcons.ArrowDown,

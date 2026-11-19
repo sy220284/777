@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import java.io.File
 import java.io.FileOutputStream
@@ -49,6 +51,18 @@ class ShenyanAtlasVisualCaptureTest {
                 compose.onNodeWithTag("sy-atlas-scroll").assertExists()
                 capture(modeId + "-" + (index + 1).toString().padStart(2, '0'))
             }
+            // Store actual native frames before and after a user drag.
+            // The pixel archive is the reviewable visual evidence for finesse-ui.
+            compose.onNodeWithText("04 手势").performScrollTo().performClick()
+            val lens = compose.onNodeWithTag("sy-liquid-optical-lens")
+            lens.performScrollTo()
+            val start = lens.getUnclippedBoundsInRoot().left
+            capture(modeId + "-optics-at-rest")
+            lens.performTouchInput { swipeRight() }
+            compose.waitForIdle()
+            val finish = lens.getUnclippedBoundsInRoot().left
+            assertTrue("Optical lens must follow direct drag", finish > start + 10.dp)
+            capture(modeId + "-optics-after-drag")
             compose.onNodeWithText(sections.first()).performScrollTo().performClick()
             for (palette in AccentPalettes.ALL) {
                 compose.onNodeWithTag("sy-atlas-palette-" + palette.key)
@@ -56,8 +70,8 @@ class ShenyanAtlasVisualCaptureTest {
                 capture("palette-" + modeId + "-" + palette.key)
             }
         }
-        assertEquals("All 20 references plus 18 native palette samples must exist",
-            20 + AccentPalettes.ALL.size * 2,
+        assertEquals("20 references, 18 palette samples and 4 optical interaction frames",
+            24 + AccentPalettes.ALL.size * 2,
             dir.listFiles()?.count { it.extension == "png" })
     }
 }

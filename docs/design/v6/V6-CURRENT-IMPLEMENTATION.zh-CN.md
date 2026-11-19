@@ -172,3 +172,7 @@
 ## 2026-11-19 · 设备失败回溯：修正光学输入
 
 发现历史 Android 36 设备日志中的 `SyLiquidRefractionAndroidTest.lensSamplesLiveBackdropOnItsOwnGpuLayer` 失败：原记录层与应用 RenderEffect 的图层分离，背景变化后捕获的像素保持白色。已将光学处理改为单一 `graphicsLayer(renderEffect)` 直接包裹实时 `backdrop()`：RenderEffect 的 `source` 即该 GraphicsLayer 的真实子内容，每次源重绘都由 Compose 自身处理，无独立帧缓存和双录制层失配。同时新增黑白条纹边缘位移设备测试，分别排除“只出现白底”和“没有真的折射”的假阳性。验收需以本次修复后的设备回归结果确认。
+
+## 2026-11-19 · 可复查的视觉验收素材
+
+组件视觉巡检继续保存典雅白、磨砂黑各 10 组原生截屏及强调色对照；新增两套主题各自镜片静止、手势右拖后的 4 帧截图（`*-optics-at-rest.png`、`*-optics-after-drag.png`），并验证镜片真实移动。光学设备测试进一步以独立的不透明覆盖层隔离真实背景，只有 AGSL 对共享 GPU 图层采样成功才会观察到背景变化；同时保留条纹边缘变形验证。静态截图能检查造型、边缘、对比；连续拖动录像及帧率性能仍需通过设备巡检交付，图像外观不得由编译通过直接推断。

@@ -53,10 +53,14 @@ class SyLiquidRefractionAndroidTest {
                     modifier = Modifier.size(width = 220.dp, height = 130.dp),
                     underlay = { Box(Modifier.fillMaxSize().background(underlay)) },
                     glass = {
-                        SyMaterialSurface(
-                            modifier = Modifier.fillMaxSize().testTag("real-sibling-lens"),
-                            tier = SyMaterialTier.L2_BAR,
-                        ) {}
+                        // An opaque sibling blocks the ordinary underlay. Only the
+                        // REAL sampled lens can reveal a live colour change.
+                        Box(Modifier.fillMaxSize().background(Color.White)) {
+                            SyMaterialSurface(
+                                modifier = Modifier.fillMaxSize().testTag("real-sibling-lens"),
+                                tier = SyMaterialTier.L2_BAR,
+                            ) {}
+                        }
                     },
                 )
             }
