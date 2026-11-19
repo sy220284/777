@@ -220,9 +220,12 @@ fun SySegmentedControl(
         with(density) { measurer.measure(option.label, style = labelStyle, softWrap = false).size.width.toDp() }
     }
     val scroll = rememberScrollState()
-    BoxWithConstraints(modifier.selectableGroup().clip(shape)
-        .background(syMaterialColor(SyMaterialTier.L2_BAR))
-        .border(1.dp, p.border, shape).padding(2.dp)) {
+    SyMaterialSurface(
+        modifier = modifier,
+        tier = SyMaterialTier.L2_BAR,
+        shape = shape,
+    ) {
+    BoxWithConstraints(Modifier.fillMaxWidth().selectableGroup().padding(2.dp)) {
         // Equal tracks are useful only when every complete label fits. Otherwise retain
         // the natural reading direction and let the single choice track scroll.
         val equalTracks = stretch &&
@@ -281,5 +284,5 @@ fun SySegmentedControl(
                 }
             }
         }
-    }
+        }
 }
