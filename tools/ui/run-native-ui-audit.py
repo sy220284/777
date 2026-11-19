@@ -10,6 +10,7 @@ OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
 VIDEOS=OUT/'videos';VIDEOS.mkdir(exist_ok=True)
 CLASSES=[
  'com.shenyan.designsystem.components.ShenyanAtlasInteractionTest',
+ 'com.shenyan.designsystem.components.SyLiquidRefractionAndroidTest',
  'com.shenyan.designsystem.components.ShenyanAtlasVisualCaptureTest',
  'com.shenyan.designsystem.components.SyLiquidRefractionAndroidTest',
  'com.shenyan.designsystem.components.SyLiquidRefractionAndroidTest',
