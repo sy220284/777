@@ -1876,7 +1876,7 @@ private fun LocalDirectoryRow(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs),
-        tier = SyMaterialTier.L2_BAR,
+        tier = SyMaterialTier.L3_CARD,
         shape = SyShapes.row,
     ) {
         Row(
@@ -1945,7 +1945,7 @@ private fun LocalFileRow(
                 onClick = { if (selecting) controls?.toggle?.invoke(file.path) else onClick() },
                 onLongClick = if (canShare) ({ controls?.begin?.invoke(file.path) }) else null,
             ),
-        tier = SyMaterialTier.L2_BAR,
+        tier = SyMaterialTier.L3_CARD,
         shape = SyShapes.row,
         tint = if (selected) colors.selected.copy(alpha = .28f)
             else androidx.compose.ui.graphics.Color.Unspecified,

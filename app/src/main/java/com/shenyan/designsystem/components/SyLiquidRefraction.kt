@@ -168,13 +168,15 @@ internal fun SyLiquidRefractionLayer(
             touchPoint.x.coerceIn(0f, width), touchPoint.y.coerceIn(0f, height),
         )
         shader.setFloatUniform("touchAmount", pressure.coerceIn(0f, 1f))
-        shader.setFloatUniform("bendPx", min(width, height) * when (tier) {
-            SyMaterialTier.L4_OVERLAY -> .09f
-            SyMaterialTier.L2_BAR -> .12f
-            else -> .075f
-        })
-        shader.setFloatUniform("chromaPx", min(width, height) * .005f)
-        shader.setFloatUniform("edgePx", min(width, height) * .20f)
+        // Optical curvature belongs to a slim physical rim, not 20% of
+        // the item height. Keep edge highlights delicate on small list rows.
+        val shortSide = min(width, height)
+        val physicalBend = with(density) { 4.dp.toPx() }
+        val physicalEdge = with(density) { 6.dp.toPx() }
+        shader.setFloatUniform("bendPx", min(shortSide * .07f, physicalBend))
+        shader.setFloatUniform("chromaPx",
+            min(shortSide * .003f, with(density) { .8.dp.toPx() }))
+        shader.setFloatUniform("edgePx", min(shortSide * .065f, physicalEdge))
         shader.setFloatUniform("reflection", reflection.coerceIn(0f, 1f))
         shader.setColorUniform("glassTint", fill.toArgb())
         renderEffect = effect

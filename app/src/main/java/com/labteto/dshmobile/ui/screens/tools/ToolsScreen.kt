@@ -1748,7 +1748,7 @@ private fun ToolCapabilityRow(
     SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        tier = SyMaterialTier.L2_BAR,
+        tier = SyMaterialTier.L3_CARD,
         shape = SyShapes.row,
     ) {
         Row(
