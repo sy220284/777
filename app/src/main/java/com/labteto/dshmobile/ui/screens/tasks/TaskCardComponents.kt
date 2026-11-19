@@ -62,6 +62,9 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.shenyan.designsystem.components.SyPill
+import com.shenyan.designsystem.components.SyMaterialFrame
+import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.components.SySwipeActionRow
 import com.labteto.dshmobile.ui.shenyan.SyStatus
 import com.labteto.dshmobile.ui.shenyan.SyStatusPill
 import com.labteto.dshmobile.ui.components.EmptyHero
@@ -89,11 +92,12 @@ private fun TaskCardSurface(
         AutomationStatus.FAILED, AutomationStatus.BLOCKED -> colors.dangerInk.copy(alpha = 0.28f)
         else -> colors.border
     }
-    Column(
-        modifier = Modifier.fillMaxWidth()
-            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(SyMetric.radiusCard))
-            .padding(SyMetric.gapSection),
-        verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+    SyMaterialFrame(
+        modifier = Modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L3_CARD,
+        border = BorderStroke(1.dp, borderColor),
+        horizontalPadding = SyMetric.gapSection,
+        verticalPadding = SyMetric.gapSection,
         content = content,
     )
 }
@@ -164,7 +168,8 @@ internal fun TaskCard(
     }
     val timing = taskTiming(task)
 
-    TaskCardSurface(status = task.status) {
+    val cardContent: @Composable () -> Unit = {
+        TaskCardSurface(status = task.status) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -349,7 +354,14 @@ internal fun TaskCard(
                 )
             }
         }
+        }
     }
+    if (enabled) {
+        SySwipeActionRow(
+            actionLabel = stringResource(R.string.tasks_delete_confirm),
+            onAction = { confirmDelete = true },
+        ) { cardContent() }
+    } else cardContent()
 
     if (confirmApproval) {
         SyDialog(
