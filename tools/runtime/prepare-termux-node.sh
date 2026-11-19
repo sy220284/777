@@ -328,5 +328,55 @@ for android_abi in "${requested_abis[@]}"; do
   esac
 done
 
+# npm is JavaScript, not an Android-native executable. Bundle the verified CLI source
+# and let the app's already-shipped Node executable interpret it from app-private data.
+NPM_VERSION="11.6.2"
+NPM_SHA512="ee22b335fcbc95662cdf3ab8a053daf045d9cf9c6df6040d28965abb707512b2c16fa6c5eec049d34c74f78f390cebd14f697919eadb97756564d4f9eccc4954"
+npm_archive="$CACHE_DIR/npm-$NPM_VERSION.tgz"
+if ! printf '%s  %s\n' "$NPM_SHA512" "$npm_archive" | sha512sum -c - >/dev/null 2>&1; then
+  if [ "${DSH_RUNTIME_OFFLINE:-false}" = true ]; then
+    echo "缺少已校验的 npm 离线归档：$npm_archive" >&2
+    exit 1
+  fi
+  rm -f "$npm_archive"
+  runtime_download -fL --retry 3 --connect-timeout 15 \
+    "https://registry.npmjs.org/npm/-/npm-$NPM_VERSION.tgz" -o "$npm_archive"
+fi
+printf '%s  %s\n' "$NPM_SHA512" "$npm_archive" | sha512sum -c - >/dev/null || exit 1
+python3 - "$npm_archive" "$OUT_ROOT/assets/runtime/node/npm" "$NPM_VERSION" <<'PY'
+import json
+import pathlib
+import shutil
+import sys
+import tarfile
+
+archive, raw_target, version = sys.argv[1:]
+target = pathlib.Path(raw_target)
+target.mkdir(parents=True, exist_ok=True)
+total = 0
+with tarfile.open(archive, mode="r:gz") as contents:
+    for member in contents:
+        parts = pathlib.PurePosixPath(member.name).parts
+        if not parts or parts[0] != "package" or "." in parts or ".." in parts:
+            raise SystemExit(f"npm archive has invalid path: {member.name}")
+        if not (member.isdir() or member.isfile()):
+            raise SystemExit(f"npm archive contains non-regular entry: {member.name}")
+        destination = target.joinpath(*parts)
+        if member.isdir():
+            destination.mkdir(parents=True, exist_ok=True)
+            continue
+        total += member.size
+        if total > 90 * 1024 * 1024:
+            raise SystemExit("npm archive exceeds maximum unpacked size")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with contents.extractfile(member) as source, destination.open("wb") as output:
+            shutil.copyfileobj(source, output)
+cli = target / "package/bin/npm-cli.js"
+manifest = target / "package/package.json"
+if not cli.is_file() or json.loads(manifest.read_text(encoding="utf-8"))["version"] != version:
+    raise SystemExit("npm CLI manifest or version verification failed")
+PY
+printf '%s\n' "$NPM_VERSION" > "$OUT_ROOT/assets/runtime/node/npm-version.txt"
+
 printf '%s\n' "$NODE_RUNTIME_VERSION" > "$OUT_ROOT/assets/runtime/node/node-version.txt"
 echo "Node runtime prepared: $NODE_RUNTIME_VERSION"
