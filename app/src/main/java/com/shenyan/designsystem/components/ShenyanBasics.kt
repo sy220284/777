@@ -87,8 +87,8 @@ fun SyButton(
         SyButtonStyle.OUTLINE -> syMaterialColor(SyMaterialTier.L1_SECTION)
     }
     val foreground = if (!enabled) c.textTertiary else when (style) {
-        SyButtonStyle.PRIMARY -> c.onPrimary
-        SyButtonStyle.DANGER -> Color(0xFF241613)
+        SyButtonStyle.PRIMARY -> com.shenyan.designsystem.foundation.syReadableInk(c.onPrimary, fill)
+        SyButtonStyle.DANGER -> com.shenyan.designsystem.foundation.syReadableInk(c.text, fill)
         else -> c.text
     }
     Surface(
@@ -168,8 +168,12 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyModalSheet(onDismiss: () -> Unit, title: String, content: @Composable ColumnScope.() -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp), content = {
+    ModalBottomSheet(onDismissRequest = onDismiss,
+        containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY),
+        contentColor = LocalSyColors.current.text,
+        shape = RoundedCornerShape(topStart = SyMetric.radiusSheet, topEnd = SyMetric.radiusSheet),
+        tonalElevation = 0.dp) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 22.dp, vertical = 14.dp), content = {
             Text(title, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(14.dp))
             content()
@@ -242,7 +246,7 @@ fun SySearchBar(
 
 @Composable
 fun SyToast(text: String, modifier: Modifier = Modifier) {
-    Surface(modifier, color = LocalSyColors.current.text, shape = RoundedCornerShape(SyMetric.radiusControl)) {
+    Surface(modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }, color = LocalSyColors.current.text, shape = RoundedCornerShape(SyMetric.radiusControl)) {
         Text(text, Modifier.padding(14.dp), color = LocalSyColors.current.canvas)
     }
 }

@@ -69,6 +69,7 @@ fun SyResponsiveSheet(
     seamlessBackground: Boolean = true,
     dimScrimWhenSeamless: Boolean = true,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
+    allowPartialExpansion: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = LocalSyPalette.current
@@ -77,7 +78,7 @@ fun SyResponsiveSheet(
     val maxBodyHeight = cfg.screenHeightDp.dp * scrollBodyHeightFraction
     val dismissal = rememberUpdatedState(dismissEnabled)
     val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
+        skipPartiallyExpanded = !allowPartialExpansion,
         confirmValueChange = { next -> dismissal.value || next != SheetValue.Hidden },
     )
     val reducedMotion = LocalSyReducedMotion.current

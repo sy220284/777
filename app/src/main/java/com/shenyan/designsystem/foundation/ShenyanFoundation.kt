@@ -40,7 +40,7 @@ data class SyColors(
     val primaryPressed: Color = Color(0xFFD9926B),
     val onPrimary: Color = Color(0xFF3A342D),
     val mint: Color = Color(0xFF7FBFA8),
-    val lilac: Color = Color(0xFFB9A0D4),
+    val lilac: Color = Color(0xFF8E9A72),
     val warning: Color = Color(0xFFE0A458),
     val danger: Color = Color(0xFFD9705F),
     val selected: Color,
@@ -51,7 +51,7 @@ data class SyColors(
     val actionFill: Color get() = primary
     val actionInk: Color get() = onPrimary
     val linkInk: Color get() = syReadableInk(
-        if (primary == Color(0xFFE8A87C)) Color(0xFF44618C) else primary, materialL5)
+        lerp(primary, text, .18f), materialL5)
     val personaInk: Color get() = syReadableInk(lilac, materialL5)
     val successInk: Color get() = if (text.luminance() < .5f) Color(0xFF2E6755) else mint
     val warningInk: Color get() = if (text.luminance() < .5f) Color(0xFF80511F) else warning
@@ -115,6 +115,21 @@ private val Matte = SyColors(
     textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
     selected = Color(0xFF573F30), overlay = Color(0x99000000)
 )
+
+/** Build a high-contrast, scene-coordinated accent rather than a fixed theme colour list.
+ * The host chooses the hue; every component consumes the same semantic palette.
+ */
+fun SyColors.withAccent(accent: Color): SyColors {
+    val opaque = accent.copy(alpha = 1f)
+    val onAccent = if (syInkContrastRatio(Color.Black, opaque) >= 4.5f)
+        Color.Black else Color.White
+    return copy(
+        primary = opaque,
+        primaryPressed = lerp(opaque, text, .14f),
+        onPrimary = onAccent,
+        selected = lerp(opaque, surfaceSolid, .76f),
+    )
+}
 
 /** Published read-only palettes; one source for Figma, native and migration adapters. */
 object ShenyanPalettes {
@@ -190,6 +205,10 @@ object SyMotion {
     const val selectMs = 150
     const val dialogMs = 220
     const val sheetMs = 280
+    const val sheetDragSettleMs = 240
+    const val swipeRevealMs = 220
+    const val onboardingMs = 280
+    const val skeletonPulseMs = 950
     const val pushMs = 260
     const val morphMs = 260
     const val toolExpandMs = 170
@@ -225,13 +244,15 @@ fun ShenyanTheme(
     mode: ShenyanMode = ShenyanMode.LIGHT,
     reduceMotion: Boolean = false,
     reduceTransparency: Boolean = false,
+    accentColor: Color? = null,
     content: @Composable () -> Unit
 ) {
-    val colors = when (mode) {
+    val baseColors = when (mode) {
         ShenyanMode.LIGHT -> Light
         ShenyanMode.DARK -> Dark
         ShenyanMode.MATTE -> Matte
     }
+    val colors = accentColor?.let(baseColors::withAccent) ?: baseColors
     val scheme = (if (mode == ShenyanMode.LIGHT) lightColorScheme(
         primary = colors.primary, onPrimary = colors.onPrimary,
         background = colors.canvas, onBackground = colors.text,
