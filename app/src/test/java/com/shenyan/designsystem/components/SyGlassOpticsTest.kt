@@ -54,7 +54,7 @@ class SyGlassOpticsTest {
         val fill = Color(0xF7FFFFFF)
         val clear = syLiquidTint(fill, Color.Unspecified)
         val accented = syLiquidTint(fill, Color(0xFFAACCFF))
-        assertTrue(clear.alpha in .65f.. .74f)
+        assertTrue(clear.alpha >= .65f && clear.alpha <= .74f)
         assertEquals(clear.alpha, accented.alpha, .002f)
         assertTrue(accented.red < clear.red)
     }
