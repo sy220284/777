@@ -3,29 +3,59 @@ name: Android 能力契约回归
 'on':
   pull_request:
     paths:
-      # Changes in Chat, Work, Session, Model, Tool, UI and any shared Harness
-      # require the same compilation/contract checks. Narrow historical filters
-      # left cross-feature regressions untested.
-      - 'app/src/**'
-      - 'app/build.gradle.kts'
-      - 'core/src/**'
-      - 'harness-core/src/**'
-      - 'harness-interop/src/**'
-      - 'harness-device-android/src/**'
-      - 'harness-runtime-android/src/**'
+      - 'app/**'
+      - 'core/**'
+      - 'harness-core/**'
+      - 'harness-interop/**'
+      - 'harness-device-android/**'
+      - 'harness-runtime-android/**'
+      - 'reference-validation/**'
+      - 'tools/ui/**'
+      - 'tools/ci/run_prebuilt_android_tests.py'
+      - 'tools/ci/test_run_prebuilt_android_tests.py'
+      - 'tools/ci/select_android_checks.py'
+      - 'tools/ci/test_select_android_checks.py'
+      - 'tools/runtime/**'
+      - 'tools/fonts/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - '.github/actions/setup-android-cached/**'
       - '.github/workflows/android-capability-contract.yml'
+      - '.github/workflows/runtime-user-journey.yml'
+      - '.github/workflows/extension-marketplace-check.yml'
+      - '.github/workflows/extension-marketplace-device-test.yml'
+      - '.github/workflows/session-storage-device-test.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-capability-${{ github.workflow }}-${{ github.ref }}
+  group: android-unified-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  contracts:
-    name: 编译、单元测试与调试包验证
+  plan:
+    name: 识别需要执行的设备检查
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.select.outputs.ui }}
+      market: ${{ steps.select.outputs.market }}
+      migration: ${{ steps.select.outputs.migration }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - id: select
+        name: 根据实际变更选择设备测试组
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 tools/ci/select_android_checks.py
+
+  shared-tests:
+    name: 共享模块与 Android 能力契约测试
     runs-on: ubuntu-latest
     timeout-minutes: 70
     steps:
@@ -38,13 +68,253 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
-      # Shared capability contracts run first. A failing fast core/MCP test must not wait
-      # behind the full Android application test suite on every corrective commit.
-      - name: 共享运行时、进程隔离、MCP 与设备能力完整单元测试
+      - name: 检查设备执行器、报告解析与测试范围选择
+        run: |
+          python3 -m unittest discover -s tools/ci -p 'test_run_prebuilt_android_tests.py' -v
+          python3 -m unittest discover -s tools/ci -p 'test_select_android_checks.py' -v
+      - name: 共享运行时、MCP、进程隔离与设备契约全量单测
         run: ./gradlew --max-workers=2 :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :reference-validation:test --stacktrace --console=plain
-      - name: 应用 JVM 单元测试
-        run: ./gradlew --max-workers=2 :app:testDebugUnitTest --stacktrace --console=plain
-      - name: 编译 Android 界面测试代码
-        run: ./gradlew --max-workers=2 :app:compileDebugAndroidTestKotlin --stacktrace --console=plain
-      - name: 构建可安装的调试包
-        run: ./gradlew --max-workers=2 :app:assembleDebug --stacktrace --console=plain
+
+  android-apks:
+    name: 应用全量 JVM 单测与统一 APK 构建
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      DSH_RUNTIME_ABIS: x86_64
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 27
+      - uses: ./.github/actions/setup-android-cached
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - name: 单次执行应用 JVM 单测、UI 测试编译及双 APK 构建
+        run: ./gradlew --max-workers=2 :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --console=plain
+      - name: 生成并校验本提交 APK 摘要
+        run: |
+          sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk > app/build/outputs/apk/SHA256SUMS
+          sha256sum -c app/build/outputs/apk/SHA256SUMS
+      - name: 上传统一 Android 测试 APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-device-test-apks
+          path: app/build/outputs/apk/
+          if-no-files-found: error
+          retention-days: 3
+      - name: 保存应用 JVM 单测报告
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-android-app-unit-results
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 7
+
+  user-journey:
+    needs: [plan, android-apks]
+    if: needs.plan.outputs.ui == 'true'
+    name: Android ${{ matrix.android.api }} 聊天工作权限与结果展示实测
+    strategy:
+      fail-fast: false
+      matrix:
+        android:
+          - api: '36'
+            target: google_apis
+          - api: '37.0'
+            target: google_apis_ps16k
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      DSH_RUNTIME_ABIS: x86_64
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 27
+      - uses: ./.github/actions/setup-android-cached
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-device-test-apks
+          path: app/build/outputs/apk/
+      - name: 校验与构建提交绑定的 APK
+        run: sha256sum -c app/build/outputs/apk/SHA256SUMS
+      - name: 检查录屏分段与视频完整性
+        run: python3 -m unittest discover -s tools/ui -p 'test_device_video.py' -v
+      - name: 检查模拟器 KVM
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: 聊天、工作、团队、授权和界面原生回归
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DSH_NATIVE_UI_PREBUILT_APKS: '1'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: ${{ matrix.android.api }}
+          target: ${{ matrix.android.target }}
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: python3 tools/ui/run-native-ui-audit.py
+      - name: 输出测试失败断言
+        if: failure()
+        run: |
+          find app/build/outputs/androidTest-results -type f -name '*.xml' -print -exec grep -n -A 16 -B 3 -E '<failure|<error' {} \; || true
+      - name: 保存 Android 用户路径测试结果
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: 777-ui-videos-and-results-${{ matrix.android.api }}
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+            app/build/outputs/ui-audit/
+          if-no-files-found: warn
+          retention-days: 30
+
+  extension-device:
+    needs: [plan, android-apks]
+    if: needs.plan.outputs.market == 'true'
+    name: Android 36 插件凭据与扩展市场交互实测
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 27
+      - uses: ./.github/actions/setup-android-cached
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-device-test-apks
+          path: app/build/outputs/apk/
+      - name: 校验同一提交的 APK
+        run: sha256sum -c app/build/outputs/apk/SHA256SUMS
+      - name: 检查模拟器 KVM
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: 使用已构建 APK 测试市场、OAuth、凭据及 Worker
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: >-
+            python3 tools/ui/device_video.py --name extension-market
+            --output app/build/outputs/ui-audit/videos --
+            python3 tools/ci/run_prebuilt_android_tests.py
+            --suite extension-market --classes
+            com.labteto.dshmobile.ui.screens.tools.PluginInventoryBrowserRegressionTest,com.labteto.dshmobile.local.tools.LocalMcpCredentialStoreAndroidTest,com.labteto.dshmobile.local.tools.LocalMcpOAuthCallbackAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpPluginWorkerCallerAndroidTest,com.labteto.dshmobile.local.tools.ipc.McpExternalLoopbackProtocolAndroidTest
+      - name: 输出测试失败断言
+        if: failure()
+        run: |
+          find app/build/outputs/androidTest-results -type f -name '*.xml' -print -exec grep -n -A 16 -B 3 -E '<failure|<error' {} \; || true
+      - name: 保存插件回归报告与录像
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: extension-market-device-test-videos-and-results
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/outputs/ui-audit/videos/
+          if-no-files-found: warn
+          retention-days: 30
+
+  session-migration:
+    needs: [plan, android-apks]
+    if: needs.plan.outputs.migration == 'true'
+    name: Android 36 SQLite 迁移与附件完整性实测
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 27
+      - uses: ./.github/actions/setup-android-cached
+        with:
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: 777-device-test-apks
+          path: app/build/outputs/apk/
+      - name: 校验同一提交的 APK
+        run: sha256sum -c app/build/outputs/apk/SHA256SUMS
+      - name: 检查模拟器 KVM
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: 使用已构建 APK 测试数据库升级、恢复与附件
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: >-
+            python3 tools/ci/run_prebuilt_android_tests.py
+            --suite session-storage --classes
+            com.labteto.dshmobile.local.session.SqliteRequestDeltaMigrationAndroidTest,com.labteto.dshmobile.local.session.SqliteEventSearchBlockIndexAndroidTest,com.labteto.dshmobile.local.session.SqliteQueuedTranscriptDeltaAndroidTest,com.labteto.dshmobile.local.session.LocalLegacySqliteMigrationAndroidTest,com.labteto.dshmobile.local.attachment.SqliteLocalAssetCatalogAndroidTest,com.labteto.dshmobile.local.session.SqliteImageAttachmentGcAndroidTest,com.labteto.dshmobile.local.session.SqliteStorageArchiveAndroidTest,com.labteto.dshmobile.local.session.SqliteSessionMediaRestoreAndroidTest,com.labteto.dshmobile.local.attachment.LocalPdfScopedRequestAndroidTest,com.labteto.dshmobile.local.usage.TokenUsageDatabaseAndroidTest
+      - name: 输出测试失败断言
+        if: failure()
+        run: |
+          find app/build/outputs/androidTest-results -type f -name '*.xml' -print -exec grep -n -A 16 -B 3 -E '<failure|<error' {} \; || true
+      - name: 保存数据库迁移报告
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: session-storage-v7-android-tests
+          path: app/build/outputs/androidTest-results/connected/
+          if-no-files-found: warn
+          retention-days: 7
+
+  required:
+    name: Android 完整验收门禁
+    if: always()
+    needs: [plan, shared-tests, android-apks, user-journey, extension-device, session-migration]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 逐项核对所有测试结果
+        env:
+          RESULTS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          results = json.loads(os.environ["RESULTS_JSON"])
+          for name, item in sorted(results.items()):
+              print(f"{name}: {item['result']}")
+          chosen = results['plan']['outputs']
+          conditional = {
+              'user-journey': chosen.get('ui') == 'true',
+              'extension-device': chosen.get('market') == 'true',
+              'session-migration': chosen.get('migration') == 'true',
+          }
+          failures = []
+          for name, item in results.items():
+              if name in conditional and not conditional[name] and item['result'] == 'skipped':
+                  continue
+              if item['result'] != 'success':
+                  failures.append(name)
+          if failures:
+              sys.exit("Android 验收未完成：" + ", ".join(failures))
+          print("所有本次需要执行的测试均已真实通过")
+          PY
