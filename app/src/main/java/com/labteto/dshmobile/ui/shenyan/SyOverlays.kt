@@ -90,6 +90,10 @@ import com.shenyan.designsystem.foundation.SyMotion
 import com.shenyan.designsystem.foundation.LocalSyMotionTempo
 import kotlinx.coroutines.delay
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.roundToInt
 /** The only native generic dialog: V5 L4, correct back and explicit scrim behavior. */
 @Composable
 fun SyDialog(
@@ -295,6 +299,164 @@ fun SyPopupMenu(
                 modifier = Modifier.heightIn(min = SyMetric.touch)
                     .testTag("menu-item:" + item.text),
             )
+        }
+    }
+}
+
+/**
+ * Position a conversation menu relative to the actual long-press point, rather than to
+ * the drawer row's top edge. The same calculation anchors the top-bar overflow menu.
+ * Coordinates and dimensions are in window pixels, so density is converted only once.
+ */
+internal fun conversationMenuPosition(
+    anchorBounds: IntRect,
+    windowSize: IntSize,
+    menuSize: IntSize,
+    touchOffset: Offset?,
+    layoutDirection: LayoutDirection,
+    marginPx: Int,
+    fingerGapPx: Int,
+): IntOffset {
+    val maxX = (windowSize.width - menuSize.width - marginPx).coerceAtLeast(0)
+    val minX = marginPx.coerceAtMost(maxX)
+    val preferredX = if (touchOffset != null) {
+        anchorBounds.left + touchOffset.x.roundToInt() - (menuSize.width * .25f).roundToInt()
+    } else if (layoutDirection == LayoutDirection.Ltr) {
+        anchorBounds.right - menuSize.width
+    } else {
+        anchorBounds.left
+    }
+    val x = preferredX.coerceIn(minX, maxX)
+    val referenceY = if (touchOffset == null) null
+        else anchorBounds.top + touchOffset.y.roundToInt()
+    val below = (referenceY ?: anchorBounds.bottom) + fingerGapPx
+    val above = (referenceY ?: anchorBounds.top) - menuSize.height - fingerGapPx
+    val maxY = (windowSize.height - menuSize.height - marginPx).coerceAtLeast(0)
+    val minY = marginPx.coerceAtMost(maxY)
+    val y = when {
+        below <= maxY -> below
+        above >= minY -> above
+        // A huge menu or very small window: keep every reachable action on-screen.
+        else -> below.coerceIn(minY, maxY)
+    }
+    return IntOffset(x, y.coerceIn(minY, maxY))
+}
+
+/**
+ * Shared floating conversation-action surface. Finger anchoring is optional: header
+ * overflow is anchored to its icon, while drawer long-press is anchored to the touch.
+ * The popup remains alive for its short exit animation and respects reduced motion.
+ */
+@Composable
+fun SyConversationActionPopup(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    items: List<SyMenuItem>,
+    touchOffset: Offset? = null,
+    primaryActionCount: Int = 0,
+) {
+    val transition = remember { MutableTransitionState(false) }
+    LaunchedEffect(expanded) { transition.targetState = expanded }
+    if (!expanded && !transition.currentState && !transition.targetState) return
+
+    val palette = LocalSyColors.current
+    val density = LocalDensity.current
+    val marginPx = with(density) { 12.dp.roundToPx() }
+    val gapPx = with(density) { 12.dp.roundToPx() }
+    val positionProvider = remember(touchOffset, marginPx, gapPx) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset = conversationMenuPosition(
+                anchorBounds, windowSize, popupContentSize, touchOffset,
+                layoutDirection, marginPx, gapPx,
+            )
+        }
+    }
+    val duration = SyMotion.duration(SyMotion.dialogMs,
+        LocalSyReduceMotion.current, LocalSyMotionTempo.current)
+    val configuration = LocalConfiguration.current
+    val maxWidth = (configuration.screenWidthDp.dp - 24.dp).coerceAtMost(292.dp)
+    val maxHeight = (configuration.screenHeightDp.dp * .72f).coerceAtLeast(180.dp)
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(
+            focusable = true,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            clippingEnabled = true,
+        ),
+    ) {
+        AnimatedVisibility(
+            visibleState = transition,
+            enter = fadeIn(tween(duration)) +
+                scaleIn(initialScale = .93f, transformOrigin = TransformOrigin(.25f, 0f),
+                    animationSpec = tween(duration)) +
+                slideInVertically(initialOffsetY = { -it / 14 }, animationSpec = tween(duration)),
+            exit = fadeOut(tween(duration / 2)) +
+                scaleOut(targetScale = .97f, transformOrigin = TransformOrigin(.25f, 0f),
+                    animationSpec = tween(duration / 2)),
+        ) {
+            SyMaterialSurface(
+                modifier = Modifier.widthIn(min = 220.dp.coerceAtMost(maxWidth), max = maxWidth)
+                    .testTag("conversation-action-popup"),
+                shape = RoundedCornerShape(22.dp),
+                tier = SyMaterialTier.L4_OVERLAY,
+                border = BorderStroke(1.dp, palette.border.copy(alpha = .72f)),
+                shadowElevation = 18.dp,
+            ) {
+                Column(Modifier.heightIn(max = maxHeight)
+                    .verticalScroll(rememberScrollState())
+                    .padding(6.dp)) {
+                    items.forEachIndexed { index, item ->
+                        if ((primaryActionCount > 0 && index == primaryActionCount) ||
+                            (item.danger && index > 0)) {
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp)
+                                .height(1.dp).background(palette.border.copy(alpha = .55f)))
+                        }
+                        val ink = if (item.danger) palette.dangerInk else palette.text
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .heightIn(min = SyMetric.touch)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (item.danger) palette.dangerInk.copy(alpha = .045f)
+                                    else Color.Transparent)
+                                .clickable {
+                                    onDismiss()
+                                    item.onClick()
+                                }
+                                .testTag("menu-item:" + item.text)
+                                .padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            if (item.icon != null) {
+                                Box(
+                                    modifier = Modifier.size(32.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(ink.copy(alpha = if (item.danger) .11f else .07f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(item.icon, contentDescription = null,
+                                        tint = if (item.danger) palette.dangerInk
+                                            else palette.textSecondary,
+                                        modifier = Modifier.size(19.dp))
+                                }
+                            }
+                            Text(
+                                item.text, color = ink,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

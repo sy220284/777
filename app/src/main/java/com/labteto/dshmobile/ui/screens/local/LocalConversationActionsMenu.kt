@@ -10,12 +10,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyIconButton
-import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
+import com.labteto.dshmobile.ui.shenyan.SyConversationActionPopup
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.ConversationMenuIcons
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 
-/** Session actions remain anchored beside the tapped icon, matching the context-menu surface. */
+/** Top-bar actions use the same animated action surface as drawer long-press menus. */
 @Composable
 internal fun ConversationActionsMenu(
     pinned: Boolean,
@@ -39,11 +39,10 @@ internal fun ConversationActionsMenu(
             onClick = { expanded = true },
             tint = colors.textSecondary,
         )
-        SyPopupMenu(
+        SyConversationActionPopup(
             expanded = expanded,
             onDismiss = { expanded = false },
-            // Match the attachment + menu: paint the aligned chat scene, not an opaque L4 plate.
-            seamlessBackground = true,
+            primaryActionCount = listOfNotNull(onSearchMessages, onOpenWorkEvidence, onOpenDocuments, onOpenSample).size,
             items = onSearchMessages?.let { open -> listOf(SyMenuItem(
                 text = stringResource(R.string.sy_v6_search_messages), icon = FeatherIcons.Search, onClick = open,
             )) }.orEmpty() + onOpenWorkEvidence?.let { open -> listOf(SyMenuItem(

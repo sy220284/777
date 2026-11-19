@@ -2,6 +2,7 @@ package com.labteto.dshmobile.ui.screens.local
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
@@ -192,6 +193,34 @@ class LocalDrawerEntryVisibilityRegressionTest {
         compose.onNodeWithText(context.getString(R.string.common_rename)).assertExists()
         compose.onNodeWithText(deleteLabel).performClick()
         compose.runOnIdle { assertEquals(1, deleteRequests) }
+    }
+
+    @Test
+    fun longPressSessionOpensFingerAnchoredMenuAndKeepsActionsReachable() {
+        var renamed = 0
+        compose.setContent {
+            DshTheme {
+                LocalSessionDrawerRow(
+                    session = LocalSessionSummary(id = "touch-menu", title = "触点定位会话", updatedAt = 1L),
+                    displayTitle = "触点定位会话",
+                    galleryEntry = null,
+                    current = false,
+                    pinned = false,
+                    running = false,
+                    selected = false,
+                    selectionOpen = false,
+                    onClick = {},
+                    onSelectMultiple = {},
+                    onRename = { renamed++ },
+                    onTogglePinned = {},
+                    onDelete = {},
+                )
+            }
+        }
+        compose.onNodeWithText("触点定位会话").performTouchInput { longClick() }
+        compose.onNodeWithTag("conversation-action-popup").assertExists()
+        compose.onNodeWithTag("menu-item:" + context.getString(R.string.common_rename)).performClick()
+        compose.runOnIdle { assertEquals(1, renamed) }
     }
 
 }

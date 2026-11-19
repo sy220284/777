@@ -82,11 +82,24 @@ def drawer():
  raise RuntimeError('Sidebar did not open after tapping the navigation control')
 
 def home():
+ def is_conversation(t):
+  return not drawer_visible(t) and bool(candidates(t,strings['app_open_navigation']))
+ t=tree()
+ if is_conversation(t):return
+ # Back is asynchronous: wait for the observed navigation state after each key event.
+ # Never declare success until the actual conversation controls are visible.
  for _ in range(4):
-  t=tree()
-  if not drawer_visible(t) and candidates(t,strings['app_open_navigation']):return
   adb('shell','-n','input','keyevent','4')
- raise RuntimeError('Could not return to conversation')
+  deadline=time.monotonic()+3
+  while time.monotonic()<deadline:
+   t=tree()
+   if is_conversation(t):return
+   time.sleep(.25)
+ # Preserve the actual UI hierarchy on failure, instead of hiding a navigation defect.
+ ET.ElementTree(t).write(out/'home-return-failure.xml',encoding='utf-8')
+ visible=[n.get('text') or n.get('content-desc') for n in t.iter('node')
+  if n.get('text') or n.get('content-desc')]
+ raise RuntimeError('Could not return to conversation after 4 verified Back events; visible controls: '+repr(visible[:35]))
 
 def page(resource,name):
  drawer();tap(strings[resource]);snapshot(name);home()
