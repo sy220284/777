@@ -594,6 +594,8 @@ fun SyMediaTransport(
     modifier: Modifier = Modifier,
     onPrevious: (() -> Unit)? = null,
     onNext: (() -> Unit)? = null,
+    enabled: Boolean = true,
+    seekable: Boolean = true,
 ) {
     val p = LocalSyColors.current
     Surface(modifier, shape = RoundedCornerShape(SyMetric.radiusCard),
@@ -603,6 +605,7 @@ fun SyMediaTransport(
             Text(title, color = p.text, style = MaterialTheme.typography.titleMedium,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
             Slider(value = progress.coerceIn(0f, 1f), onValueChange = onSeek,
+                enabled = seekable,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(thumbColor = p.primary,
                     activeTrackColor = p.primary,
@@ -621,7 +624,7 @@ fun SyMediaTransport(
                 }
                 SyIconButton(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                     if (playing) "暂停" else "播放", onPlayPause,
-                    selected = true, iconSize = 24.dp)
+                    enabled = enabled, selected = true, iconSize = 24.dp)
                 onNext?.let {
                     SyIconButton(Icons.Default.SkipNext, "下一项", it, bare = true)
                 }

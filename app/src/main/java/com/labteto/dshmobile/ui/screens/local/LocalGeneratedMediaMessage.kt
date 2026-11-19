@@ -7,6 +7,7 @@ import com.shenyan.designsystem.foundation.SyMetric
 import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMediaTransport
 
 
 import android.content.ClipData
@@ -926,15 +927,8 @@ internal fun InlineSpeechPlayer(file: File) {
             delay(300)
         }
     }
-    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
-        SyButton(
-            text = if (playing) resources.getString(R.string.media_chat_pause_audio)
-                else resources.getString(R.string.media_chat_play_audio),
-            size = SyButtonSize.Small,
-            enabled = !preparing,
-            onClick = {
-                if (preparing) return@SyButton
+    fun togglePlayback() {
+                if (preparing) return
                 error = null
                 runCatching {
                     val current = player
@@ -997,23 +991,24 @@ internal fun InlineSpeechPlayer(file: File) {
                     player?.let { playerOwner.releaseIfOwned(it) }
                     player = null
                 }
-            },
-        )
-        Text(
-            "${formatMediaDuration(positionMs)} / ${formatMediaDuration(durationMs)}",
-            style = SyType.caption11.withReadingWeight(),
-            color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
-        )
     }
-    androidx.compose.material3.Slider(
-        value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
-        onValueChange = { fraction ->
+    SyMediaTransport(
+        title = file.nameWithoutExtension.ifBlank { resources.getString(R.string.media_chat_play_audio) },
+        playing = playing,
+        progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
+        elapsedLabel = formatMediaDuration(positionMs),
+        durationLabel = formatMediaDuration(durationMs),
+        onPlayPause = ::togglePlayback,
+        onSeek = { fraction ->
             val target = (durationMs * fraction).toInt().coerceIn(0, durationMs)
             runCatching { player?.seekTo(target) }.onSuccess { positionMs = target }
         },
-        enabled = durationMs > 0,
-        modifier = Modifier.fillMaxWidth(),
+        enabled = !preparing,
+        seekable = durationMs > 0 && player != null,
     )
+    if (preparing) Text(resources.getString(R.string.common_loading),
+        style = SyType.caption11.withReadingWeight(),
+        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
     error?.let { Text(it, style = SyType.caption11.withReadingWeight(),
         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary) }
 }
