@@ -42,6 +42,11 @@ class LocalLegacySqliteMigrationAndroidTest {
                     })
                     events.importLegacyEvents("a-older-session", legacy)
                     assertEquals(1L, catalog.pendingReferenceCount(hash))
+                    // The first backfill pass consumes this newly imported event;
+                    // its references are already indexed atomically, so replay
+                    // must not duplicate the unresolved reference.
+                    assertEquals(1, catalog.reconcileCommittedEvents())
+                    assertEquals(1L, catalog.pendingReferenceCount(hash))
                     assertEquals(0, catalog.reconcileCommittedEvents())
                 } finally { legacy.close() }
                 events.clearSession("a-older-session")
