@@ -1,7 +1,6 @@
 package com.shenyan.designsystem.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -10,11 +9,11 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,8 +41,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -527,17 +524,6 @@ fun SySwipeActionRow(
     Box(modifier.fillMaxWidth().clip(RoundedCornerShape(SyMetric.radiusControl))
         .semantics {
             stateDescription = if (open) "操作已展开" else "左滑展开操作"
-            customActions = listOf(
-                CustomAccessibilityAction(if (open) "收起操作" else "展开操作") {
-                    open = !open
-                    true
-                },
-                CustomAccessibilityAction(actionLabel) {
-                    onAction()
-                    open = false
-                    true
-                },
-            )
         }) {
         if (open || dragging) {
             Surface(onClick = { onAction(); open = false },
@@ -656,74 +642,5 @@ fun SyChatComposer(
                 selected = value.isNotBlank() && enabled,
                 iconSize = 21.dp)
         }
-    }
-}
-
-
-/** Persistent mini-player: playback ownership remains with the caller. */
-@Composable
-fun SyMiniPlayer(
-    title: String,
-    subtitle: String?,
-    playing: Boolean,
-    onPlayPause: () -> Unit,
-    onExpand: () -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val p = LocalSyColors.current
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(SyMetric.radiusCard),
-        color = p.materialL4,
-        border = androidx.compose.foundation.BorderStroke(1.dp, p.border)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Surface(onClick = onExpand, modifier = Modifier.weight(1f),
-                color = Color.Transparent) {
-                Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    Text(title, style = MaterialTheme.typography.bodyMedium, color = p.text,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    subtitle?.let {
-                        Text(it, style = MaterialTheme.typography.labelSmall,
-                            color = p.textSecondary, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-            SyIconButton(
-                icon = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (playing) "暂停播放" else "继续播放",
-                onClick = onPlayPause, selected = true,
-            )
-            SyIconButton(icon = Icons.Default.Close,
-                contentDescription = "关闭迷你播放器",
-                onClick = onClose, bare = true)
-        }
-    }
-}
-
-/** Real progress only: displays values supplied by an authoritative task owner. */
-@Composable
-fun SyProgressRing(
-    progress: Float,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    val p = LocalSyColors.current
-    val value by animateFloatAsState(
-        progress.coerceIn(0f, 1f),
-        tween(SyMotion.duration(SyMotion.progressMs,
-            LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
-        label = "syRealProgress",
-    )
-    Box(modifier.size(86.dp).semantics {
-        stateDescription = "${(progress.coerceIn(0f, 1f) * 100).roundToInt()}%，${label}"
-    }, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(
-            progress = { value }, modifier = Modifier.fillMaxSize(),
-            color = p.primary, trackColor = p.textTertiary.copy(alpha = .2f),
-            strokeWidth = 5.dp,
-        )
-        Text("${(value * 100).roundToInt()}%", color = p.text,
-            style = MaterialTheme.typography.titleMedium)
     }
 }

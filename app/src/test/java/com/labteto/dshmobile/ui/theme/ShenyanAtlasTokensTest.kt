@@ -12,8 +12,11 @@ import org.junit.Test
 class ShenyanAtlasTokensTest {
     @Test fun allThemesHonorArbitraryAccentsAndKeepActionTextReadable() {
         val accents = listOf(
-            Color(0xFFBB3B29), Color(0xFF216F51), Color(0xFFCF9032),
-            Color(0xFF696057), Color(0xFFEAD5C5),
+            Color(0xFFBB3B29),
+            Color(0xFF216F51),
+            Color(0xFFCF9032),
+            Color(0xFF696057),
+            Color(0xFFEAD5C5),
         )
         val themes = listOf(ShenyanPalettes.light, ShenyanPalettes.dark, ShenyanPalettes.matte)
         for (base in themes) {
@@ -21,11 +24,11 @@ class ShenyanAtlasTokensTest {
                 val current = base.withAccent(accent)
                 assertEquals(accent, current.primary)
                 assertTrue(
-                    "Action labels must meet 4.5:1 contrast",
+                    "Chosen accent must keep action labels readable",
                     syInkContrastRatio(current.onPrimary, current.primary) >= 4.5f,
                 )
                 assertTrue(
-                    "Link ink must remain legible over the reading material",
+                    "Link ink must remain readable over the local reading material",
                     syInkContrastRatio(current.linkInk, current.materialL5) >= 4.5f,
                 )
             }
