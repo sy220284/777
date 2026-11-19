@@ -994,11 +994,23 @@ class LocalWorkspace(
         require(command.isNotBlank()) { "命令不能为空" }
         // Retain stdout and stderr as separate evidence. Shell 126/127 cannot be
         // diagnosed from their numeric exit status without the command's stderr.
-        val builder = ProcessBuilder(shellExecutable, "-c", command)
+        // Android cannot exec scripts copied into app-writable data. Package managers
+        // run through the bundled interpreters as shell functions in this session.
+        val bundledEnvironment = environmentProvider()
+        val managedShellCommands = buildString {
+            if (bundledEnvironment["DSH_NPM_CLI"]?.let { File(it).isFile } == true) {
+                appendLine("npm() { node \"\$DSH_NPM_CLI\" \"\$@\"; }")
+            }
+            if (bundledEnvironment["PYTHONHOME"]?.isNotBlank() == true) {
+                appendLine("pip() { python3 -m pip \"\$@\"; }")
+                appendLine("pip3() { python3 -m pip \"\$@\"; }")
+            }
+        }
+        val builder = ProcessBuilder(shellExecutable, "-c", managedShellCommands + command)
             .directory(canonicalRoot)
             .redirectErrorStream(false)
         builder.environment().apply {
-            putAll(environmentProvider())
+            putAll(bundledEnvironment)
             val inheritedPath = get("PATH").orEmpty()
             val runtimePath = extraSearchPaths()
                 .filter(File::isDirectory)
