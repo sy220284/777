@@ -6,6 +6,14 @@ import androidx.compose.foundation.layout.Row
 import com.shenyan.designsystem.foundation.SyMetric
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.shenyan.designsystem.components.SyCoachMark
+import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyCheckboxControl
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -58,9 +66,25 @@ internal fun LocalWorkCapabilitySheet(
     onConfigureDevice: (() -> Unit)? = null,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    var showGuide by rememberSaveable { mutableStateOf(false) }
     SyResponsiveSheet(
         title = stringResource(R.string.work_capability_title),
         onDismiss = onDismiss,
+        trailing = {
+            SyCoachMark(
+                title = stringResource(R.string.work_capability_title),
+                description = "先检查模型、设备权限及外部连接，再确认工作交接。状态可随时刷新，当前草稿会保留。",
+                expanded = showGuide,
+                onDismiss = { showGuide = false },
+            ) {
+                SyIconButton(
+                    icon = Icons.Default.Info,
+                    contentDescription = "说明工作能力配置",
+                    onClick = { showGuide = true },
+                    bare = true,
+                )
+            }
+        },
         dismissEnabled = !switching,
         scrollable = true,
         footer = {
