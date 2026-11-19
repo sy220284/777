@@ -8,6 +8,7 @@ import com.shenyan.designsystem.components.SyMaterialTier
 
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMediaTransport
+import com.shenyan.designsystem.components.SyMiniPlayer
 
 
 import android.content.ClipData
@@ -56,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -884,6 +886,7 @@ internal fun InlineSpeechPlayer(file: File) {
     var playing by remember(file.absolutePath) { mutableStateOf(false) }
     var preparing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
+    var compact by rememberSaveable(file.absolutePath) { mutableStateOf(false) }
     // The resource holder and its DisposableEffect must have the same file identity.
     val playerHolder = remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
     val playerOwner = remember(file.absolutePath) { InlineSpeechPlayerOwner() }
@@ -992,20 +995,38 @@ internal fun InlineSpeechPlayer(file: File) {
                     player = null
                 }
     }
-    SyMediaTransport(
-        title = file.nameWithoutExtension.ifBlank { resources.getString(R.string.media_chat_play_audio) },
-        playing = playing,
-        progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
-        elapsedLabel = formatMediaDuration(positionMs),
-        durationLabel = formatMediaDuration(durationMs),
-        onPlayPause = ::togglePlayback,
-        onSeek = { fraction ->
-            val target = (durationMs * fraction).toInt().coerceIn(0, durationMs)
-            runCatching { player?.seekTo(target) }.onSuccess { positionMs = target }
-        },
-        enabled = !preparing,
-        seekable = durationMs > 0 && player != null,
-    )
+    if (compact) {
+        SyMiniPlayer(
+            title = file.nameWithoutExtension.ifBlank {
+                resources.getString(R.string.media_chat_play_audio)
+            },
+            subtitle = "${formatMediaDuration(positionMs)} / ${formatMediaDuration(durationMs)}",
+            playing = playing,
+            onPlayPause = ::togglePlayback,
+            onExpand = { compact = false },
+            onClose = {
+                runCatching { player?.pause() }
+                playing = false
+                compact = false
+            },
+        )
+    } else {
+        SyMediaTransport(
+            title = file.nameWithoutExtension.ifBlank { resources.getString(R.string.media_chat_play_audio) },
+            playing = playing,
+            progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
+            elapsedLabel = formatMediaDuration(positionMs),
+            durationLabel = formatMediaDuration(durationMs),
+            onPlayPause = ::togglePlayback,
+            onSeek = { fraction ->
+                val target = (durationMs * fraction).toInt().coerceIn(0, durationMs)
+                runCatching { player?.seekTo(target) }.onSuccess { positionMs = target }
+            },
+            enabled = !preparing,
+            seekable = durationMs > 0 && player != null,
+            onCollapse = { compact = true },
+        )
+    }
     if (preparing) Text(resources.getString(R.string.common_loading),
         style = SyType.caption11.withReadingWeight(),
         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
