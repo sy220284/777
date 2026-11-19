@@ -212,12 +212,11 @@ private fun AppearanceAdvancedSlider(
 
 @Composable
 internal fun AppearanceRow(settings: AppSettings, onSelect: (String) -> Unit) {
-    // Screen 26: theme modes are a four-position choice track, not four unrelated
+    // Screen 26: theme modes are a three-position choice track, not three unrelated
     // preview cards. Real previews remain in AppearanceReadingPreview below.
     SySegmented(
         segments = listOf(
             SySegment("light", stringResource(R.string.settings_appearance_light)),
-            SySegment("dark", stringResource(R.string.settings_appearance_dark)),
             SySegment("matte_black", stringResource(R.string.settings_appearance_matte_black)),
             SySegment("system", stringResource(R.string.settings_appearance_system)),
         ),

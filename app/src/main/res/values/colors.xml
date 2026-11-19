@@ -4,7 +4,6 @@
 
     <!-- Window/splash colours mirror the Compose canvas tokens exactly. -->
     <color name="window_background_light">#FCFCFB</color>
-    <color name="window_background_dark">#24211E</color>
-    <color name="window_background_matte_black">#10100F</color>
+    <color name="window_background_matte_black">#0F0F10</color>
     <color name="window_background">#FCFCFB</color>
 </resources>
