@@ -121,7 +121,9 @@ internal class LocalSkillStore(
 
     fun presets(): List<LocalPresetSkill> {
         val names = workspace.skills().toSet()
-        return LocalPresetSkillCatalog.entries.map { it.copy(installed = it.id in names) }
+        return LocalPresetSkillCatalog.entries
+            .filterNot { it.id in creativeIds && creativeBundle == null }
+            .map { it.copy(installed = it.id in names) }
     }
 
     /** Installed official presets track app releases; removed and custom skills remain untouched. */
