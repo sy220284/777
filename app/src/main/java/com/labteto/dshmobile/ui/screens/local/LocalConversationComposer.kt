@@ -77,9 +77,9 @@ import com.labteto.dshmobile.ui.shenyan.SyComposerField
 import com.labteto.dshmobile.ui.shenyan.SyConversationComposer
 import com.shenyan.designsystem.components.SyIconButton
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsAnimations
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyAnimations
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.AppBackgroundState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -294,9 +294,9 @@ internal fun LocalConversationComposer(
             Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.Center) {
                 Text(modelLabel, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    style = DsType.small13Strong.withReadingWeight(), color = colors.text)
+                    style = SyType.small13Strong.withReadingWeight(), color = colors.text)
                 Text(reasoningLabel, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
             }
         }
     }
@@ -376,7 +376,7 @@ internal fun LocalConversationComposer(
                 horizontalArrangement = Arrangement.End,
             ) {
                 Text(stringResource(R.string.local_team_selected_hint),
-                    modifier = Modifier.weight(1f), style = DsType.small13.withReadingWeight(),
+                    modifier = Modifier.weight(1f), style = SyType.small13.withReadingWeight(),
                     maxLines = 2, overflow = TextOverflow.Ellipsis, color = colors.textSecondary)
                 Icon(
                     painter = painterResource(R.drawable.ic_ui_create_subagent),
@@ -396,7 +396,7 @@ internal fun LocalConversationComposer(
         if (state.usageMode == LocalUsageMode.WORK && state.planMode) {
             Text(stringResource(R.string.composer_plan_active),
                 modifier = Modifier.testTag("composer-plan-state"),
-                style = DsType.caption11.withReadingWeight(), color = colors.primaryPressed)
+                style = SyType.caption11.withReadingWeight(), color = colors.primaryPressed)
         }
         if (state.usageMode == LocalUsageMode.WORK && state.running &&
             (input.isNotBlank() || attachments.isNotEmpty())) {
@@ -427,7 +427,7 @@ internal fun LocalConversationComposer(
                     if (attachmentImportProgress != null) {
                         "正在添加附件 ${attachmentImportProgress.first}/${attachmentImportProgress.second}"
                     } else "已添加 ${attachments.size} 个附件",
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
                 if (attachments.isNotEmpty() && attachmentImportProgress == null) {
@@ -585,15 +585,15 @@ private fun ImportedImageAttachmentTile(
     Box(
         modifier = Modifier
             .size(88.dp)
-            .clip(DsShapes.block)
+            .clip(SyShapes.block)
             .background(colors.selected)
-            .border(1.dp, colors.border, DsShapes.block),
+            .border(1.dp, colors.border, SyShapes.block),
     ) {
         thumbnail?.let { image ->
             Image(
                 bitmap = image,
                 contentDescription = attachment.name,
-                modifier = Modifier.fillMaxWidth().size(88.dp).clip(DsShapes.block),
+                modifier = Modifier.fillMaxWidth().size(88.dp).clip(SyShapes.block),
             )
         }
         SyIconButton(
@@ -637,9 +637,9 @@ private fun ImportedAttachmentRow(
         modifier = Modifier
             .widthIn(max = 276.dp)
             .heightIn(min = 60.dp)
-            .clip(DsShapes.block)
+            .clip(SyShapes.block)
             .background(colors.selected.copy(alpha = 0.55f))
-            .border(1.dp, colors.border, DsShapes.block)
+            .border(1.dp, colors.border, SyShapes.block)
             .padding(start = SyMetric.gapMd, end = SyMetric.gapXs, top = SyMetric.gapSm, bottom = SyMetric.gapSm),
         horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
         verticalAlignment = Alignment.CenterVertically,
@@ -655,7 +655,7 @@ private fun ImportedAttachmentRow(
                 attachment.name,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.text,
             )
             Text(
@@ -666,7 +666,7 @@ private fun ImportedAttachmentRow(
                     else -> "$kind · ${localAttachmentDisplaySize(attachment.bytes)}"
                 },
                 maxLines = 1,
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }

@@ -11,13 +11,13 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.chat.LocalGroupChatState
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
 internal fun GroupReplyFailureNotice(group: LocalGroupChatState, running: Boolean, retry: (String) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.audit_group_partial), style = DsType.small13.withReadingWeight(),
+        Text(stringResource(R.string.audit_group_partial), style = SyType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk)
         group.members.filter { it.galleryId in group.failedReplyMemberIds }.forEach { member ->
             val request = stringResource(R.string.audit_group_retry_request, member.displayName)

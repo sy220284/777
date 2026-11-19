@@ -10,7 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 import androidx.compose.material3.Text
@@ -60,7 +60,7 @@ internal fun LocalChatTurnUsageButton(aggregate: TokenUsageAggregate, onClick: (
                 Text(
                     stringResource(if (aggregate.unreportedRequestCount > 0) R.string.local_chat_turn_usage_incomplete
                         else R.string.local_chat_turn_usage_known, aggregate.totalTokens),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = LocalSyColors.current.textTertiary,
                 )
             }

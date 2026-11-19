@@ -41,8 +41,8 @@ import com.labteto.dshmobile.local.presentation.personaMemberDescription
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 @Composable
@@ -90,7 +90,7 @@ internal fun GroupChatMemberPickerSheet(
                 selected.size,
                 MAX_GROUP_CHAT_MEMBERS,
             ),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
         )
         SyButton(
@@ -115,14 +115,14 @@ internal fun GroupChatMemberPickerSheet(
                 MIN_GROUP_CHAT_MEMBERS,
                 MAX_GROUP_CHAT_MEMBERS,
             ),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
         )
 
         if (entries.isEmpty()) {
             Text(
                 stringResource(R.string.local_group_chat_no_characters),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
             )
             if (onCreatePersona != null) {
@@ -153,7 +153,7 @@ internal fun GroupChatMemberPickerSheet(
             if (filteredEntries.isEmpty()) {
                 Text(
                     stringResource(R.string.persona_gallery_no_match),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                 )
             } else {
@@ -165,7 +165,7 @@ internal fun GroupChatMemberPickerSheet(
                         val checked = entry.id in selected
                         val canAdd = checked || selected.size < MAX_GROUP_CHAT_MEMBERS
                         Surface(
-                            shape = DsShapes.row,
+                            shape = SyShapes.row,
                             color = if (checked) com.shenyan.designsystem.foundation.LocalSyColors.current.selected.copy(alpha = .32f)
                                 else androidx.compose.ui.graphics.Color.Transparent,
                             modifier = Modifier
@@ -196,7 +196,7 @@ internal fun GroupChatMemberPickerSheet(
                                 ) {
                                     Text(
                                         entry.persona.name.trim().take(1).ifBlank { avatarFallback },
-                                        style = DsType.std14Strong.withReadingWeight(),
+                                        style = SyType.std14Strong.withReadingWeight(),
                                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.lilac,
                                         modifier = Modifier.padding(SyMetric.gapMd),
                                     )
@@ -204,13 +204,13 @@ internal fun GroupChatMemberPickerSheet(
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         entry.persona.name,
-                                        style = DsType.std14Strong.withReadingWeight(),
+                                        style = SyType.std14Strong.withReadingWeight(),
                                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.text,
                                     )
                                     personaMemberDescription(entry.persona).takeIf(String::isNotBlank)?.let {
                                         Text(
                                             it,
-                                            style = DsType.caption11.withReadingWeight(),
+                                            style = SyType.caption11.withReadingWeight(),
                                             color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                                             maxLines = 1,
                                         )
