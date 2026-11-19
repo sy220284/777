@@ -718,8 +718,10 @@ fun SySwipeActionRow(
     Box(modifier.fillMaxWidth().clip(RoundedCornerShape(SyMetric.radiusControl))
         .semantics {
             stateDescription = if (open) "操作已展开" else "左滑展开操作"
-            customActions = listOf(CustomAccessibilityAction("展开" + actionLabel) {
-                open = true
+            customActions = listOf(CustomAccessibilityAction(
+                if (open) "收起" + actionLabel else "展开" + actionLabel,
+            ) {
+                open = !open
                 true
             })
         }) {

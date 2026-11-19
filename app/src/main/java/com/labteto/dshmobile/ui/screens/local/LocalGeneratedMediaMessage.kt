@@ -887,6 +887,7 @@ internal fun InlineSpeechPlayer(file: File) {
     var preparing by remember(file.absolutePath) { mutableStateOf(false) }
     var error by remember(file.absolutePath) { mutableStateOf<String?>(null) }
     var compact by rememberSaveable(file.absolutePath) { mutableStateOf(false) }
+    var dismissed by rememberSaveable(file.absolutePath) { mutableStateOf(false) }
     // The resource holder and its DisposableEffect must have the same file identity.
     val playerHolder = remember(file.absolutePath) { mutableStateOf<MediaPlayer?>(null) }
     val playerOwner = remember(file.absolutePath) { InlineSpeechPlayerOwner() }
@@ -995,7 +996,14 @@ internal fun InlineSpeechPlayer(file: File) {
                     player = null
                 }
     }
-    if (compact) {
+    if (dismissed) {
+        SyButton(
+            text = resources.getString(R.string.media_chat_play_audio),
+            onClick = { dismissed = false },
+            modifier = Modifier.fillMaxWidth().testTag("sy-audio-reopen"),
+            variant = SyButtonVariant.Ghost,
+        )
+    } else if (compact) {
         SyMiniPlayer(
             title = file.nameWithoutExtension.ifBlank {
                 resources.getString(R.string.media_chat_play_audio)
@@ -1005,9 +1013,13 @@ internal fun InlineSpeechPlayer(file: File) {
             onPlayPause = ::togglePlayback,
             onExpand = { compact = false },
             onClose = {
-                runCatching { player?.pause() }
+                player?.let { playerOwner.releaseIfOwned(it) }
+                player = null
                 playing = false
+                preparing = false
+                positionMs = 0
                 compact = false
+                dismissed = true
             },
         )
     } else {

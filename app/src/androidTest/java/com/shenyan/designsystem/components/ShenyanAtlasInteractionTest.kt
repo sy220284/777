@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.shenyan.designsystem.foundation.ShenyanTheme
@@ -59,6 +61,26 @@ class ShenyanAtlasInteractionTest {
             assertEquals(setOf("a", "b"), applied)
             assertEquals(1, count)
         }
+    }
+
+    @Test fun coachMarkUsesRealSpotlightAndDismisses() {
+        var expanded by mutableStateOf(false)
+        compose.setContent {
+            ShenyanTheme {
+                SyCoachMark(
+                    title = "操作引导",
+                    description = "检查工作权限",
+                    expanded = expanded,
+                    onDismiss = { expanded = false },
+                ) {
+                    SyButton("查看引导", { expanded = true })
+                }
+            }
+        }
+        compose.onNodeWithText("查看引导").performClick()
+        compose.onNodeWithTag("sy-coach-spotlight").assertExists()
+        compose.onNodeWithText("知道了").performClick()
+        compose.runOnIdle { assertEquals(false, expanded) }
     }
 
     @Test fun destructiveActionNeedsExplicitConfirmation() {
