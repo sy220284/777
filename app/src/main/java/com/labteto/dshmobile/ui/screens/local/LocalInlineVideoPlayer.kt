@@ -86,7 +86,7 @@ internal fun InlineVideoPlayer(
     url: String?,
     localFile: File?,
     onError: (String) -> Unit,
-    onCollapse: () -> Unit,
+    onCollapse: (() -> Unit)? = null,
 ) {
     val source = localFile?.takeIf { it.isFile }?.let(Uri::fromFile)
         ?: url?.takeIf(String::isNotBlank)?.let(Uri::parse)
