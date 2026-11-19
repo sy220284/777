@@ -67,10 +67,27 @@ def checked(argv,timeout=180):
  return p.stdout
 
 # Build failures stop here: no stale APK can satisfy this head's verification.
-subprocess.run(['./gradlew','--max-workers=2',':app:assembleDebug',':app:assembleDebugAndroidTest','--stacktrace','--console=plain'],cwd=ROOT,check=True)
 debug=ROOT/'app/build/outputs/apk/debug/app-debug.apk'
 test=ROOT/'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'
-for apk in [debug,test]:checked(['adb','install','--no-streaming','-r',str(apk)])
+if os.environ.get('DSH_NATIVE_UI_PREBUILT_APKS') == '1':
+ manifest=ROOT/'app/build/outputs/apk/SHA256SUMS'
+ if not manifest.is_file():raise RuntimeError('Prebuilt APK checksum manifest missing')
+ expected={}
+ for line in manifest.read_text(encoding='utf-8').splitlines():
+  digest,separator,relpath=line.partition('  ')
+  if not separator or not re.fullmatch(r'[0-9a-f]{64}',digest) or relpath in expected:
+   raise RuntimeError('Invalid prebuilt APK checksum manifest entry: '+repr(line))
+  expected[relpath]=digest
+ required={str(apk.relative_to(ROOT)) for apk in (debug,test)}
+ if set(expected)!=required:raise RuntimeError('Prebuilt APK manifest must list exactly the debug and test APKs')
+ for apk in (debug,test):
+  if not apk.is_file():raise RuntimeError('Required prebuilt APK missing: '+str(apk))
+  digest=hashlib.sha256(apk.read_bytes()).hexdigest()
+  if digest!=expected[str(apk.relative_to(ROOT))]:raise RuntimeError('Prebuilt APK checksum mismatch: '+str(apk))
+ print('Verified Android device-test APKs against workflow build manifest',flush=True)
+else:
+ subprocess.run(['./gradlew','--max-workers=2',':app:assembleDebug',':app:assembleDebugAndroidTest','--stacktrace','--console=plain'],cwd=ROOT,check=True)
+for apk in (debug,test):checked(['adb','install','--no-streaming','-r',str(apk)])
 
 for name in CLASSES:
  def run_class(name=name):
