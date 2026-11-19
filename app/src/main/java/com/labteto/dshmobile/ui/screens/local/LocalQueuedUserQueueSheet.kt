@@ -11,9 +11,11 @@ import com.labteto.dshmobile.ui.theme.SyShapes
 import com.shenyan.designsystem.components.SyFlatSurface
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
@@ -22,7 +24,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -184,6 +186,7 @@ internal fun LocalQueuedUserQueueSheet(
         }
         snapshot.inputs.forEachIndexed { index, input ->
             androidx.compose.runtime.key(input.id) {
+                var handleCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
                 SyFlatSurface(
                     modifier = Modifier.fillMaxWidth().onGloballyPositioned {
                         val row = it.boundsInRoot()
@@ -201,22 +204,31 @@ internal fun LocalQueuedUserQueueSheet(
                             maxLines = 3, modifier = Modifier.weight(1f))
                         Box(
                             Modifier.size(SyMetric.touch).testTag("queue-drag-${input.id}")
-                                .semantics { contentDescription = "长按拖动调整顺序，也可用上移和下移" }
-                                .pointerInput(input.id, sessionId) {
+                                .onGloballyPositioned { handleCoordinates = it }
+                                .semantics {
+                                    contentDescription = "拖动把手调整顺序，也可用上移和下移"
+                                    val targetIndex = dropTarget?.let(ids::indexOf) ?: -1
+                                    if (draggedId == input.id && targetIndex >= 0) {
+                                        stateDescription = "将移到第 ${targetIndex + 1} 项"
+                                    }
+                                }
+                                .pointerInput(input.id, sessionId, port) {
                                     var startIds = emptyList<String>()
                                     var startIdentity = currentSnapshot.identity
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            val center = itemCenters[input.id]
-                                            if (!currentBusy && center != null && currentSnapshot.identity != null) {
+                                    detectVerticalDragGestures(
+                                        onDragStart = { position ->
+                                            val rootY = handleCoordinates?.takeIf { it.isAttached }
+                                                ?.localToRoot(position)?.y
+                                            if (!currentBusy && rootY != null && currentSnapshot.identity != null) {
                                                 startIds = currentSnapshot.inputs.map { it.id }
                                                 startIdentity = currentSnapshot.identity
-                                                pointerY = center
+                                                pointerY = rootY
                                                 draggedId = input.id
                                                 dropTarget = input.id
                                             }
                                         },
                                         onDragEnd = {
+                                            if (draggedId == input.id) updateDropTarget()
                                             val to = dropTarget
                                             val live = currentSnapshot
                                             if (draggedId == input.id && !currentBusy && to != null &&
@@ -228,11 +240,12 @@ internal fun LocalQueuedUserQueueSheet(
                                             dropTarget = null
                                         },
                                         onDragCancel = { draggedId = null; dropTarget = null },
-                                    ) { change, delta ->
+                                    ) { change, _ ->
                                         if (draggedId == input.id && !currentBusy) {
-                                            change.consume()
-                                            pointerY += delta.y
-                                            updateDropTarget()
+                                            handleCoordinates?.takeIf { it.isAttached }?.let { coordinates ->
+                                                pointerY = coordinates.localToRoot(change.position).y
+                                                updateDropTarget()
+                                            }
                                         }
                                     }
                                 },

@@ -1,7 +1,5 @@
 package com.labteto.dshmobile.ui.screens.local
 
-import android.os.SystemClock
-import android.view.ViewConfiguration
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
@@ -10,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -66,9 +66,11 @@ class ShenyanAtlasClosureTest {
         val second = compose.onNodeWithTag("queue-drag-two")
         val distance = second.getUnclippedBoundsInRoot().top.value - first.getUnclippedBoundsInRoot().top.value
         val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
-        first.performTouchInput { down(center) }
-        SystemClock.sleep(ViewConfiguration.getLongPressTimeout().toLong() + 150)
-        first.performTouchInput { moveBy(Offset(0f, distance * density)) }
+        first.performTouchInput {
+            down(center)
+            repeat(4) { moveBy(Offset(0f, distance * density / 4)) }
+        }
+        first.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "将移到第 2 项"))
         assertEquals(0, writes.get())
         captureUiAudit(compose, "queue-drag-before-drop")
         first.performTouchInput { up() }

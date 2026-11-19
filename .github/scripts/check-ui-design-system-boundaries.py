@@ -232,7 +232,7 @@ REQUIRED_ATLAS_FEATURES = {
     "screens/local/LocalWorkCapabilitySheet.kt": ("SyCoachMark",),
     "screens/local/LocalGeneratedMediaMessage.kt": ("SyMediaTransport", "SyMiniPlayer", "SyRadialActionMenu", "InlineVideoPlayer"),
     "screens/local/LocalInlineVideoPlayer.kt": ("SyMediaTransport",),
-    "screens/local/LocalQueuedUserQueueSheet.kt": ("detectDragGesturesAfterLongPress", "SyResponsiveSheet"),
+    "screens/local/LocalQueuedUserQueueSheet.kt": ("detectVerticalDragGestures", "SyResponsiveSheet"),
     "shenyan/SyResponsiveSheet.kt": ("SySnapBottomSheet",),
     "screens/tasks/TaskCardComponents.kt": ("SySwipeActionRow",),
     "shenyan/SyConversation.kt": ("SyChatComposer",),
