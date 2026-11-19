@@ -90,7 +90,9 @@ def home():
  # navigation; Back may intentionally finish the activity and show the launcher.
  for _ in range(4):
   if drawer_visible(t):
-   tap(strings['local_usage_work'])
+   # The currently selected Work item may leave the drawer expanded.
+   # Android Back dismisses the drawer before navigating away.
+   adb('shell','-n','input','keyevent','4')
   elif candidates(t,strings['app_open_navigation']):
    drawer()
    tap(strings['local_usage_work'])
