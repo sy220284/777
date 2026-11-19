@@ -82,13 +82,12 @@ fun SyComposerSurface(
     shadowElevation: Dp = 0.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val palette = LocalSyColors.current
     SyMaterialSurface(
         modifier = modifier,
         tier = SyMaterialTier.L2_BAR,
         shape = RoundedCornerShape(SyMetric.radiusCard),
         tint = tint,
-        border = BorderStroke(1.dp, palette.border),
+        // Let the canonical renderer draw the directional optical rim.
         shadowElevation = shadowElevation,
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),

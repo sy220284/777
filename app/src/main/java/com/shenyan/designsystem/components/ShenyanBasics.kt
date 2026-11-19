@@ -247,18 +247,27 @@ fun SyModalSheet(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val height = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+    val sheetShape = RoundedCornerShape(topStart = SyMetric.radiusSheet, topEnd = SyMetric.radiusSheet)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY),
+        // The single L4 renderer owns the glass colour, rim and aligned backdrop.
+        containerColor = Color.Transparent,
         contentColor = LocalSyColors.current.text,
         modifier = modifier,
-        shape = RoundedCornerShape(topStart = SyMetric.radiusSheet, topEnd = SyMetric.radiusSheet),
+        shape = sheetShape,
         dragHandle = null,
         tonalElevation = 0.dp,
     ) {
-        SySheetScaffold(title, subtitle = subtitle, onDismiss = onDismiss,
-            scrollable = scrollable, maxBodyHeight = height * .62f,
-            footer = footer, content = content)
+        SyMaterialSurface(
+            modifier = Modifier.fillMaxWidth(),
+            tier = SyMaterialTier.L4_OVERLAY,
+            shape = sheetShape,
+            shadowElevation = 0.dp,
+        ) {
+            SySheetScaffold(title, subtitle = subtitle, onDismiss = onDismiss,
+                scrollable = scrollable, maxBodyHeight = height * .62f,
+                footer = footer, content = content)
+        }
     }
 }
 
