@@ -1,5 +1,6 @@
 package com.shenyan.designsystem.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardVoice
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Pause
@@ -55,6 +57,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.LocalSyMotionTempo
@@ -630,14 +633,22 @@ fun SyMediaTransport(
     onNext: (() -> Unit)? = null,
     enabled: Boolean = true,
     seekable: Boolean = true,
+    onCollapse: (() -> Unit)? = null,
 ) {
     val p = LocalSyColors.current
     Surface(modifier, shape = RoundedCornerShape(SyMetric.radiusCard),
         color = p.materialL3) {
         Column(Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, color = p.text, style = MaterialTheme.typography.titleMedium,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(title, color = p.text, style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f), maxLines = 2,
+                    overflow = TextOverflow.Ellipsis)
+                onCollapse?.let {
+                    SyIconButton(Icons.Default.KeyboardArrowDown, "收起播放器", it, bare = true)
+                }
+            }
             Slider(value = progress.coerceIn(0f, 1f), onValueChange = onSeek,
                 enabled = seekable,
                 modifier = Modifier.fillMaxWidth(),
@@ -766,6 +777,31 @@ fun SyMiniPlayer(
     }
 }
 
+/**
+ * Full-featured Chat and Work input reuse this shell while retaining feature-owned
+ * attachments, voice recording, model selection, queue, keyboard and send actions.
+ */
+@Composable
+fun SyChatComposer(
+    modifier: Modifier = Modifier,
+    surfaceColor: Color = LocalSyColors.current.materialL3,
+    shadowElevation: Dp = 0.dp,
+    animateSize: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val reduced = LocalSyReduceMotion.current
+    SyComposerSurface(
+        modifier = modifier.then(if (animateSize)
+            Modifier.animateContentSize(tween(
+                SyMotion.duration(SyMotion.toolExpandMs, reduced, LocalSyMotionTempo.current),
+                easing = SyMotion.ease,
+            )) else Modifier),
+        tint = surfaceColor.copy(alpha = surfaceColor.alpha.coerceAtMost(.06f)),
+        shadowElevation = shadowElevation,
+        content = content,
+    )
+}
+
 @Composable
 fun SyChatComposer(
     value: String,
@@ -778,7 +814,7 @@ fun SyChatComposer(
     onAttachment: (() -> Unit)? = null,
     onVoice: (() -> Unit)? = null,
 ) {
-    SyComposerSurface(
+    SyChatComposer(
         modifier = modifier.fillMaxWidth().imePadding().testTag("sy-atlas-composer"),
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp),
