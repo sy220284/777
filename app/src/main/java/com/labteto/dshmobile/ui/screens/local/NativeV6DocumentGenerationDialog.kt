@@ -3,7 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.OutlinedTextField
+import com.shenyan.designsystem.components.SyTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,7 +37,7 @@ internal fun NativeV6DocumentGenerationDialog(
         dismissOnScrimTap = !busy,
     ) {
         Text("生成会额外请求一次模型并产生相应消耗，仅在确认后执行。")
-        OutlinedTextField(
+        SyTextField(
             value = prompt,
             onValueChange = { prompt = it },
             label = { Text("文档要求") },
