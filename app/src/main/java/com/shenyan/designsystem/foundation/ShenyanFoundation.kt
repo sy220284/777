@@ -131,6 +131,31 @@ fun SyColors.withAccent(accent: Color): SyColors {
     )
 }
 
+/**
+ * A complete product colour family: canvas, opaque reading surface and every translucent
+ * elevation level move together. Components never guess a local tint from the accent.
+ */
+fun SyColors.withAtmosphere(canvasTone: Color, readingSurface: Color): SyColors {
+    val surfaceTone = readingSurface.copy(alpha = 1f)
+    val backdropTone = canvasTone.copy(alpha = 1f)
+    val layer1 = lerp(backdropTone, surfaceTone, .22f)
+    val layer2 = lerp(backdropTone, surfaceTone, .44f)
+    val layer3 = lerp(backdropTone, surfaceTone, .68f)
+    return copy(
+        canvas = backdropTone,
+        topBar = lerp(backdropTone, surfaceTone, .72f),
+        materialL1 = layer1.copy(alpha = materialL1.alpha),
+        materialL2 = layer2.copy(alpha = materialL2.alpha),
+        materialL3 = layer3.copy(alpha = materialL3.alpha),
+        materialL4 = surfaceTone.copy(alpha = materialL4.alpha),
+        materialL5 = surfaceTone,
+        surface = layer3.copy(alpha = surface.alpha),
+        surfaceRaised = layer2.copy(alpha = surfaceRaised.alpha),
+        surfaceSolid = surfaceTone,
+        border = lerp(border.copy(alpha = 1f), backdropTone, .12f).copy(alpha = border.alpha),
+    )
+}
+
 /** Published read-only palettes; one source for Figma, native and migration adapters. */
 object ShenyanPalettes {
     val light: SyColors get() = Light

@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.Density
 import com.labteto.dshmobile.connection.AppDisplayLimits
 import com.labteto.dshmobile.ui.shenyan.SyMode
 import com.labteto.dshmobile.ui.shenyan.SyThemeProvider
+import com.shenyan.designsystem.foundation.withAtmosphere
 import com.labteto.dshmobile.ui.shenyan.rememberSyReducedMotion
 
 /** Theme preference exposed by the app Appearance row. */
@@ -288,9 +289,13 @@ internal fun resolveV6ThemePalette(
         }
     )
     val defaultAccent = palette.key == AccentPalettes.DEFAULT.key
+    val atmosphere = if (defaultAccent) canonical else canonical.withAtmosphere(
+        canvasTone = if (dark) palette.darkCanvas else palette.lightCanvas,
+        readingSurface = if (dark) palette.darkSurface else palette.lightSurface,
+    )
     val page = (if (defaultAccent) base else base.withAccent(palette, dark))
-        .harmonizeV6(canonical, preserveAccent = !defaultAccent)
-    val controls = if (defaultAccent) canonical else canonical.withV6Accent(page)
+        .harmonizeV6(atmosphere, preserveAccent = !defaultAccent)
+    val controls = if (defaultAccent) atmosphere else atmosphere.withV6Accent(page)
     return V6ThemeProjection(dark, page, controls, defaultAccent)
 }
 
