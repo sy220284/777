@@ -291,8 +291,8 @@ internal fun resolveV6ThemePalette(
     val defaultAccent = palette.key == AccentPalettes.DEFAULT.key
     // 显式选色只改变浅色交互色，典雅白背景不会随色卡重新染色。
     val atmosphere = if (!dark || defaultAccent) canonical else canonical.withAtmosphere(
-        canvasTone = if (dark) palette.darkCanvas else palette.lightCanvas,
-        readingSurface = if (dark) palette.darkSurface else palette.lightSurface,
+        canvasTone = palette.darkCanvas,
+        readingSurface = palette.darkSurface,
     )
     val page = (if (defaultAccent) base else base.withAccent(palette, dark))
         .harmonizeV6(atmosphere, preserveAccent = !defaultAccent)
