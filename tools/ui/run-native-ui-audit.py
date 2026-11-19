@@ -9,6 +9,8 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
 VIDEOS=OUT/'videos';VIDEOS.mkdir(exist_ok=True)
 CLASSES=[
+ 'com.shenyan.designsystem.components.ShenyanAtlasInteractionTest',
+ 'com.shenyan.designsystem.components.ShenyanAtlasVisualCaptureTest',
  'com.shenyan.designsystem.components.MobileActionReadabilityTest',
  'com.labteto.dshmobile.ui.screens.local.WorkspaceBrowseLayoutTest',
  'com.labteto.dshmobile.ui.screens.local.UiPolishInteractionRegressionTest',
