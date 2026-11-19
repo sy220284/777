@@ -9,8 +9,10 @@ import com.labteto.dshmobile.local.runtime.BundledNodeRuntime
 import com.labteto.dshmobile.local.runtime.BundledPythonRuntime
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
+import com.labteto.dshmobile.runtime.ProcessIsolationContext
 import java.io.File
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -40,6 +42,24 @@ class BundledCliAndroidTest {
                 val result = process.execute(ProcessRequest(listOf(name, "--version"), timeoutMillis = 25_000))
                 assertEquals("$name: ${result.stderr}\n${result.stdout}", 0, result.exitCode)
                 assertTrue("$name returned no version", result.stdout.isNotBlank() || result.stderr.isNotBlank())
+            }
+
+            // Work tools run behind Landlock/seccomp. Verify interpreter resources
+            // remain readable without granting extra writes or network permissions.
+            val sandboxRoot = File(context.cacheDir, "cli-isolated").apply { mkdirs() }
+            val isolated = AndroidProcessRuntime(
+                defaultWorkingDirectory = sandboxRoot,
+                dynamicSearchPaths = manager::searchPaths,
+                baseEnvironment = manager::environment,
+                commandAliases = manager::commandAliases,
+            )
+            withContext(ProcessIsolationContext()) {
+                for (name in listOf("rg", "curl", "jq", "npm", "pip")) {
+                    val result = isolated.execute(
+                        ProcessRequest(listOf(name, "--version"), timeoutMillis = 25_000),
+                    )
+                    assertEquals("$name isolated process: ${result.stderr}", 0, result.exitCode)
+                }
             }
 
             val root = File(context.cacheDir, "cli-smoke").apply { mkdirs() }
