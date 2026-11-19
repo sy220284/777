@@ -54,6 +54,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyDialog
 import com.labteto.dshmobile.ui.shenyan.SyProgressBar
 import com.labteto.dshmobile.ui.shenyan.SyProgressStatus
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.components.SyIconButton
 import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyToastHost
@@ -103,12 +105,12 @@ internal fun LocalAgentTeamStatusBar(
         exit = fadeOut(teamFadeSpec()) +
             shrinkVertically(animationSpec = teamRevealSpec()),
     ) {
-        androidx.compose.material3.Surface(
+        SyMaterialSurface(
             onClick = onClick,
             enabled = team.visible,
             modifier = modifier.fillMaxWidth(),
             shape = SyShapes.row,
-            color = colors.materialL2,
+            tier = SyMaterialTier.L2_BAR,
         ) {
             Row(
                 modifier = Modifier.heightIn(min = SyMetric.touch)
@@ -417,11 +419,12 @@ private fun TeamMemberRow(
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     val expansionLabel = stringResource(if (selected) R.string.local_team_expanded else R.string.local_team_collapsed)
     val pulse = rememberHapticPulse()
-    androidx.compose.material3.Surface(
+    SyMaterialSurface(
         onClick = { pulse(); onClick() },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = SyShapes.block,
-        color = if (selected) colors.selected.copy(alpha = .18f) else androidx.compose.ui.graphics.Color.Transparent,
+        tier = SyMaterialTier.L3_CARD,
+        tint = if (selected) colors.selected.copy(alpha = .18f) else androidx.compose.ui.graphics.Color.Unspecified,
         border = BorderStroke(
             1.dp,
             if (selected) colors.primary.copy(alpha = 0.32f) else colors.border,
@@ -680,11 +683,11 @@ private fun TeamTaskRow(task: LocalAgentTeamTaskUiState) {
         if (task.writeConflict) add(stringResource(R.string.local_team_write_conflict))
         if (task.description.isNotBlank()) add(task.description)
     }
-    androidx.compose.material3.Surface(
+    SyMaterialSurface(
         onClick = { pulse(); expanded = !expanded },
         modifier = Modifier.fillMaxWidth().semantics { stateDescription = expansionLabel },
         shape = SyShapes.row,
-        color = androidx.compose.ui.graphics.Color.Transparent,
+        tier = SyMaterialTier.L3_CARD,
         border = BorderStroke(1.dp, colors.border),
     ) {
         Column(
@@ -927,11 +930,11 @@ private fun StandaloneAgentRow(
     var busy by remember(agent.id) { mutableStateOf(false) }
     var confirmClose by remember(agent.id) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-        androidx.compose.material3.Surface(
+        SyMaterialSurface(
             onClick = { expanded = !expanded },
             shape = SyShapes.block,
+            tier = SyMaterialTier.L3_CARD,
             border = BorderStroke(1.dp, colors.border),
-            color = androidx.compose.ui.graphics.Color.Transparent,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(SyMetric.gapLg),

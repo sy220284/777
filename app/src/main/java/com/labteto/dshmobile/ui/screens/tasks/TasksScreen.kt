@@ -400,35 +400,18 @@ private fun TaskEmptyState(
                 .padding(bottom = SyMetric.gapLg),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            Surface(
+            SyButton(
+                text = stringResource(R.string.tasks_create_manual),
                 onClick = onManualCreate,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = colors.primary,
-                contentColor = colors.onPrimary,
-                shape = RoundedCornerShape(SyMetric.radiusControl),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
-                    Text(
-                        stringResource(R.string.tasks_create_manual),
-                        style = SyType.std14Strong.withReadingWeight(),
-                        color = colors.onPrimary,
-                    )
-                }
-            }
-            if (onCreateViaChat != null) Surface(
-                onClick = onCreateViaChat,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                color = androidx.compose.ui.graphics.Color.Transparent,
-                shape = RoundedCornerShape(SyMetric.radiusControl),
-                border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
-                    Text(
-                        stringResource(R.string.tasks_create_via_chat),
-                        style = SyType.std14Strong.withReadingWeight(),
-                        color = colors.text,
-                    )
-                }
+            )
+            if (onCreateViaChat != null) {
+                SyButton(
+                    text = stringResource(R.string.tasks_create_via_chat),
+                    onClick = onCreateViaChat,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    variant = SyButtonVariant.Outline,
+                )
             }
         }
     }
