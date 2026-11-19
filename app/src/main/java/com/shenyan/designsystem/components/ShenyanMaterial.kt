@@ -131,19 +131,6 @@ fun SyMaterialSurface(
     val defaultInteraction = remember { MutableInteractionSource() }
     val interaction = interactionSource ?: defaultInteraction
     val pressed by interaction.collectIsPressedAsState()
-    var touchOrigin by remember(interaction) { mutableStateOf<Offset?>(null) }
-    LaunchedEffect(interaction) {
-        // Observe the press without intercepting scrolling, sheets or system back gestures.
-        interaction.interactions.collect { event ->
-            if (event is PressInteraction.Press) touchOrigin = event.pressPosition
-        }
-    }
-    val pressLight by animateFloatAsState(
-        targetValue = if (pressed && onClick != null && enabled && !LocalSyReduceMotion.current) 1f else 0f,
-        animationSpec = tween(SyMotion.duration(SyMotion.interactionColorMs,
-            LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
-        label = "glassTouchReflection",
-    )
     val press by animateFloatAsState(
         if (pressed && enabled && onClick != null && !LocalSyReduceMotion.current) SyMotion.pressedScale else 1f,
         tween(SyMotion.duration(SyMotion.pressMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current)), label = "materialPress",
@@ -157,6 +144,24 @@ fun SyMaterialSurface(
         reduceTransparency = LocalSyReduceTransparency.current,
         nestedDepth = nested, hasBackdrop = scene != null || backdrop != null,
     )
+    var touchOrigin by remember(interaction) { mutableStateOf<Offset?>(null) }
+    if (optics.glass && onClick != null) {
+        LaunchedEffect(interaction) {
+            // Only interactive glass observes press location; this does not claim the gesture.
+            interaction.interactions.collect { event ->
+                if (event is PressInteraction.Press) touchOrigin = event.pressPosition
+            }
+        }
+    }
+    val pressLight = if (optics.glass && onClick != null) {
+        val animated by animateFloatAsState(
+            targetValue = if (pressed && enabled && !LocalSyReduceMotion.current) 1f else 0f,
+            animationSpec = tween(SyMotion.duration(SyMotion.interactionColorMs,
+                LocalSyReduceMotion.current, LocalSyMotionTempo.current)),
+            label = "glassTouchReflection",
+        )
+        animated
+    } else 0f
     val blurRadius = optics.blur
     val elevation = optics.elevation
     val rim = if (optics.glass) BorderStroke(1.dp, Brush.linearGradient(
@@ -184,9 +189,6 @@ fun SyMaterialSurface(
             }
             Box(Modifier.matchParentSize().background(fill))
             if (tint.isSpecified) Box(Modifier.matchParentSize().background(tint.copy(alpha = tint.alpha.coerceAtMost(.22f))))
-            CompositionLocalProvider(LocalSyGlassDepth provides (nested + 1)) {
-                content()
-            }
             if (optics.glass) {
                 // Reflected light belongs beneath content: the reading text stays crisp.
                 // The reactive pool follows PressInteraction without owning touch gestures.
@@ -227,6 +229,9 @@ fun SyMaterialSurface(
                         )
                     }
                 }
+            }
+            CompositionLocalProvider(LocalSyGlassDepth provides (nested + 1)) {
+                content()
             }
         }
     }
