@@ -6,6 +6,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.Orientation
@@ -40,6 +42,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -339,6 +353,11 @@ fun SyOnboardingCarousel(
     }
 }
 
+/**
+ * A true guided spotlight. Anchor geometry is measured in the window, then the
+ * dimmed overlay is punched through at precisely that rectangle. Dismissal is
+ * explicit; the underlying feature action is never invoked by dismissing.
+ */
 @Composable
 fun SyCoachMark(
     title: String,
@@ -347,19 +366,86 @@ fun SyCoachMark(
     onDismiss: () -> Unit,
     anchor: @Composable () -> Unit,
 ) {
-    val p = LocalSyColors.current
-    Box {
+    var target by remember { mutableStateOf(Rect.Zero) }
+    Box(Modifier.onGloballyPositioned { coords ->
+        val point = coords.positionInWindow()
+        target = Rect(point.x, point.y,
+            point.x + coords.size.width, point.y + coords.size.height)
+    }) {
         anchor()
-        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss,
-            modifier = Modifier.widthIn(max = 292.dp)
-                .background(p.materialL5, RoundedCornerShape(SyMetric.radiusCard))) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(title, color = p.text, style = MaterialTheme.typography.titleSmall)
-                Text(description, color = p.textSecondary,
-                    style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("知道了", color = p.linkInk)
+    }
+    if (expanded && target.width > 0f) {
+        val palette = LocalSyColors.current
+        val density = LocalDensity.current
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val screenWidth = with(density) { maxWidth.toPx() }
+                val screenHeight = with(density) { maxHeight.toPx() }
+                val margin = with(density) { 16.dp.toPx() }
+                val gap = with(density) { 12.dp.toPx() }
+                val halo = with(density) { 6.dp.toPx() }
+                val width = minOf(screenWidth - margin * 2,
+                    with(density) { 292.dp.toPx() })
+                val left = (target.left - halo).coerceIn(
+                    margin, (screenWidth - width - margin).coerceAtLeast(margin))
+                val expectedHeight = with(density) { 178.dp.toPx() }
+                val top = if (target.bottom + gap + expectedHeight < screenHeight - margin)
+                    target.bottom + gap
+                else (target.top - gap - expectedHeight).coerceAtLeast(margin)
+                val haloRect = Rect(
+                    (target.left - halo).coerceAtLeast(0f),
+                    (target.top - halo).coerceAtLeast(0f),
+                    (target.right + halo).coerceAtMost(screenWidth),
+                    (target.bottom + halo).coerceAtMost(screenHeight),
+                )
+                Canvas(
+                    Modifier.fillMaxSize().clickable(onClick = onDismiss)
+                        .graphicsLayer {
+                            compositingStrategy = CompositingStrategy.Offscreen
+                        }.testTag("sy-coach-spotlight"),
+                ) {
+                    drawRect(Color.Black.copy(alpha = .56f))
+                    drawRoundRect(
+                        color = Color.Transparent,
+                        topLeft = Offset(haloRect.left, haloRect.top),
+                        size = Size(haloRect.width, haloRect.height),
+                        cornerRadius = CornerRadius(14.dp.toPx()),
+                        blendMode = BlendMode.Clear,
+                    )
+                    drawRoundRect(
+                        color = palette.primary,
+                        topLeft = Offset(haloRect.left, haloRect.top),
+                        size = Size(haloRect.width, haloRect.height),
+                        cornerRadius = CornerRadius(14.dp.toPx()),
+                        style = Stroke(width = 2.dp.toPx()),
+                    )
+                }
+                SyMaterialSurface(
+                    modifier = Modifier.offset {
+                        IntOffset(left.roundToInt(), top.roundToInt())
+                    }.width(with(density) { width.toDp() })
+                        .testTag("sy-coach-card"),
+                    tier = SyMaterialTier.L4_OVERLAY,
+                    shape = RoundedCornerShape(SyMetric.radiusCard),
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(title, color = palette.text,
+                            style = MaterialTheme.typography.titleMedium)
+                        Text(description, color = palette.textSecondary,
+                            style = MaterialTheme.typography.bodyMedium)
+                        SyButton("知道了", onDismiss,
+                            modifier = Modifier.align(Alignment.End),
+                            style = SyButtonStyle.SECONDARY)
+                    }
                 }
             }
         }
