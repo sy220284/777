@@ -59,7 +59,7 @@ class SharedApkDeviceTests(unittest.TestCase):
             manifest = root / "app/build/outputs/apk/SHA256SUMS"
             manifest.write_text("".join(f"{hashlib.sha256((root / p).read_bytes()).hexdigest()}  {p}\n" for p in names))
             with patch.object(tool, "ROOT", root):
-                self.assertEqual(len(tool.verify_apks(manifest.parent)), 2)
+                self.assertEqual([p.name for p in tool.verify_apks(manifest.parent)],\n                                 ["app-debug.apk", "app-debug-androidTest.apk"])
                 (root / names[0]).write_bytes(b"changed")
                 with self.assertRaisesRegex(ValueError, "校验失败"):
                     tool.verify_apks(manifest.parent)
