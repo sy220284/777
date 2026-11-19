@@ -196,7 +196,7 @@ fun SySheetScaffold(
 ) {
     val palette = LocalSyColors.current
     Column(
-        modifier.fillMaxWidth().imePadding()
+        modifier.fillMaxWidth().navigationBarsPadding().imePadding()
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -243,6 +243,7 @@ fun SyModalSheet(
     subtitle: String? = null,
     scrollable: Boolean = false,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val height = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
@@ -250,6 +251,7 @@ fun SyModalSheet(
         onDismissRequest = onDismiss,
         containerColor = syMaterialColor(SyMaterialTier.L4_OVERLAY),
         contentColor = LocalSyColors.current.text,
+        modifier = modifier,
         shape = RoundedCornerShape(topStart = SyMetric.radiusSheet, topEnd = SyMetric.radiusSheet),
         dragHandle = null,
         tonalElevation = 0.dp,

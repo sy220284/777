@@ -96,6 +96,7 @@ fun SyActionSheet(
     var destructiveChoice by remember { mutableStateOf<SyActionEntry?>(null) }
     SyModalSheet(
         onDismiss = onDismiss, title = title, subtitle = subtitle, scrollable = true,
+        modifier = modifier,
         footer = {
             SyButton("取消", onDismiss, modifier = Modifier.fillMaxWidth(),
                 style = SyButtonStyle.SECONDARY)
@@ -105,12 +106,12 @@ fun SyActionSheet(
             SyMaterialSurface(
                 onClick = {
                     if (entry.destructive) destructiveChoice = entry
-                    else { onChoose(entry.id); onDismiss() }
+                    else { onDismiss(); onChoose(entry.id) }
                 },
                 enabled = entry.enabled,
                 shape = RoundedCornerShape(SyMetric.radiusControl),
                 tier = SyMaterialTier.L3_CARD,
-                modifier = modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
+                modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
                     .testTag("sy-action:" + entry.id),
             ) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
@@ -138,8 +139,8 @@ fun SyActionSheet(
             dangerous = true,
             onConfirm = {
                 destructiveChoice = null
-                onChoose(entry.id)
                 onDismiss()
+                onChoose(entry.id)
             },
             onDismiss = { destructiveChoice = null })
     }
