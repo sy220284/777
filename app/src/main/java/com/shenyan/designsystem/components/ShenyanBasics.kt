@@ -287,7 +287,7 @@ fun SyModalSheet(
         tonalElevation = 0.dp,
     ) {
         SyMaterialSurface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("sy-modal-sheet-surface"),
             tier = SyMaterialTier.L4_OVERLAY,
             shape = sheetShape,
             shadowElevation = 0.dp,

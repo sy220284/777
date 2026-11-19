@@ -181,6 +181,7 @@ class PluginInventoryBrowserRegressionTest {
         }
         compose.onNodeWithTag("capability-settings-entry").performClick()
         compose.runOnIdle { assertEquals(1, opened) }
+        compose.onNodeWithText("发现").performClick()
         compose.onNodeWithTag("plugin-inventory-more").performClick()
         compose.onNodeWithText("能力与权限设置").assertDoesNotExist()
     }
@@ -404,6 +405,7 @@ class PluginInventoryBrowserRegressionTest {
                 )
             }
         }
+        compose.onNodeWithText("发现").performClick()
         compose.onNodeWithTag("plugin-inventory-more").performClick()
         compose.onNodeWithTag("skill-import-file").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, imported) }

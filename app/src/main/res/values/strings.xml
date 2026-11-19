@@ -1022,8 +1022,9 @@
     <string name="persona_gallery_standee_meta">%1$d 条故事线 · %2$d 条对白</string>
     <string name="persona_gallery_presets_title">作品预置</string>
     <string name="persona_gallery_presets_hint">先加入人设图集再开聊。预置只提供无剧透基础人设，故事、关系和记忆仍沿用现有人物系统持续成长。</string>
-    <string name="persona_gallery_preset_add">快到碗里来</string>
-    <string name="persona_gallery_preset_taken">已抱走</string>
+    <string name="persona_gallery_preset_add">添加</string>
+    <string name="persona_gallery_preset_more">%1$s 的更多操作</string>
+    <string name="persona_gallery_preset_taken">已添加</string>
     <string name="persona_gallery_preset_installed">人物预置已加入人设图集</string>
     <string name="persona_gallery_preset_install_failed">人物预置加入失败</string>
     <string name="persona_gallery_preset_long_press_delete_hint">长按作品预置可删除</string>
@@ -1577,6 +1578,12 @@
 <string name="local_send_rejected_empty">请输入消息或添加附件。</string>
 <string name="local_send_rejected_loading">会话仍在加载，请稍后重试；当前输入已保留。</string>
 <string name="local_welcome_connect_title">先连接 AI，就可以开始使用</string>
+    <string name="local_chat_start_title">开始对话</string>
+    <string name="local_chat_start_connect">选好模型后，就能在这里和当前人物对话。</string>
+    <string name="local_work_start_title">你想完成什么任务？</string>
+    <string name="local_work_start_connect">选好模型后，在这里描述目标，就能查看执行进度和成果。</string>
+    <string name="usage_overview_tab">概览</string>
+    <string name="usage_log_tab">日志</string>
     <string name="local_welcome_connect_body">登录账户或添加模型后，就能在这里聊天和处理任务。</string>
     <string name="local_welcome_connect_action">去连接</string>
     <string name="local_send_rejected_unconfigured">还没有可用的 AI 模型。请先在设置里连接一个，然后再发送。</string>

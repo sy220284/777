@@ -1,6 +1,9 @@
 package com.shenyan.designsystem.components
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -35,16 +38,18 @@ class ShenyanAtlasVisualCaptureTest {
             "01 基础组件", "02 弹窗", "03 底部面板", "04 手势",
             "05 反馈", "06 加载", "07 引导", "08 表单", "09 媒体", "10 对话",
         )
-        fun capture(name: String) {
+        fun capture(name: String, sheet: Boolean = false) {
             compose.waitForIdle()
-            val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            val bitmap = if (sheet) compose.onNodeWithTag("sy-modal-sheet-surface", useUnmergedTree = true)
+                .assertIsDisplayed().captureToImage().asAndroidBitmap()
+            else requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
             val target = File(dir, name + ".png")
             val saved = try {
                 FileOutputStream(target).use {
                     bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
                 }
             } finally {
-                bitmap.recycle()
+                if (!sheet) bitmap.recycle()
             }
             assertTrue("Native pixel artifact must exist: " + name,
                 saved && target.length() > 5000)
@@ -82,8 +87,14 @@ class ShenyanAtlasVisualCaptureTest {
                 }
                 for ((trigger, title, frame) in overlays) {
                     compose.onNodeWithText(trigger).performScrollTo().performClick()
-                    compose.onNodeWithText(title).assertExists()
-                    capture("$modeId-$frame")
+                    compose.onNodeWithText(title).assertIsDisplayed()
+                    val actionTag = when (frame) {
+                        "action-sheet-open" -> "sy-action:edit"
+                        "multi-select-open" -> "sy-multi-option:a"
+                        else -> null
+                    }
+                    actionTag?.let { compose.onNodeWithTag(it).assertIsDisplayed() }
+                    capture("$modeId-$frame", sheet = actionTag != null)
                     if (frame == "danger-dialog-open") {
                         compose.onNodeWithText("取消").performClick()
                     } else {

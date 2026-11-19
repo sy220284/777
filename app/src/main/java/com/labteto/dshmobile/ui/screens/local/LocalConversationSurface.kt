@@ -1192,14 +1192,18 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.CenterVertically),
                         ) {
-                            Text(stringResource(R.string.local_welcome_connect_title),
+                            val work = state.usageMode == LocalUsageMode.WORK
+                            Text(stringResource(if (work) R.string.local_work_start_title else R.string.local_chat_start_title),
                                 style = SyType.large20.withReadingWeight(), color = colors.text,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                            Text(stringResource(R.string.local_welcome_connect_body),
+                            Text(stringResource(if (work) R.string.local_work_start_connect
+                                else R.string.local_chat_start_connect),
                                 style = SyType.small13.withReadingWeight(), color = colors.textSecondary,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.widthIn(max = 280.dp))
-                            SyButton(stringResource(R.string.local_welcome_connect_action), onConfigure)
+                            SyButton(stringResource(R.string.local_model_choose), onClick = {
+                                if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
+                            })
                         }
                     }
                 } else if (showEmptyGuide) {
@@ -2165,7 +2169,7 @@ private fun EmptyLocalHarness(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Text(
-            stringResource(R.string.local_welcome_title),
+            stringResource(R.string.local_work_start_title),
             style = SyType.large20.withReadingWeight(),
             color = colors.text,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,

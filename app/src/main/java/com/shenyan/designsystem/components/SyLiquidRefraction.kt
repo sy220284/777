@@ -133,7 +133,7 @@ internal object SyLiquidShader {
             // No drop shadow, opaque stroke, or full-surface glare is drawn.
             float luminance = sourceLuma;
             float facing = max(dot(normal, float2(-0.71, -0.71)), 0.0);
-            float edgeLight = pow(rim, 3.0) * reflection * (0.035 + 0.18 * facing);
+            float edgeLight = pow(rim, 3.0) * reflection * (0.035 + (0.12 + 0.06 * pulse) * facing);
             half3 edgeTone = half3(luminance > 0.64 ? 0.43 : 1.0) * half(alpha);
             colour = mix(colour, edgeTone, half(edgeLight));
 
