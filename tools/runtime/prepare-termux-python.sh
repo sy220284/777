@@ -16,6 +16,7 @@ TERMUX_KEY_FINGERPRINT="CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 PYTHON_PACKAGE="python"
 PYTHON_PACKAGE_VERSION="3.14.10"
 PYTHON_RUNTIME_VERSION="$PYTHON_PACKAGE_VERSION"
+PYTHON_PIP_PACKAGE_VERSION=""
 PYTHON_MAJOR_MINOR="3.14"
 TERMUX_PREFIX="/data/data/com.termux/files/usr"
 SYSTEM_LIBS=(
@@ -352,7 +353,7 @@ prepare_arch() {
   # Keep it as an explicit root because Python/readline ELF objects require
   # libandroid-support.so and repository metadata can vary across architectures.
   mapfile -t runtime_packages < <(
-    resolve_runtime_packages "$packages_file" "$PYTHON_PACKAGE" "libandroid-support"
+    resolve_runtime_packages "$packages_file" "$PYTHON_PACKAGE" "python-pip" "libandroid-support"
   )
   [ "${#runtime_packages[@]}" -gt 0 ] || {
     echo "Python 运行时依赖解析为空：$apt_arch" >&2
@@ -386,6 +387,14 @@ prepare_arch() {
     mkdir -p "$extracted"
     dpkg-deb -x "$deb" "$extracted"
     local prefix="$extracted$TERMUX_PREFIX"
+
+    if [ "$pkg" = "python-pip" ]; then
+      if [ -n "$PYTHON_PIP_PACKAGE_VERSION" ] && [ "$PYTHON_PIP_PACKAGE_VERSION" != "$version" ]; then
+        echo "Python pip 双架构包版本不一致：$PYTHON_PIP_PACKAGE_VERSION / $version" >&2
+        exit 1
+      fi
+      PYTHON_PIP_PACKAGE_VERSION="$version"
+    fi
 
     if [ "$pkg" = "$PYTHON_PACKAGE" ]; then
       local python_bin="$prefix/bin/python$PYTHON_MAJOR_MINOR"
@@ -428,6 +437,14 @@ prepare_arch() {
       find "$stdlib_dir" -type f -name '*.pyc' -delete
     fi
 
+    # Python wheels and Termux's python-pip package live in site-packages.
+    # Preserve their pure-Python modules in the relocated interpreter home.
+    if [ -d "$prefix/lib/python$PYTHON_MAJOR_MINOR/site-packages" ]; then
+      local site_dir="$home_dir/lib/python$PYTHON_MAJOR_MINOR/site-packages"
+      mkdir -p "$site_dir"
+      cp -aL "$prefix/lib/python$PYTHON_MAJOR_MINOR/site-packages/." "$site_dir/"
+    fi
+
     if [ -d "$prefix/lib" ]; then
       while IFS= read -r -d '' library; do
         local name
@@ -456,6 +473,10 @@ prepare_arch() {
 
   [ -f "$jni_dir/libdsh_python.so" ] || {
     echo "Python 可执行文件未生成：$android_abi" >&2
+    exit 1
+  }
+  [ -f "$stdlib_dir/site-packages/pip/__main__.py" ] || {
+    echo "Python pip 模块未生成：$android_abi" >&2
     exit 1
   }
   [ -f "$stdlib_dir/os.py" ] || {
@@ -490,5 +511,7 @@ for android_abi in "${requested_abis[@]}"; do
   esac
 done
 
+[ -n "$PYTHON_PIP_PACKAGE_VERSION" ] || { echo "pip 版本未知" >&2; exit 1; }
+printf '%s\n' "$PYTHON_PIP_PACKAGE_VERSION" > "$OUT_ROOT/assets/runtime/python/pip-version.txt"
 printf '%s\n' "$PYTHON_RUNTIME_VERSION" > "$OUT_ROOT/assets/runtime/python/python-version.txt"
 echo "Python runtime prepared: $PYTHON_RUNTIME_VERSION"
