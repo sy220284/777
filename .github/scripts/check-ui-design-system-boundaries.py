@@ -156,7 +156,7 @@ if "SySceneBackgroundSurface(" not in mask_non_code(background_host):
 # moved to Sy. New production UI must consume the current Shenyan vocabulary.
 # Match identifiers in Kotlin code only; allow documentation and historical storage keys.
 RETIRED_VISUAL_TOKEN = re.compile(
-    r"\\b(?:LocalDs(?:Colors|ReadingPreferences)|Ds(?:Type|Shapes|MaterialShapes|Metrics|Animations|Colors|ThemeTokens|Theme|ReadingPreferences|Typography|Light|Dark)|dsTypography)\\b"
+    r"\b(?:LocalDs(?:Colors|ReadingPreferences)|Ds(?:Type|Shapes|MaterialShapes|Metrics|Animations|Colors|ThemeTokens|Theme|ReadingPreferences|Typography|Light|Dark)|dsTypography)\b"
 )
 RETIRED_DRAWING_CALL = re.compile(
     r"\bDs(?:Button|Card|Segmented|Checkbox|BottomSheet|SearchField|ToastHost|TopBar|ProgressBar)\s*\("
@@ -170,7 +170,7 @@ for path in UI.rglob("*.kt"):
     for match in RETIRED_DRAWING_CALL.finditer(source):
         violations.append(f"{relative}: retired Ds drawing component {match.group(0)}")
     for match in RETIRED_VISUAL_TOKEN.finditer(source):
-        line = source.count("\\n", 0, match.start()) + 1
+        line = source.count("\n", 0, match.start()) + 1
         violations.append(f"{relative}:{line}: retired Ds visual token {match.group(0)} -> migrate to Sy")
 
     if re.search(r"\bDsTheme\.colors\b", source):
