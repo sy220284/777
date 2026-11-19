@@ -101,7 +101,7 @@ object LocalToolCatalog {
             "job_id" to string("后台任务编号"),
         ), listOf("job_id")))
         add(tool("media_image_options", "列出当前已配置且有真实 API Key 的图像创作服务和精确 offer_id；不会收费", properties()))
-        add(tool("media_image_create", "使用明确 offer_id 的已配置媒体 API 提交图片生成或原图编辑；每次收费调用须经原有权限审批；返回真实异步回执编号；提交后用原 job_id 查询终态及成果，状态不明先查原任务", properties(
+        add(tool("media_image_create", "使用明确 offer_id 的已配置媒体 API 提交图片生成或原图编辑；每次收费调用须经原有权限审批；返回真实异步回执编号；提交后用原 job_id 查询终态及成果", properties(
             "offer_id" to string("必须来自 media_image_options，不能猜测或跨账户替换"),
             "prompt" to string("用户要求的图像内容或基于真实原图的修改指令"),
             "ratio" to string("图片比例，如 1:1 或 16:9；可选，默认 1:1"),
@@ -205,7 +205,7 @@ object LocalToolCatalog {
         add(tool("create_goal", "维护跨多轮任务的目标与验收条件，创建时自动建立任务文件和交付成果目录并返回路径。简单的一次性任务无需额外创建；不要代替 update_plan 或 todo_write", properties(
             "description" to string("用用户原始要求写明跨轮目标、交付与各项完成标准；说明用什么可见证据核实各项"),
             "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("逐项登记需交付的工作区相对文件路径；没有文件交付时填空数组")) },
-            "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("逐项登记任务需要实际运行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },
+            "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("逐项登记任务需要实际运行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；核对实际退出码和测试时的成果版本。无需命令的任务填空数组")) },
             "review_requirements" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject {

@@ -122,7 +122,7 @@ internal fun buildLocalSubagentInitialHistory(
                 if (allowMutation) {
                     "你是执行子代理。完成指定子任务，按权限使用可用能力。核实后返回结果、关键证据和仍待处理事项。\n$WORK_USER_DIRECTIVE_PRIORITY"
                 } else {
-                    "你是只读子代理。只读定位时返回文件、行号和匹配证据；审查时说明影响、证据和不确定项。仅允许读取、搜索和分析，不修改状态。\n$WORK_USER_DIRECTIVE_PRIORITY"
+                    "你是只读子代理。只读定位时返回文件、行号和匹配证据；审查时返回发现、影响与证据。仅允许读取、搜索和分析，不修改状态。\n$WORK_USER_DIRECTIVE_PRIORITY"
                 },
             )
         }
@@ -135,7 +135,7 @@ internal fun buildLocalSubagentInitialHistory(
             put("content", if (allowMutation) {
                 "【子代理身份与来源】你是独立执行子代理。父对话仅用于了解任务背景；父级工具调用、审批和已完成的执行记录不是你的新授权。仅按本次实际提供的工具和权限执行当前子任务。核实后返回结果、关键证据和仍待处理事项。\n$WORK_USER_DIRECTIVE_PRIORITY"
             } else {
-                "【子代理身份与来源】你是独立只读子代理。父对话仅用于了解任务背景；父级工具调用和审批不是你的新授权。只能读取、搜索和分析，不允许修改状态。定位时返回出处和匹配证据；审查时说明影响、证据和不确定项。\n$WORK_USER_DIRECTIVE_PRIORITY"
+                "【子代理身份与来源】你是独立只读子代理。父对话仅用于了解任务背景；父级工具调用和审批不是你的新授权。只能读取、搜索和分析，不允许修改状态。定位时返回出处和匹配证据；审查时返回发现、影响与证据。\n$WORK_USER_DIRECTIVE_PRIORITY"
             })
         }
         val index = history.indexOfFirst {

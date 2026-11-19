@@ -190,8 +190,8 @@ internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
 internal const val INTERNAL_WORK_GOAL_PROGRESS_PROMPT =
     "上一轮已有真实进展。对照当前目标、最新用户要求和工具回执，从仍缺的交付或验收继续，" +
-        "复用已核实的成果，不重放已结算的副作用。相关调查还有证据缺口时，继续读取原始材料并修订判断。" +
-        "工具结果未知时先核对真实状态，缺少授权时继续处理已获准的部分。确无可执行的下一步时，说明卡点与已完成事项。"
+        "复用已核实的成果和已结算的回执。相关调查还有证据缺口时，继续读取原始材料并修订判断。" +
+        "先核对上一步的实际状态，再推进当前权限下可执行的事项。"
 
 /**
  * Called only by the current Work run owner while holding its handoff lock.
