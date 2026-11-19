@@ -27,10 +27,16 @@ def verify_apks(directory=APK_ROOT):
         expected[match.group(2)] = match.group(1).lower()
     if set(expected) != expected_paths:
         raise ValueError(f"APK 清单与测试包契约不一致：{sorted(expected)}")
+    # Android 仪表测试包依赖被测应用，必须先安装应用再安装测试包。
+    install_order = [
+        "app/build/outputs/apk/debug/app-debug.apk",
+        "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+    ]
     verified = []
-    for relative in sorted(expected_paths):
+    for relative in install_order:
         file = ROOT / relative
-        digest = hashlib.file_digest(file.open("rb"), "sha256").hexdigest()
+        with file.open("rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
         if digest != expected[relative]:
             raise ValueError(f"APK SHA-256 校验失败：{relative}")
         verified.append(file)
