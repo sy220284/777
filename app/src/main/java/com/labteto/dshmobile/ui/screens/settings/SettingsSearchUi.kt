@@ -30,7 +30,7 @@ import androidx.compose.ui.semantics.stateDescription
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.SySearchField
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.shenyan.designsystem.foundation.LocalSyColors
 
 internal data class SettingsSearchFocus(val title: String, val request: String)
@@ -74,7 +74,7 @@ internal fun SettingsSearchResults(
             modifier = Modifier.fillMaxWidth().testTag("settings-search-input"),
             placeholder = stringResource(R.string.settings_search_hint))
         Text(stringResource(R.string.settings_search_count, results.size),
-            style = DsType.small13, color = colors.textSecondary)
+            style = SyType.small13, color = colors.textSecondary)
         if (results.isEmpty()) Text(stringResource(R.string.settings_search_empty), color = colors.textSecondary)
         LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("settings-search-results")) {
             items(results, key = { it.id }) { entry ->

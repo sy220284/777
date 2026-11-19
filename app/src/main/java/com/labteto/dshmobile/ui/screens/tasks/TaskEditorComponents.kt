@@ -38,7 +38,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyGroupCard
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.util.Calendar
@@ -82,7 +82,7 @@ internal fun ColumnScope.TaskEditorPane(
                 stringResource(
                     if (editingTaskId != null) R.string.tasks_edit else R.string.tasks_new,
                 ),
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = colors.text,
             )
             SyTextField(
@@ -103,7 +103,7 @@ internal fun ColumnScope.TaskEditorPane(
         SyGroupCard {
             Text(
                 stringResource(R.string.tasks_schedule_label),
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.textSecondary,
             )
             CadenceRow(
@@ -167,12 +167,12 @@ internal fun ColumnScope.TaskEditorPane(
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.tasks_notify_title),
-                        style = DsType.small13Strong.withReadingWeight(),
+                        style = SyType.small13Strong.withReadingWeight(),
                         color = colors.text,
                     )
                     Text(
                         stringResource(R.string.tasks_notify_hint),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textTertiary,
                     )
                 }
@@ -184,7 +184,7 @@ internal fun ColumnScope.TaskEditorPane(
             createError?.let {
                 Text(
                     it,
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.dangerInk,
                 )
             }
@@ -364,7 +364,7 @@ private fun TaskSchedulePicker(
             if (!validTime) {
                 Text(
                     stringResource(R.string.app_schedule_future_hint),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.warningInk,
                 )
             }

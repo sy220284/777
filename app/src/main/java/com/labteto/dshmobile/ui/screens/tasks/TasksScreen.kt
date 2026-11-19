@@ -55,7 +55,7 @@ import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.shenyan.rememberSyToast
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import java.text.DateFormat
@@ -333,7 +333,7 @@ private fun WorkTasksScreen(
                                 ) {
                                     Text(
                                         stringResource(R.string.tasks_filter_empty),
-                                        style = DsType.small13.withReadingWeight(),
+                                        style = SyType.small13.withReadingWeight(),
                                         color = colors.textSecondary,
                                     )
                                     SyButton(
@@ -383,13 +383,13 @@ private fun TaskEmptyState(
             )
             Text(
                 stringResource(R.string.tasks_empty_title),
-                style = DsType.base16Strong.withReadingWeight(),
+                style = SyType.base16Strong.withReadingWeight(),
                 color = colors.text,
                 textAlign = TextAlign.Center,
             )
             Text(
                 stringResource(R.string.tasks_empty_subtitle),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textTertiary,
                 textAlign = TextAlign.Center,
             )
@@ -409,7 +409,7 @@ private fun TaskEmptyState(
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
                         stringResource(R.string.tasks_create_manual),
-                        style = DsType.std14Strong.withReadingWeight(),
+                        style = SyType.std14Strong.withReadingWeight(),
                         color = colors.onPrimary,
                     )
                 }
@@ -424,7 +424,7 @@ private fun TaskEmptyState(
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(SyMetric.gapLg)) {
                     Text(
                         stringResource(R.string.tasks_create_via_chat),
-                        style = DsType.std14Strong.withReadingWeight(),
+                        style = SyType.std14Strong.withReadingWeight(),
                         color = colors.text,
                     )
                 }

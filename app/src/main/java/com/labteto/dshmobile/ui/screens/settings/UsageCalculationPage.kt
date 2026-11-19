@@ -62,8 +62,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegmentedTabs
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -134,7 +134,7 @@ internal fun UsageCalculationPage(
     ) {
         Text(
             stringResource(R.string.usage_model_filter_label),
-            style = DsType.std14Strong.withReadingWeight(),
+            style = SyType.std14Strong.withReadingWeight(),
             color = colors.text,
             modifier = Modifier.weight(1f),
         )
@@ -160,7 +160,7 @@ internal fun UsageCalculationPage(
     if (selectedModel != null && analytics.modelHistoryPartial) {
         Text(
             stringResource(R.string.usage_model_history_partial),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
     }
@@ -195,7 +195,7 @@ internal fun UsageCalculationPage(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
         ) {
-            Text(stringResource(R.string.fluid_model_composition), style = DsType.std14Strong,
+            Text(stringResource(R.string.fluid_model_composition), style = SyType.std14Strong,
                 color = colors.text)
             val total = analytics.byModel.values.sumOf { it.tracked.totalTokens.toDouble() }.coerceAtLeast(1.0)
             androidx.compose.foundation.lazy.LazyColumn(
@@ -210,7 +210,7 @@ internal fun UsageCalculationPage(
                             onClick = { onSelectModel(entry.key) },
                             modifier = Modifier.fillMaxWidth()
                                 .testTag("usage-model-select:" + entry.key),
-                            shape = DsShapes.row,
+                            shape = SyShapes.row,
                             color = androidx.compose.ui.graphics.Color.Transparent,
                         ) {
                             Column(
@@ -220,13 +220,13 @@ internal fun UsageCalculationPage(
                                 Row {
                                     Text(
                                         entry.key,
-                                        style = DsType.small13Strong.withReadingWeight(),
+                                        style = SyType.small13Strong.withReadingWeight(),
                                         modifier = Modifier.weight(1f),
                                         color = colors.text,
                                     )
                                     Text(
                                         formatTokens(entry.value.tracked.totalTokens),
-                                        style = DsType.caption11.copy(fontFeatureSettings = "tnum"),
+                                        style = SyType.caption11.copy(fontFeatureSettings = "tnum"),
                                         color = colors.textSecondary,
                                     )
                                 }
@@ -249,7 +249,7 @@ internal fun UsageCalculationPage(
             Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                 Text(
                     stringResource(R.string.usage_daily_title),
-                    style = DsType.std14Strong.withReadingWeight(),
+                    style = SyType.std14Strong.withReadingWeight(),
                     color = colors.text,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -267,14 +267,14 @@ internal fun UsageCalculationPage(
                 Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
                     Text(
                         formatEpochDay(day),
-                        style = DsType.small13Strong.withReadingWeight(),
+                        style = SyType.small13Strong.withReadingWeight(),
                         color = colors.text,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
                         "${stringResource(R.string.usage_calculation_input)} ${formatTokens(aggregate.inputTokens)} · " +
                             "${stringResource(R.string.usage_calculation_output)} ${formatTokens(aggregate.outputTokens)}",
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
@@ -334,7 +334,7 @@ internal fun UsageCalculationPage(
     if (selectedModel == null && usage.totalTokens > analytics.tracked.totalTokens) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.row,
+            shape = SyShapes.row,
             color = colors.selected,
         ) {
             Column(
@@ -348,13 +348,13 @@ internal fun UsageCalculationPage(
                             DateFormat.getDateInstance(DateFormat.MEDIUM)
                                 .format(Date(analytics.trackedSince)),
                         ),
-                        style = DsType.small13Strong.withReadingWeight(),
+                        style = SyType.small13Strong.withReadingWeight(),
                         color = colors.text,
                     )
                 }
                 Text(
                     stringResource(R.string.usage_legacy_notice),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                 )
             }
@@ -364,7 +364,7 @@ internal fun UsageCalculationPage(
     if (visibleUsage.unreportedRequestCount > 0L || (selectedModel == null && usage.unpricedTokens > 0L)) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = DsShapes.row,
+            shape = SyShapes.row,
             color = colors.warning.copy(alpha = .18f),
         ) {
             Column(
@@ -373,20 +373,20 @@ internal fun UsageCalculationPage(
             ) {
                 Text(
                     stringResource(R.string.usage_calculation_partial),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.warningInk,
                 )
                 if (visibleUsage.unreportedRequestCount > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unreported, visibleUsage.unreportedRequestCount),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
                 if (selectedModel == null && usage.unpricedTokens > 0L) {
                     Text(
                         stringResource(R.string.local_usage_unpriced, formatNumber(usage.unpricedTokens)),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
                 }
@@ -396,7 +396,7 @@ internal fun UsageCalculationPage(
 
     Text(
         stringResource(R.string.usage_calculation_disclaimer),
-        style = DsType.caption11.withReadingWeight(),
+        style = SyType.caption11.withReadingWeight(),
         color = colors.textTertiary,
     )
     SyButton(
@@ -436,7 +436,7 @@ internal fun UsageLogPage(
         }
     }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.usage_log_retention), style = DsType.caption11)
+        Text(stringResource(R.string.usage_log_retention), style = SyType.caption11)
         records.forEachIndexed { index, record ->
             UsageRequestRow(record = record, onClick = { onOpenRequest(record.requestId) })
             if (index != records.lastIndex) UsageDivider()
@@ -563,7 +563,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
                     R.string.usage_calculation_reasoning_note,
                     formatNumber(record.reasoningTokens),
                 ),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
         }
@@ -576,7 +576,7 @@ internal fun UsageRequestDetailPage(record: TokenUsageRecord?) {
     } ?: record.model
     Text(
         "$modelStep · ${formatTime(record.timestamp)}",
-        style = DsType.caption11.withReadingWeight(),
+        style = SyType.caption11.withReadingWeight(),
         color = colors.textTertiary,
     )
 }
