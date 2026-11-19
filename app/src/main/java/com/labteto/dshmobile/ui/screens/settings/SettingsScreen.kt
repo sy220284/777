@@ -82,6 +82,8 @@ import com.labteto.dshmobile.local.TokenUsageRecord
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.session.LocalSessionStorageStatus
 import com.shenyan.designsystem.components.SyTextField
+import com.shenyan.designsystem.components.SyMaterialFrame
+import com.shenyan.designsystem.components.SyMaterialTier
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SySegment
@@ -1360,8 +1362,23 @@ internal fun SettingsSeamlessGroup(
 
 @Composable
 internal fun SettingsCard(title: String, content: @Composable () -> Unit) {
-    // Lightweight settings share the same canvas. Explicit data/approval cards keep their own material.
-    SettingsSeamlessGroup(title, content)
+    // Structured settings use one shared L1 material; editorial/seamless sections keep
+    // SettingsSeamlessGroup's open layout so every page does not become a card grid.
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("settingsSeamlessGroup"),
+        verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+    ) {
+        SettingsGroupTitle(title)
+        SyMaterialFrame(
+            modifier = Modifier.fillMaxWidth(),
+            tier = SyMaterialTier.L1_SECTION,
+            horizontalPadding = SyMetric.gapLg,
+            verticalPadding = SyMetric.gapMd,
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+        ) {
+            content()
+        }
+    }
 }
 
 /** 更新检查是设置页内的即时操作，不占用独立导航层级。 */
