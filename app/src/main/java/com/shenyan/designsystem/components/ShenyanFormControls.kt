@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -91,7 +92,7 @@ fun SyTextField(
     val fieldContent: @Composable () -> Unit = {
     OutlinedTextField(
         value = value, onValueChange = onValueChange,
-        modifier = (if (flat) modifier else Modifier.fillMaxWidth()).heightIn(min = SyMetric.touch),
+        modifier = modifier.heightIn(min = SyMetric.touch),
         enabled = enabled, readOnly = readOnly,
         textStyle = textStyle.copy(color = if (enabled) p.text else p.textTertiary),
         label = label, placeholder = placeholder, leadingIcon = leadingIcon,
@@ -121,11 +122,16 @@ fun SyTextField(
     if (flat) {
         fieldContent()
     } else {
-        SyMaterialSurface(
-            modifier = modifier.heightIn(min = SyMetric.touch),
-            tier = SyMaterialTier.L2_BAR,
-            shape = shape,
-        ) { fieldContent() }
+        // The actual text field retains the caller's modifier, focus semantics and
+        // test tag. The optical surface is a non-interactive sibling behind it.
+        Box {
+            SyMaterialSurface(
+                modifier = Modifier.matchParentSize(),
+                tier = SyMaterialTier.L2_BAR,
+                shape = shape,
+            ) {}
+            fieldContent()
+        }
     }
 }
 
