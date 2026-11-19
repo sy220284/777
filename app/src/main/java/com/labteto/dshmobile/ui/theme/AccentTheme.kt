@@ -18,8 +18,6 @@ data class AccentPalette(
     val darkAccent: Color,
     val onLight: Color = Color(0xFFFFFFFF),
     val onDark: Color = Color(0xFF0C1A19),
-    val darkCanvas: Color = Color(0xFF24211E),
-    val darkSurface: Color = Color(0xFF35312D),
 )
 
 object AccentPalettes {
@@ -28,22 +26,14 @@ object AccentPalettes {
     val ALL = listOf(
         AccentPalette("fluid_apricot", "流体杏", Color(0xFFD9926B), Color(0xFFE8A87C),
             onLight = Color.Black, onDark = Color(0xFF3A342D)),
-        AccentPalette("vermilion", "朱砂墨", Color(0xFFAA4235), Color(0xFFD87460),
-            darkCanvas = Color(0xFF291F1C), darkSurface = Color(0xFF372A24)),
-        AccentPalette("forest", "森野", Color(0xFF276D4E), Color(0xFF8CA66B),
-            darkCanvas = Color(0xFF1D2721), darkSurface = Color(0xFF2C392F)),
-        AccentPalette("amber", "琥珀", Color(0xFFAA6A21), Color(0xFFE3AD57),
-            darkCanvas = Color(0xFF29231B), darkSurface = Color(0xFF3B3024)),
-        AccentPalette("celadon_explicit", "青瓷", Color(0xFF307B67), Color(0xFF80B7A1),
-            darkCanvas = Color(0xFF1D2928), darkSurface = Color(0xFF2C3A37)),
-        AccentPalette("graphite", "岩墨", Color(0xFF665E50), Color(0xFFB9A58B),
-            darkCanvas = Color(0xFF222323), darkSurface = Color(0xFF343432)),
-        AccentPalette("rose_copper", "玫铜", Color(0xFFA94C50), Color(0xFFD99283),
-            darkCanvas = Color(0xFF2B2123), darkSurface = Color(0xFF3D2E2D)),
-        AccentPalette("olive", "橄榄", Color(0xFF5B7240), Color(0xFFADBD79),
-            darkCanvas = Color(0xFF24291F), darkSurface = Color(0xFF363C2C)),
-        AccentPalette("modern_coral", "珊瑚几何", Color(0xFFE44E34), Color(0xFFF2A44C),
-            darkCanvas = Color(0xFF29231E), darkSurface = Color(0xFF3B3229)),
+        AccentPalette("vermilion", "朱砂墨", Color(0xFFAA4235), Color(0xFFD87460)),
+        AccentPalette("forest", "森野", Color(0xFF276D4E), Color(0xFF8CA66B)),
+        AccentPalette("amber", "琥珀", Color(0xFFAA6A21), Color(0xFFE3AD57)),
+        AccentPalette("celadon_explicit", "青瓷", Color(0xFF307B67), Color(0xFF80B7A1)),
+        AccentPalette("graphite", "岩墨", Color(0xFF665E50), Color(0xFFB9A58B)),
+        AccentPalette("rose_copper", "玫铜", Color(0xFFA94C50), Color(0xFFD99283)),
+        AccentPalette("olive", "橄榄", Color(0xFF5B7240), Color(0xFFADBD79)),
+        AccentPalette("modern_coral", "珊瑚几何", Color(0xFFE44E34), Color(0xFFF2A44C)),
     )
 
     val DEFAULT = ALL.first()

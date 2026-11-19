@@ -13,11 +13,10 @@ import androidx.compose.ui.unit.Density
 import com.labteto.dshmobile.connection.AppDisplayLimits
 import com.labteto.dshmobile.ui.shenyan.SyMode
 import com.labteto.dshmobile.ui.shenyan.SyThemeProvider
-import com.shenyan.designsystem.foundation.withAtmosphere
 import com.labteto.dshmobile.ui.shenyan.rememberSyReducedMotion
 
 /** Theme preference exposed by the app Appearance row. */
-enum class ThemePreference { LIGHT, DARK, MATTE_BLACK, SYSTEM }
+enum class ThemePreference { LIGHT, MATTE_BLACK, SYSTEM }
 
 /** Shenyan host semantic palette for screen-level preferences and system integration. */
 data class SyHostColors(
@@ -120,82 +119,41 @@ object SyHostThemeTokens {
         markdownTag = SyHostLight.markdownTag, overlayMask = SyHostLight.overlayMask,
     )
 
-    val dark = SyHostColors(
-        bgBase = SyHostDark.bgBase, bgLayer1 = SyHostDark.bgLayer1, bgLayer2 = SyHostDark.bgLayer2,
-        bgLayer3 = SyHostDark.bgLayer3, bgModulePlatform = SyHostDark.bgModulePlatform,
-        borderL1 = SyHostDark.borderL1, borderL2 = SyHostDark.borderL2, borderL3 = SyHostDark.borderL3,
-        brandPrimary = SyHostDark.brandPrimary, onBrandPrimary = SyHostDark.onBrandPrimary,
-        labelPrimary = SyHostDark.labelPrimary, labelSecondary = SyHostDark.labelSecondary,
-        labelTertiary = SyHostDark.labelTertiary, labelCaption = SyHostDark.labelCaption,
-        labelDimmed = SyHostDark.labelDimmed,
-        accent = SyHostDark.accent, onAccent = SyHostDark.onAccent,
-        accentTertiary = SyHostDark.accentTertiary,
+    val matteBlack = SyHostColors(
+        bgBase = SyHostMatte.bgBase, bgLayer1 = SyHostMatte.bgLayer1, bgLayer2 = SyHostMatte.bgLayer2,
+        bgLayer3 = SyHostMatte.bgLayer3, bgModulePlatform = SyHostMatte.bgModulePlatform,
+        borderL1 = SyHostMatte.borderL1, borderL2 = SyHostMatte.borderL2, borderL3 = SyHostMatte.borderL3,
+        brandPrimary = SyHostMatte.brandPrimary, onBrandPrimary = SyHostMatte.onBrandPrimary,
+        labelPrimary = SyHostMatte.labelPrimary, labelSecondary = SyHostMatte.labelSecondary,
+        labelTertiary = SyHostMatte.labelTertiary, labelCaption = SyHostMatte.labelCaption,
+        labelDimmed = SyHostMatte.labelDimmed,
+        accent = SyHostMatte.accent, onAccent = SyHostMatte.onAccent,
+        accentTertiary = SyHostMatte.accentTertiary,
         characterAccent = Color(0xFFD7A477),
         characterAccentTertiary = Color(0x30C98B6B),
-        accentHover = SyHostDark.accentHover,
-        hover = SyHostDark.hover, hoverSolid = SyHostDark.hoverSolid, hoverAccent = SyHostDark.hoverAccent,
-        active = SyHostDark.active, dangerHover = SyHostDark.dangerHover,
-        buttonPrimaryHover = SyHostDark.buttonPrimaryHover, buttonPrimaryDimmed = SyHostDark.buttonPrimaryDimmed,
-        buttonInfoFill = SyHostDark.buttonInfoFill, buttonInfoHover = SyHostDark.buttonInfoHover,
-        error = SyHostDark.error, onError = Color(0xFF0C1A19), errorSecondary = SyHostDark.errorSecondary, errorTertiary = SyHostDark.errorTertiary,
-        success = SyHostDark.success, successSecondary = SyHostDark.successSecondary,
-        successTertiary = SyHostDark.successTertiary,
-        warnLabel = SyHostDark.warnLabel, warn = SyHostDark.warn, warnSecondary = SyHostDark.warnSecondary,
-        warnTertiary = SyHostDark.warnTertiary,
-        progressFailedStart = SyHostDark.progressFailedStart,
-        progressFailedEnd = SyHostDark.progressFailedEnd,
-        toastBg = SyHostDark.toastBg, onToast = Color(0xFFF5F0E8), tooltipBg = SyHostDark.tooltipBg,
-        userBubble = SyHostDark.userBubble, userBubbleHighlight = SyHostDark.userBubbleHighlight,
-        composerCard = SyHostDark.composerCard,
-        sidebar = SyHostDark.sidebar, sidebarNavActive = SyHostDark.sidebarNavActive,
-        sidebarNavAccent = SyHostDark.sidebarNavAccent, sidebarNavHover = SyHostDark.sidebarNavHover,
-        tipSurface = SyHostDark.tipSurface,
-        codeBlockBg = SyHostDark.codeBlockBg, codeBlockBanner = SyHostDark.codeBlockBanner,
-        inlineCode = SyHostDark.inlineCode, citation = SyHostDark.citation,
-        markdownTag = SyHostDark.markdownTag, overlayMask = SyHostDark.overlayMask,
+        accentHover = SyHostMatte.accentHover,
+        hover = SyHostMatte.hover, hoverSolid = SyHostMatte.hoverSolid, hoverAccent = SyHostMatte.hoverAccent,
+        active = SyHostMatte.active, dangerHover = SyHostMatte.dangerHover,
+        buttonPrimaryHover = SyHostMatte.buttonPrimaryHover, buttonPrimaryDimmed = SyHostMatte.buttonPrimaryDimmed,
+        buttonInfoFill = SyHostMatte.buttonInfoFill, buttonInfoHover = SyHostMatte.buttonInfoHover,
+        error = SyHostMatte.error, onError = Color(0xFF0C1A19), errorSecondary = SyHostMatte.errorSecondary, errorTertiary = SyHostMatte.errorTertiary,
+        success = SyHostMatte.success, successSecondary = SyHostMatte.successSecondary,
+        successTertiary = SyHostMatte.successTertiary,
+        warnLabel = SyHostMatte.warnLabel, warn = SyHostMatte.warn, warnSecondary = SyHostMatte.warnSecondary,
+        warnTertiary = SyHostMatte.warnTertiary,
+        progressFailedStart = SyHostMatte.progressFailedStart,
+        progressFailedEnd = SyHostMatte.progressFailedEnd,
+        toastBg = SyHostMatte.toastBg, onToast = Color(0xFFF5F0E8), tooltipBg = SyHostMatte.tooltipBg,
+        userBubble = SyHostMatte.userBubble, userBubbleHighlight = SyHostMatte.userBubbleHighlight,
+        composerCard = SyHostMatte.composerCard,
+        sidebar = SyHostMatte.sidebar, sidebarNavActive = SyHostMatte.sidebarNavActive,
+        sidebarNavAccent = SyHostMatte.sidebarNavAccent, sidebarNavHover = SyHostMatte.sidebarNavHover,
+        tipSurface = SyHostMatte.tipSurface,
+        codeBlockBg = SyHostMatte.codeBlockBg, codeBlockBanner = SyHostMatte.codeBlockBanner,
+        inlineCode = SyHostMatte.inlineCode, citation = SyHostMatte.citation,
+        markdownTag = SyHostMatte.markdownTag, overlayMask = SyHostMatte.overlayMask,
     )
-    /**
-     * A warmer, low-glare dark palette for the optional matte-black appearance.
-     *
-     * It deliberately keeps the normal dark theme intact. Surfaces move to neutral charcoal while
-     * text uses warm off-white values, giving the UI a softer "matte black / matte white" contrast.
-     */
-    val matteBlack = dark.copy(
-        bgBase = Color(0xFF10100F),
-        bgLayer1 = Color(0xFF191918),
-        bgLayer2 = Color(0xFF222220),
-        bgLayer3 = Color(0xFF2B2B28),
-        bgModulePlatform = Color(0xFF222220),
-        borderL1 = Color(0x0FF3F0E8),
-        borderL2 = Color(0x1FF3F0E8),
-        borderL3 = Color(0x29F3F0E8),
-        brandPrimary = Color(0xFFF3F0E8),
-        onBrandPrimary = Color(0xFF10100F),
-        onAccent = Color(0xFF3A342D),
-        labelPrimary = Color(0xFFF4F3EF),
-        labelSecondary = Color(0xFFD5D1C9),
-        labelTertiary = Color(0xFFAAA69E),
-        labelCaption = Color(0xFF7F7C75),
-        labelDimmed = Color(0xFF5B5954),
-        hoverSolid = Color(0xFF242421),
-        buttonPrimaryHover = Color(0xFFD5D1C9),
-        buttonPrimaryDimmed = Color(0xFF4B4944),
-        toastBg = Color(0xFF363431),
-        tooltipBg = Color(0xFF363431),
-        userBubble = Color(0xFF222220),
-        userBubbleHighlight = Color(0xFF363431),
-        composerCard = Color(0xFF222220),
-        sidebar = Color(0xFF151514),
-        sidebarNavActive = Color(0xFF363431),
-        sidebarNavAccent = Color(0xFF2D2C29),
-        sidebarNavHover = Color(0xFF222220),
-        tipSurface = Color(0xFF2D2C29),
-        codeBlockBg = Color(0xFF181816),
-        codeBlockBanner = Color(0xFF1B1B19),
-        inlineCode = Color(0xFF222220),
-        citation = Color(0xFF2D2C29),
-        markdownTag = Color(0xFF222220),
-    )
+
 
 }
 
@@ -268,35 +226,19 @@ internal fun resolveV6ThemePalette(
 ): V6ThemeProjection {
     val dark = when (preference) {
         ThemePreference.LIGHT -> false
-        ThemePreference.DARK, ThemePreference.MATTE_BLACK -> true
+        ThemePreference.MATTE_BLACK -> true
         ThemePreference.SYSTEM -> systemDark
     }
-    val base = when (preference) {
-        ThemePreference.LIGHT -> SyHostThemeTokens.light
-        ThemePreference.DARK -> SyHostThemeTokens.dark
-        ThemePreference.MATTE_BLACK -> SyHostThemeTokens.matteBlack
-        ThemePreference.SYSTEM -> if (systemDark) SyHostThemeTokens.dark else SyHostThemeTokens.light
-    }
+    // Both explicit night and system-night use the same matte-black material.
+    val base = if (dark) SyHostThemeTokens.matteBlack else SyHostThemeTokens.light
+    val canonical = if (dark)
+        com.shenyan.designsystem.foundation.ShenyanPalettes.matte
+    else com.shenyan.designsystem.foundation.ShenyanPalettes.light
     val palette = AccentPalettes.of(accentKey)
-    val canonical = com.shenyan.designsystem.foundation.ShenyanPalettes.forMode(
-        when (preference) {
-            ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-            ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
-            ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
-            ThemePreference.SYSTEM -> if (systemDark)
-                com.shenyan.designsystem.foundation.ShenyanMode.DARK
-                else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-        }
-    )
     val defaultAccent = palette.key == AccentPalettes.DEFAULT.key
-    // 显式选色只改变浅色交互色，典雅白背景不会随色卡重新染色。
-    val atmosphere = if (!dark || defaultAccent) canonical else canonical.withAtmosphere(
-        canvasTone = palette.darkCanvas,
-        readingSurface = palette.darkSurface,
-    )
     val page = (if (defaultAccent) base else base.withAccent(palette, dark))
-        .harmonizeV6(atmosphere, preserveAccent = !defaultAccent)
-    val controls = if (defaultAccent) atmosphere else atmosphere.withV6Accent(page)
+        .harmonizeV6(canonical, preserveAccent = !defaultAccent)
+    val controls = if (defaultAccent) canonical else canonical.withV6Accent(page)
     return V6ThemeProjection(dark, page, controls, defaultAccent)
 }
 
@@ -358,30 +300,20 @@ fun DshTheme(
             darkTheme = dark,
             surfaceBase = themed.bgBase,
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
-            fluidGlass = preference != ThemePreference.MATTE_BLACK,
+            fluidGlass = !dark,
             ambientGlow = ambientGlow.coerceIn(0f, 1f),
             ambientPalette = controlPalette,
         ) {
             // One canonical visual theme owns all Material3 colour and shape tokens.
             // Canonical V6 palette owns production controls; SyHostColors now only projects retained preferences.
-            val syMode = when (preference) {
-                ThemePreference.LIGHT -> SyMode.LIGHT
-                ThemePreference.DARK -> SyMode.DARK
-                ThemePreference.MATTE_BLACK -> SyMode.MATTE
-                ThemePreference.SYSTEM -> SyMode.SYSTEM
-            }
-            val canonicalMode = when (preference) {
-                ThemePreference.LIGHT -> com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-                ThemePreference.DARK -> com.shenyan.designsystem.foundation.ShenyanMode.DARK
-                ThemePreference.MATTE_BLACK -> com.shenyan.designsystem.foundation.ShenyanMode.MATTE
-                ThemePreference.SYSTEM -> if (systemDark)
-                    com.shenyan.designsystem.foundation.ShenyanMode.DARK
-                    else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
-            }
+            val syMode = if (dark) SyMode.MATTE else SyMode.LIGHT
+            val canonicalMode = if (dark)
+                com.shenyan.designsystem.foundation.ShenyanMode.MATTE
+            else com.shenyan.designsystem.foundation.ShenyanMode.LIGHT
             com.shenyan.designsystem.foundation.ShenyanTheme(
                 mode = canonicalMode,
                 reduceMotion = reducedMotion,
-                reduceTransparency = preference == ThemePreference.MATTE_BLACK,
+                reduceTransparency = dark,
             ) {
                 CompositionLocalProvider(
                     com.shenyan.designsystem.foundation.LocalSyColors provides controlPalette,
@@ -389,7 +321,7 @@ fun DshTheme(
                     SyThemeProvider(
                         mode = syMode,
                         reduceMotion = reducedMotion,
-                        reduceTransparency = preference == ThemePreference.MATTE_BLACK,
+                        reduceTransparency = dark,
                     ) {
                         // Preserve user-defined accent and reading accessibility controls.
                         val resolvedScheme = if (projected.isDefaultAccent)

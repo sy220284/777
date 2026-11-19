@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /** 完全独立的新组件库，不依赖 777 旧版 DsTheme / DsButton / Ds*。 */
-enum class ShenyanMode { LIGHT, DARK, MATTE }
+enum class ShenyanMode { LIGHT, MATTE }
 
 @Immutable
 data class SyColors(
@@ -95,16 +95,6 @@ private val Light = SyColors(
     textSecondary = Color(0xFF353535), textTertiary = Color(0xFF595959),
     onPrimary = Color.Black, selected = Color(0xFFF9EDE5), overlay = Color(0x33000000)
 )
-private val Dark = SyColors(
-    canvas = Color(0xFF24211E), topBar = Color(0xFF292521),
-    materialL1 = Color(0x1A302B27), materialL2 = Color(0x29302B27),
-    materialL3 = Color(0x4035302B), materialL4 = Color(0xE0312B26),
-    materialL5 = Color(0xFF35312D), materialSheen = Color(0x29FFF1DE),
-    surface = Color(0x4035302B), surfaceRaised = Color(0x29302B27), surfaceSolid = Color(0xFF35312D),
-    border = Color(0x21FFFFFF), text = Color(0xFFF5F0E8),
-    textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
-    selected = Color(0xFF60422F), overlay = Color(0x5C000000)
-)
 private val Matte = SyColors(
     canvas = Color(0xFF0F0F10), topBar = Color(0xFF18181A),
     materialL1 = Color(0xFF181819), materialL2 = Color(0xFF1E1E20),
@@ -131,39 +121,12 @@ fun SyColors.withAccent(accent: Color): SyColors {
     )
 }
 
-/**
- * A complete product colour family: canvas, opaque reading surface and every translucent
- * elevation level move together. Components never guess a local tint from the accent.
- */
-fun SyColors.withAtmosphere(canvasTone: Color, readingSurface: Color): SyColors {
-    val surfaceTone = readingSurface.copy(alpha = 1f)
-    val backdropTone = canvasTone.copy(alpha = 1f)
-    val layer1 = lerp(backdropTone, surfaceTone, .22f)
-    val layer2 = lerp(backdropTone, surfaceTone, .44f)
-    val layer3 = lerp(backdropTone, surfaceTone, .68f)
-    return copy(
-        canvas = backdropTone,
-        topBar = lerp(backdropTone, surfaceTone, .72f),
-        materialL1 = layer1.copy(alpha = materialL1.alpha),
-        materialL2 = layer2.copy(alpha = materialL2.alpha),
-        materialL3 = layer3.copy(alpha = materialL3.alpha),
-        materialL4 = surfaceTone.copy(alpha = materialL4.alpha),
-        materialL5 = surfaceTone,
-        surface = layer3.copy(alpha = surface.alpha),
-        surfaceRaised = layer2.copy(alpha = surfaceRaised.alpha),
-        surfaceSolid = surfaceTone,
-        border = lerp(border.copy(alpha = 1f), backdropTone, .12f).copy(alpha = border.alpha),
-    )
-}
-
 /** Published read-only palettes; one source for Figma, native and migration adapters. */
 object ShenyanPalettes {
     val light: SyColors get() = Light
-    val dark: SyColors get() = Dark
     val matte: SyColors get() = Matte
     fun forMode(mode: ShenyanMode): SyColors = when (mode) {
         ShenyanMode.LIGHT -> Light
-        ShenyanMode.DARK -> Dark
         ShenyanMode.MATTE -> Matte
     }
 }
@@ -274,7 +237,6 @@ fun ShenyanTheme(
 ) {
     val baseColors = when (mode) {
         ShenyanMode.LIGHT -> Light
-        ShenyanMode.DARK -> Dark
         ShenyanMode.MATTE -> Matte
     }
     val colors = accentColor?.let(baseColors::withAccent) ?: baseColors

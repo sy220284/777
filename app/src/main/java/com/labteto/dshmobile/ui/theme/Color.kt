@@ -53,32 +53,32 @@ object SyPrimitiveColors {
 
 /** Semantic alias tokens for the light theme. */
 object SyHostLight {
-    val bgBase = Color(0xFFFCFCFB)
-    val bgLayer1 = Color.White
-    val bgLayer2 = Color(0xFFF8F8F7)
-    val bgLayer3 = Color.White
-    val bgModulePlatform = Color(0xFFF8F8F7)
-    val borderL1 = Color(0x14000000)
-    val borderL2 = Color(0x24000000)
-    val borderL3 = Color(0x38000000)
-    val brandPrimary = Color(0xFFE8A87C)
-    val onBrandPrimary = Color.Black
-    val labelPrimary = Color.Black
-    val labelSecondary = Color(0xFF353535)
-    val labelTertiary = Color(0xFF595959)
-    val labelCaption = Color(0xFF595959)
-    val labelDimmed = Color(0xFF777777)
+    val bgBase = Color(0xFF0F0F10)
+    val bgLayer1 = Color(0xFF191918)
+    val bgLayer2 = Color(0xFF222220)
+    val bgLayer3 = Color(0xFF2B2B28)
+    val bgModulePlatform = Color(0xFF222220)
+    val borderL1 = Color(0x0FF3F0E8)
+    val borderL2 = Color(0x1FF3F0E8)
+    val borderL3 = Color(0x29F3F0E8)
+    val brandPrimary = Color(0xFFF3F0E8)
+    val onBrandPrimary = Color(0xFF10100F)
+    val labelPrimary = Color(0xFFF4F3EF)
+    val labelSecondary = Color(0xFFD5D1C9)
+    val labelTertiary = Color(0xFFAAA69E)
+    val labelCaption = Color(0xFF7F7C75)
+    val labelDimmed = Color(0xFF5B5954)
     val accent = Color(0xFFD9926B)
-    val onAccent = Color.Black
+    val onAccent = Color(0xFF3A342D)
     val accentTertiary = Color(0xFFF9EDE5)
     val accentHover = Color(0xFFD9926B)
     val hover = Color(0x0DE8A87C)
-    val hoverSolid = Color(0xFFF5F5F3)
+    val hoverSolid = Color(0xFF242421)
     val hoverAccent = Color(0x26E8A87C)
     val active = Color(0x1FE8A87C)
     val dangerHover = Color(0x18D9705F)
-    val buttonPrimaryHover = Color(0xFFD9926B)
-    val buttonPrimaryDimmed = Color(0xFFF9EDE5)
+    val buttonPrimaryHover = Color(0xFFD5D1C9)
+    val buttonPrimaryDimmed = Color(0xFF4B4944)
     val buttonInfoFill = Color(0xFFE8A87C)
     val buttonInfoHover = Color(0xFFD9926B)
     val error = Color(0xFFAA4435)
@@ -93,26 +93,26 @@ object SyHostLight {
     val warnTertiary = Color(0xFFF8EDD9)
     val progressFailedStart = Color(0xFFC98B6B)
     val progressFailedEnd = Color(0xFF9C6247)
-    val toastBg = Color(0xFF202020)
-    val tooltipBg = Color(0xFF202020)
-    val userBubble = Color(0xFFF9F4F0)
-    val userBubbleHighlight = Color(0xFFF5EBE4)
-    val composerCard = Color.White
-    val sidebar = Color.White
-    val sidebarNavActive = Color(0xFFF9EDE5)
-    val sidebarNavAccent = Color(0x24E8A87C)
-    val sidebarNavHover = Color(0xFFF5F5F3)
-    val tipSurface = Color.White
-    val codeBlockBg = Color(0xFFF5F5F3)
-    val codeBlockBanner = Color(0xFFEDEDEB)
-    val inlineCode = Color(0xFFF2F2F0)
-    val citation = Color(0xFFEDEDEB)
-    val markdownTag = Color(0xFFF5F5F3)
+    val toastBg = Color(0xFF363431)
+    val tooltipBg = Color(0xFF363431)
+    val userBubble = Color(0xFF222220)
+    val userBubbleHighlight = Color(0xFF363431)
+    val composerCard = Color(0xFF222220)
+    val sidebar = Color(0xFF151514)
+    val sidebarNavActive = Color(0xFF363431)
+    val sidebarNavAccent = Color(0xFF2D2C29)
+    val sidebarNavHover = Color(0xFF222220)
+    val tipSurface = Color(0xFF2D2C29)
+    val codeBlockBg = Color(0xFF181816)
+    val codeBlockBanner = Color(0xFF1B1B19)
+    val inlineCode = Color(0xFF222220)
+    val citation = Color(0xFF2D2C29)
+    val markdownTag = Color(0xFF222220)
     val overlayMask = Color(0x33000000)
 }
 
-/** Semantic alias tokens for the dark theme. */
-object SyHostDark {
+/** Semantic aliases for the retained matte-black theme. */
+object SyHostMatte {
     val bgBase = Color(0xFF24211E)
     val bgLayer1 = Color(0xFF2E2B28)
     val bgLayer2 = Color(0xFF35312D)
