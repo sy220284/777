@@ -72,7 +72,7 @@ internal fun workRuntimeContextParts(
             appendLine("- 需要本机工具操作流程时，先读取 .dsh/tools/777-runtime-guide.md；使用范围明确的文件与执行工具，以实际运行结果验证。")
         }
         if (asksPhoneFiles) {
-            appendLine("- Android 下载目录中的其他应用文件需由用户在 Work 文件页点击「导入手机文件」，通过系统选择器授权后读取返回的「导入文件/…」路径；收到实际导入路径后继续原任务；交付时以成果下载回执中的实际位置和状态为准。")
+            appendLine("- Android 下载目录中的其他应用文件需由用户在 Work 文件页点击「导入手机文件」，通过系统选择器授权后读取返回的「导入文件/…」路径；交付成果继续保存到 Download/神言神语，不要求用户开放全盘文件权限。")
         }
         if (asksHistory) {
             appendLine("- 较早精确事实用 session_event_search，完整旧工具输出按 call_id 用 tool_output_read 获取，优先复用已有结果。")
