@@ -27,7 +27,7 @@ import com.labteto.dshmobile.local.model.LocalHarnessStreamingState
 import com.labteto.dshmobile.local.model.visibleAssistantText
 import com.labteto.dshmobile.local.model.forSurface
 import com.labteto.dshmobile.local.session.LocalHarnessMessage
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.StateFlow
 
@@ -81,7 +81,7 @@ internal fun LocalStreamingChatTurn(
                 Spacer(Modifier.width(SyMetric.gapMd))
                 Text(
                     stringResource(R.string.local_chat_replying),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
                 )
             }
@@ -145,13 +145,13 @@ internal fun LocalStreamingWorkPreview(
                     else R.string.local_work_process_preparing,
                     stream.attempt,
                 ),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = com.shenyan.designsystem.foundation.LocalSyColors.current.textTertiary,
             )
         }
         if (visiblePreview) {
             SelectionContainer {
-                MarkdownText(text = text, bodyStyle = DsType.workBody, streaming = true)
+                MarkdownText(text = text, bodyStyle = SyType.workBody, streaming = true)
             }
         }
     }

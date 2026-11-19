@@ -37,7 +37,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsAnimations
+import com.labteto.dshmobile.ui.theme.SyAnimations
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
@@ -76,8 +76,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SySheetChoiceRow
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
 import com.labteto.dshmobile.ui.theme.wallpaperSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
@@ -179,20 +179,20 @@ internal fun ChatPersonaPickerDialog(
         if (!canSwitchPersona) {
             Text(
                 stringResource(R.string.local_persona_picker_switch_requires_new_chat),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textSecondary,
             )
         }
         if (entries.isEmpty()) {
             Text(
                 stringResource(R.string.local_persona_picker_empty),
-                style = DsType.small13.withReadingWeight(),
+                style = SyType.small13.withReadingWeight(),
                 color = colors.textTertiary,
             )
         } else {
             Text(
                 "${stringResource(R.string.local_persona_picker_saved)} · ${entries.size}",
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
             // Keep the sheet header visible; only the portrait grid scrolls.
@@ -278,7 +278,7 @@ private fun PersonaPickerAvatarTile(
                 this.selected = selected
             }
             .testTag("personaPickerAvatar_${entry.id}"),
-        shape = DsShapes.block,
+        shape = SyShapes.block,
         color = background,
         border = BorderStroke(if (selected) 2.dp else 1.dp, outline),
     ) {
@@ -352,12 +352,12 @@ internal fun ApprovalDialog(
         dismissEnabled = false, showDragHandle = false, scrollable = true, seamlessBackground = false) {
         Text(
             stringResource(agentOperationLabelRes(approval.toolName)),
-            style = DsType.base16Strong.withReadingWeight(),
+            style = SyType.base16Strong.withReadingWeight(),
             color = colors.text,
         )
         Text(
             stringResource(R.string.local_approval_impact, impactLabel),
-            style = DsType.caption11Strong.withReadingWeight(),
+            style = SyType.caption11Strong.withReadingWeight(),
             color = when (approval.impact) {
                 LocalApprovalImpact.LOW -> colors.textTertiary
                 LocalApprovalImpact.MEDIUM -> colors.warningInk
@@ -373,12 +373,12 @@ internal fun ApprovalDialog(
             ) {
                 Text(
                     stringResource(R.string.local_approval_purpose_title),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.text,
                 )
                 Text(
                     stringResource(agentApprovalPurposeRes(approval.toolName)),
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.textSecondary,
                 )
             }
@@ -392,7 +392,7 @@ internal fun ApprovalDialog(
                     else -> R.string.local_approval_high_risk_scope
                 },
             ),
-            style = DsType.caption11.withReadingWeight(),
+            style = SyType.caption11.withReadingWeight(),
             color = colors.textTertiary,
         )
 
@@ -417,7 +417,7 @@ internal fun ApprovalDialog(
         } else {
             Text(
                 stringResource(R.string.local_approval_safe_enabled),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textTertiary,
             )
         }
@@ -456,7 +456,7 @@ internal fun QuestionDialog(
         scrollable = true,
         seamlessBackground = !requireConfirmation,
     ) {
-        Text(question, style = DsType.base16Strong.withReadingWeight(), color = colors.text)
+        Text(question, style = SyType.base16Strong.withReadingWeight(), color = colors.text)
         options.forEach { option ->
             SySheetChoiceRow(
                 title = option,
@@ -567,7 +567,7 @@ internal fun ChatPersonaDialog(
         dismissEnabled = !aiGenerating && !saving,
         footer = {
             saveError?.let {
-                Text(it, style = DsType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
+                Text(it, style = SyType.caption11.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk)
             }
         SyButton(
             text = stringResource(R.string.local_persona_save),
@@ -657,7 +657,7 @@ internal fun ChatPersonaDialog(
                     Text(
                         stringResource(if (creatingNew) R.string.local_persona_ai_new_draft
                             else R.string.local_persona_ai_synced),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     )
                     val covered = factDrafts.asSequence().filter { it.content.isNotBlank() }
@@ -666,7 +666,7 @@ internal fun ChatPersonaDialog(
                             it in personaEditableFactCategories }
                     Text(
                         stringResource(R.string.persona_v4_ai_coverage, covered),
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary,
                     )
                 }
@@ -680,7 +680,7 @@ internal fun ChatPersonaDialog(
                     }
                     Text(
                         message,
-                        style = DsType.caption11.withReadingWeight(),
+                        style = SyType.caption11.withReadingWeight(),
                         color = com.shenyan.designsystem.foundation.LocalSyColors.current.dangerInk,
                     )
                 }
@@ -929,7 +929,7 @@ private fun PersonaFormSection(title: String, content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(top = SyMetric.gapMd),
         verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
     ) {
-        Text(title, style = DsType.base16Strong.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
+        Text(title, style = SyType.base16Strong.withReadingWeight(), color = com.shenyan.designsystem.foundation.LocalSyColors.current.text)
         content()
     }
 }

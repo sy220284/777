@@ -66,7 +66,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.shenyan.designsystem.components.SyTextField
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.shenyan.designsystem.foundation.LocalSyColors
 import java.io.File
@@ -249,7 +249,7 @@ internal fun LocalMediaStudioSheetContent(
                 Text(stringResource(
                     if (matchingRevision != null) R.string.media_recreate_change_account_notice
                     else R.string.media_route_permission_notice
-                ), color = colors.textSecondary, style = DsType.caption11.withReadingWeight())
+                ), color = colors.textSecondary, style = SyType.caption11.withReadingWeight())
                 available.forEach { option ->
                     SyButton(
                         text = "${option.label} · ${option.profile.displayName ?: option.profile.model}",
@@ -272,7 +272,7 @@ internal fun LocalMediaStudioSheetContent(
                 Text(
                     text = stringResource(if (!manualRouteActive) R.string.media_route_current_auto else R.string.media_route_current_manual, selected.label),
                     modifier = Modifier.weight(1f),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -287,7 +287,7 @@ internal fun LocalMediaStudioSheetContent(
             Text(
                 stringResource(R.string.media_route_selected_account,
                     selected.profile.displayName ?: selected.profile.model),
-                style = DsType.caption11.withReadingWeight(),
+                style = SyType.caption11.withReadingWeight(),
                 color = colors.textSecondary,
             )
             if (showModelChoices) {
@@ -341,7 +341,7 @@ internal fun LocalMediaStudioSheetContent(
             ) {
                 Text(
                     text = stringResource(R.string.media_reply_requires_visual_scene),
-                    style = DsType.caption11.withReadingWeight(),
+                    style = SyType.caption11.withReadingWeight(),
                     color = colors.textSecondary,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -369,7 +369,7 @@ internal fun LocalMediaStudioSheetContent(
                             )
                         } else {
                             Text(stringResource(R.string.media_recreate_edit_not_supported),
-                                color = colors.textSecondary, style = DsType.caption11.withReadingWeight())
+                                color = colors.textSecondary, style = SyType.caption11.withReadingWeight())
                         }
                     }
                     SyButton(text = stringResource(R.string.minimax_media_create_image),
@@ -399,7 +399,7 @@ internal fun LocalMediaStudioSheetContent(
                         ?: taskRecords.firstOrNull()
                     if (taskRecords.size > 1) {
                         Text(stringResource(R.string.media_studio_previous_video_tasks),
-                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
+                            style = SyType.caption11.withReadingWeight(), color = colors.textSecondary)
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth().height(128.dp),
                             verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
@@ -420,7 +420,7 @@ internal fun LocalMediaStudioSheetContent(
                     currentTask?.let { task ->
                         task.providerTaskId?.let { taskId ->
                             Text(stringResource(R.string.minimax_media_task_id, taskId),
-                                color = colors.textSecondary, style = DsType.caption11.withReadingWeight())
+                                color = colors.textSecondary, style = SyType.caption11.withReadingWeight())
                         }
                         Text(
                             stringResource(when (task.phase) {
@@ -435,7 +435,7 @@ internal fun LocalMediaStudioSheetContent(
                         )
                         task.lastError?.let { reason ->
                             Text(reason, color = colors.textSecondary,
-                                style = DsType.caption11.withReadingWeight())
+                                style = SyType.caption11.withReadingWeight())
                         }
                         if (task.phase == LocalMediaVideoPhase.QUEUED ||
                             task.phase == LocalMediaVideoPhase.PROCESSING
@@ -463,7 +463,7 @@ internal fun LocalMediaStudioSheetContent(
                             text = if (voiceId.isBlank()) stringResource(R.string.media_voice_required)
                                 else stringResource(R.string.media_voice_current, voices.firstOrNull { it.id == voiceId }?.name ?: LocalMediaVoiceLabels.label(selected.provider, voiceId)),
                             modifier = Modifier.weight(1f),
-                            style = DsType.small13Strong.withReadingWeight(),
+                            style = SyType.small13Strong.withReadingWeight(),
                             color = colors.textSecondary, maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -519,7 +519,7 @@ internal fun LocalMediaStudioSheetContent(
                         enabled = !busy, modifier = Modifier.fillMaxWidth(),
                         onClick = { picker.launch(arrayOf("audio/*")) })
                     transcript?.let { text ->
-                        Text(text, color = colors.text, style = DsType.std14.withReadingWeight())
+                        Text(text, color = colors.text, style = SyType.std14.withReadingWeight())
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
                             SyButton(text = stringResource(R.string.minimax_media_insert_text),
@@ -533,13 +533,13 @@ internal fun LocalMediaStudioSheetContent(
                 }
             }
             if (busy) Text(stringResource(R.string.minimax_media_running),
-                color = colors.textSecondary, style = DsType.caption11.withReadingWeight())
+                color = colors.textSecondary, style = SyType.caption11.withReadingWeight())
             error?.let { Text(stringResource(R.string.minimax_media_error, it),
-                color = colors.text, style = DsType.caption11.withReadingWeight()) }
+                color = colors.text, style = SyType.caption11.withReadingWeight()) }
         }
         storageError?.let {
             SyButton(text = stringResource(R.string.media_retry_storage), onClick = { scope.launch { viewModel.retryStorage() } })
-            Text(stringResource(R.string.minimax_media_error, it), color = colors.text, style = DsType.caption11.withReadingWeight())
+            Text(stringResource(R.string.minimax_media_error, it), color = colors.text, style = SyType.caption11.withReadingWeight())
         }
         if (archive.hasMore) {
             SyButton(text = stringResource(R.string.media_load_older), onClick = viewModel::loadOlderArchive)
@@ -583,21 +583,21 @@ internal fun LocalMediaStudioSheetContent(
                                         LocalMediaVideoPhase.FAILED -> R.string.minimax_media_video_failed
                                     })),
                                 color = colors.text,
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                             )
                             Text(
                                 task.providerTaskId ?: task.id,
                                 color = colors.textSecondary,
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                             )
                             task.lastError?.let { reason ->
                                 Text(reason, color = colors.textSecondary,
-                                    style = DsType.caption11.withReadingWeight())
+                                    style = SyType.caption11.withReadingWeight())
                             }
                             if (matchingOffer == null) {
                                 Text(stringResource(R.string.media_studio_video_account_unavailable),
                                     color = colors.textSecondary,
-                                    style = DsType.caption11.withReadingWeight())
+                                    style = SyType.caption11.withReadingWeight())
                             } else if (task.phase in setOf(
                                     LocalMediaVideoPhase.QUEUED, LocalMediaVideoPhase.PROCESSING, LocalMediaVideoPhase.SUCCEEDED
                                 )
@@ -672,7 +672,7 @@ internal fun LocalMediaStudioSheetContent(
             if (showHistory) {
                 Text(stringResource(R.string.media_studio_temporary_links_notice),
                     color = colors.textSecondary,
-                    style = DsType.caption11.withReadingWeight())
+                    style = SyType.caption11.withReadingWeight())
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(232.dp),
                     verticalArrangement = Arrangement.spacedBy(SyMetric.gapLg),
@@ -691,7 +691,7 @@ internal fun LocalMediaStudioSheetContent(
                                     },
                                 ),
                                 color = colors.text,
-                                style = DsType.caption11.withReadingWeight(),
+                                style = SyType.caption11.withReadingWeight(),
                             )
                             val file = viewModel.resultFile(asset)
                             val mime = when (file?.extension?.lowercase()) {
@@ -732,7 +732,7 @@ internal fun LocalMediaStudioSheetContent(
                                     )
                                 } else {
                                     Text(stringResource(R.string.media_studio_result_missing),
-                                        style = DsType.caption11.withReadingWeight(),
+                                        style = SyType.caption11.withReadingWeight(),
                                         color = colors.textSecondary)
                                 }
                                 LocalMediaRevisionDraft.from(asset)?.let { draft ->
@@ -754,7 +754,7 @@ internal fun LocalMediaStudioSheetContent(
                             }
                             if (pendingDeleteId == asset.id) {
                                 Text(stringResource(R.string.media_studio_confirm_delete),
-                                    style = DsType.caption11.withReadingWeight(),
+                                    style = SyType.caption11.withReadingWeight(),
                                     color = colors.textSecondary)
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                         verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
@@ -781,7 +781,7 @@ internal fun LocalMediaStudioSheetContent(
         }
         }
         historyError?.let { Text(it, color = colors.text,
-            style = DsType.caption11.withReadingWeight()) }
+            style = SyType.caption11.withReadingWeight()) }
     }
 }
 
@@ -820,7 +820,7 @@ internal fun MediaStudioFlatTabs(
                 Text(
                     text = label,
                     modifier = Modifier.padding(horizontal = 2.dp, vertical = 10.dp),
-                    style = DsType.small13Strong.withReadingWeight(),
+                    style = SyType.small13Strong.withReadingWeight(),
                     color = if (active) colors.text else colors.textSecondary,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
