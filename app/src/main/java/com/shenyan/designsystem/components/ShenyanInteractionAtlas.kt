@@ -630,7 +630,8 @@ fun SyMultiSelectSheet(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SyButton("取消", onDismiss, modifier = Modifier.weight(1f),
                     style = SyButtonStyle.SECONDARY)
-                SyButton(confirmLabel, { onConfirm(draft) },
+                SyButton(if (confirmLabel == "应用") "应用（${draft.size}）" else confirmLabel,
+                    { onConfirm(draft) },
                     enabled = enabled && draft.size in minSelected..maxSelected,
                     modifier = Modifier.weight(1f))
             }
