@@ -1087,9 +1087,9 @@ class LocalWorkspace(
         val rulesFile = skillFile(name)
         val segments = resource.split('/')
         require(segments.size >= 2 &&
-            segments.first() in setOf("references", "scripts", "assets") &&
+            segments.first() in setOf("references", "scripts", "assets", "data", "templates", "examples") &&
             segments.all { it.isNotBlank() && it != "." && it != ".." && '\\' !in it }) {
-            "技能资料路径应位于 references/、scripts/ 或 assets/ 文件夹"
+            "技能资料路径应位于 references/、scripts/、assets/、data/、templates/ 或 examples/ 文件夹"
         }
         var target = rulesFile.parentFile
         for (segment in segments) {
