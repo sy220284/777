@@ -442,7 +442,7 @@ prepare_arch() {
     if [ -d "$prefix/lib/python$PYTHON_MAJOR_MINOR/site-packages" ]; then
       local site_dir="$home_dir/lib/python$PYTHON_MAJOR_MINOR/site-packages"
       mkdir -p "$site_dir"
-      cp -aL "$prefix/lib/python$PYTHON_MAJOR_MINOR/site-packages/." "$site_dir/"
+      cp -a "$prefix/lib/python$PYTHON_MAJOR_MINOR/site-packages/." "$site_dir/"
     fi
 
     if [ -d "$prefix/lib" ]; then
@@ -470,6 +470,22 @@ prepare_arch() {
     fi
     printf '%s\t%s\t%s\t%s\n' "$pkg" "$version" "$filename" "$digest" >> "$manifest"
   done
+
+  # Termux pip points its vendored certifi bundle at the Termux prefix.
+  # Replace the absolute symlink with the actual signed CA bundle from this APK.
+  local pip_cert="$stdlib_dir/site-packages/pip/_vendor/certifi/cacert.pem"
+  if [ -L "$pip_cert" ]; then
+    [ -s "$home_dir/etc/tls/cert.pem" ] || {
+      echo "pip CA bundle 尚未准备：$android_abi" >&2
+      exit 1
+    }
+    rm "$pip_cert"
+    cp "$home_dir/etc/tls/cert.pem" "$pip_cert"
+  fi
+  if find "$stdlib_dir/site-packages" -type l -print -quit | grep -q .; then
+    echo "Python 包仍存在无法在 APK 中使用的符号链接：$android_abi" >&2
+    exit 1
+  fi
 
   [ -f "$jni_dir/libdsh_python.so" ] || {
     echo "Python 可执行文件未生成：$android_abi" >&2
