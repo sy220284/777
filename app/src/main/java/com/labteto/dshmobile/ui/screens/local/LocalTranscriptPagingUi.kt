@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -315,7 +315,7 @@ internal fun LocalTranscriptPagingStatus(
         Spacer(Modifier.width(SyMetric.gapMd))
         Text(
             stringResource(R.string.local_transcript_loading_older),
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
     }

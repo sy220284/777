@@ -31,8 +31,8 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.components.MarkdownText
 import com.labteto.dshmobile.ui.components.FeatherIcons
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 private const val PLAN_REVIEW_PREFIX = "Harness 已完成计划，是否批准并进入执行模式？"
@@ -74,7 +74,7 @@ internal fun LocalPlanReviewCard(
 
     SyMaterialSurface(
         modifier = modifier.fillMaxWidth(),
-        shape = DsShapes.approvalCard,
+        shape = SyShapes.approvalCard,
         tier = SyMaterialTier.L3_CARD,
         border = BorderStroke(1.dp, colors.border),
     ) {
@@ -84,7 +84,7 @@ internal fun LocalPlanReviewCard(
         ) {
             Text(
                 stringResource(R.string.plan_review_title),
-                style = DsType.small13Strong.withReadingWeight(),
+                style = SyType.small13Strong.withReadingWeight(),
                 color = colors.text,
             )
             MarkdownText(review.plan)

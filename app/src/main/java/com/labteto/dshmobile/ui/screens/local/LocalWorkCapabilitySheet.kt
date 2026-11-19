@@ -21,7 +21,7 @@ import com.shenyan.designsystem.components.SyTextField
 import com.labteto.dshmobile.ui.shenyan.SyButton
 import com.labteto.dshmobile.ui.shenyan.SyButtonSize
 import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 /** The user explicitly enters the surface that owns executable capabilities. */
@@ -78,7 +78,7 @@ internal fun LocalWorkCapabilitySheet(
             )
         },
     ) {
-        Text(stringResource(R.string.work_capability_hint), style = DsType.std14.withReadingWeight(), color = colors.textSecondary)
+        Text(stringResource(R.string.work_capability_hint), style = SyType.std14.withReadingWeight(), color = colors.textSecondary)
         SyTextField(
             value = prompt, onValueChange = onPromptChange,
             label = { Text(stringResource(R.string.work_handoff_task)) }, enabled = !switching,
@@ -91,10 +91,10 @@ internal fun LocalWorkCapabilitySheet(
             modifier = Modifier.fillMaxWidth(),
             maxLines = 6,
         )
-        Text(stringResource(R.string.work_handoff_scope), style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+        Text(stringResource(R.string.work_handoff_scope), style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         if (selectableMessages.isNotEmpty() || hasEarlierMessages || messageSearch.isNotBlank()) {
             Text(stringResource(R.string.work_handoff_select_messages),
-                style = DsType.std14.withReadingWeight(), color = colors.text)
+                style = SyType.std14.withReadingWeight(), color = colors.text)
             if (selectableMessages.size > 12 || hasEarlierMessages || messageSearch.isNotBlank()) {
                 SyTextField(
                     value = messageSearch, onValueChange = onMessageSearchChange,
@@ -107,11 +107,11 @@ internal fun LocalWorkCapabilitySheet(
             val visible = (recent + archivedMatches).distinctBy(LocalHarnessMessage::id)
             if (selectedMessageIds.isNotEmpty()) {
                 Text(stringResource(R.string.work_handoff_selected_count, selectedMessageIds.size),
-                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
             }
             if (visible.isEmpty() && messageSearch.isNotBlank() && !archiveSearching && archiveSearchError == null && onLoadMoreArchive == null) {
                 Text(stringResource(R.string.work_handoff_no_matches),
-                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
             }
             visible.forEach { message ->
                 val checked = message.id in selectedMessageIds
@@ -134,7 +134,7 @@ internal fun LocalWorkCapabilitySheet(
                             message.handoffAttachmentNames().joinToString("、").take(100)
                         }
                     Text("$speaker · $itemPreview",
-                        style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                        style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
                 }
             }
             if (messageSearch.isNotBlank()) {
@@ -160,7 +160,7 @@ internal fun LocalWorkCapabilitySheet(
         }
         if (capabilities.isNotEmpty()) {
             Text(stringResource(R.string.work_capability_readiness_title),
-                style = DsType.std14.withReadingWeight(), color = colors.text)
+                style = SyType.std14.withReadingWeight(), color = colors.text)
             capabilities.forEach { item ->
                 val name = when (item.kind) {
                     LocalTaskCapabilityKind.GITHUB -> R.string.work_capability_readiness_github
@@ -192,7 +192,7 @@ internal fun LocalWorkCapabilitySheet(
                 }
                 Text(stringResource(R.string.work_capability_readiness_row,
                     stringResource(name), statusLabel),
-                    style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                    style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
                 if (onConfigureCapabilities != null && item.state != LocalTaskCapabilityState.CONFIGURED &&
                     (item.kind == LocalTaskCapabilityKind.GITHUB ||
                         item.kind == LocalTaskCapabilityKind.MCP ||
@@ -243,6 +243,6 @@ internal fun LocalWorkCapabilitySheet(
                 )
             }
         }
-        if (failed) Text(stringResource(R.string.work_capability_failed), style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+        if (failed) Text(stringResource(R.string.work_capability_failed), style = SyType.small13.withReadingWeight(), color = colors.dangerInk)
     }
 }

@@ -36,7 +36,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.labteto.dshmobile.ui.shenyan.SySegment
 import com.labteto.dshmobile.ui.shenyan.SySegmented
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.shenyan.designsystem.foundation.LocalSyColors
 import com.shenyan.designsystem.foundation.SyMetric
 import kotlinx.coroutines.CancellationException
@@ -96,8 +96,8 @@ internal fun LocalWorkEvidenceSheet(
             }
             if (tab == "requirements") {
                 currentWork?.goal?.let { goal -> item {
-                    Text(goal.description, style = DsType.std14Strong, color = colors.text)
-                    Text(localGoalStatusLabel(goal.status), style = DsType.small13, color = colors.textSecondary)
+                    Text(goal.description, style = SyType.std14Strong, color = colors.text)
+                    Text(localGoalStatusLabel(goal.status), style = SyType.small13, color = colors.textSecondary)
                     goal.note?.let { Text(it, color = colors.textSecondary) }
                 } }
                 if (currentWork?.todos.isNullOrEmpty()) item {
@@ -105,23 +105,23 @@ internal fun LocalWorkEvidenceSheet(
                 }
                 itemsIndexed(currentWork?.todos.orEmpty()) { index, todo ->
                     Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
-                        Text("${index + 1}. ${todo.content}", style = DsType.std14Strong, color = colors.text)
+                        Text("${index + 1}. ${todo.content}", style = SyType.std14Strong, color = colors.text)
                         state.links.filter { it.requirementIndex == index && it.requirement == todo.content }.forEach { link ->
-                            Text(link.artifactPath, style = DsType.small13, color = colors.text)
+                            Text(link.artifactPath, style = SyType.small13, color = colors.text)
                             Text(if (link.versionNow == link.versionAtLink) link.versionAtLink
-                                else stringResource(R.string.work_evidence_changed), style = DsType.caption11,
+                                else stringResource(R.string.work_evidence_changed), style = SyType.caption11,
                                 color = colors.textSecondary)
                             SyButton(stringResource(R.string.media_chat_view_entire_file), onClick = { onOpenFile(link.artifactPath) },
                                 size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
                         }
                     }
                 }
-                item { Text(stringResource(R.string.work_evidence_reference_only), style = DsType.small13, color = colors.textSecondary) }
+                item { Text(stringResource(R.string.work_evidence_reference_only), style = SyType.small13, color = colors.textSecondary) }
             } else {
                 item {
                     Text(
                         "模型审查、人工确认、实际工具执行分别留有独立回执；完成状态以当前目标和真实执行记录为准。",
-                        style = DsType.caption11,
+                        style = SyType.caption11,
                         color = colors.textSecondary,
                     )
                 }
@@ -129,7 +129,7 @@ internal fun LocalWorkEvidenceSheet(
                     item {
                         Text(
                             "设备操作状态：当前设备共有 ${currentWork!!.activeVirtualDisplays} 个虚拟屏资源正在使用；下方工具记录显示每次操作的实际结果。",
-                            style = DsType.small13,
+                            style = SyType.small13,
                             color = colors.textSecondary,
                             modifier = Modifier.testTag("work_device_active_displays"),
                         )
@@ -152,15 +152,15 @@ internal fun LocalWorkEvidenceSheet(
                         if (reviewRecord) {
                             Text(
                                 if (record.type.startsWith("work/code-review-")) "独立代码审查" else "独立安全审查",
-                                style = DsType.std14Strong, color = colors.text,
+                                style = SyType.std14Strong, color = colors.text,
                             )
-                            Text(record.content, style = DsType.small13,
+                            Text(record.content, style = SyType.small13,
                                 color = if (record.content.contains("阻止")) colors.dangerInk else colors.textSecondary)
                         } else {
-                            Text(stringResource(agentOperationLabelRes(agentOperationKind(record.name))), style = DsType.std14Strong, color = colors.text)
+                            Text(stringResource(agentOperationLabelRes(agentOperationKind(record.name))), style = SyType.std14Strong, color = colors.text)
                             record.phase?.let { Text(stringResource(workToolPhaseLabel(it)), color = colors.textSecondary) }
                         }
-                        Text("#${record.sequence} · ${record.name}", style = DsType.caption11, color = colors.textSecondary)
+                        Text("#${record.sequence} · ${record.name}", style = SyType.caption11, color = colors.textSecondary)
                         if (!reviewRecord) record.callId?.let { callId ->
                             SyButton(stringResource(R.string.work_tool_details), onClick = { evidenceRequest = callId to record.sequence },
                                 variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
@@ -170,11 +170,11 @@ internal fun LocalWorkEvidenceSheet(
                                 // History is a ledger, not the live transcript: rendering every
                                 // full media card starts file previews/image decoding as soon as
                                 // the sheet opens. Show the existing reference and explicit actions.
-                                Text(artifact.reference, style = DsType.small13, color = colors.text)
+                                Text(artifact.reference, style = SyType.small13, color = colors.text)
                                 Text(stringResource(
                                     if (artifact.currentlyAvailable == false) R.string.media_chat_work_file_missing
                                     else R.string.media_chat_work_output_here,
-                                ), style = DsType.caption11, color = colors.textSecondary)
+                                ), style = SyType.caption11, color = colors.textSecondary)
                                 SyButton(stringResource(R.string.media_chat_view_entire_file),
                                     onClick = { onOpenFile(artifact.reference) },
                                     size = SyButtonSize.Small, variant = SyButtonVariant.Ghost)
@@ -200,9 +200,9 @@ internal fun LocalWorkEvidenceSheet(
     state.inspected?.let { artifact ->
         SyResponsiveSheet(stringResource(R.string.work_evidence_choose_requirement), onDismiss = controller::dismissInspection,
             dismissEnabled = !state.linking, scrollable = true) {
-            Text(artifact.reference, style = DsType.std14Strong, color = colors.text)
-            Text(artifact.versionNow ?: stringResource(R.string.work_evidence_changed), style = DsType.small13, color = colors.textSecondary)
-            Text(stringResource(R.string.work_evidence_reference_only), style = DsType.small13, color = colors.textSecondary)
+            Text(artifact.reference, style = SyType.std14Strong, color = colors.text)
+            Text(artifact.versionNow ?: stringResource(R.string.work_evidence_changed), style = SyType.small13, color = colors.textSecondary)
+            Text(stringResource(R.string.work_evidence_reference_only), style = SyType.small13, color = colors.textSecondary)
             currentWork?.todos?.forEachIndexed { index, todo ->
                 SyButton(todo.content, onClick = { controller.link(LocalRequirementUiTarget(index, todo.content, currentWork.goal?.id), artifact) },
                     enabled = !state.linking && artifact.versionNow != null && state.linkAccepted != true,
@@ -225,7 +225,7 @@ internal fun LocalWorkEvidenceSheet(
         }
         SyResponsiveSheet(stringResource(R.string.work_tool_details), onDismiss = { evidenceRequest = null }, scrollable = true) {
             SelectionContainer { Text(detail?.take(32_000) ?: stringResource(if (finished) R.string.work_tool_detail_missing else R.string.common_loading),
-                style = DsType.small13, color = colors.text) }
+                style = SyType.small13, color = colors.text) }
             if ((detail?.length ?: 0) > 32_000) Text(stringResource(R.string.work_evidence_preview_limited), color = colors.textSecondary)
         }
     }

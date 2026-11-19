@@ -24,7 +24,7 @@ import com.labteto.dshmobile.ui.shenyan.SyButtonVariant
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SyTextField
 import com.shenyan.designsystem.foundation.SyMetric
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -98,15 +98,15 @@ internal fun LocalQueuedUserQueueSheet(
     ) {
         Text(
             "可以调整尚未开始执行的消息。运行中的操作会继续进行。",
-            style = DsType.small13.withReadingWeight(),
+            style = SyType.small13.withReadingWeight(),
             color = colors.textSecondary,
         )
         error?.let {
-            Text(it, style = DsType.small13.withReadingWeight(), color = colors.dangerInk)
+            Text(it, style = SyType.small13.withReadingWeight(), color = colors.dangerInk)
         }
         if (snapshot.inputs.isEmpty()) {
             Text("目前没有等待执行的用户消息",
-                style = DsType.small13.withReadingWeight(), color = colors.textSecondary)
+                style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
         }
         snapshot.inputs.forEachIndexed { index, input ->
             Column(
@@ -115,7 +115,7 @@ internal fun LocalQueuedUserQueueSheet(
             ) {
                 Text(
                     input.preview.ifBlank { "附件消息" },
-                    style = DsType.small13.withReadingWeight(),
+                    style = SyType.small13.withReadingWeight(),
                     color = colors.text,
                     maxLines = 3,
                 )

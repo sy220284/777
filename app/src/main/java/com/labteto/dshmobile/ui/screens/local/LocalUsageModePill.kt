@@ -29,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import com.shenyan.designsystem.foundation.LocalSySceneBackdrop
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
-import com.labteto.dshmobile.ui.theme.DsShapes
-import com.labteto.dshmobile.ui.theme.DsType
+import com.labteto.dshmobile.ui.theme.SyShapes
+import com.labteto.dshmobile.ui.theme.SyType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 
 internal fun localHarnessModeSwitchEnabled(
@@ -62,7 +62,7 @@ internal fun LocalUsageModePill(
             .fillMaxWidth()
             .widthIn(max = 216.dp)
             .height(48.dp),
-        shape = DsShapes.row,
+        shape = SyShapes.row,
         color = track.copy(alpha = if (hasWallpaper) 0.92f else 1f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
@@ -86,7 +86,7 @@ internal fun LocalUsageModePill(
                     .offset(x = thumbOffset)
                     .width(segmentWidth)
                     .fillMaxHeight(),
-                shape = DsShapes.row,
+                shape = SyShapes.row,
                 color = thumb.copy(alpha = if (hasWallpaper) 0.96f else 1f),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
@@ -110,7 +110,7 @@ internal fun LocalUsageModePill(
                     ) {
                         Text(
                             stringResource(labelRes),
-                            style = DsType.navigationSupporting.copy(
+                            style = SyType.navigationSupporting.copy(
                                 fontSize = 18.sp,
                                 lineHeight = 24.sp,
                                 fontWeight = FontWeight.Bold,
