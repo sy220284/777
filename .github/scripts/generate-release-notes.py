@@ -45,7 +45,7 @@ def shorten(s: str, limit: int = 85) -> str:
     s = clean(s)
     if len(s) <= limit:
         return s
-    for delim in ("。", "；", ";", "，", ","):
+    for delim in ("。", "！", "；", ";"):
         pos = s.find(delim)
         if 12 <= pos < limit:
             return s[:pos + 1]
@@ -78,9 +78,15 @@ def summary(body: str, title: str) -> str:
             if not m:
                 continue
             candidate = clean(m.group(1))
-            if len(candidate) < 8 or candidate.startswith(("验证", "测试", "CI ", "通过", "运行 ")):
+            if len(candidate) < 8 or candidate.startswith((
+                "验证", "测试", "CI ", "通过", "运行 ", "完整打包",
+                "增加回归测试", "补充回归测试", "更新测试",
+            )):
                 continue
-            return shorten(candidate)
+            if candidate.startswith(("使用现有", "沿用现有", "复用现有")) and "，" in candidate:
+                candidate = candidate.split("，", 1)[1].strip()
+            if candidate:
+                return shorten(candidate)
         if heading in preferred:
             for raw in lines:
                 candidate = clean(raw)
