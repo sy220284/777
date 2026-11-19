@@ -26,6 +26,7 @@ class PersistentPipeTerminalProvider(
     private val defaultWorkingDirectory: File? = null,
     private val extraSearchPaths: () -> List<File> = { emptyList() },
     private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
+    private val commandAliases: () -> Map<String, List<String>> = { emptyMap() },
     private val inheritEnvironment: Boolean = true,
     private val trustedReadRoots: List<File> = emptyList(),
 ) : HarnessTerminalProvider {
@@ -239,6 +240,12 @@ class PersistentPipeTerminalProvider(
     private fun resolveCommand(command: List<String>): List<String> {
         val executable = command.first()
         if (executable.contains(File.separatorChar)) return command
+        commandAliases()[executable]?.let { alias ->
+            require(alias.isNotEmpty() && File(alias.first()).canExecute()) {
+                "终端解释型命令尚未就绪：$executable"
+            }
+            return alias + command.drop(1)
+        }
         val resolved = searchPaths()
             .asSequence()
             .map { directory -> File(directory, executable) }
