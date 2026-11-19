@@ -67,4 +67,37 @@ class ConversationMenuPositionTest {
         assertTrue(result.x >= 0)
         assertTrue(result.y >= 0)
     }
+
+    @Test fun longPressMenuIsContainedByTheDrawerInsteadOfCoveringTheChat() {
+        val drawerRow = IntRect(18, 280, 340, 332)
+        val menu = IntSize(206, 218)
+        val result = conversationMenuPosition(
+            anchorBounds = drawerRow,
+            windowSize = IntSize(400, 900),
+            menuSize = menu,
+            touchOffset = Offset(300f, 20f),
+            layoutDirection = LayoutDirection.Ltr,
+            marginPx = 10,
+            fingerGapPx = 8,
+        )
+        assertTrue(result.x >= drawerRow.left + 10)
+        assertTrue(result.x + menu.width <= drawerRow.right - 10)
+        assertEquals(340 - 206 - 10, result.x)
+    }
+
+    @Test fun narrowDrawerStillKeepsTheMenuOnScreen() {
+        val result = conversationMenuPosition(
+            anchorBounds = IntRect(10, 280, 178, 332),
+            windowSize = IntSize(240, 470),
+            menuSize = IntSize(206, 218),
+            touchOffset = Offset(160f, 20f),
+            layoutDirection = LayoutDirection.Ltr,
+            marginPx = 10,
+            fingerGapPx = 8,
+        )
+        assertTrue(result.x >= 0)
+        assertTrue(result.x + 206 <= 240)
+        assertTrue(result.y >= 0)
+        assertTrue(result.y + 218 <= 470)
+    }
 }
