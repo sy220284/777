@@ -86,10 +86,12 @@ fun SyTextField(
     colors: TextFieldColors? = null,
 ) {
     val p = LocalSyColors.current
-    val inputFill = syMaterialColor(SyMaterialTier.L1_SECTION)
+    // All standalone forms share the same live glass as navigation and composers.
+    // Flat fields (inside an existing glass composer) inherit their parent's lens.
+    val fieldContent: @Composable () -> Unit = {
     OutlinedTextField(
         value = value, onValueChange = onValueChange,
-        modifier = modifier.heightIn(min = SyMetric.touch),
+        modifier = (if (flat) modifier else Modifier.fillMaxWidth()).heightIn(min = SyMetric.touch),
         enabled = enabled, readOnly = readOnly,
         textStyle = textStyle.copy(color = if (enabled) p.text else p.textTertiary),
         label = label, placeholder = placeholder, leadingIcon = leadingIcon,
@@ -100,9 +102,9 @@ fun SyTextField(
         colors = colors ?: OutlinedTextFieldDefaults.colors(
             focusedTextColor = p.text, unfocusedTextColor = p.text,
             disabledTextColor = p.textTertiary,
-            focusedContainerColor = inputFill,
-            unfocusedContainerColor = inputFill,
-            disabledContainerColor = inputFill,
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
             cursorColor = p.primary,
             focusedBorderColor = if (flat) Color.Transparent else p.primary,
             unfocusedBorderColor = if (flat) Color.Transparent else p.border,
@@ -115,6 +117,16 @@ fun SyTextField(
             errorCursorColor = p.danger,
         ),
     )
+    }
+    if (flat) {
+        fieldContent()
+    } else {
+        SyMaterialSurface(
+            modifier = modifier.heightIn(min = SyMetric.touch),
+            tier = SyMaterialTier.L2_BAR,
+            shape = shape,
+        ) { fieldContent() }
+    }
 }
 
 @Composable
