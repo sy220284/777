@@ -21,7 +21,7 @@ enum class ShenyanMode { LIGHT, MATTE }
 data class SyColors(
     val canvas: Color,
     val topBar: Color,
-    // Five semantic material tiers. L1-L3 are translucent; L4 prioritises readability; L5 solid.
+    // Global glass tiers in both themes; L4 protects overlay readability, L5 stays solid.
     val materialL1: Color,
     val materialL2: Color,
     val materialL3: Color,
@@ -86,21 +86,21 @@ fun syReadableInk(accent: Color, background: Color, minimumRatio: Float = 4.5f):
 
 private val Light = SyColors(
     // 典雅白：亮白画布、白色卡片与黑色文字，通过细描边区分层次。
-    canvas = Color(0xFFFCFCFB), topBar = Color(0xFFFFFFFF),
-    materialL1 = Color(0x4DFFFFFF), materialL2 = Color(0xC2FFFFFF),
-    materialL3 = Color(0xE6FFFFFF), materialL4 = Color(0xF7FFFFFF),
-    materialL5 = Color(0xFFFFFFFF), materialSheen = Color(0xB3FFFFFF),
-    surface = Color(0xE6FFFFFF), surfaceRaised = Color(0xC2FFFFFF), surfaceSolid = Color.White,
+    canvas = Color(0xFFFCFCFB), topBar = Color(0xD9FFFFFF),
+    materialL1 = Color(0x40FFFFFF), materialL2 = Color(0xB0FFFFFF),
+    materialL3 = Color(0xC9FFFFFF), materialL4 = Color(0xE0FFFFFF),
+    materialL5 = Color(0xFFFFFFFF), materialSheen = Color(0xA6FFFFFF),
+    surface = Color(0xC9FFFFFF), surfaceRaised = Color(0xB0FFFFFF), surfaceSolid = Color.White,
     border = Color(0x38777777), text = Color.Black,
     textSecondary = Color(0xFF353535), textTertiary = Color(0xFF595959),
     onPrimary = Color.Black, selected = Color(0xFFF9EDE5), overlay = Color(0x33000000)
 )
 private val Matte = SyColors(
-    canvas = Color(0xFF0F0F10), topBar = Color(0xFF18181A),
-    materialL1 = Color(0xFF181819), materialL2 = Color(0xFF1E1E20),
-    materialL3 = Color(0xFF232324), materialL4 = Color(0xFF29292B),
-    materialL5 = Color(0xFF29292B), materialSheen = Color(0x0EFFFFFF),
-    surface = Color(0xFF232324), surfaceRaised = Color(0xFF1E1E20), surfaceSolid = Color(0xFF29292B),
+    canvas = Color(0xFF0F0F10), topBar = Color(0xC218181A),
+    materialL1 = Color(0x66181819), materialL2 = Color(0xB31E1E20),
+    materialL3 = Color(0xCC232324), materialL4 = Color(0xE029292B),
+    materialL5 = Color(0xFF29292B), materialSheen = Color(0x29FFFFFF),
+    surface = Color(0xCC232324), surfaceRaised = Color(0xB31E1E20), surfaceSolid = Color(0xFF29292B),
     border = Color(0x1AFFFFFF), text = Color(0xFFF5F0E8),
     textSecondary = Color(0xFFD9D0C5), textTertiary = Color(0xFFB8AB9B),
     selected = Color(0xFF573F30), overlay = Color(0x99000000)
