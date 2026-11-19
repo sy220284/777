@@ -94,7 +94,7 @@ class HostsStore @Inject constructor(
             notificationQuietHoursEnabled = prefs[Keys.NOTIFICATION_QUIET_ENABLED] ?: false,
             notificationQuietStartMinute = (prefs[Keys.NOTIFICATION_QUIET_START] ?: 1380).coerceIn(0, 1439),
             notificationQuietEndMinute = (prefs[Keys.NOTIFICATION_QUIET_END] ?: 420).coerceIn(0, 1439),
-            themePreference = prefs[Keys.THEME] ?: "system",
+            themePreference = ThemePreferenceValues.normalize(prefs[Keys.THEME]),
             accentTheme = prefs[Keys.ACCENT_THEME] ?: "celadon",
             backgroundImagePath = prefs[Keys.BACKGROUND_IMAGE],
             sidebarAvatarSource = prefs[Keys.SIDEBAR_AVATAR],
@@ -113,7 +113,8 @@ class HostsStore @Inject constructor(
     suspend fun setSetting(transform: (AppSettings) -> AppSettings) {
         var committed: AppSettings? = null
         dataStore.edit { prefs ->
-            val next = transform(decodeSettings(prefs))
+            val proposed = transform(decodeSettings(prefs))
+            val next = proposed.copy(themePreference = ThemePreferenceValues.normalize(proposed.themePreference))
             prefs[Keys.NOTIFY_LOCAL_JOBS] = next.notifyLocalJobs
             prefs[Keys.NOTIFY_JOB_RESULTS] = next.notifyJobResults
             prefs[Keys.NOTIFY_JOB_FAILURES] = next.notifyJobFailures

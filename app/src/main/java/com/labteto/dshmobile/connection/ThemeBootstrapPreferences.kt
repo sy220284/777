@@ -12,11 +12,12 @@ internal object ThemeBootstrapPreferences {
 
     fun read(context: Context): String? =
         context.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE).getString(KEY_THEME, null)
+            ?.let(ThemePreferenceValues::normalize)
 
     fun store(context: Context, themePreference: String) {
         context.getSharedPreferences(UI_PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_THEME, themePreference)
+            .putString(KEY_THEME, ThemePreferenceValues.normalize(themePreference))
             .apply()
     }
 }
