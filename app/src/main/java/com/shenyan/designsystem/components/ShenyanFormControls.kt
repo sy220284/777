@@ -284,5 +284,6 @@ fun SySegmentedControl(
                 }
             }
         }
-        }
+    }
+    }
 }
