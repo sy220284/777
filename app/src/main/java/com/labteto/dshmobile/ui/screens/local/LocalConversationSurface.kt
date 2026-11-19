@@ -1199,7 +1199,24 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                     }
                 }
-                if (showEmptyGuide) {
+                if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
+                    item(key = "connect-conversation-model") {
+                        Column(
+                            modifier = Modifier.fillParentMaxSize().padding(horizontal = SyMetric.gapLg),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd, Alignment.CenterVertically),
+                        ) {
+                            Text(stringResource(R.string.local_welcome_connect_title),
+                                style = DsType.large20.withReadingWeight(), color = colors.text,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            Text(stringResource(R.string.local_welcome_connect_body),
+                                style = DsType.small13.withReadingWeight(), color = colors.textSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.widthIn(max = 280.dp))
+                            SyButton(stringResource(R.string.local_welcome_connect_action), onConfigure)
+                        }
+                    }
+                } else if (showEmptyGuide) {
                     item(key = "local-empty-guide") {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             if (showChatPersonaWelcome) {
@@ -1539,38 +1556,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             )
         }
 
-        if (!state.configured && !state.loading && transcriptItems.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(
-                    horizontal = SyMetric.gapLg,
-                    vertical = SyMetric.gapMd,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier.padding(SyMetric.gapLg),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.local_welcome_connect_title),
-                            style = DsType.std14Strong.withReadingWeight(),
-                            color = colors.text,
-                        )
-                        Text(
-                            stringResource(R.string.local_welcome_connect_body),
-                            style = DsType.small13.withReadingWeight(),
-                            color = colors.textSecondary,
-                        )
-                    }
-                    SyButton(
-                        text = stringResource(R.string.local_welcome_connect_action),
-                        onClick = onConfigure,
-                        size = SyButtonSize.Small,
-                    )
-                }
-            }
-        }
 
         val sendRejectMessage = sendFeedback.rejectReason
             ?.takeIf { sendFeedback.sessionId == state.sessionId }
@@ -1726,7 +1711,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
             },
             teamDispatchSelected = teamDispatchSelected,
-            onClearTeamDispatch = { teamDispatchSelected = false },
+            onTeamDispatchChange = { teamDispatchSelected = it },
             onStop = onStop,
             reasoningMode = reasoningMode,
             temperatureLevel = if (state.usageMode == LocalUsageMode.WORK) {
@@ -2087,25 +2072,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     },
                 )
             }
-            if (state.usageMode == LocalUsageMode.WORK && teamCardDismissed && state.team.visible) {
-                SySheetChoiceRow(
-                    title = stringResource(R.string.local_team_reopen),
-                    icon = FeatherIcons.ChevronRight,
-                    onClick = {
-                        showAttachmentPicker = false
-                        showTeamPanel = true
-                    },
-                )
-            }
-            if (state.usageMode == LocalUsageMode.WORK) {
-                LocalAgentSwarmLaunchEntry(
-                    selected = teamDispatchSelected,
-                    onClick = {
-                        teamDispatchSelected = !teamDispatchSelected
-                        showAttachmentPicker = false
-                    },
-                )
-            }
         }
     }
 
@@ -2246,7 +2212,7 @@ private fun EmptyLocalHarness(
             SyButton(
                 text = stringResource(R.string.local_suggestions_title),
                 icon = FeatherIcons.Sparkles,
-                variant = SyButtonVariant.Info,
+                variant = SyButtonVariant.Outline,
                 onClick = { suggestionsOpen = true },
             )
             SyPopupMenu(

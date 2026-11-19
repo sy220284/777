@@ -9,9 +9,6 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -38,12 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
@@ -57,7 +53,7 @@ import com.shenyan.designsystem.components.SyIconBox
 import com.labteto.dshmobile.ui.shenyan.LocalSyPalette
 import com.shenyan.designsystem.components.SyCheckboxControl
 import com.labteto.dshmobile.ui.shenyan.SyPopupMenu
-import com.labteto.dshmobile.ui.shenyan.SyConversationActionPopup
+import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.SyEntryIcons
@@ -288,10 +284,15 @@ internal fun LocalSessionDrawerRow(
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
     var menuOpen by remember(session.id) { mutableStateOf(false) }
-    var touchOffset by remember(session.id) { mutableStateOf<Offset?>(null) }
+    val pressAnchor = remember(session.id) { ContextMenuPressAnchor() }
+    var menuAnchor by remember(session.id) { mutableStateOf<IntOffset?>(null) }
     Box(Modifier.fillMaxWidth().clip(DsShapes.row)) {
         Row(
-            modifier = Modifier
+            modifier = pressAnchor.observe(Modifier)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { menuAnchor = pressAnchor.point; menuOpen = true },
+                )
                 .fillMaxWidth()
                 .heightIn(min = SyMetric.touch)
                 .clip(DsShapes.row)
@@ -311,19 +312,6 @@ internal fun LocalSessionDrawerRow(
                         ),
                         label = "sessionRowBackground",
                     ).value,
-                )
-                // Observe the finger-down coordinate without consuming the gesture; combinedClickable
-                // retains ripple, accessibility semantics, click and built-in long-press haptics.
-                .pointerInput(session.id) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        touchOffset = down.position
-                        waitForUpOrCancellation()
-                    }
-                }
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = { menuOpen = true },
                 )
                 .padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapMd),
             verticalAlignment = Alignment.CenterVertically,
@@ -368,9 +356,9 @@ internal fun LocalSessionDrawerRow(
                 }
             }
         }
-        SyConversationActionPopup(
+        SyContextActionMenu(
             expanded = menuOpen,
-            touchOffset = touchOffset,
+            touchAnchor = menuAnchor,
             onDismiss = { menuOpen = false },
             items = listOf(
                 SyMenuItem(

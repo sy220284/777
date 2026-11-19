@@ -5,6 +5,8 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class ContextActionMenuPositionTest {
@@ -14,19 +16,32 @@ class ContextActionMenuPositionTest {
 
     @Test
     fun twoPressesOnOneBubbleProduceDifferentMenuPositions() {
-        assertEquals(IntOffset(40, 128), place(IntOffset(100, 120)))
-        assertEquals(IntOffset(180, 298), place(IntOffset(240, 290)))
+        assertEquals(IntOffset(40, 128), place(IntOffset(100, 120)).offset)
+        assertEquals(IntOffset(180, 298), place(IntOffset(240, 290)).offset)
     }
 
     @Test
     fun nearBottomTheMenuFlipsAboveAndRespectsTheSafeHorizontalEdge() {
-        assertEquals(IntOffset(186, 442), place(IntOffset(302, 530)))
+        val placement = place(IntOffset(302, 530))
+        assertEquals(IntOffset(186, 442), placement.offset)
+        assertTrue(placement.opensAbove)
     }
 
     @Test
     fun buttonAndAccessibilityActionsUseTheLayoutAnchor() {
-        assertEquals(IntOffset(170, 328), place(null))
-        assertEquals(IntOffset(24, 328), place(null, LayoutDirection.Rtl))
+        assertEquals(IntOffset(170, 328), place(null).offset)
+        assertFalse(place(null).opensAbove)
+        assertEquals(IntOffset(24, 328), place(null, LayoutDirection.Rtl).offset)
+    }
+
+    @Test
+    fun constrainedViewportPrefersTheSideWithMoreRoom() {
+        val placement = contextActionMenuPosition(
+            bubble, IntSize(120, 220), IntRect(12, 120, 306, 400),
+            LayoutDirection.Ltr, IntOffset(180, 285), gap = 8,
+        )
+        assertEquals(IntOffset(120, 120), placement.offset)
+        assertTrue(placement.opensAbove)
     }
 
     private fun place(point: IntOffset?, direction: LayoutDirection = LayoutDirection.Ltr) =

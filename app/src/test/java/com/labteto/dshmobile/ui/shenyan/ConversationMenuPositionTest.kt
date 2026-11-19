@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.ui.shenyan
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -20,7 +21,10 @@ class ConversationMenuPositionTest {
         finger: Offset? = Offset(120f, 26f),
         direction: LayoutDirection = LayoutDirection.Ltr,
         viewport: IntSize = window,
-    ) = conversationMenuPosition(anchor, viewport, size, finger, direction, 12, 12)
+    ) = contextActionMenuPosition(
+        anchor, size, IntRect(12, 12, viewport.width - 12, viewport.height - 12),
+        direction, finger?.let { IntOffset(anchor.left + it.x.toInt(), anchor.top + it.y.toInt()) }, 12,
+    ).offset
 
     @Test fun menuFollowsLongPressRatherThanTheRowOrigin() {
         val left = position(finger = Offset(90f, 26f))

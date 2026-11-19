@@ -21,7 +21,6 @@ import com.labteto.dshmobile.ui.shenyan.SySegmented
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -311,59 +310,36 @@ internal fun PluginInventoryBrowser(
                 onBack = onBack,
                 backContentDescription = stringResource(R.string.common_back),
             )
-            Row(Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
-                verticalAlignment = Alignment.CenterVertically) {
-                SySegmented(
-                    segments = listOf(SySegment("added", stringResource(R.string.extension_added)),
-                        SySegment("discover", stringResource(R.string.extension_discover))),
-                    selectedKey = if (addedOnly) "added" else "discover",
-                    onSelect = { addedOnly = it == "added" },
-                    modifier = Modifier.weight(1f).testTag("plugin-ownership-tabs"), stretch = true,
-                )
-                IconButton(onClick = { showMarketActions = true },
-                    modifier = Modifier.testTag("plugin-inventory-more")) {
-                    Icon(FeatherIcons.MoreVertical, contentDescription = "更多操作", tint = colors.text)
-                }
-            }
-            kindFilter?.let { kind ->
-                val label = when (kind) {
-                    ExtensionKind.SKILL -> R.string.capability_filter_skills
-                    ExtensionKind.PLUGIN -> R.string.capability_filter_plugins
-                    ExtensionKind.CONNECTOR -> R.string.capability_filter_connectors
-                }
-                SyButton(
-                    text = stringResource(label),
-                    onClick = { kindFilter = null },
-                    variant = SyButtonVariant.Ghost,
-                    modifier = Modifier.padding(horizontal = SyMetric.gapSection)
-                        .testTag("capability-clear-kind-filter"),
-                )
-            }
-            Surface(
-                onClick = onOpenSettings,
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = SyMetric.gapSection, vertical = SyMetric.gapXs)
-                    .testTag("capability-settings-entry"),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                color = colors.materialL2,
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(FeatherIcons.Sliders, contentDescription = null,
-                        tint = colors.textSecondary, modifier = Modifier.size(24.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("能力设置", style = DsType.std14Strong.withReadingWeight(),
-                            color = colors.text)
-                        Text("网络搜索、执行授权与高级配置",
-                            style = DsType.caption11.withReadingWeight(), color = colors.textSecondary)
-                    }
-                    Icon(FeatherIcons.ChevronRight, contentDescription = null,
-                        tint = colors.textTertiary, modifier = Modifier.size(17.dp))
-                }
+                SyButton(
+                    text = stringResource(R.string.capability_add_action),
+                    icon = FeatherIcons.Plus,
+                    onClick = { showMarketActions = true },
+                    modifier = Modifier.weight(1f).testTag("plugin-inventory-more"),
+                    variant = SyButtonVariant.Primary,
+                )
+                SyButton(
+                    text = stringResource(R.string.capability_settings_action),
+                    onClick = onOpenSettings,
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.weight(1f).testTag("capability-settings-entry"),
+                )
             }
+            SySegmented(
+                segments = listOf(
+                    SySegment("added", stringResource(R.string.extension_added)),
+                    SySegment("discover", stringResource(R.string.extension_discover)),
+                ),
+                selectedKey = if (addedOnly) "added" else "discover",
+                onSelect = { addedOnly = it == "added" },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection)
+                    .testTag("plugin-ownership-tabs"),
+                stretch = true,
+            )
             SyTextField(
                 value = catalogueQuery,
                 onValueChange = { catalogueQuery = it.take(128) },
@@ -371,6 +347,21 @@ internal fun PluginInventoryBrowser(
                     .testTag("plugin-inventory-search"),
                 placeholder = { Text(stringResource(R.string.tools_catalog_search)) },
                 singleLine = true,
+            )
+            val filterLabel = when (kindFilter) {
+                ExtensionKind.SKILL -> R.string.capability_filter_skills
+                ExtensionKind.PLUGIN -> R.string.capability_filter_plugins
+                ExtensionKind.CONNECTOR -> R.string.capability_filter_connectors
+                null -> R.string.skills_title
+            }
+            SyButton(
+                text = stringResource(filterLabel),
+                icon = if (kindFilter == null) FeatherIcons.List else FeatherIcons.X,
+                onClick = { kindFilter = if (kindFilter == null) ExtensionKind.SKILL else null },
+                variant = SyButtonVariant.Ghost,
+                size = SyButtonSize.Small,
+                modifier = Modifier.padding(horizontal = SyMetric.gapSection)
+                    .testTag(if (kindFilter == null) "capability-filter-skills" else "capability-clear-kind-filter"),
             )
             if (loading && visible.isNotEmpty()) {
                 Text(
@@ -755,13 +746,8 @@ internal fun PluginInventoryBrowser(
         }
     }
     if (showMarketActions) {
-        SyResponsiveSheet(title = "能力管理", onDismiss = { showMarketActions = false }, scrollable = true) {
-            SyButton(
-                text = stringResource(R.string.skills_title),
-                onClick = { kindFilter = ExtensionKind.SKILL; showMarketActions = false },
-                modifier = Modifier.fillMaxWidth(),
-                variant = SyButtonVariant.Ghost,
-            )
+        SyResponsiveSheet(title = stringResource(R.string.capability_add_action),
+            onDismiss = { showMarketActions = false }, scrollable = true) {
             if (onImportSkill != null) SyButton(
                 text = "导入技能文件",
                 onClick = { showMarketActions = false; onImportSkill() },

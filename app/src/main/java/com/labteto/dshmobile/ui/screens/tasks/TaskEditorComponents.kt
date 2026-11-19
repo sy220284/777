@@ -198,7 +198,7 @@ internal fun ColumnScope.TaskEditorPane(
                     text = stringResource(R.string.common_cancel),
                     onClick = onReset,
                     enabled = !saving,
-                    variant = SyButtonVariant.Info,
+                    variant = SyButtonVariant.Outline,
                     modifier = Modifier.weight(1f),
                     size = SyButtonSize.Large,
 

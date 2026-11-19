@@ -10,7 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.labteto.dshmobile.R
 import com.shenyan.designsystem.components.SyIconButton
-import com.labteto.dshmobile.ui.shenyan.SyConversationActionPopup
+import com.labteto.dshmobile.ui.shenyan.SyContextActionMenu
 import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.components.ConversationMenuIcons
 import com.labteto.dshmobile.ui.shenyan.SyMenuItem
@@ -39,7 +39,7 @@ internal fun ConversationActionsMenu(
             onClick = { expanded = true },
             tint = colors.textSecondary,
         )
-        SyConversationActionPopup(
+        SyContextActionMenu(
             expanded = expanded,
             onDismiss = { expanded = false },
             primaryActionCount = listOfNotNull(onSearchMessages, onOpenWorkEvidence, onOpenDocuments, onOpenSample).size,
