@@ -122,8 +122,8 @@ internal object SyLiquidShader {
             half alpha = mix(centerSample.a, half(1.0), half(tintAlpha));
             // A single, directional highlight hugs the inner edge. There is
             // no simulated underside shadow, stroke or full-surface glare.
-            float glint = pow(rim, 4.0) * reflection *
-                max(dot(normal, float2(-0.71, -0.71)), 0.0) * 0.15;
+            float glint = pow(rim, 5.0) * reflection *
+                max(dot(normal, float2(-0.71, -0.71)), 0.0) * mix(0.12, 0.18, pulse);
             colour = mix(colour, half3(alpha), half(glint));
 
             float coverage = 1.0 - smoothstep(-1.0, 0.7, deformedDistance);

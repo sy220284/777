@@ -1,1 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="模型" fill="none" stroke="#302B27" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z"/><path d="M4 7.5l8 4.5 8-4.5"/><path d="M12 12v9"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="模型" fill="none" stroke="#302B27" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 5h14v14H5Z"/>
+  <path d="M9 2.8V5m6-2.2V5m-6 14v2.2m6-2.2v2.2M2.8 9H5m-2.2 6H5m14-6h2.2M19 15h2.2"/>
+  <path d="M9 12l3-3 3 3-3 3Z"/>
+</svg>

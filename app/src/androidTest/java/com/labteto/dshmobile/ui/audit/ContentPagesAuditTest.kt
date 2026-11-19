@@ -126,6 +126,14 @@ class ContentPagesAuditTest(
                 }
             }
         }
+        if (page == "persona-presets") {
+            val firstPreset = PersonaPresetCatalog.presets.first()
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithTag("persona-preset-name:" + firstPreset.id, useUnmergedTree = true)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertTrue("A real preset must show its identity", layouts.isNotEmpty())
+            assertFalse("Actions must not squeeze the preset name", layouts.single().hasVisualOverflow)
+        }
         captureScrollableUiAudit(compose, "sample-$page-${theme.name}-$fontScale-$width", "content-audit-frame")
         if (page == "usage-content") {
             val layouts = mutableListOf<TextLayoutResult>()

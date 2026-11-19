@@ -459,11 +459,144 @@ fun SettingsScreen(
         } else null
     }
 
+    val chatPreferences: @Composable () -> Unit = {
+        val customFilters = localHarness.chatStyleGuardCustomPhrases
+        val personaFilters = localHarness.personaBannedPhrases
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+        val candidate = customChatFilterDraft.trim()
+        val canAddFilter =
+            candidate.isNotEmpty() &&
+                candidate.length <= MAX_CUSTOM_CHAT_FILTER_CHARS &&
+                candidate !in customFilters &&
+                customFilters.size < MAX_CUSTOM_CHAT_FILTERS
+
+        SettingsCard(stringResource(R.string.settings_page_chat)) {
+            ToggleRow(
+                stringResource(R.string.settings_chat_style_guard),
+                localHarness.chatStyleGuardEnabled,
+                            ) {
+                viewModel.configureChatStyleGuard(!localHarness.chatStyleGuardEnabled)
+            }
+
+            if (!localHarness.chatStyleGuardEnabled) {
+                Text(
+                    stringResource(R.string.settings_chat_filter_disabled_notice),
+                    style = SyType.small13.withReadingWeight(),
+                    color = colors.textSecondary,
+                )
+            }
+
+            Text(
+                stringResource(R.string.settings_chat_custom_filters_title, customFilters.size),
+                style = SyType.small13Strong.withReadingWeight(),
+                color = colors.text,
+            )
+            Text(
+                stringResource(
+                    R.string.settings_chat_filter_limits,
+                    MAX_CUSTOM_CHAT_FILTERS,
+                    MAX_CUSTOM_CHAT_FILTER_CHARS,
+                ),
+                style = SyType.caption11.withReadingWeight(),
+                color = colors.textTertiary,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+            ) {
+                SyTextField(
+                    value = customChatFilterDraft,
+                    onValueChange = {
+                        customChatFilterDraft = it
+                            .replace("\n", " ")
+                            .take(MAX_CUSTOM_CHAT_FILTER_CHARS)
+                    },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.settings_chat_custom_filter_hint)) },
+                    singleLine = true,
+                )
+                SyButton(
+                    text = stringResource(R.string.settings_chat_custom_filter_add),
+                    onClick = {
+                        if (viewModel.addChatStyleGuardPhrase(candidate)) {
+                            customChatFilterDraft = ""
+                        }
+                    },
+                    enabled = canAddFilter,
+                    size = SyButtonSize.Small,
+                )
+            }
+            customFilters.forEach { phrase ->
+                ChatFilterPhraseRow(
+                    phrase = phrase,
+                    removeLabel = stringResource(R.string.settings_chat_custom_filter_remove),
+                    onRemove = { viewModel.removeChatStyleGuardPhrase(phrase) },
+                )
+            }
+
+            Text(
+                stringResource(R.string.settings_chat_persona_filters_title, personaFilters.size),
+                style = SyType.small13Strong.withReadingWeight(),
+                color = colors.text,
+            )
+            if (personaFilters.isEmpty()) {
+                Text(
+                    stringResource(R.string.settings_chat_persona_filters_empty),
+                    style = SyType.caption11.withReadingWeight(),
+                    color = colors.textTertiary,
+                )
+            } else {
+                personaFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
+            }
+
+            if (localHarness.styleGuardHits.isNotEmpty()) {
+                SyButton(
+                    text = stringResource(
+                        if (showChatPreferenceDiagnostics) {
+                            R.string.settings_chat_guard_hits_hide
+                        } else {
+                            R.string.settings_chat_guard_hits_show
+                        },
+                        localHarness.styleGuardHits.size,
+                    ),
+                    onClick = {
+                        showChatPreferenceDiagnostics = !showChatPreferenceDiagnostics
+                    },
+                    variant = SyButtonVariant.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (showChatPreferenceDiagnostics) {
+                    Text(
+                        stringResource(R.string.settings_chat_guard_hits_title),
+                        style = SyType.small13Strong.withReadingWeight(),
+                        color = colors.text,
+                    )
+                    localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
+                        ChatFilterPhraseRow(phrase = hit)
+                    }
+                    SyButton(
+                        text = stringResource(R.string.settings_chat_guard_hits_clear),
+                        onClick = {
+                            viewModel.clearChatStyleGuardHits()
+                            showChatPreferenceDiagnostics = false
+                        },
+                        variant = SyButtonVariant.Ghost,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+    var showStorageChatPreferences by rememberSaveable { mutableStateOf(false) }
+
     val title = when (page) {
         SettingsDestination.ROOT -> stringResource(R.string.settings_title)
         SettingsDestination.SEARCH -> stringResource(R.string.settings_search_title)
-        SettingsDestination.USAGE_DETAIL -> stringResource(if (usageDetailSelection is UsageDetailSelection.Request)
-            R.string.usage_request_detail else R.string.usage_group_detail)
+        SettingsDestination.USAGE, SettingsDestination.USAGE_LOG, SettingsDestination.USAGE_DETAIL ->
+            stringResource(R.string.usage_calculation_title)
         else -> stringResource(requireNotNull(settingsPageEntry(page)).titleRes)
     }
 
@@ -493,14 +626,11 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     actionIcon = when (page) {
                         SettingsDestination.SEARCH -> null
-                        SettingsDestination.USAGE -> FeatherIcons.Clock
                         else -> FeatherIcons.Search
                     },
-                    actionContentDescription = stringResource(if (page == SettingsDestination.USAGE)
-                        R.string.usage_log_open else R.string.settings_search_title),
+                    actionContentDescription = stringResource(R.string.settings_search_title),
                     onAction = when (page) {
                         SettingsDestination.SEARCH -> null
-                        SettingsDestination.USAGE -> { { openPage(SettingsDestination.USAGE_LOG) } }
                         else -> { { openPage(SettingsDestination.SEARCH) } }
                     },
                 )
@@ -508,10 +638,40 @@ fun SettingsScreen(
                 SyHierarchyPage(
                     page = pageStack,
                     pageKey = { it.last().name },
-                    depth = { it.size },
+                    depth = { it.last().menuLevel },
                     modifier = Modifier.weight(1f),
                 ) { shownStack ->
                 val shownPage = shownStack.last()
+                val usageSection = shownPage == SettingsDestination.USAGE ||
+                    shownPage == SettingsDestination.USAGE_LOG ||
+                    shownPage == SettingsDestination.USAGE_DETAIL
+                if (usageSection) {
+                    SySegmented(
+                        segments = listOf(
+                            SySegment("overview", stringResource(R.string.usage_overview_tab)),
+                            SySegment("log", stringResource(R.string.usage_log_tab)),
+                        ),
+                        selectedKey = if (shownPage == SettingsDestination.USAGE_LOG ||
+                            (shownPage == SettingsDestination.USAGE_DETAIL && SettingsDestination.USAGE_LOG in shownStack))
+                            "log" else "overview",
+                        onSelect = { key ->
+                            val destination = if (key == "log") SettingsDestination.USAGE_LOG else SettingsDestination.USAGE
+                            if (destination != page) {
+                                settingsSearchTargetId = null
+                                usageDetailSelection = null
+                                usageDetailBackSelection = null
+                                val parent = pageStack.dropLastWhile {
+                                    it == SettingsDestination.USAGE ||
+                                        it == SettingsDestination.USAGE_LOG ||
+                                        it == SettingsDestination.USAGE_DETAIL
+                                }
+                                pageStack = parent + destination
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapSection),
+                        stretch = true,
+                    )
+                }
                 val searchFocus = settingsSearchTarget?.takeIf { it.destination == shownPage }
                     ?.anchorTitleRes?.let { SettingsSearchFocus(stringResource(it), settingsSearchTargetId.orEmpty()) }
                 CompositionLocalProvider(LocalSettingsSearchFocus provides searchFocus) {
@@ -720,137 +880,7 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    SettingsDestination.CHAT -> {
-                        val customFilters = localHarness.chatStyleGuardCustomPhrases
-                        val personaFilters = localHarness.personaBannedPhrases
-                            .map(String::trim)
-                            .filter(String::isNotBlank)
-                            .distinct()
-                        val candidate = customChatFilterDraft.trim()
-                        val canAddFilter =
-                            candidate.isNotEmpty() &&
-                                candidate.length <= MAX_CUSTOM_CHAT_FILTER_CHARS &&
-                                candidate !in customFilters &&
-                                customFilters.size < MAX_CUSTOM_CHAT_FILTERS
-
-                        SettingsCard(stringResource(R.string.settings_page_chat)) {
-                            ToggleRow(
-                                stringResource(R.string.settings_chat_style_guard),
-                                localHarness.chatStyleGuardEnabled,
-                                            ) {
-                                viewModel.configureChatStyleGuard(!localHarness.chatStyleGuardEnabled)
-                            }
-
-                            if (!localHarness.chatStyleGuardEnabled) {
-                                Text(
-                                    stringResource(R.string.settings_chat_filter_disabled_notice),
-                                    style = SyType.small13.withReadingWeight(),
-                                    color = colors.textSecondary,
-                                )
-                            }
-
-                            Text(
-                                stringResource(R.string.settings_chat_custom_filters_title, customFilters.size),
-                                style = SyType.small13Strong.withReadingWeight(),
-                                color = colors.text,
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.settings_chat_filter_limits,
-                                    MAX_CUSTOM_CHAT_FILTERS,
-                                    MAX_CUSTOM_CHAT_FILTER_CHARS,
-                                ),
-                                style = SyType.caption11.withReadingWeight(),
-                                color = colors.textTertiary,
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                            ) {
-                                SyTextField(
-                                    value = customChatFilterDraft,
-                                    onValueChange = {
-                                        customChatFilterDraft = it
-                                            .replace("\n", " ")
-                                            .take(MAX_CUSTOM_CHAT_FILTER_CHARS)
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    placeholder = { Text(stringResource(R.string.settings_chat_custom_filter_hint)) },
-                                    singleLine = true,
-                                )
-                                SyButton(
-                                    text = stringResource(R.string.settings_chat_custom_filter_add),
-                                    onClick = {
-                                        if (viewModel.addChatStyleGuardPhrase(candidate)) {
-                                            customChatFilterDraft = ""
-                                        }
-                                    },
-                                    enabled = canAddFilter,
-                                    size = SyButtonSize.Small,
-                                )
-                            }
-                            customFilters.forEach { phrase ->
-                                ChatFilterPhraseRow(
-                                    phrase = phrase,
-                                    removeLabel = stringResource(R.string.settings_chat_custom_filter_remove),
-                                    onRemove = { viewModel.removeChatStyleGuardPhrase(phrase) },
-                                )
-                            }
-
-                            Text(
-                                stringResource(R.string.settings_chat_persona_filters_title, personaFilters.size),
-                                style = SyType.small13Strong.withReadingWeight(),
-                                color = colors.text,
-                            )
-                            if (personaFilters.isEmpty()) {
-                                Text(
-                                    stringResource(R.string.settings_chat_persona_filters_empty),
-                                    style = SyType.caption11.withReadingWeight(),
-                                    color = colors.textTertiary,
-                                )
-                            } else {
-                                personaFilters.forEach { phrase -> ChatFilterPhraseRow(phrase = phrase) }
-                            }
-
-                            if (localHarness.styleGuardHits.isNotEmpty()) {
-                                SyButton(
-                                    text = stringResource(
-                                        if (showChatPreferenceDiagnostics) {
-                                            R.string.settings_chat_guard_hits_hide
-                                        } else {
-                                            R.string.settings_chat_guard_hits_show
-                                        },
-                                        localHarness.styleGuardHits.size,
-                                    ),
-                                    onClick = {
-                                        showChatPreferenceDiagnostics = !showChatPreferenceDiagnostics
-                                    },
-                                    variant = SyButtonVariant.Ghost,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                if (showChatPreferenceDiagnostics) {
-                                    Text(
-                                        stringResource(R.string.settings_chat_guard_hits_title),
-                                        style = SyType.small13Strong.withReadingWeight(),
-                                        color = colors.text,
-                                    )
-                                    localHarness.styleGuardHits.takeLast(8).asReversed().forEach { hit ->
-                                        ChatFilterPhraseRow(phrase = hit)
-                                    }
-                                    SyButton(
-                                        text = stringResource(R.string.settings_chat_guard_hits_clear),
-                                        onClick = {
-                                            viewModel.clearChatStyleGuardHits()
-                                            showChatPreferenceDiagnostics = false
-                                        },
-                                        variant = SyButtonVariant.Ghost,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    SettingsDestination.CHAT -> chatPreferences()
 
                     SettingsDestination.MODEL_PERFORMANCE -> ModelPerformanceSettingsPage()
 
@@ -950,6 +980,8 @@ fun SettingsScreen(
                     }
 
                     SettingsDestination.USAGE_DETAIL -> {
+                        SettingsGroupTitle(stringResource(if (usageDetailSelection is UsageDetailSelection.Request)
+                            R.string.usage_request_detail else R.string.usage_group_detail))
                         when (val selection = usageDetailSelection) {
                             is UsageDetailSelection.Group -> {
                                 val detail by produceState<TokenUsageGroupDetail?>(
@@ -1185,10 +1217,13 @@ fun SettingsScreen(
 
                     SettingsDestination.SESSION_STORAGE -> {
                         AppSettingsSection {
-                            AppSettingsRow(icon = SyEntryIcons.ChatStyle,
-                                title = stringResource(settingsPageEntry(SettingsDestination.SESSION)!!.titleRes),
-                                onClick = { openPage(SettingsDestination.SESSION) })
+                            AppSettingsRow(
+                                icon = SyEntryIcons.ChatStyle,
+                                title = stringResource(R.string.settings_page_session),
+                                onClick = { showStorageChatPreferences = !showStorageChatPreferences },
+                            )
                         }
+                        if (showStorageChatPreferences) chatPreferences()
                         LocalSessionStorageCard(
                             status = localSessionStorageStatus,
                             busy = localSessionStorageBusy,
