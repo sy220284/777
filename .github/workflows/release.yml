@@ -21,6 +21,7 @@ jobs:
       should_release: ${{ steps.detect.outputs.should_release }}
       version: ${{ steps.detect.outputs.version }}
       release_sha: ${{ steps.detect.outputs.release_sha }}
+      previous_tag: ${{ steps.detect.outputs.previous_tag }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -48,6 +49,7 @@ jobs:
             RETIRED_TAGS="$(awk '$1 ~ /^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$/ { print $1 }' .github/scripts/retired-releases.txt)"
           fi
           MAX_RESERVED_TAG="$(printf '%s\n%s\n' "$MAX_RELEASE_TAG" "$RETIRED_TAGS" | sed '/^$/d' | sort -V | tail -n 1)"
+          echo "previous_tag=$MAX_RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
           # Only code/build changes create a new APK. Documentation and governance edits do not.
           if [ -n "$MAX_RELEASE_TAG" ] && git fetch --no-tags origin "refs/tags/$MAX_RELEASE_TAG"; then
@@ -90,10 +92,12 @@ jobs:
     permissions:
       contents: write
       actions: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.check-release.outputs.release_sha }}
+          fetch-depth: 0
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
@@ -189,6 +193,19 @@ jobs:
           echo "DSH_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
+
+      - name: Generate concise release notes from merged PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_TAG: ${{ needs.check-release.outputs.previous_tag }}
+          RELEASE_SHA: ${{ needs.check-release.outputs.release_sha }}
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'test_generate_release_notes.py'
+          python3 .github/scripts/generate-release-notes.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "$PREVIOUS_TAG" \
+            --head "$RELEASE_SHA" \
+            --output "$RUNNER_TEMP/release-notes.md"
 
       - name: Build release APK
         env:
@@ -350,9 +367,5 @@ jobs:
           name: ${{ steps.version.outputs.tag }}
           files: |
             .release-assets/*
-          body: |
-            ## 安装要求
-            - 此安装包适用于 Android 16 及以上、支持 arm64-v8a 的设备。
-            - Android 15 及以下系统和仅支持 x86_64 或 32 位 ABI 的设备无法安装此包。
-            - x86_64 模拟器可按[兼容性说明](https://github.com/sy220284/777/blob/main/docs/COMPATIBILITY.md)自行构建调试包。
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
+          generate_release_notes: false
