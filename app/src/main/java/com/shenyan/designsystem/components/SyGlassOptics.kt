@@ -1,6 +1,8 @@
 package com.shenyan.designsystem.components
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import java.util.ArrayDeque
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.SyColors
@@ -54,4 +56,23 @@ internal fun syGlassOptics(
         else -> 0f
     }
     return SyGlassOptics(true, blur, elevation, reflection)
+}
+
+/**
+ * Forty-eight millisecond pointer history produces comparable bending at
+ * 60Hz and 120Hz, without dividing by sub-millisecond single-event intervals.
+ * The result is displacement per reference 16ms frame, not a scroll command.
+ */
+internal fun syWindowedGlassDrag(
+    history: ArrayDeque<Pair<Long, Offset>>,
+    timeMillis: Long,
+    position: Offset,
+): Offset {
+    history.addLast(timeMillis to position)
+    while (history.size > 2 && timeMillis - history.first.first > 48L) {
+        history.removeFirst()
+    }
+    val oldest = history.first
+    val elapsed = (timeMillis - oldest.first).coerceAtLeast(8L).toFloat()
+    return (position - oldest.second) * (16f / elapsed)
 }

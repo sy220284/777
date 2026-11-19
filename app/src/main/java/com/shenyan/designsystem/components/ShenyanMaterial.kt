@@ -281,11 +281,15 @@ fun SyMaterialSurface(
             lensPoint = first.position
             lensDrag = Offset.Zero
             lensDown = true
+            val motionHistory = java.util.ArrayDeque<Pair<Long, Offset>>()
+            motionHistory.addLast(first.uptimeMillis to first.position)
             do {
                 val next = awaitPointerEvent(PointerEventPass.Final)
                     .changes.firstOrNull { it.id == first.id }
                 if (next != null && next.pressed) {
-                    lensDrag = next.position - lensPoint
+                    lensDrag = syWindowedGlassDrag(
+                        motionHistory, next.uptimeMillis, next.position,
+                    )
                     lensPoint = next.position
                 }
             } while (next != null && next.pressed)

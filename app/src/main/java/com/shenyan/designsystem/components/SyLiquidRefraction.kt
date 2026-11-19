@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalDensity
@@ -213,7 +214,9 @@ internal fun SyLiquidRefractionLayer(
         })
         shader.setColorUniform("glassTint", fill.toArgb())
         renderEffect = effect
-    }) {
+    }.clearAndSetSemantics {}) {
+        // This is a visual-only sampling copy; accessible content and controls
+        // remain in the actual underlay or foreground, not the optical texture.
         backdrop()
     }
 }

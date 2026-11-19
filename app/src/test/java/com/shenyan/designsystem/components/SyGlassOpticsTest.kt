@@ -1,6 +1,8 @@
 package com.shenyan.designsystem.components
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import java.util.ArrayDeque
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.ShenyanPalettes
 import org.junit.Assert.assertEquals
@@ -69,6 +71,21 @@ class SyGlassOpticsTest {
             assertEquals(0.dp, style.blur)
             assertEquals(0f, style.reflection)
         }
+    }
+
+    @Test fun fortyEightMillisecondWindowSuppressesSingleEventVelocitySpikes() {
+        val history = ArrayDeque<Pair<Long, Offset>>()
+        val start = syWindowedGlassDrag(history, 0L, Offset.Zero)
+        assertEquals(0f, start.x, 0.001f)
+        val first = syWindowedGlassDrag(history, 8L, Offset(10f, 0f))
+        assertEquals(20f, first.x, 0.001f)
+        val second = syWindowedGlassDrag(history, 16L, Offset(20f, 0f))
+        assertEquals(20f, second.x, 0.001f)
+        // An extra 1ms event must not produce a 12x flicker in curvature.
+        val third = syWindowedGlassDrag(history, 17L, Offset(20.5f, 0f))
+        assertTrue(third.x in 18f..21f)
+        val rested = syWindowedGlassDrag(history, 120L, Offset(20.5f, 0f))
+        assertEquals(0f, rested.x, 0.001f)
     }
 
     @Test fun nestedSurfacesKeepEdgeLightWithoutDuplicateBlur() {
