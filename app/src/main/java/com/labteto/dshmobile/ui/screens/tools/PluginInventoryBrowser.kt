@@ -352,7 +352,7 @@ internal fun PluginInventoryBrowser(
                 ExtensionKind.SKILL -> R.string.capability_filter_skills
                 ExtensionKind.PLUGIN -> R.string.capability_filter_plugins
                 ExtensionKind.CONNECTOR -> R.string.capability_filter_connectors
-                null -> R.string.skills_title
+                null -> R.string.capability_filter_skill_action
             }
             SyButton(
                 text = stringResource(filterLabel),

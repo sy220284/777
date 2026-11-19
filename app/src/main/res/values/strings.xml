@@ -2491,6 +2491,7 @@
     <string name="work_open_execution_record">查看执行记录</string>
     <string name="tasks_list_load_failed">无法读取任务列表</string>
     <string name="tasks_refresh_list">刷新任务列表</string>
+    <string name="capability_filter_skill_action">只看技能</string>
     <string name="capability_filter_skills">技能 · 查看全部能力</string>
     <string name="capability_filter_plugins">插件 · 查看全部能力</string>
     <string name="capability_filter_connectors">连接器 · 查看全部能力</string>
