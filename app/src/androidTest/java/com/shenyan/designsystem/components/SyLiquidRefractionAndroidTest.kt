@@ -38,6 +38,9 @@ class SyLiquidRefractionAndroidTest {
         shader.setFloatUniform("chromaPx", 1f)
         shader.setFloatUniform("edgePx", 22f)
         shader.setFloatUniform("reflection", 0.8f)
+        shader.setFloatUniform("blurPx", 2.4f)
+        shader.setFloatUniform("clarity", 0.66f)
+        shader.setFloatUniform("drag", 3f, -1f)
         shader.setColorUniform("glassTint", Color(0xC2FFFFFF).toArgb())
         assertTrue(RenderEffect.createRuntimeShaderEffect(shader, SyLiquidShader.INPUT) != null)
     }

@@ -174,6 +174,7 @@ fun SyMaterialSurface(
     // inexpensive rim unless they explicitly own a live underlay.
     val refract = optics.glass && syShouldRefract(resolved, nested, backdrop != null)
     var lensPoint by remember { mutableStateOf(Offset.Zero) }
+    var lensDrag by remember { mutableStateOf(Offset.Zero) }
     var lensDown by remember { mutableStateOf(false) }
     val lensPressure by animateFloatAsState(
         if (refract && lensDown && !LocalSyReduceMotion.current) 1f else 0f,
@@ -215,6 +216,7 @@ fun SyMaterialSurface(
                     reflection = optics.reflection,
                     touchPoint = lensPoint,
                     pressure = lensPressure,
+                    drag = lensDrag * lensPressure,
                     backdrop = sampled,
                 )
             } else {
@@ -277,11 +279,15 @@ fun SyMaterialSurface(
             // Observe in the Final pass without consuming the page's scroll/drag events.
             val first = awaitFirstDown(requireUnconsumed = false)
             lensPoint = first.position
+            lensDrag = Offset.Zero
             lensDown = true
             do {
                 val next = awaitPointerEvent(PointerEventPass.Final)
                     .changes.firstOrNull { it.id == first.id }
-                if (next != null && next.pressed) lensPoint = next.position
+                if (next != null && next.pressed) {
+                    lensDrag = next.position - lensPoint
+                    lensPoint = next.position
+                }
             } while (next != null && next.pressed)
             lensDown = false
         }

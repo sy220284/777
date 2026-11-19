@@ -1531,9 +1531,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
             }
             }
-            // Work and Chat share the normal transcript; no separate five-tab dashboard.
-            transcriptBody()
-
+            // Capture the actual visible message glyphs only while the shortcut is
+            // shown. Both Chat and Work use this same underlying LazyColumn.
+            // Glass stays outside the capture, so it cannot recursively refract itself.
+            com.shenyan.designsystem.components.SyLiveGlassScene(
+                modifier = Modifier.fillMaxSize(),
+                enabled = scrollHint.target != null,
+                underlay = { transcriptBody() },
+                glass = {
             ConversationScrollShortcut(
                 target = scrollHint.target ?: ConversationScrollTarget.LATEST.takeIf {
                     state.usageMode == LocalUsageMode.WORK && workReaderPaused.value && listState.canScrollForward
@@ -1557,6 +1562,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             workReaderPaused.value = false
                         }
                     }
+                },
+            )
                 },
             )
         }

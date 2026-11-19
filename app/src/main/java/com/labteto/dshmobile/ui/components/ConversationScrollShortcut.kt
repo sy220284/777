@@ -8,7 +8,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.border
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.foundation.LocalSyReduceMotion
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -95,13 +99,15 @@ fun ConversationScrollShortcut(
     modifier: Modifier = Modifier,
 ) {
     val colors = com.shenyan.designsystem.foundation.LocalSyColors.current
+    val reduceMotion = LocalSyReduceMotion.current
 
     AnimatedContent(
         targetState = target,
         modifier = modifier,
         transitionSpec = {
-            (fadeIn() + scaleIn(initialScale = 0.85f)) togetherWith
-                (fadeOut() + scaleOut(targetScale = 0.85f))
+            val duration = if (reduceMotion) 0 else 150
+            (fadeIn(tween(duration)) + scaleIn(tween(duration), initialScale = 0.85f)) togetherWith
+                (fadeOut(tween(duration)) + scaleOut(tween(duration), targetScale = 0.85f))
         },
         label = "conversationScrollShortcut",
     ) { direction ->
@@ -116,12 +122,12 @@ fun ConversationScrollShortcut(
                     .clickable { onClick(direction) },
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .border(1.dp, colors.border.copy(alpha = 0.28f), CircleShape),
-                    contentAlignment = Alignment.Center,
+                SyMaterialSurface(
+                    modifier = Modifier.size(40.dp).testTag("sy-conversation-liquid-shortcut"),
+                    tier = SyMaterialTier.L4_OVERLAY,
+                    shape = CircleShape,
                 ) {
+                    Box(contentAlignment = Alignment.Center) {
                     Icon(
                         if (direction == ConversationScrollTarget.START) FeatherIcons.ArrowUp
                         else FeatherIcons.ArrowDown,
@@ -129,6 +135,7 @@ fun ConversationScrollShortcut(
                         tint = colors.text,
                         modifier = Modifier.size(19.dp),
                     )
+                    }
                 }
             }
         }

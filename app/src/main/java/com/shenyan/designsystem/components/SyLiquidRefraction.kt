@@ -3,6 +3,7 @@ package com.shenyan.designsystem.components
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -44,6 +45,9 @@ internal object SyLiquidShader {
         uniform float chromaPx;
         uniform float edgePx;
         uniform float reflection;
+        uniform float blurPx;
+        uniform float clarity;
+        uniform float2 drag;
         layout(color) uniform half4 glassTint;
 
         float cornerAt(float2 p) {
@@ -72,12 +76,16 @@ internal object SyLiquidShader {
             float touchRadius = max(min(resolution.x, resolution.y) * 0.60, 32.0);
             float pulse = touchAmount * exp(-touchDistance * touchDistance /
                 (touchRadius * touchRadius));
-            // The contact slightly changes the apparent local thickness of the lens.
-            float deformedDistance = d - pulse * 4.0;
+            // Directional compression moves the INSIDE edge of the glass with
+            // the finger while the public shape stays securely hit-testable.
+            float2 motion = clamp(drag, float2(-14.0), float2(14.0));
+            float directional = dot(normal, motion) / max(length(motion), 1.0);
+            float deformedDistance = d + pulse * (1.1 + directional * 0.7);
             float rim = smoothstep(-edgePx, -0.3, deformedDistance);
             float lensBend = bendPx * rim * rim;
-            float wave = pulse * 2.2 * sin(touchDistance * 0.055);
-            float2 displacement = -normal * (lensBend + wave);
+            float wave = pulse * 1.15 * sin(touchDistance * 0.055);
+            float2 displacement = -normal * (lensBend + wave) +
+                motion * pulse * rim * 0.28;
             float2 samplePoint = clamp(
                 p + displacement,
                 float2(0.75),
@@ -85,15 +93,37 @@ internal object SyLiquidShader {
             );
             float2 spread = normal * chromaPx * rim;
 
-            half4 redSample = source.eval(clamp(samplePoint + spread,
-                float2(0.75), resolution - float2(0.75)));
-            half4 greenSample = source.eval(samplePoint);
-            half4 blueSample = source.eval(clamp(samplePoint - spread,
-                float2(0.75), resolution - float2(0.75)));
-            half3 refracted = half3(redSample.r, greenSample.g, blueSample.b);
+            half3 refracted;
+            if (chromaPx > 0.01) {
+                half4 redSample = source.eval(clamp(samplePoint + spread,
+                    float2(0.75), resolution - float2(0.75)));
+                half4 greenSample = source.eval(samplePoint);
+                half4 blueSample = source.eval(clamp(samplePoint - spread,
+                    float2(0.75), resolution - float2(0.75)));
+                refracted = half3(redSample.r, greenSample.g, blueSample.b);
+            } else {
+                refracted = source.eval(samplePoint).rgb;
+            }
+            if (blurPx > 0.05) {
+                float2 horizontal = float2(blurPx, 0.0);
+                float2 vertical = float2(0.0, blurPx);
+                half3 soft = (
+                    source.eval(clamp(samplePoint + horizontal,
+                        float2(0.75), resolution - float2(0.75))).rgb +
+                    source.eval(clamp(samplePoint - horizontal,
+                        float2(0.75), resolution - float2(0.75))).rgb +
+                    source.eval(clamp(samplePoint + vertical,
+                        float2(0.75), resolution - float2(0.75))).rgb +
+                    source.eval(clamp(samplePoint - vertical,
+                        float2(0.75), resolution - float2(0.75))).rgb
+                ) * half(0.25);
+                refracted = mix(refracted, soft, half(0.22 + 0.15 * rim));
+            }
 
-            // Retain the selected palette/contrast tint on top of real displaced pixels.
-            half3 finalColor = mix(refracted, glassTint.rgb, glassTint.a);
+            // Preserve the solid center for readable foreground ink; reduce
+            // veil selectively at the edge so the actual bending stays visible.
+            float tintAlpha = glassTint.a * (1.0 - clarity * rim);
+            half3 finalColor = mix(refracted, glassTint.rgb, half(tintAlpha));
             // Fresnel-style edge highlight and underside shadow reveal curved thickness.
             float edgeHighlight = pow(rim, 2.6) * reflection;
             float lightDirection = 0.52 - 0.48 * normal.x - 0.42 * normal.y;
@@ -129,6 +159,7 @@ internal fun SyLiquidRefractionLayer(
     reflection: Float,
     touchPoint: Offset,
     pressure: Float,
+    drag: Offset = Offset.Zero,
     backdrop: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -174,10 +205,23 @@ internal fun SyLiquidRefractionLayer(
         val physicalBend = with(density) { 4.dp.toPx() }
         val physicalEdge = with(density) { 6.dp.toPx() }
         shader.setFloatUniform("bendPx", min(shortSide * .07f, physicalBend))
-        shader.setFloatUniform("chromaPx",
-            min(shortSide * .003f, with(density) { .8.dp.toPx() }))
-        shader.setFloatUniform("edgePx", min(shortSide * .065f, physicalEdge))
+         shader.setFloatUniform("edgePx", min(shortSide * .065f, physicalEdge))
         shader.setFloatUniform("reflection", reflection.coerceIn(0f, 1f))
+        shader.setFloatUniform("drag", drag.x, drag.y)
+        // Scale down multi-tap blur/dispersion for large full-width overlays:
+        // keep optical displacement while avoiding a 7-sample fullscreen pass.
+        val highCost = width * height > 430_000f
+        shader.setFloatUniform("blurPx",
+            if (highCost) 0f else min(shortSide * .026f,
+                with(density) { if (tier == SyMaterialTier.L4_OVERLAY) 2.4.dp.toPx() else 1.6.dp.toPx() }))
+        shader.setFloatUniform("chromaPx",
+            if (highCost) 0f else min(shortSide * .003f,
+                with(density) { .8.dp.toPx() }))
+        shader.setFloatUniform("clarity", when (tier) {
+            SyMaterialTier.L2_BAR -> .66f
+            SyMaterialTier.L4_OVERLAY -> .46f
+            else -> .40f
+        })
         shader.setColorUniform("glassTint", fill.toArgb())
         renderEffect = effect
         }) {

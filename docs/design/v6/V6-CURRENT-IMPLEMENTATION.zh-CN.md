@@ -159,3 +159,12 @@
 `SyLiveGlassScene.kt` 以 `underlay`（实际背景页面）和 `glass`（浮动控件）两个明确图层构成：前者由 `rememberGraphicsLayer` / `drawWithContent` 在 GPU 显示列表中逐帧记录一次，后者从同一 GPU 图层读取已渲染的文字或图像，在 AGSL 中做逐像素折射。两层互不包含，避免玻璃反射被再次采样出现无限重影。尺寸、窗口坐标同步更新，手动滑动镜片会改变覆盖的字符。默认材质优先选择此共享画面，其次才是同坐标壁纸；跨窗口对话框继续取壁纸，避免跨窗口 RenderNode 误用。
 
 调试组件实验室的「04 手势」使用这条共享 GPU 渲染链路，支持滑动镜片和刷新底层文字；`SyLiquidRefractionAndroidTest` 增加了真实同级图层像素变化验证，并纳入设备端 UI 自动巡检。
+
+## 2026-11-19 · 聊天与工作实际消息层接入和高级光学统一
+
+- 原生共用的 `LocalConversationSurface` 已将实际 `LazyColumn` 消息列表作为 `SyLiveGlassScene.underlay`，将滚动定位浮钮放入 `glass`。滚动中的文本实时参与折射；提示隐藏时关闭全列表 GPU 图层记录。两种模式走同一入口，避免各自复制一次绘制逻辑。
+- `ConversationScrollShortcut` 改用 L4 统一圆形液态材质，外层继续保留 48dp 的点击区域。减少动效时，进出场动画直接到最终状态。磨砂黑依照主题策略保持实心。
+- AGSL 将局部折射、轻柔化、轻微色散、边缘菲涅耳反射与触点方向性压缩放入同一渲染器。边缘雾化最多为少量邻域采样，主阅读区保持高对比；大于 43 万像素的覆盖面停用额外邻域采样以控制 GPU 成本，仍保留单次像素位移。
+- `SyLiquidRefractionAndroidTest` 对新增的 blurPx/clarity/drag uniform 做实际 RuntimeShader 建立验证；完整 UI 回归仍以 Android 36/37 的 CI、真实截图和帧率审计为准。
+
+视觉技能审查重点：真实文本在玻璃边缘应有明确但不过火的局部位移，文字本身锐利；点击反馈快速而可中断；典雅白清澈、磨砂黑低反射；实际滚动时不能因阴影或泛白丧失内容层次。

@@ -44,6 +44,7 @@ internal val LocalSyLiveGlassBacking =
 @Composable
 fun SyLiveGlassScene(
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     underlay: @Composable BoxScope.() -> Unit,
     glass: @Composable BoxScope.() -> Unit,
 ) {
@@ -67,16 +68,20 @@ fun SyLiveGlassScene(
                     if (viewport != coordinates.size) viewport = coordinates.size
                 }
                 .drawWithContent {
-                    graphicsLayer.record {
-                        this@drawWithContent.drawContent()
+                    if (enabled) {
+                        graphicsLayer.record {
+                            this@drawWithContent.drawContent()
+                        }
+                        drawLayer(graphicsLayer)
+                    } else {
+                        drawContent()
                     }
-                    drawLayer(graphicsLayer)
                 },
         ) { underlay() }
         val backing = remember(graphicsLayer, origin, viewport, rootView) {
             SyLiveGlassBacking(graphicsLayer, origin, viewport, rootView)
         }
-        CompositionLocalProvider(LocalSyLiveGlassBacking provides backing) {
+        CompositionLocalProvider(LocalSyLiveGlassBacking provides backing.takeIf { enabled }) {
             glass()
         }
     }
