@@ -11,7 +11,7 @@ import com.shenyan.designsystem.foundation.SyColors
 
 /**
  * One optical policy shared by all native Shenyan material surfaces.
- * Matte-black and readable solid surfaces never run a glass rendering pass.
+ * Light and matte palettes refract translucent chrome; solid reading surfaces remain stable.
  */
 internal data class SyGlassOptics(
     val glass: Boolean,
@@ -33,8 +33,7 @@ internal fun syGlassOptics(
         SyMaterialTier.L3_CARD -> 1.dp
         SyMaterialTier.L4_OVERLAY -> 16.dp
     }
-    // Only the white theme's translucent chrome gets optical depth.
-    // A fully opaque sampled fill or the system's reduced transparency is a solid.
+    // The optical policy is theme-independent: only solid and accessible surfaces skip it.
     val glass = colors.materialL3.alpha < 1f &&
         fill.alpha < 0.999f &&
         !reduceTransparency &&
@@ -54,7 +53,8 @@ internal fun syGlassOptics(
 
 /** Optical chrome uses a thinner veil than the corresponding flat reading surface. */
 internal fun syLiquidTint(fill: Color, tint: Color): Color {
-    val clearFill = fill.copy(alpha = fill.alpha * .36f)
+    // Preserve legibility over vivid photos while still showing the actual sampled pixels.
+    val clearFill = fill.copy(alpha = (fill.alpha * .74f).coerceIn(.24f, .74f))
     return if (tint.isSpecified) {
         lerp(clearFill, tint.copy(alpha = clearFill.alpha), tint.alpha.coerceAtMost(.16f))
     } else clearFill
