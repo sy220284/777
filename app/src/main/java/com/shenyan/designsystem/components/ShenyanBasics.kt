@@ -108,22 +108,7 @@ fun SyButton(
         SyButtonStyle.DANGER -> com.shenyan.designsystem.foundation.syReadableInk(c.text, fill)
         else -> c.text
     }
-    Surface(
-        onClick = onClick,
-        enabled = enabled && !loading,
-        interactionSource = interaction,
-        modifier = modifier.sizeIn(minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch))
-            .scale(scale).semantics { if (loading) stateDescription = "正在处理" },
-        color = fill,
-        contentColor = foreground,
-        shape = RoundedCornerShape(SyMetric.radiusControl),
-        border = when {
-            focused && enabled && !loading -> BorderStroke(1.dp, c.linkInk)
-            style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE || style == SyButtonStyle.INFO ->
-                BorderStroke(1.dp, c.border)
-            else -> null
-        },
-    ) {
+    val buttonBody: @Composable () -> Unit = {
         Row(
             Modifier.padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 11.dp),
             horizontalArrangement = Arrangement.Center,
@@ -141,6 +126,37 @@ fun SyButton(
                     style = if (compact) MaterialTheme.typography.labelMedium else LocalTextStyle.current)
             }
         }
+    }
+    val buttonShape = RoundedCornerShape(SyMetric.radiusControl)
+    val buttonBorder = when {
+        focused && enabled && !loading -> BorderStroke(1.dp, c.linkInk)
+        style == SyButtonStyle.SECONDARY || style == SyButtonStyle.OUTLINE || style == SyButtonStyle.INFO ->
+            BorderStroke(1.dp, c.border)
+        else -> null
+    }
+    val buttonModifier = modifier.sizeIn(
+        minWidth = SyMetric.touch, minHeight = height.coerceAtLeast(SyMetric.touch),
+    ).semantics { if (loading) stateDescription = "正在处理" }
+    if (style == SyButtonStyle.SECONDARY || style == SyButtonStyle.INFO || style == SyButtonStyle.OUTLINE) {
+        SyMaterialSurface(
+            onClick = onClick, enabled = enabled && !loading,
+            modifier = buttonModifier, interactionSource = interaction,
+            tier = SyMaterialTier.L2_BAR,
+            tint = if (style == SyButtonStyle.INFO) c.primary.copy(alpha = .16f) else Color.Unspecified,
+            contentColor = foreground, shape = buttonShape,
+            border = buttonBorder,
+        ) { buttonBody() }
+    } else {
+        Surface(
+            onClick = onClick,
+            enabled = enabled && !loading,
+            interactionSource = interaction,
+            modifier = buttonModifier.scale(scale),
+            color = fill,
+            contentColor = foreground,
+            shape = buttonShape,
+            border = buttonBorder,
+        ) { buttonBody() }
     }
 }
 
@@ -170,14 +186,14 @@ fun SyTabs(tabs: List<SyOption>, selectedId: String, onSelect: (String) -> Unit,
                 if (tab.id == selectedId) c.selected else syMaterialColor(SyMaterialTier.L2_BAR),
                 tween(SyMotion.duration(SyMotion.selectMs, LocalSyReduceMotion.current, LocalSyMotionTempo.current)), label = "tabSelection",
             )
-            Surface(onClick = { onSelect(tab.id) }, enabled = tab.enabled,
+            SyMaterialSurface(onClick = { onSelect(tab.id) }, enabled = tab.enabled,
                 modifier = Modifier.heightIn(min = SyMetric.touch).semantics {
                     selected = tab.id == selectedId
                     role = Role.Tab
                 },
+                tier = SyMaterialTier.L3_CARD,
                 shape = RoundedCornerShape(SyMetric.radiusControl),
-                color = fill,
-                border = BorderStroke(1.dp, c.border)) {
+                tint = if (tab.id == selectedId) fill.copy(alpha = .16f) else Color.Unspecified) {
                 Box(Modifier.padding(horizontal = 15.dp, vertical = 11.dp), contentAlignment = Alignment.Center) {
                     Text(tab.label, color = c.text)
                 }
