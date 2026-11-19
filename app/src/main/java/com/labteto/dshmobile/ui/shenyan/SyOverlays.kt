@@ -394,7 +394,7 @@ fun SyConversationActionPopup(
     val configuration = LocalConfiguration.current
     val shortcutCount = primaryActionCount.coerceIn(0, items.size)
     val hasShortcutGrid = shortcutCount >= 2
-    val desiredWidth = if (hasShortcutGrid) 240.dp else 206.dp
+    val desiredWidth = if (hasShortcutGrid) 224.dp else 206.dp
     val popupWidth = desiredWidth.coerceAtMost(
         (configuration.screenWidthDp.dp - 20.dp).coerceAtLeast(1.dp),
     )
@@ -423,10 +423,10 @@ fun SyConversationActionPopup(
         ) {
             SyMaterialSurface(
                 modifier = Modifier.width(popupWidth).testTag("conversation-action-popup"),
-                shape = RoundedCornerShape(15.dp),
+                shape = RoundedCornerShape(14.dp),
                 tier = SyMaterialTier.L4_OVERLAY,
                 border = BorderStroke(1.dp, palette.border.copy(alpha = .48f)),
-                shadowElevation = 9.dp,
+                shadowElevation = 8.dp,
             ) {
                 Column(
                     Modifier.heightIn(max = maxHeight)
@@ -444,9 +444,9 @@ fun SyConversationActionPopup(
                                 pair.forEach { item ->
                                     Column(
                                         modifier = Modifier.weight(1f)
-                                            .heightIn(min = 62.dp)
+                                            .heightIn(min = 56.dp)
                                             .clip(RoundedCornerShape(10.dp))
-                                            .background(palette.text.copy(alpha = .045f))
+                                            .background(palette.text.copy(alpha = .025f))
                                             .clickable {
                                                 onDismiss()
                                                 item.onClick()
