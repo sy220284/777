@@ -61,6 +61,16 @@ class ConversationMenuPositionTest {
         assertEquals(94, result.y)
     }
 
+    @Test fun drawerRemainsInsideItsRowWhenItFits() {
+        val drawer = IntRect(10, 150, 310, 200)
+        val result = contextActionMenuPosition(
+            drawer, popup, IntRect(8, 8, 392, 892), LayoutDirection.Ltr,
+            IntOffset(304, 178), 8, stayWithinAnchor = true,
+        )
+        assertEquals(82, result.offset.x)
+        assertEquals(186, result.offset.y)
+    }
+
     @Test fun oversizedMenuAndNarrowViewportNeverProduceNegativeCoordinates() {
         val result = position(
             anchor = IntRect(0, 40, 180, 100),

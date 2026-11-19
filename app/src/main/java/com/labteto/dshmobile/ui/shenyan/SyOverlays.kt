@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -71,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -308,15 +310,21 @@ internal fun contextActionMenuPosition(
     direction: LayoutDirection,
     touchAnchor: IntOffset?,
     gap: Int,
+    stayWithinAnchor: Boolean = false,
 ): ContextMenuPlacement {
-    val maxX = (viewport.right - popup.width).coerceAtLeast(viewport.left)
+    val anchorLeft = maxOf(viewport.left, anchor.left + gap)
+    val anchorRight = minOf(viewport.right, anchor.right - gap)
+    val fitsAnchor = stayWithinAnchor && anchorRight - anchorLeft >= popup.width
+    val minX = if (fitsAnchor) anchorLeft else viewport.left
+    val right = if (fitsAnchor) anchorRight else viewport.right
+    val maxX = (right - popup.width).coerceAtLeast(minX)
     val maxY = (viewport.bottom - popup.height).coerceAtLeast(viewport.top)
     val alignedX = when (direction) {
         LayoutDirection.Ltr -> anchor.right - popup.width
         LayoutDirection.Rtl -> anchor.left
     }
     val x = (touchAnchor?.let { it.x - popup.width / 2 } ?: alignedX)
-        .coerceIn(viewport.left, maxX)
+        .coerceIn(minX, maxX)
     val originTop = touchAnchor?.y ?: anchor.top
     val originBottom = touchAnchor?.y ?: anchor.bottom
     val below = originBottom + gap
@@ -337,6 +345,7 @@ fun SyContextActionMenu(
     items: List<SyMenuItem>,
     touchAnchor: IntOffset? = null,
     primaryActionCount: Int = 0,
+    stayWithinAnchor: Boolean = false,
 ) {
     val visibility = remember { MutableTransitionState(false) }
     val open = expanded && items.isNotEmpty()
@@ -364,9 +373,15 @@ fun SyContextActionMenu(
     val window = LocalWindowInfo.current.containerSize
     val maxWidth = with(density) { (window.width - left - right).toDp() }.coerceAtLeast(1.dp)
     val maxHeight = with(density) { (window.height - top - bottom).toDp() }.coerceAtLeast(1.dp)
-    val width = minOf(maxWidth, if (density.fontScale >= 1.3f) 220.dp else 184.dp)
+    val gridCount = if (primaryActionCount >= 2 && maxWidth >= 208.dp && density.fontScale < 1.3f)
+        primaryActionCount else 0
+    val width = minOf(maxWidth, when {
+        gridCount > 0 -> 208.dp
+        density.fontScale >= 1.3f -> 220.dp
+        else -> 184.dp
+    })
     val origin = remember { mutableStateOf(TransformOrigin(.5f, 0f)) }
-    val provider = remember(touchAnchor, left, top, right, bottom, margin) {
+    val provider = remember(touchAnchor, left, top, right, bottom, margin, stayWithinAnchor) {
         object : PopupPositionProvider {
             override fun calculatePosition(
                 anchorBounds: IntRect,
@@ -377,7 +392,7 @@ fun SyContextActionMenu(
                 val bounds = IntRect(left, top, maxOf(left, windowSize.width - right),
                     maxOf(top, windowSize.height - bottom))
                 val placement = contextActionMenuPosition(
-                    anchorBounds, popupContentSize, bounds, layoutDirection, touchAnchor, margin,
+                    anchorBounds, popupContentSize, bounds, layoutDirection, touchAnchor, margin, stayWithinAnchor,
                 )
                 val anchorX = touchAnchor?.x ?: anchorBounds.center.x
                 val fraction = (anchorX - placement.offset.x).toFloat() / maxOf(1, popupContentSize.width)
@@ -417,34 +432,70 @@ fun SyContextActionMenu(
                 border = BorderStroke(1.dp, palette.border),
             ) {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(4.dp)) {
-                    items.forEachIndexed { index, item ->
-                        if (index > 0 && (index == primaryActionCount || item.danger && !items[index - 1].danger)) {
+                    if (gridCount > 0) {
+                        Column(Modifier.testTag("conversation-action-shortcuts")) {
+                            items.take(gridCount).chunked(2).forEach { row ->
+                                Row(Modifier.fillMaxWidth()) {
+                                    row.forEach { item ->
+                                        ContextMenuAction(
+                                            item, open, onDismiss, Modifier.weight(1f), iconAbove = true,
+                                        )
+                                    }
+                                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                    items.drop(gridCount).forEachIndexed { index, item ->
+                        val position = gridCount + index
+                        if (position > 0 && (position == primaryActionCount ||
+                                item.danger && !items[position - 1].danger)) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = SyMetric.gapMd, vertical = 2.dp),
                                 color = palette.border,
                             )
                         }
-                        val ink = if (item.danger) palette.dangerInk else palette.text
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .heightIn(min = SyMetric.touch)
-                                .clip(RoundedCornerShape(SyMetric.radiusSm))
-                                .clickable(enabled = open) { onDismiss(); item.onClick() }
-                                .testTag("menu-item:" + item.text)
-                                .padding(horizontal = SyMetric.gapMd, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
-                        ) {
-                            item.icon?.let {
-                                Icon(it, contentDescription = null, modifier = Modifier.size(18.dp),
-                                    tint = if (item.danger) ink else palette.textSecondary)
-                            }
-                            Text(item.text, color = ink, style = MaterialTheme.typography.bodyMedium)
-                        }
+                        ContextMenuAction(item, open, onDismiss, Modifier.fillMaxWidth())
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ContextMenuAction(
+    item: SyMenuItem,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier,
+    iconAbove: Boolean = false,
+) {
+    val palette = LocalSyColors.current
+    val ink = if (item.danger) palette.dangerInk else palette.text
+    val action = modifier.heightIn(min = SyMetric.touch)
+        .clip(RoundedCornerShape(SyMetric.radiusSm))
+        .clickable(enabled = enabled) { onDismiss(); item.onClick() }
+        .testTag("menu-item:" + item.text)
+    val content: @Composable () -> Unit = {
+        item.icon?.let {
+            Icon(it, contentDescription = null, modifier = Modifier.size(18.dp),
+                tint = if (item.danger) ink else palette.textSecondary)
+        }
+        Text(item.text, color = ink,
+            style = if (iconAbove) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
+            textAlign = if (iconAbove) TextAlign.Center else TextAlign.Start)
+    }
+    if (iconAbove) {
+        Column(action.padding(horizontal = SyMetric.gapXs, vertical = SyMetric.gapSm),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(SyMetric.gapXs, Alignment.CenterVertically),
+        ) { content() }
+    } else {
+        Row(action.padding(horizontal = SyMetric.gapMd, vertical = SyMetric.gapSm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
+        ) { content() }
     }
 }
 

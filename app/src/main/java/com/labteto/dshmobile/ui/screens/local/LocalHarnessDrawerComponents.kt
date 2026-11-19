@@ -359,6 +359,7 @@ internal fun LocalSessionDrawerRow(
         SyContextActionMenu(
             expanded = menuOpen,
             touchAnchor = menuAnchor,
+            stayWithinAnchor = true,
             onDismiss = { menuOpen = false },
             items = listOf(
                 SyMenuItem(
