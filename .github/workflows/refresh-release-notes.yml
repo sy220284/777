@@ -1,0 +1,62 @@
+name: Refresh published release notes
+
+'on':
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/generate-release-notes.py'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/refresh-release-notes.yml'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-notes-refresh-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  refresh-latest:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Refresh latest published release notes when using old format
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RELEASE_TAGS="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')"
+          TAGS="$(printf '%s\n' "$RELEASE_TAGS" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-777\.[0-9]+$' | sort -V || true)"
+          LATEST_TAG="$(printf '%s\n' "$TAGS" | sed '/^$/d' | tail -n 1)"
+          PREVIOUS_TAG="$(printf '%s\n' "$TAGS" | sed '/^$/d' | tail -n 2 | head -n 1)"
+          if [ -z "$LATEST_TAG" ] || [ -z "$PREVIOUS_TAG" ] || [ "$LATEST_TAG" = "$PREVIOUS_TAG" ]; then
+            echo "没有可供比较的连续正式版本，跳过更新说明同步"
+            exit 0
+          fi
+
+          RELEASE_JSON="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$LATEST_TAG")"
+          if ! printf '%s' "$RELEASE_JSON" | jq -e '(.body // "") | (contains("## 安装要求") or contains("## What\u0027s Changed"))' >/dev/null; then
+            echo "最新版已使用简洁说明或人工内容，不覆盖"
+            exit 0
+          fi
+
+          python3 -m unittest discover -s .github/scripts -p 'test_generate_release_notes.py'
+          python3 .github/scripts/generate-release-notes.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "$PREVIOUS_TAG" \
+            --head "$LATEST_TAG" \
+            --output "$RUNNER_TEMP/release-notes.md"
+
+          RELEASE_ID="$(printf '%s' "$RELEASE_JSON" | jq -r '.id')"
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            -f body="$(cat "$RUNNER_TEMP/release-notes.md")" >/dev/null
+
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            --jq '.body' | grep -Fq '## 本次更新'
+          echo "::notice::已为 $LATEST_TAG 更新中文版本说明"
