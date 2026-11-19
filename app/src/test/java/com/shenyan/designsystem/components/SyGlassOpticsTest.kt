@@ -5,6 +5,9 @@ import androidx.compose.ui.geometry.Offset
 import java.util.ArrayDeque
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.ShenyanPalettes
+import com.shenyan.designsystem.foundation.SySceneBackdrop
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,6 +39,8 @@ class SyGlassOpticsTest {
         assertTrue(syShouldRefract(SyMaterialTier.L2_BAR, 0, false))
         assertTrue(syShouldRefract(SyMaterialTier.L4_OVERLAY, 0, false))
         assertFalse(syShouldRefract(SyMaterialTier.L3_CARD, 0, false))
+        assertTrue(syShouldRefract(SyMaterialTier.L3_CARD, 0, false, interactive = true))
+        assertFalse(syShouldRefract(SyMaterialTier.L3_CARD, 1, false, interactive = true))
         assertFalse(syShouldRefract(SyMaterialTier.L2_BAR, 1, false))
         assertTrue(syShouldRefract(SyMaterialTier.L3_CARD, 1, true))
         assertFalse(syShouldRefract(SyMaterialTier.L5_SOLID, 0, false))
@@ -49,18 +54,28 @@ class SyGlassOpticsTest {
         val fill = Color(0xF7FFFFFF)
         val clear = syLiquidTint(fill, Color.Unspecified)
         val accented = syLiquidTint(fill, Color(0xFFAACCFF))
-        assertTrue(clear.alpha < .4f)
+        assertTrue(clear.alpha in .65f.. .74f)
         assertEquals(clear.alpha, accented.alpha, .002f)
         assertTrue(accented.red < clear.red)
     }
 
-    @Test fun matteBlackNeverUsesGlassOptics() {
-        for (tier in SyMaterialTier.entries) {
-            val style = syGlassOptics(ShenyanPalettes.matte, tier,
-                Color(0xFF29292B), false, 0, true)
-            assertFalse(style.glass)
-            assertEquals(0f, style.reflection)
+    @Test fun matteChromeAndOverlayRefractWhileSolidReadingAreasStayOpaque() {
+        val dark = ShenyanPalettes.matte
+        for (tier in listOf(SyMaterialTier.L2_BAR, SyMaterialTier.L3_CARD, SyMaterialTier.L4_OVERLAY)) {
+            val fill = when (tier) {
+                SyMaterialTier.L2_BAR -> dark.materialL2
+                SyMaterialTier.L3_CARD -> dark.materialL3
+                else -> dark.materialL4
+            }
+            val optics = syGlassOptics(dark, tier, fill, false, 0, true)
+            assertTrue("Matte $tier should retain glass optics", optics.glass)
+            assertEquals(0.dp, optics.elevation)
         }
+        for (tier in listOf(SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID)) {
+            assertFalse(syGlassOptics(dark, tier, dark.materialL5, false, 0, true).glass)
+        }
+        assertFalse(syGlassOptics(dark, SyMaterialTier.L2_BAR,
+            dark.materialL2, true, 0, true).glass)
     }
 
     @Test fun reducedTransparencyNoSceneOpaqueFillsAndNonGlassTiersStaySolid() {
@@ -100,4 +115,40 @@ class SyGlassOpticsTest {
             assertEquals(0.dp, style.elevation)
         }
     }
+    @Test fun globalGlassStaysOpticallyActiveAcrossSolidAndWallpaperColors() {
+        val backgrounds = listOf(
+            Color.White,
+            Color.Black,
+            Color(0xFFBA4A31),
+            Color(0xFF22655B),
+            Color(0xFFFFD24D),
+            Color(0xFF353C7F),
+        )
+        for (palette in listOf(ShenyanPalettes.light, ShenyanPalettes.matte)) {
+            for (background in backgrounds) {
+                val scene = SySceneBackdrop(
+                    viewportOrigin = IntOffset.Zero,
+                    viewportSize = IntSize(412, 915),
+                    canvas = palette.canvas,
+                    image = null,
+                    regionColors = listOf(background, background, background),
+                    regionExtremes = listOf(
+                        listOf(background, background),
+                        listOf(background, background),
+                        listOf(background, background),
+                    ),
+                    surfaceTransparency = .5f,
+                )
+                for (tier in listOf(SyMaterialTier.L2_BAR, SyMaterialTier.L3_CARD, SyMaterialTier.L4_OVERLAY)) {
+                    val fill = syResolveMaterialFill(palette, tier, scene)
+                    assertTrue("Glass should remain translucent for $background / $tier", fill.alpha < 1f)
+                    assertTrue("Optics disabled on $background / $tier",
+                        syGlassOptics(palette, tier, fill, false, 0, true).glass)
+                }
+                assertEquals(1f,
+                    syResolveMaterialFill(palette, SyMaterialTier.L5_SOLID, scene).alpha, .0001f)
+            }
+        }
+    }
+
 }
