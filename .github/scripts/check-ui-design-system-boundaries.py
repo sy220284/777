@@ -152,6 +152,12 @@ if "SySceneBackgroundSurface(" not in mask_non_code(background_host):
     violations.append("theme/AppBackground.kt: root is no longer using the shared scene painter")
 
 # V6 hardening: prevent deleted visual APIs and retired design references from returning.
+# Migration ratchet: the actively used Ds text/shape/motion/layout/theme APIs have
+# moved to Sy. New production UI must consume the current Shenyan vocabulary.
+# Match identifiers in Kotlin code only; allow documentation and historical storage keys.
+RETIRED_VISUAL_TOKEN = re.compile(
+    r"\\b(?:LocalDs(?:Colors|ReadingPreferences)|Ds(?:Type|Shapes|MaterialShapes|Metrics|Animations|Colors|ThemeTokens|Theme|ReadingPreferences|Typography|Light|Dark)|dsTypography)\\b"
+)
 RETIRED_DRAWING_CALL = re.compile(
     r"\bDs(?:Button|Card|Segmented|Checkbox|BottomSheet|SearchField|ToastHost|TopBar|ProgressBar)\s*\("
 )
@@ -163,6 +169,10 @@ for path in UI.rglob("*.kt"):
     source = mask_non_code(path.read_text(encoding="utf-8"))
     for match in RETIRED_DRAWING_CALL.finditer(source):
         violations.append(f"{relative}: retired Ds drawing component {match.group(0)}")
+    for match in RETIRED_VISUAL_TOKEN.finditer(source):
+        line = source.count("\\n", 0, match.start()) + 1
+        violations.append(f"{relative}:{line}: retired Ds visual token {match.group(0)} -> migrate to Sy")
+
     if re.search(r"\bDsTheme\.colors\b", source):
         actual.add(relative)
     if re.search(r"\bDsSpacing\b", source):
