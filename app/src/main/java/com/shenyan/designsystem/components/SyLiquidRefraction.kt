@@ -122,7 +122,8 @@ internal object SyLiquidShader {
             // This adapts PER PIXEL without an extra GPU sampling pass.
             float sourceLuma = dot(refracted, half3(0.2126, 0.7152, 0.0722));
             float materialLuma = dot(glassTint.rgb, half3(0.2126, 0.7152, 0.0722));
-            float mismatch = smoothstep(0.22, 0.70, abs(sourceLuma - materialLuma));
+            float mismatch = smoothstep(0.22, 0.70, abs(sourceLuma - materialLuma)) *
+                smoothstep(0.01, 0.16, float(glassTint.a));
             float protectiveAlpha = mix(float(glassTint.a), max(float(glassTint.a), 0.88), mismatch);
             float tintAlpha = protectiveAlpha * (1.0 - clarity * rim * 0.65);
             half3 colour = mix(refracted, glassTint.rgb, half(tintAlpha));
