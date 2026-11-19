@@ -13,6 +13,8 @@ name: Android 能力契约回归
       - 'tools/ui/**'
       - 'tools/ci/run_prebuilt_android_tests.py'
       - 'tools/ci/test_run_prebuilt_android_tests.py'
+      - 'tools/ci/select_android_checks.py'
+      - 'tools/ci/test_select_android_checks.py'
       - 'tools/runtime/**'
       - 'tools/fonts/**'
       - 'gradle/**'
@@ -34,6 +36,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan:
+    name: 识别需要执行的设备检查
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.select.outputs.ui }}
+      market: ${{ steps.select.outputs.market }}
+      migration: ${{ steps.select.outputs.migration }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - id: select
+        name: 根据实际变更选择设备测试组
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 tools/ci/select_android_checks.py
+
   shared-tests:
     name: 共享模块与 Android 能力契约测试
     runs-on: ubuntu-latest
@@ -48,8 +68,10 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
-      - name: 检查设备测试执行器与报告解析
-        run: python3 -m unittest discover -s tools/ci -p 'test_run_prebuilt_android_tests.py' -v
+      - name: 检查设备执行器、报告解析与测试范围选择
+        run: |
+          python3 -m unittest discover -s tools/ci -p 'test_run_prebuilt_android_tests.py' -v
+          python3 -m unittest discover -s tools/ci -p 'test_select_android_checks.py' -v
       - name: 共享运行时、MCP、进程隔离与设备契约全量单测
         run: ./gradlew --max-workers=2 :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :reference-validation:test --stacktrace --console=plain
 
@@ -94,7 +116,8 @@ jobs:
           retention-days: 7
 
   user-journey:
-    needs: android-apks
+    needs: [plan, android-apks]
+    if: needs.plan.outputs.ui == 'true'
     name: Android ${{ matrix.android.api }} 聊天工作权限与结果展示实测
     strategy:
       fail-fast: false
@@ -159,7 +182,8 @@ jobs:
           retention-days: 30
 
   extension-device:
-    needs: android-apks
+    needs: [plan, android-apks]
+    if: needs.plan.outputs.market == 'true'
     name: Android 36 插件凭据与扩展市场交互实测
     runs-on: ubuntu-latest
     timeout-minutes: 65
@@ -211,7 +235,8 @@ jobs:
           retention-days: 30
 
   session-migration:
-    needs: android-apks
+    needs: [plan, android-apks]
+    if: needs.plan.outputs.migration == 'true'
     name: Android 36 SQLite 迁移与附件完整性实测
     runs-on: ubuntu-latest
     timeout-minutes: 65
@@ -262,7 +287,7 @@ jobs:
   required:
     name: Android 完整验收门禁
     if: always()
-    needs: [shared-tests, android-apks, user-journey, extension-device, session-migration]
+    needs: [plan, shared-tests, android-apks, user-journey, extension-device, session-migration]
     runs-on: ubuntu-latest
     steps:
       - name: 逐项核对所有测试结果
@@ -274,8 +299,19 @@ jobs:
           results = json.loads(os.environ["RESULTS_JSON"])
           for name, item in sorted(results.items()):
               print(f"{name}: {item['result']}")
-          failures = [name for name, item in results.items() if item['result'] != 'success']
+          chosen = results['plan']['outputs']
+          conditional = {
+              'user-journey': chosen.get('ui') == 'true',
+              'extension-device': chosen.get('market') == 'true',
+              'session-migration': chosen.get('migration') == 'true',
+          }
+          failures = []
+          for name, item in results.items():
+              if name in conditional and not conditional[name] and item['result'] == 'skipped':
+                  continue
+              if item['result'] != 'success':
+                  failures.append(name)
           if failures:
               sys.exit("Android 验收未完成：" + ", ".join(failures))
-          print("共享模块、JVM、APK、Android 36/37、插件与迁移回归全部通过")
+          print("所有本次需要执行的测试均已真实通过")
           PY
