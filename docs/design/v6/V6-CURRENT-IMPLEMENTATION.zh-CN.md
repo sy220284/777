@@ -168,3 +168,7 @@
 - `SyLiquidRefractionAndroidTest` 对新增的 blurPx/clarity/drag uniform 做实际 RuntimeShader 建立验证；完整 UI 回归仍以 Android 36/37 的 CI、真实截图和帧率审计为准。
 
 视觉技能审查重点：真实文本在玻璃边缘应有明确但不过火的局部位移，文字本身锐利；点击反馈快速而可中断；典雅白清澈、磨砂黑低反射；实际滚动时不能因阴影或泛白丧失内容层次。
+
+## 2026-11-19 · 设备失败回溯：修正光学输入
+
+发现历史 Android 36 设备日志中的 `SyLiquidRefractionAndroidTest.lensSamplesLiveBackdropOnItsOwnGpuLayer` 失败：原记录层与应用 RenderEffect 的图层分离，背景变化后捕获的像素保持白色。已将光学处理改为单一 `graphicsLayer(renderEffect)` 直接包裹实时 `backdrop()`：RenderEffect 的 `source` 即该 GraphicsLayer 的真实子内容，每次源重绘都由 Compose 自身处理，无独立帧缓存和双录制层失配。同时新增黑白条纹边缘位移设备测试，分别排除“只出现白底”和“没有真的折射”的假阳性。验收需以本次修复后的设备回归结果确认。

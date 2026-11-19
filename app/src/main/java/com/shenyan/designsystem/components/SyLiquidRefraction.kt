@@ -2,12 +2,8 @@ package com.shenyan.designsystem.components
 
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
-import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -168,19 +164,12 @@ internal fun SyLiquidRefractionLayer(
         RenderEffect.createRuntimeShaderEffect(shader, SyLiquidShader.INPUT)
             .asComposeRenderEffect()
     }
-    // Record underlay once as a GPU display list. Android RenderEffect only receives
-    // pixels explicitly drawn into its layer; direct composable children can become
-    // flattened/opaque under the host Surface and lose live source updates.
-    val sourceLayer = rememberGraphicsLayer()
-    Box(modifier) {
-        Box(
-            Modifier.matchParentSize().drawWithContent {
-                sourceLayer.record { this@drawWithContent.drawContent() }
-                // The source is owned by the lens renderer; never draw the unfiltered
-                // copy here or pixel-diff tests could pass without real refraction.
-            },
-        ) { backdrop() }
-        Canvas(Modifier.matchParentSize().graphicsLayer {
+    // The RenderEffect input must be the pixels of THIS graphicsLayer.
+    // Previous code recorded the backdrop into a separate GPU layer and
+    // tried to draw that layer through an unrelated Canvas: the explicit
+    // backdrop test stayed white even when its content changed.
+    // A single offscreen graphicsLayer owns the real live child rendering.
+    Box(modifier.graphicsLayer {
         val width = size.width.coerceAtLeast(2f)
         val height = size.height.coerceAtLeast(2f)
         val layoutSize = Size(width, height)
@@ -205,7 +194,7 @@ internal fun SyLiquidRefractionLayer(
         val physicalBend = with(density) { 4.dp.toPx() }
         val physicalEdge = with(density) { 6.dp.toPx() }
         shader.setFloatUniform("bendPx", min(shortSide * .07f, physicalBend))
-         shader.setFloatUniform("edgePx", min(shortSide * .065f, physicalEdge))
+        shader.setFloatUniform("edgePx", min(shortSide * .065f, physicalEdge))
         shader.setFloatUniform("reflection", reflection.coerceIn(0f, 1f))
         shader.setFloatUniform("drag", drag.x, drag.y)
         // Scale down multi-tap blur/dispersion for large full-width overlays:
@@ -224,8 +213,7 @@ internal fun SyLiquidRefractionLayer(
         })
         shader.setColorUniform("glassTint", fill.toArgb())
         renderEffect = effect
-        }) {
-            drawLayer(sourceLayer)
-        }
+    }) {
+        backdrop()
     }
 }

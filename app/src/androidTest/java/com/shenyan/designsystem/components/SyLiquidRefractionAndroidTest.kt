@@ -71,6 +71,60 @@ class SyLiquidRefractionAndroidTest {
         assertNotEquals("A separate underlying GPU layer must remain live", firstColor, secondColor)
     }
 
+    @Test fun gpuRefractionTransformsActualEdgePixels() {
+        var showLens by mutableStateOf(false)
+        val stripes: @androidx.compose.runtime.Composable () -> Unit = {
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val stripeWidth = 3.dp.toPx()
+                var x = 0f
+                var index = 0
+                while (x < size.width) {
+                    drawRect(
+                        if (index % 2 == 0) Color.Black else Color.White,
+                        topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
+                        size = androidx.compose.ui.geometry.Size(stripeWidth, size.height),
+                    )
+                    x += stripeWidth
+                    index++
+                }
+            }
+        }
+        compose.setContent {
+            Box(Modifier.size(width = 220.dp, height = 126.dp)
+                .background(Color.White).testTag("optical-pixel-pattern")) {
+                if (showLens) {
+                    SyLiquidRefractionLayer(
+                        modifier = Modifier.fillMaxSize(),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                        fill = Color.Transparent,
+                        tier = SyMaterialTier.L2_BAR,
+                        reflection = 0f,
+                        touchPoint = androidx.compose.ui.geometry.Offset.Zero,
+                        pressure = 0f,
+                        backdrop = stripes,
+                    )
+                } else stripes()
+            }
+        }
+        compose.waitForIdle()
+        val plain = compose.onNodeWithTag("optical-pixel-pattern")
+            .captureToImage().toPixelMap()
+        compose.runOnIdle { showLens = true }
+        compose.waitForIdle()
+        val shaped = compose.onNodeWithTag("optical-pixel-pattern")
+            .captureToImage().toPixelMap()
+        val mid = shaped.height / 2
+        // The interior still contains BOTH black and white stripes; a blank
+        // effect buffer or white material fill cannot satisfy this assertion.
+        val interior = (shaped.width / 3 .. shaped.width * 2 / 3)
+            .map { x -> shaped[x, mid].red }
+        assertTrue("The refracted source must retain actual high-frequency glyph-like pixels",
+            interior.minOrNull()!! < .45f && interior.maxOrNull()!! > .65f)
+        val changedAtRim = (3 until minOf(shaped.width / 8, 35))
+            .count { x -> plain[x, mid] != shaped[x, mid] }
+        assertTrue("The optical rim must truly move source pixels", changedAtRim > 3)
+    }
+
     @Test fun lensSamplesLiveBackdropOnItsOwnGpuLayer() {
         var source by mutableStateOf(Color(0xFFCC3322))
         compose.setContent {
