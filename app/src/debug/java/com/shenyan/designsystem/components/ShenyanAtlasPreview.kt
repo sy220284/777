@@ -58,6 +58,7 @@ import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.theme.ThemePreference
 import com.labteto.dshmobile.ui.theme.AccentPalettes
 import com.shenyan.designsystem.foundation.SyOption
+import com.shenyan.designsystem.foundation.SyPhase
 import kotlinx.coroutines.launch
 
 /**
@@ -158,18 +159,42 @@ private fun AtlasBasics() {
     var checked by remember { mutableStateOf(true) }
     var slider by remember { mutableFloatStateOf(.34f) }
     var tab by remember { mutableStateOf("recent") }
-    AtlasHeading("组件状态、触控与信息层级")
+    var lastAction by remember { mutableStateOf("选择操作后在这里显示真实状态") }
+    var confirmDanger by remember { mutableStateOf(false) }
+
+    AtlasHeading("按钮、输入、导航与信息层级")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SyButton("主要按钮", {}, compact = true)
-        SyButton("次要", {}, compact = true, style = SyButtonStyle.SECONDARY)
-        SyButton("危险", {}, compact = true, style = SyButtonStyle.DANGER)
+        SyButton("主要按钮", { lastAction = "主要操作已执行" }, compact = true)
+        SyButton("次要", { lastAction = "次要操作已执行" }, compact = true,
+            style = SyButtonStyle.SECONDARY)
+        SyButton("危险", { confirmDanger = true }, compact = true,
+            style = SyButtonStyle.DANGER)
+    }
+    AtlasHeading("禁用、加载、错误与成功状态")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SyButton("禁用", {}, compact = true, enabled = false)
+        SyButton("正在加载", {}, compact = true, loading = true)
+        SyStatusTag("已完成", SyPhase.DONE)
     }
     SyInput(text, { text = it }, label = "项目名称")
+    if (text.isBlank()) {
+        SyInput(text, { text = it }, label = "必填字段", error = "请输入项目名称")
+    } else {
+        SyStatusTag("字段已填写", SyPhase.DONE)
+    }
     SyTabs(listOf(SyOption("recent", "最近"), SyOption("saved", "收藏")),
-        tab, { tab = it })
+        tab, { tab = it; lastAction = if (it == "recent") "最近项目" else "收藏项目" })
     SySwitch("开启提醒", checked, { checked = it })
     SySliderControl(value = slider, onValueChange = { slider = it })
-    SyInlineBanner("这组控件使用同一组字体、状态和动态颜色", SyBannerKind.INFO)
+    SyFileRow("本地报告.md", "点击查看文件 · 不连接外部服务",
+        onOpen = { lastAction = "打开本地文件演示" })
+    SyInlineBanner(lastAction, SyBannerKind.INFO)
+    if (confirmDanger) SyConfirmDialog(
+        title = "确认危险操作", body = "仅修改实验室的反馈文字，不会删除真实资料。",
+        dangerous = true,
+        onConfirm = { confirmDanger = false; lastAction = "已确认危险操作" },
+        onDismiss = { confirmDanger = false },
+    )
 }
 
 @Composable
@@ -211,9 +236,8 @@ private fun AtlasGestures() {
     var actionCount by remember { mutableIntStateOf(0) }
     AtlasHeading("左滑显示操作；滑动不会直接执行危险动作")
     SySwipeActionRow("收藏", onAction = { actionCount++ }) {
-        Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-            Text("将这一行向左滑动，然后点击“收藏”",
-                Modifier.fillMaxWidth().padding(18.dp))
+        Column(Modifier.fillMaxWidth().padding(18.dp)) {
+            Text("将这一行向左滑动，然后点击“收藏”")
         }
     }
     Text("操作次数：" + actionCount, style = MaterialTheme.typography.bodySmall)
@@ -352,28 +376,60 @@ private fun AtlasForms() {
     var selectedDay by remember { mutableStateOf("未选择") }
     var numeric by remember { mutableIntStateOf(3) }
     var showRange by remember { mutableStateOf(false) }
-    AtlasHeading("日期、时间范围、多选、步进与验证")
+    var notification by remember { mutableStateOf(true) }
+    var visibility by remember { mutableStateOf("private") }
+    var phase by remember { mutableStateOf("draft") }
+    AtlasHeading("日期、时间范围、步进与输入校验")
     SyDatePickerField("计划日期", selectedDay, onDateSelected = { selectedDay = it.toString() })
     SyNumericStepper(numeric, { numeric = it }, minimum = 0, maximum = 20)
     SyButton("选择日期范围", { showRange = true })
     if (showRange) SyDateRangePickerDialog(true,
         onDismiss = { showRange = false },
         onConfirm = { _, _ -> showRange = false })
+    AtlasHeading("选择、开关与分段控制")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        SyCheckboxControl(notification, onCheckedChange = { notification = it })
+        Text("完成后通知", modifier = Modifier.weight(1f))
+        SyRadioControl(visibility == "private", onClick = { visibility = "private" })
+        Text("私有")
+        SyRadioControl(visibility == "public", onClick = { visibility = "public" })
+        Text("公开")
+    }
+    SySegmentedControl(
+        segments = listOf(SyOption("draft", "草稿"), SyOption("ready", "待发布"),
+            SyOption("done", "已完成")),
+        selectedId = phase, onSelect = { phase = it }, stretch = true,
+    )
+    SyInlineBanner(
+        "提醒：${if (notification) "开启" else "关闭"} · 范围：${if (visibility == "private") "私有" else "公开"} · 状态：$phase",
+        SyBannerKind.INFO,
+    )
 }
 
 @Composable
 private fun AtlasMedia() {
     var playing by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(.4f) }
-    var expanded by remember { mutableStateOf(true) }
-    AtlasHeading("媒体进度、播放控制与迷你播放器")
-    SyMediaTransport("演示视频 · 用户触控体验", playing, progress,
-        "00:12", "00:30", onPlayPause = { playing = !playing },
-        onSeek = { progress = it })
-    if (expanded) SyMiniPlayer("正在播放 · 样例音轨", "本机 UI 演示", playing,
-        onPlayPause = { playing = !playing },
-        onExpand = { expanded = false }, onClose = { expanded = false })
-    else SyButton("恢复迷你播放器", { expanded = true })
+    var compact by remember { mutableStateOf(false) }
+    var visible by remember { mutableStateOf(true) }
+    AtlasHeading("同一个播放状态贯穿完整播放器与迷你播放器")
+    if (!visible) {
+        SyButton("重新打开播放器", { visible = true; compact = false })
+    } else if (compact) {
+        SyMiniPlayer("演示音轨 · 本机", "00:12 / 00:30", playing,
+            onPlayPause = { playing = !playing },
+            onExpand = { compact = false },
+            onClose = { visible = false; playing = false })
+    } else {
+        SyMediaTransport("演示音轨 · 本机", playing, progress,
+            "00:12", "00:30",
+            onPlayPause = { playing = !playing },
+            onSeek = { progress = it },
+            onCollapse = { compact = true })
+    }
 }
 
 @Composable
