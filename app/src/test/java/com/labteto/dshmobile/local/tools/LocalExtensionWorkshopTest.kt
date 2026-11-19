@@ -124,7 +124,7 @@ class LocalExtensionWorkshopTest {
             workshop.record("tool", "../unsafe", "created", "测试", "")
         }
         val record = workshop.record("mcp", "x-twitter", "tested", "仅模拟读取", "proof.txt")
-        assertTrue(record.contains("不代表工具已经注册"))
+        assertTrue(record.contains("用 extension_inspect 查看当前注册状态"))
         val absent = workshop.inspect("mcp", "x-twitter", emptySet(), emptySet())
         assertTrue(absent.contains("没有对应工具"))
         assertTrue(absent.contains("待独立核验"))

@@ -69,7 +69,7 @@ internal object LocalLargeFileIO {
                 while (true) {
                     val match = pending.indexOf(oldText)
                     if (match >= 0) {
-                        require(replacements == 0) { "待替换内容出现多次，请提供更长的唯一片段" }
+                        require(replacements == 0) { "待替换内容出现多次。给 old_text 加上足以区分目标位置的相邻原文" }
                         writer.append(pending, 0, match)
                         writer.write(newText)
                         pending.delete(0, match + oldText.length)
@@ -96,7 +96,7 @@ internal object LocalLargeFileIO {
                 }
             }
             process(true)
-            require(replacements == 1) { "文件中没有找到待替换内容" }
+            require(replacements == 1) { "文件中没有找到待替换内容。用 read 核对目标区域的原文与缩进，再填写 old_text" }
             writer.flush()
         }
     }

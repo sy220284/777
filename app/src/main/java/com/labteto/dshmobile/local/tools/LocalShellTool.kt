@@ -1,6 +1,7 @@
 package com.labteto.dshmobile.local.tools
 
 import com.labteto.dshmobile.local.jobs.LocalJobManager
+import com.labteto.dshmobile.local.jobs.toToolReceipt
 import com.labteto.dshmobile.local.files.LocalWorkspace
 import kotlinx.serialization.json.JsonObject
 import com.labteto.dshmobile.harness.tools.ToolResult
@@ -33,7 +34,7 @@ internal object LocalShellTool {
 
         val isolation = kotlinx.coroutines.currentCoroutineContext()[com.labteto.dshmobile.runtime.ProcessIsolationContext]
         return if (background) {
-            ToolResult(jobs.start(
+            ToolResult(jobs.startResult(
                 label = "后台命令",
                 expectedDurationMillis = timeout * 1_000L,
                 ownerSessionId = ownerSessionId,
@@ -41,7 +42,7 @@ internal object LocalShellTool {
                 kotlinx.coroutines.withContext(isolation ?: kotlin.coroutines.EmptyCoroutineContext) {
                     workspace.shell(command, timeout, report, throwOnFailure = true)
                 }
-            })
+            }.toToolReceipt())
         } else {
             workspace.shellResult(command, timeout)
         }

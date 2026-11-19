@@ -7,6 +7,7 @@ import com.labteto.dshmobile.harness.jobs.JobMessageAdmission
 import com.labteto.dshmobile.harness.jobs.JobStartResult
 import com.labteto.dshmobile.harness.jobs.JobSnapshot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.JsonPrimitive
 
 /** Android projection adapter for the process-agnostic core job controller. */
 internal class LocalJobManager(
@@ -30,7 +31,14 @@ internal class LocalJobManager(
         expectedDurationMillis: Long? = null,
         ownerSessionId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String = delegate.start(label, expectedDurationMillis, ownerSessionId, block)
+    ): String = startResult(label, expectedDurationMillis, ownerSessionId, block).message
+
+    fun startResult(
+        label: String,
+        expectedDurationMillis: Long? = null,
+        ownerSessionId: String? = null,
+        block: suspend (String, (String) -> Unit) -> String,
+    ): JobStartResult = delegate.startResult(label, expectedDurationMillis, ownerSessionId, block)
 
     fun startPersistent(
         label: String,
@@ -40,15 +48,9 @@ internal class LocalJobManager(
         continuable: Boolean = false,
         requestedId: String? = null,
         block: suspend (String, (String) -> Unit) -> String,
-    ): String = delegate.startPersistent(
-        label = label,
-        resumeKind = resumeKind,
-        resumePayload = resumePayload,
-        ownerId = ownerSessionId,
-        continuable = continuable,
-        requestedId = requestedId,
-        block = block,
-    )
+    ): String = startPersistentResult(
+        label, resumeKind, resumePayload, ownerSessionId, continuable, requestedId, block,
+    ).message
 
     fun startPersistentResult(
         label: String,
@@ -187,3 +189,9 @@ private fun JobInfo.toLocalJobInfo(): LocalJobInfo = LocalJobInfo(
     pendingMessageCount = pendingMessageCount,
     updatedAt = updatedAt,
 )
+
+internal fun JobStartResult.toToolReceipt(): String {
+    val jobId = id ?: return message
+    if (!accepted) return message
+    return "$message\n需要结果时调用 tool_call({\"name\":\"job_output\",\"arguments\":{\"job_id\":${JsonPrimitive(jobId)}}}) 查看状态与输出。任务运行期间可继续做独立事项。"
+}

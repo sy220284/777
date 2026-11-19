@@ -78,7 +78,12 @@ class DeviceVideoRecorder:
                     break
                 self._started.set()
                 stdout, stderr = process.communicate(timeout=self.seconds + 35)
-                if process.returncode:
+                # Android adb can report 130 when stop() intentionally sends
+                # SIGINT. Successful capture still requires stop() to pull and
+                # validate the finalized MP4 before returning a receipt.
+                if process.returncode and not (
+                    process.returncode == 130 and self._stop.is_set()
+                ):
                     raise RuntimeError(f"screenrecord 退出 {process.returncode}: {(stderr or stdout)[-800:]}")
                 self._remotes.append({"remote": remote, "file": f"part-{index:03d}.mp4",
                                       "started_at": began, "ended_at": _utc_now(),

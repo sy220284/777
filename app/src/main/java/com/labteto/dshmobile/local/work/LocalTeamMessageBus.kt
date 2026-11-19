@@ -140,7 +140,7 @@ internal class LocalTeamMessageBus(
             put("outcome", normalized)
             put("reason", cleanReason)
         })
-        "消息处理声明已记录：$messageId；outcome=$normalized；不代表任务成果已验收"
+        "消息处理声明已记录：$messageId；outcome=$normalized。验收时查看对应任务产出。"
     }
 
     /** The execution context above authenticates the actor; only the addressed member can reply. */

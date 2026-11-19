@@ -274,7 +274,7 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
         val indexed = "- $kind / $id：$clean；来源 [$phase]($kind-$id/RECORD.md)\n"
         require((index + indexed).toByteArray(Charsets.UTF_8).size <= 200_000) { "扩展索引过大，请先归档" }
         workspace.write(indexPath, index + indexed)
-        return "已写入 $target 及 $indexPath；本次为记录声明，不代表工具已经注册或业务调用成功。"
+        return "已写入 $target 及 $indexPath；记录已保存。用 extension_inspect 查看当前注册状态，用实际工具结果核对业务效果。"
     }
 
     fun inspect(kind: String, rawId: String, liveToolNames: Set<String>, installedPlugins: Set<String>): String {
@@ -289,7 +289,7 @@ internal class LocalExtensionWorkshop(private val workspace: LocalWorkspace) {
             "mcp", "connector", "tool" -> {
                 val exact = liveToolNames.filter { it == id || it.startsWith("mcp_${id}_") }
                 if (exact.isEmpty()) "当前工具注册表没有对应工具" else
-                    "当前已注册：${exact.sorted().joinToString(", ")}；注册不等于真实调用成功"
+                    "当前已注册：${exact.sorted().joinToString(", ")}。需要核实业务效果时查看实际调用结果"
             }
             else -> error("未知类型")
         }

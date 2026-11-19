@@ -36,7 +36,7 @@ internal fun interruptedWorkReplyContinuationError(reply: LocalModelReply?): Loc
 
 
 internal const val INTERNAL_WORK_CONTINUATION_PROMPT =
-    "恢复同一工作任务。只处理检查点之后尚未完成的部分；已记录的工具回执、审批和副作用不可重复执行。先核对实际进度，再继续。"
+    "恢复同一工作任务。对照最新用户要求、检查点和工具回执，核对已做事项及尚缺的交付与验收，从第一个可执行的未完成事项继续。沿用现有审批和已结算的结果；状态不明时先核对现场再决定下一步。"
 
 /** Typed, checkpoint-addressed command; internal resume never masquerades as new user input. */
 internal data class LocalWorkResumeCommand(

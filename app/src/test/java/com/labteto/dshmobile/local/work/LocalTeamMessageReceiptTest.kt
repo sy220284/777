@@ -81,7 +81,7 @@ class LocalTeamMessageReceiptTest {
         assertEquals("member_handled_reported", handled.status)
         assertEquals(5L, handled.memberAcknowledgedSequence)
         assertEquals("handled", handled.memberAcknowledgedOutcome)
-        assertTrue(handled.render().contains("never independent proof of verified task completion"))
+        assertTrue(handled.render().contains("Check the task result for completion"))
         val declined = projectLocalTeamMessageReceipt(id,
             received + acknowledged(5, outcome = "cannot_handle", reason = "缺少授权"), true, sessionId)
         assertEquals("member_cannot_handle_reported", declined.status)
@@ -113,7 +113,7 @@ class LocalTeamMessageReceiptTest {
         )
         assertEquals("model_reply_observed", receipt.status)
         assertEquals(4L, receipt.modelReplySequence)
-        assertTrue(receipt.render().contains("does not prove comprehension"))
+        assertTrue(receipt.render().contains("Check the task result for completion"))
         assertFalse(receipt.render().contains("completion_status=completed"))
     }
 
@@ -180,7 +180,7 @@ class LocalTeamMessageReceiptTest {
             checkpoint(3, jobId)), true, sessionId)
         assertEquals("checkpointed_in_model_history", c.status)
         assertEquals(3L, c.historyCheckpointSequence)
-        assertTrue(c.render().contains("does not prove comprehension"))
+        assertTrue(c.render().contains("Check the task result for completion"))
     }
 
     @Test fun differentJobCannotForgeMessageConsumption() {

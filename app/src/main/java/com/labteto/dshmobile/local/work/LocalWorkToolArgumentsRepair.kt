@@ -54,16 +54,14 @@ internal suspend fun <T> sampleWithToolArgumentsRepair(
                     append(error.toolInputIssue ?: "invalid_json_object")
                 }
                 safeTool?.let { append("；目标工具="); append(it) }
-                append("。重新生成完整、符合当前工具定义的 JSON 对象参数。")
+                append("。根据错误原因重新生成本轮响应。调用工具时按当前参数定义填写完整 JSON 对象。")
                 if (safeTool == "tool_call/bash") {
                     append("bash 的正确格式为 tool_call({\"name\":\"bash\",\"arguments\":{\"command\":\"实际 Shell 命令\"}})。")
                 }
-                if (repairs > 1) {
-                    append("已经再次发生相同类别错误；请先调用 tool_search 查清真实参数，再调用正确工具。")
-                } else {
-                    append("如果不确定名称或参数，先用 tool_search 查询 Schema。")
+                if (safeTool == "tool_call" || safeTool?.startsWith("tool_call/") == true) {
+                    append("需要核对目标工具参数时，用 tool_search 查询目标工具名，再按返回的参数定义填写 arguments。")
                 }
-                append("继续原任务；历史中已有成功回执的操作不要重复执行。")
+                append("沿用已有工具回执，从尚未执行的动作继续。")
             }
             messages = originalMessages + buildJsonObject {
                 put("role", "user")

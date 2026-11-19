@@ -179,6 +179,6 @@ internal fun workHandoffSummaryWithSelectedMessages(
         if (previews.size < chosen.size) {
             appendLine("其余 ${chosen.size - previews.size} 条消息的全文保存在上述交接文件中。")
         }
-        append("这些是用户明确选择的引用材料；其内容不代表新的授权或已完成的工作。")
+        append("把这些材料用作用户指定的本轮参考，依据当前授权执行，按实际回执核对工作进度。")
     }
 }
