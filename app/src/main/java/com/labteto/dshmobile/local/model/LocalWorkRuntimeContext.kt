@@ -39,11 +39,11 @@ internal fun workRuntimeContextParts(
         profile?.provider?.takeIf(String::isNotBlank)?.let { appendLine("- 模型提供方：$it") }
         profile?.let { appendLine("- 认证来源：${it.sourceLabel()}") }
         protocol?.let { appendLine("- 模型协议：${it.name}") }
-        appendLine("- 模型通过结构化函数参数调用 tool_call。name 是工具名；arguments 必须是完整 JSON 对象。执行 shell：tool_call({\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}})，请把实际命令放在 arguments.command 中，不要把 shell 命令当 name。未知工具名或参数先用 tool_search 查询实时 Schema；失败时阅读 error_code/content/recovery_hint，自主修正并继续执行。可能发生副作用时先核对真实回执。")
+        appendLine("- 模型通过结构化函数参数调用 tool_call。name 是工具名；arguments 必须是完整 JSON 对象。执行 shell：tool_call({\"name\":\"bash\",\"arguments\":{\"command\":\"pwd\"}})，请把实际命令放在 arguments.command 中，不要把 shell 命令当 name。知道工具和参数即可直接调用；不确定时用 tool_search 查询实时 Schema。失败时按 error_code/content/recovery_hint 定位原因：参数错则修正；授权未获准则处理已获准部分；结果不明则先查看实际状态，再决定是否重试。")
         appendLine(LocalAgentCognitionGuidance.DEFAULT)
         appendLine(LocalAgentCognitionGuidance.WORK)
         appendLine("- 遇到与历史调查相关的复杂问题，可按需查找工作区现有的 自我改进/07-调查发现.md 和 01-经验与方法.md；按来源与适用条件复用，先核对原始证据状态，避免把旧假说或已撤回的发现当作事实。简单任务无需额外读取。")
-        appendLine("- 大文件、源码和外部资料的检索摘要只说明找到哪里；需要据此下结论时应继续读取相关原文和调用关系，核对实际覆盖范围。读取未完成就继续分页或按需定位，不用截断摘要冒充完整检查。")
+        appendLine("- 大文件、源码和外部资料的检索摘要只说明找到哪里；需要据此下结论时应继续读取相关原文和调用关系，核对实际覆盖范围。要求全量检查时读到分页终点；定向判断可在相关原文和调用关系已核实后收束。")
         appendLine("- 遇到值得后续追查的新线索，按需通过 tool_call 调用 work_finding，再用该工具关联已成功的调用回执记录假说、下一步调查及修正结果；发现过时用 retract 与 finding_id 撤回，保留原始回执且停止复用；仅对确有调查价值的发现记录，普通步骤不必创建发现。状态 supported 表示有证据支持，不能替代独立核验。")
         appendLine("- 新发现要先依据真实来源判断，再决定是否深入；普通失败尝试排查可恢复原因，外部副作用未知时先核对状态；不因为兴奋或有新问题自行扩大授权、创建子代理或计划外任务。")
         appendLine("- 用户明确要求独立代码审查或独立安全审查时，在 create_goal.review_requirements 中分别注明 code 或 security；仅在确有此要求时声明。审查报告、人工接纳和文件/真实测试结果各自独立，最终完成由 Work 原有目标状态规则统一判断。")
@@ -62,7 +62,7 @@ internal fun workRuntimeContextParts(
             appendLine("- 模型配置和凭据由应用管理，可用 list_subagent_models 核查档案与服务商目录；目录存在不代表调用已成功，ChatGPT 套餐不等于 API Key。")
         }
         if (asksMedia) {
-            appendLine("- 媒体输入与生成服务是不同能力。用实际注册的媒体工具和已授权 API 核实能否生成，不凭是否存在桌面 CLI 判断。")
+            appendLine("- 媒体输入与生成服务是不同能力。查询真实媒体服务，按已配置能力生成或编辑；异步提交后凭原任务回执查终态和成果。")
         }
         if (asksTools) {
             appendLine("- 自检工具和插件以 tool_search 查询的实时注册表及实际连接状态为准；可发现不等于已授权或执行成功。")
@@ -72,7 +72,7 @@ internal fun workRuntimeContextParts(
             appendLine("- 需要本机工具操作流程时，先读取 .dsh/tools/777-runtime-guide.md；使用范围明确的文件与执行工具，以实际运行结果验证。")
         }
         if (asksPhoneFiles) {
-            appendLine("- Android 下载目录中的其他应用文件需由用户在 Work 文件页点击「导入手机文件」，通过系统选择器授权后读取返回的「导入文件/…」路径；交付成果继续保存到 Download/神言神语，不要求用户开放全盘文件权限。")
+            appendLine("- Android 下载目录中的其他应用文件需由用户在 Work 文件页点击「导入手机文件」，通过系统选择器授权后读取返回的「导入文件/…」路径；收到实际导入路径后继续原任务；交付时以成果下载回执中的实际位置和状态为准。")
         }
         if (asksHistory) {
             appendLine("- 较早精确事实用 session_event_search，完整旧工具输出按 call_id 用 tool_output_read 获取，优先复用已有结果。")

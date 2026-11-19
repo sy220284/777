@@ -444,10 +444,17 @@ internal class LocalWorkAgentTurnExecutor(
                     }
                     // Reuse the run's fixed gateway schema; live registry bindings
                     // are captured separately at each execution step.
+                    val dynamicWorkPrompt = listOf(
+                        workPromptContext.dynamic,
+                        LOCAL_WORK_CAPABILITY_RECOVERY_GUIDANCE,
+                        com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
+                        improvementGuidance,
+                        investigationContext,
+                        reusableDiscoveryContext,
+                    ).filter(String::isNotBlank).joinToString("\n")
                     val productContextTokens =
                         estimateModelTokens(workPromptContext.stable) +
-                            estimateModelTokens(workPromptContext.dynamic + improvementGuidance +
-                                investigationContext + reusableDiscoveryContext) +
+                            estimateModelTokens(dynamicWorkPrompt) +
                             estimateModelTokens(workPromptContext.skill)
                     if (shouldProactivelyCompactBeforeModelStep(snapshot.usageMode, modelStep)) {
                         LocalWorkSummarySettings.attach(context)
@@ -506,10 +513,7 @@ internal class LocalWorkAgentTurnExecutor(
                     val durableRequestMessages = withWorkTurnContext(
                         withLocalWorkExecutionMode(runHistory.snapshot()),
                         workPromptContext.stable,
-                        workPromptContext.dynamic + improvementGuidance + "\n" +
-                            investigationContext + "\n" + reusableDiscoveryContext + "\n" +
-                            LOCAL_WORK_CAPABILITY_RECOVERY_GUIDANCE + "\n" +
-                            com.labteto.dshmobile.local.presentation.document.LocalReplyUiDocumentProtocol.instruction,
+                        dynamicWorkPrompt,
                         workPromptContext.skill,
                     )
                     val selectedMode = resolveLocalImageInputMode(

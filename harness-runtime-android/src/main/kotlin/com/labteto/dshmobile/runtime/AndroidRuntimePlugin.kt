@@ -447,7 +447,7 @@ class AndroidRuntimePlugin(
 
     private fun processExecSchema(): JsonObject = functionToolSchema(
         "process_exec",
-        "直接执行一个本机进程参数数组；用于 Git、Python、Node 等已存在的命令",
+        "直接执行 Git、Python、Node 等已存在的命令。command 按程序和参数分项填写，指定适用的工作目录；以实际退出码和输出判断结果",
         buildJsonObject {
             put(
                 "command",

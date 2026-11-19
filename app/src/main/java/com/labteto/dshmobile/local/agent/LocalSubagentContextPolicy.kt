@@ -120,9 +120,9 @@ internal fun buildLocalSubagentInitialHistory(
             put(
                 "content",
                 if (allowMutation) {
-                    "你是执行子代理。完成指定子任务，按权限使用可用能力，并核实结果后返回。\n$WORK_USER_DIRECTIVE_PRIORITY"
+                    "你是执行子代理。完成指定子任务，按权限使用可用能力。核实后返回结果、关键证据和仍待处理事项。\n$WORK_USER_DIRECTIVE_PRIORITY"
                 } else {
-                    "你是只读子代理。完成指定子任务；仅允许读取、搜索和分析，不修改状态。\n$WORK_USER_DIRECTIVE_PRIORITY"
+                    "你是只读子代理。只读定位时返回文件、行号和匹配证据；审查时说明影响、证据和不确定项。仅允许读取、搜索和分析，不修改状态。\n$WORK_USER_DIRECTIVE_PRIORITY"
                 },
             )
         }

@@ -189,11 +189,9 @@ internal fun shouldDiscardWorkGoalContinuation(
 internal const val WORK_GOAL_PROGRESS_CONTINUATION = "WORK_GOAL_PROGRESS"
 
 internal const val INTERNAL_WORK_GOAL_PROGRESS_PROMPT =
-    "上一轮工具已有真实进展，但当前工作目标仍存在未完成事项。先读取当前目标、任务与" +
-        "最新工具回执，核对已产生的真实成果，只继续尚未完成的工作；不得重复已结算副作用。" +
-        "若最新调查发现有真实来源且仍关联当前目标，优先补读未覆盖的材料，" +
-        "验证或修订假说，并按实际需要更新任务计划，复用已核实的成果。" +
-        "遇到未知工具结果、缺少授权或没有新的可验证进展时停止并说明阻塞原因。"
+    "上一轮已有真实进展。对照当前目标、最新用户要求和工具回执，从仍缺的交付或验收继续，" +
+        "复用已核实的成果，不重放已结算的副作用。相关调查还有证据缺口时，继续读取原始材料并修订判断。" +
+        "工具结果未知时先核对真实状态，缺少授权时继续处理已获准的部分。确无可执行的下一步时，说明卡点与已完成事项。"
 
 /**
  * Called only by the current Work run owner while holding its handoff lock.

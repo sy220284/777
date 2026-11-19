@@ -82,26 +82,26 @@ object LocalToolCatalog {
             "path" to string("相对路径，默认 ."),
             "cursor" to integer("可选；目录扫描未完时返回的下一页游标"),
         ), listOf("pattern")))
-        add(tool("grep", "在工作区文件中搜索文字；默认字面量，可指定正则表达式", properties(
+        add(tool("grep", "在工作区文件中定位匹配；默认字面量，可指定正则。需要判断含义或调用关系时，用 read 查看相关上下文", properties(
             "query" to string("搜索内容；regex=true 时按正则表达式解析"),
             "path" to string("相对路径，默认 ."),
             "regex" to boolean("是否按正则表达式搜索，默认 false"),
             "cursor" to string("可选；上次返回的搜索未完成游标，保持 query/path/regex 不变以继续扫描"),
         ), listOf("query")))
-        add(tool("bash", "在应用工作区执行 Android 系统 shell", properties(
+        add(tool("bash", "需要 shell 语法或执行命令时使用。先确认执行目录和目标；命令结束后查看退出状态与相关输出", properties(
             "command" to string("shell 命令"),
             "timeout_seconds" to integer("无 stdout/stderr 的连续空闲超时秒数，不是整个任务时长；每次实际输出都会续期。前台默认 30/最大 120，后台默认 300/最大 900；大型构建、全量扫描建议后台执行并持续输出进度，主动取消不受此值约束"),
             "run_in_background" to boolean("是否转为后台任务，默认 false；普通后台 shell 属当前会话非持久任务，创建、切换或删除会话时会取消"),
         ), listOf("command")))
         add(tool("job_list", "列出本机会话创建的后台任务", properties()))
-        add(tool("job_output", "读取后台任务状态和输出", properties(
+        add(tool("job_output", "用原任务的 job_id 查看状态和输出。需要该任务的结果才能验收时，核实终态与实际输出后再交付", properties(
             "job_id" to string("后台任务编号"),
         ), listOf("job_id")))
         add(tool("job_kill", "按 job_list 返回的真实 job_id 停止当前会话的后台任务；如需关闭持久 Agent 使用 agent_close，团队成员先按 Team 生命周期处理，不把历史日志误当运行任务。", properties(
             "job_id" to string("后台任务编号"),
         ), listOf("job_id")))
         add(tool("media_image_options", "列出当前已配置且有真实 API Key 的图像创作服务和精确 offer_id；不会收费", properties()))
-        add(tool("media_image_create", "使用明确 offer_id 的已配置媒体 API 提交图片生成或原图编辑；每次收费调用须经原有权限审批；返回真实异步回执编号，不代表已完成", properties(
+        add(tool("media_image_create", "使用明确 offer_id 的已配置媒体 API 提交图片生成或原图编辑；每次收费调用须经原有权限审批；返回真实异步回执编号；提交后用原 job_id 查询终态及成果，状态不明先查原任务", properties(
             "offer_id" to string("必须来自 media_image_options，不能猜测或跨账户替换"),
             "prompt" to string("用户要求的图像内容或基于真实原图的修改指令"),
             "ratio" to string("图片比例，如 1:1 或 16:9；可选，默认 1:1"),
@@ -110,7 +110,7 @@ object LocalToolCatalog {
         add(tool("media_image_status", "按任务 ID 查询当前会话已提交的真实图片生成回执与成果；不触发新的付费调用", properties(
             "job_id" to string("media_image_create 返回的任务 ID"),
         ), listOf("job_id")))
-        add(tool("web_search", "联网搜索：默认使用免费 Bing RSS；在能力中心明确开启 DeepSeek 付费搜索并配置官方密钥后优先使用原生 Search API（按成功请求计费）；可用 provider 指定搜索服务", properties(
+        add(tool("web_search", "联网搜索：默认使用免费 Bing RSS；在能力中心明确开启 DeepSeek 付费搜索并配置官方密钥后优先使用原生 Search API（按成功请求计费）；可用 provider 指定搜索服务；按结果定位来源，依赖具体事实时抓取正文核实", properties(
             "queries" to buildJsonObject {
                 put("type", "array")
                 put("description", "1 到 4 个搜索词，DeepSeek 单词条最多 128 个 Unicode 字符")
@@ -126,7 +126,7 @@ object LocalToolCatalog {
             "ori_question" to string("可选，触发搜索的原始用户问题；1～128 个 Unicode 字符"),
             "localization" to string("可选，用于本地化搜索结果的 IP 地址；不提供时由服务商自行处理"),
         ), listOf("queries")))
-        add(tool("web_fetch", "抓取指定网页正文；默认本机抓取，失败后可用已配置的 DeepSeek 官方 Fetch API（按成功请求计费）备用；provider=deepseek 可直接抓取 Markdown", properties(
+        add(tool("web_fetch", "抓取指定网页正文；默认本机抓取，失败后可用已配置的 DeepSeek 官方 Fetch API（按成功请求计费）备用；provider=deepseek 可直接抓取 Markdown；正文缺失或截断时注明覆盖范围，按需要核对其他原始入口", properties(
             "url" to string("完整网址"),
             "max_bytes" to integer("最多读取字节数，默认 4194304，最大 4194304；适用于本机抓取"),
             "format" to buildJsonObject {
@@ -173,23 +173,23 @@ object LocalToolCatalog {
         add(tool("tool_search", "只读查找实时工具注册表及准确参数定义；不选择、不加载、不改变模型工具表。", properties(
             "query" to string("工具名称、功能描述或 能力目录"),
         ), listOf("query")))
-        add(tool("update_plan", "记录任务执行方案的步骤顺序，不记录进行中/已完成状态；进度用 todo_write，长期目标用 create_goal。仅复杂任务需要维护计划，避免重复写同一内容", properties(
+        add(tool("update_plan", "为复杂任务记录实施顺序、依赖和验证步骤；执行状态用 todo_write，跨轮完成条件用 create_goal。单一步骤直接处理", properties(
             "items" to buildJsonObject {
                 put("type", "array")
                 put("description", "按执行顺序排列的计划项")
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("items")))
-        add(tool("exit_plan_mode", "提交完整计划供用户审批；仅在规划模式中调用", properties(
-            "plan" to string("完整、可直接执行的计划"),
+        add(tool("exit_plan_mode", "在规划模式中提交待实施的完整方案供用户审批；纯只读调查可直接交付发现", properties(
+            "plan" to string("实施范围、依赖顺序与验证方式；内容应可直接执行"),
         ), listOf("plan")))
-        add(tool("todo_write", "记录实际执行项及 pending/in_progress/completed 状态；它是进度权威来源，不要与 update_plan 重复维护步骤。按需使用", properties(
+        add(tool("todo_write", "按实际进展维护执行项。开始时设为 in_progress，核实该项结果后设为 completed。收到变更时更新受影响的条目，保留其他有效状态", properties(
             "items" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject {
                     put("type", "object")
                     put("properties", buildJsonObject {
-                        put("content", string("任务内容"))
+                        put("content", string("可核对的任务结果，例如核对当前版本的构建日志"))
                         put("status", buildJsonObject {
                             put("type", "string")
                             put("enum", buildJsonArray {
@@ -203,9 +203,9 @@ object LocalToolCatalog {
             },
         ), listOf("items")))
         add(tool("create_goal", "维护跨多轮任务的目标与验收条件，创建时自动建立任务文件和交付成果目录并返回路径。简单的一次性任务无需额外创建；不要代替 update_plan 或 todo_write", properties(
-            "description" to string("目标和完成标准"),
-            "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("按用户要求交付的工作区相对文件路径；讨论任务填空数组")) },
-            "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("按用户要求执行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },
+            "description" to string("用用户原始要求写明跨轮目标、交付与各项完成标准；说明用什么可见证据核实各项"),
+            "artifact_paths" to buildJsonObject { put("type", "array"); put("items", string("逐项登记需交付的工作区相对文件路径；没有文件交付时填空数组")) },
+            "verification_commands" to buildJsonObject { put("type", "array"); put("items", string("逐项登记任务需要实际运行的完整 shell 命令原文或 process_exec command 的 JSON 数组原文；通过真实退出码和成果版本核验，不能以打印成功日志替代。无需命令的任务填空数组")) },
             "review_requirements" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject {
@@ -216,7 +216,7 @@ object LocalToolCatalog {
             },
         ), listOf("description", "artifact_paths", "verification_commands")))
         add(tool("get_goal", "读取当前会话目标", properties()))
-        add(tool("update_goal", "更新当前 Work Goal 状态。完成前依据原目标真实执行已声明的验收命令并核验当前成果版本；命令未执行、最新失败、缺少退出码、文件缺失和版本变化会分别说明修复动作。受阻时保留已完成进度，按具体错误恢复后继续结算。", properties(
+        add(tool("update_goal", "更新当前 Work Goal 状态。完成前对照用户的交付和验收要求，真实执行已声明的验收命令并核验当前成果版本；命令未执行、最新失败、缺少退出码、文件缺失和版本变化会分别说明修复动作。受阻时保留已完成进度，按具体错误恢复后继续结算。", properties(
             "status" to buildJsonObject {
                 put("type", "string")
                 put("description", "active、paused、completed 或 blocked")
@@ -248,15 +248,15 @@ object LocalToolCatalog {
             },
             "next_action" to string("准备补查或验证的下一步；可选"),
         ), listOf("action")))
-        add(tool("ask_user_question", "暂停当前轮次并向用户询问无法自行确定的选择", properties(
-            "question" to string("清晰、可直接回答的问题"),
+        add(tool("ask_user_question", "在可查证事项和独立步骤已推进后，询问必须由用户决定且会影响后续执行的事项；调用会暂停当前轮次", properties(
+            "question" to string("独立可理解的问题，说明需要决定什么以及对后续执行的影响"),
             "options" to buildJsonObject {
                 put("type", "array")
                 put("items", buildJsonObject { put("type", "string") })
             },
         ), listOf("question")))
 
-        add(tool("skill", "三级渐进技能加载：目录只含元数据，选中后读取 SKILL.md，专项资料在引用时按行读取", properties(
+        add(tool("skill", "三级渐进技能加载：用目录定位适用技能，选中后读取 SKILL.md，所需专项资料按引用读取。本轮已取得同版本内容时可直接复用", properties(
             "name" to string("可选；读取指定技能的完整核心规则"),
             "query" to string("可选；目录查询"),
             "offset" to integer("可选；目录续读游标"),
@@ -634,7 +634,7 @@ object LocalToolCatalog {
             "after" to integer("后置事件数，最多 20"),
             "offset_chars" to integer("可选；按上一页提示继续读取的字符偏移，默认 0"),
         ), listOf("seq")))
-        add(tool("present", "标记工作区中已定稿的真实成果文件；先完成内容修改和原目标所需的测试/核验，再按实际相对路径交付，避免交付后修改造成证据版本变化。", properties(
+        add(tool("present", "标记工作区中已定稿的真实成果文件；先完成内容修改和原目标所需的测试/核验，再按实际相对路径交付，若定稿后有修改，按最新版本重新核验。", properties(
             "path" to string("成果文件的相对路径"),
         ), listOf("path")))
     }
