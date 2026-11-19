@@ -171,9 +171,9 @@ fun SyUndoSnackbarHost(
 ) {
     val p = LocalSyColors.current
     SnackbarHost(hostState = hostState, modifier = modifier, snackbar = { data ->
-        Surface(
+        SyMaterialSurface(
+            tier = SyMaterialTier.L4_OVERLAY,
             shape = RoundedCornerShape(SyMetric.radiusControl),
-            color = p.materialL5,
             shadowElevation = 8.dp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite },
@@ -216,10 +216,12 @@ fun SyInlineBanner(
         SyBannerKind.WARNING -> p.warningInk
         SyBannerKind.ERROR -> p.dangerInk
     }
-    Surface(modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    SyMaterialSurface(
+        modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        tier = SyMaterialTier.L3_CARD,
         shape = RoundedCornerShape(SyMetric.radiusControl),
-        color = p.materialL3,
-        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = .36f))) {
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = .36f)),
+    ) {
         Row(Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -735,7 +737,8 @@ fun SySwipeActionRow(
                 }
             }
         }
-        Box(Modifier.fillMaxWidth()
+        SyMaterialSurface(
+            modifier = Modifier.fillMaxWidth()
             .offset { IntOffset(actual.roundToInt(), 0) }
             .draggable(
                 orientation = Orientation.Horizontal,
@@ -747,8 +750,10 @@ fun SySwipeActionRow(
                     open = drag < -travel * .5f || velocity < -650f
                     dragging = false
                 },
-            )
-            .background(p.materialL3, RoundedCornerShape(SyMetric.radiusControl))) {
+            ),
+            tier = SyMaterialTier.L3_CARD,
+            shape = RoundedCornerShape(SyMetric.radiusControl),
+        ) {
             content()
         }
     }
@@ -776,8 +781,11 @@ fun SyMediaTransport(
     onCollapse: (() -> Unit)? = null,
 ) {
     val p = LocalSyColors.current
-    Surface(modifier, shape = RoundedCornerShape(SyMetric.radiusCard),
-        color = p.materialL3) {
+    SyMaterialSurface(
+        modifier = modifier,
+        tier = SyMaterialTier.L3_CARD,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
@@ -876,10 +884,9 @@ fun SyMiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalSyColors.current
-    Surface(
-        modifier.fillMaxWidth(),
-        color = palette.materialL3,
-        contentColor = palette.text,
+    SyMaterialSurface(
+        modifier = modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L3_CARD,
         shape = RoundedCornerShape(SyMetric.radiusCard),
         border = androidx.compose.foundation.BorderStroke(1.dp, palette.border),
     ) {
