@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PixelMap
@@ -49,6 +50,22 @@ class SyLiquidRefractionAndroidTest {
         shader.setFloatUniform("drag", 3f, -1f)
         shader.setColorUniform("glassTint", Color(0xC2FFFFFF).toArgb())
         assertTrue(RenderEffect.createRuntimeShaderEffect(shader, SyLiquidShader.INPUT) != null)
+    }
+
+    @Test fun glassInputKeepsDirectFocusAndTextEntrySemantics() {
+        var query by mutableStateOf("")
+        compose.setContent {
+            ShenyanTheme {
+                SyTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.testTag("glass-text-input"),
+                    singleLine = true,
+                )
+            }
+        }
+        compose.onNodeWithTag("glass-text-input").performTextInput("插件搜索")
+        compose.runOnIdle { assertEquals("插件搜索", query) }
     }
 
     @Test fun sharedGpuSceneRefractsRealSiblingPixelsWithoutDuplicatingContent() {
