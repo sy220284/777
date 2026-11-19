@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasSetTextAction
 import com.labteto.dshmobile.uicontract.UiMessagePage
@@ -18,6 +19,9 @@ import com.labteto.dshmobile.uicontract.UiMessageSearchReceipt
 import com.labteto.dshmobile.uicontract.UiMessageSnapshot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.labteto.dshmobile.R
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityState
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityReadiness
+import com.labteto.dshmobile.local.tools.LocalTaskCapabilityKind
 import com.labteto.dshmobile.ui.theme.DshTheme
 import com.labteto.dshmobile.ui.audit.captureUiAudit
 import org.junit.Assert.assertEquals
@@ -120,6 +124,34 @@ class LocalSessionEntryRegressionTest {
         compose.runOnIdle { assertEquals(1, searched) }
     }
 
+
+    @Test fun workHandoffOpensTheMissingCapabilityWithoutSubmittingTheDraft() {
+        var selected: LocalTaskCapabilityKind? = null
+        var continued = 0
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val github = LocalTaskCapabilityKind.GITHUB
+        val draft = "整理仓库本周的讨论"
+        compose.setContent {
+            DshTheme {
+                LocalWorkCapabilitySheet(
+                    switching = false, failed = false, enabled = true,
+                    onContinue = { continued++ }, onDismiss = {},
+                    prompt = draft,
+                    capabilities = listOf(LocalTaskCapabilityReadiness(
+                        github, LocalTaskCapabilityState.CONNECTION_REQUIRED,
+                    )),
+                    onConfigureCapabilities = { selected = it },
+                )
+            }
+        }
+        compose.onNodeWithText(draft).assertExists()
+        compose.onNodeWithText(context.getString(R.string.work_capability_configure_item, "GitHub"))
+            .performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(github, selected)
+            assertEquals(0, continued)
+        }
+    }
 
     @Test fun modelConfigurationEntryClosesPickerThenOpensSettings() {
         var closed = 0

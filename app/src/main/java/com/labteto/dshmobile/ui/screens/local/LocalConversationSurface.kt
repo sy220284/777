@@ -666,7 +666,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         if (state.usageMode == LocalUsageMode.WORK) foldWorkToolsToTurnStart(withReplyAttachments)
         else withReplyAttachments
     }
-    // The running-status strip follows the current user turn only, not a prior turn's
+    // The running summary follows the current user turn only, not a prior turn's
     // still-cached tool receipts. The tool events remain the single source of truth.
     val currentWorkDisclosure = remember(transcriptItems, transcriptMessages, state.usageMode) {
         val currentUserTurn = transcriptMessages.lastOrNull { it.role == "user" }?.id
@@ -1030,10 +1030,15 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                 state.pendingApproval != null -> "等待工具授权"
                                 state.pendingQuestion != null -> "等待确认"
                                 workToolReadFailures > 0 -> "执行状态读取异常"
-                                state.running -> workToolActivities.lastOrNull {
-                                    it.phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.RUNNING ||
-                                        it.phase == com.labteto.dshmobile.local.presentation.LocalToolUiPhase.DECLARED
-                                }?.let { "正在执行 · " + (userFacingWorkToolAction(it.name) ?: "当前步骤") } ?: "正在执行"
+                                state.running && currentRunningTool != null -> {
+                                    val action = workToolActionLabel(
+                                        currentRunningTool.name, currentRunningTool.argumentsPreview,
+                                    )
+                                    if (currentRunningCount > 1) stringResource(
+                                        R.string.work_header_running_count, currentRunningCount, action,
+                                    ) else stringResource(R.string.work_header_running_action, action)
+                                }
+                                state.running -> stringResource(R.string.work_header_running)
                                 state.loading -> "正在加载"
                                 !state.error.isNullOrBlank() -> "执行异常 · " + state.error
                                 workToolActivities.lastOrNull()?.phase ==
@@ -1615,40 +1620,6 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         )
                     }
                 }
-            }
-        }
-
-        if (state.usageMode == LocalUsageMode.WORK && state.running &&
-            currentRunningCount > 0 && currentRunningTool != null
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = SyMetric.gapLg, vertical = SyMetric.gapXs)
-                    .heightIn(min = SyMetric.touch),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
-            ) {
-                androidx.compose.material3.Icon(
-                    imageVector = FeatherIcons.Clock,
-                    contentDescription = null,
-                    tint = colors.successInk,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    "正在执行 · " + workToolActionLabel(
-                        currentRunningTool.name, currentRunningTool.argumentsPreview,
-                    ),
-                    modifier = Modifier.weight(1f),
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${currentRunningCount} 项进行中",
-                    style = DsType.small13.withReadingWeight(),
-                    color = colors.successInk,
-                )
             }
         }
 

@@ -6,7 +6,6 @@ import com.shenyan.designsystem.foundation.SyMetric
 
 
 import android.content.Context
-import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -39,7 +38,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -71,9 +69,7 @@ import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.text.DateFormat
 import java.util.Calendar
-import java.util.Date
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -278,7 +274,7 @@ internal fun TaskCard(
             if (historyExpanded) {
                 for (receipt in task.runReceipts.asReversed()) {
                     Text(
-                        stringResource(R.string.tasks_run_history_item, formatTime(receipt.finishedAt), receiptStatusLabel(receipt)),
+                        stringResource(R.string.tasks_run_history_item, taskDateTime(receipt.finishedAt), receiptStatusLabel(receipt)),
                         style = DsType.caption11.withReadingWeight(),
                         color = colors.textSecondary,
                     )
@@ -461,11 +457,11 @@ private fun taskStatusLabel(status: AutomationStatus): String = when (status) {
 private fun taskTiming(task: AutomationTask): String {
     return when (task.status) {
         AutomationStatus.WAITING_USER -> stringResource(R.string.tasks_waiting_user_timing)
-        AutomationStatus.SCHEDULED -> stringResource(R.string.tasks_planned_run, formatTime(task.nextRunAt))
+        AutomationStatus.SCHEDULED -> stringResource(R.string.tasks_planned_run, taskDateTime(task.nextRunAt))
         AutomationStatus.QUEUED -> stringResource(R.string.tasks_status_queued)
-        AutomationStatus.RUNNING -> task.lastRunAt?.let { stringResource(R.string.tasks_started_at, formatTime(it)) }
+        AutomationStatus.RUNNING -> task.lastRunAt?.let { stringResource(R.string.tasks_started_at, taskDateTime(it)) }
             ?: taskStatusLabel(task.status)
-        else -> task.lastRunAt?.let { stringResource(R.string.tasks_last_run, formatTime(it)) }
+        else -> task.lastRunAt?.let { stringResource(R.string.tasks_last_run, taskDateTime(it)) }
             ?: taskStatusLabel(task.status)
     }
 }

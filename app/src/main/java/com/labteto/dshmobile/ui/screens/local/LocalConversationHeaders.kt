@@ -3,6 +3,11 @@ package com.labteto.dshmobile.ui.screens.local
 import com.shenyan.designsystem.foundation.SyMetric
 
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import com.shenyan.designsystem.foundation.LocalSyMotionTempo
+import com.shenyan.designsystem.foundation.LocalSyReduceMotion
+import com.shenyan.designsystem.foundation.SyMotion
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -200,16 +205,26 @@ internal fun WorkSurfaceHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs),
             ) {
-                Text(
-                    statusText,
+                Crossfade(
+                    targetState = statusText,
                     modifier = Modifier.weight(1f, fill = false),
-                    style = DsType.small13.withReadingWeight(),
-                    color = if (statusText.startsWith("执行异常") ||
-                        statusText.startsWith("执行状态读取异常") ||
-                        statusText.startsWith("任务步骤失败")) colors.dangerInk else colors.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                    animationSpec = tween(
+                        SyMotion.duration(SyMotion.composerFadeMs, LocalSyReduceMotion.current,
+                            LocalSyMotionTempo.current),
+                        easing = SyMotion.ease,
+                    ),
+                    label = "workHeaderStatus",
+                ) { status ->
+                    Text(
+                        status,
+                        style = DsType.small13.withReadingWeight(),
+                        color = if (status.startsWith("执行异常") ||
+                            status.startsWith("执行状态读取异常") ||
+                            status.startsWith("任务步骤失败")) colors.dangerInk else colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 if (onOpenWorkEvidence != null) {
                     Icon(FeatherIcons.ChevronRight, contentDescription = null,
                         modifier = Modifier.size(16.dp), tint = colors.textSecondary)

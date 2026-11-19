@@ -7,7 +7,6 @@ import com.shenyan.designsystem.components.SyMaterialTier
 import com.shenyan.designsystem.components.SyMaterialSurface
 
 
-import android.text.format.DateFormat as AndroidDateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -70,8 +68,6 @@ import com.labteto.dshmobile.ui.theme.DsShapes
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.rootSurface
 import com.labteto.dshmobile.ui.theme.withReadingWeight
-import java.text.DateFormat
-import java.util.Date
 
 internal enum class ChatAutomationVisualStatus {
     PENDING, RUNNING, ONGOING, COMPLETED, PAUSED, WAITING, BLOCKED, FAILED,
@@ -788,31 +784,31 @@ private fun chatScheduleDescription(task: AutomationTask): String = when (task.s
     )
     AutomationScheduleType.DAILY -> stringResource(
         R.string.tasks_chat_schedule_daily,
-        shortTime(task.nextRunAt),
+        taskDateTime(task.nextRunAt),
     )
     AutomationScheduleType.WEEKLY -> stringResource(
         R.string.tasks_chat_schedule_weekly,
-        shortTime(task.nextRunAt),
+        taskDateTime(task.nextRunAt),
     )
-    AutomationScheduleType.MONTHLY -> stringResource(R.string.tasks_schedule_monthly) + " · " + shortTime(task.nextRunAt)
+    AutomationScheduleType.MONTHLY -> stringResource(R.string.tasks_schedule_monthly) + " · " + taskDateTime(task.nextRunAt)
     AutomationScheduleType.INTERVAL, AutomationScheduleType.LEGACY -> {
         val minutes = task.recurringMinutes
         when {
-            minutes == null -> stringResource(R.string.tasks_chat_schedule_once, shortTime(task.nextRunAt))
+            minutes == null -> stringResource(R.string.tasks_chat_schedule_once, taskDateTime(task.nextRunAt))
             minutes % 60L == 0L -> stringResource(
                 R.string.tasks_chat_schedule_interval_hours,
                 minutes / 60L,
-                shortTime(task.nextRunAt),
+                taskDateTime(task.nextRunAt),
             )
             else -> stringResource(
                 R.string.tasks_chat_schedule_interval_minutes,
                 minutes,
-                shortTime(task.nextRunAt),
+                taskDateTime(task.nextRunAt),
             )
         }
     }
     AutomationScheduleType.ONCE ->
-        stringResource(R.string.tasks_chat_schedule_once, shortTime(task.nextRunAt))
+        stringResource(R.string.tasks_chat_schedule_once, taskDateTime(task.nextRunAt))
 }
 
 private fun PlannerUiError.messageRes(): Int = when (this) {
@@ -823,6 +819,3 @@ private fun PlannerUiError.messageRes(): Int = when (this) {
 
 private fun formatMinute(minuteOfDay: Int): String =
     "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
-
-private fun shortTime(time: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(time))

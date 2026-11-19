@@ -58,7 +58,8 @@ import com.labteto.dshmobile.ui.shenyan.rememberSyToast
 import com.labteto.dshmobile.ui.theme.DsType
 import com.labteto.dshmobile.ui.theme.withReadingWeight
 import com.labteto.dshmobile.ui.theme.rootSurface
-import java.text.DateFormat
+import android.text.format.DateFormat
+import androidx.compose.ui.platform.LocalContext
 import java.util.Date
 
 /** Device-side view filter only; never changes the persisted task's real status. */
@@ -451,5 +452,10 @@ private fun cadenceForTask(task: AutomationTask): AutomationCadence = when (task
 private fun customHoursForTask(task: AutomationTask): String =
     maxOf(1L, (task.recurringMinutes ?: 6L * 60L) / 60L).toString()
 
-internal fun formatTime(time: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(time))
+@Composable
+internal fun taskDateTime(time: Long): String {
+    val context = LocalContext.current
+    val date = Date(time)
+    return stringResource(R.string.tasks_date_time_display,
+        DateFormat.getDateFormat(context).format(date), DateFormat.getTimeFormat(context).format(date))
+}
