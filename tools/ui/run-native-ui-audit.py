@@ -9,6 +9,7 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
 VIDEOS=OUT/'videos';VIDEOS.mkdir(exist_ok=True)
 CLASSES=[
+ 'com.labteto.dshmobile.local.BundledCliAndroidTest',
  'com.shenyan.designsystem.components.ShenyanAtlasInteractionTest',
  'com.labteto.dshmobile.ui.screens.local.ShenyanAtlasClosureTest',
  'com.shenyan.designsystem.components.SyLiquidRefractionAndroidTest',
