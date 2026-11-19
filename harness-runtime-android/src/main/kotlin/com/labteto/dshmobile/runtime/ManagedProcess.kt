@@ -15,6 +15,37 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
+/**
+ * The system setsid/sh loader must start with Android's platform libraries.
+ * Bundled Termux libraries belong only to the actual child command. Pass them
+ * through inert environment keys until the trusted shell has printed its PID.
+ * No caller command or environment value is interpolated into shell source.
+ */
+internal fun prepareManagedProcessLauncher(
+    builder: ProcessBuilder,
+    setsid: String,
+    shell: String,
+) {
+    val originalCommand = builder.command().toList()
+    val deferredLinkerVariables = listOf("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")
+    val bootstrapEnvironment = builder.environment()
+    deferredLinkerVariables.forEach { key ->
+        val stagedKey = "DSH_MANAGED_$key"
+        require(!bootstrapEnvironment.containsKey(stagedKey)) { "进程启动环境变量冲突：$stagedKey" }
+        bootstrapEnvironment.remove(key)?.let { bootstrapEnvironment[stagedKey] = it }
+    }
+    val launchScript = buildString {
+        append("printf '%s\\n' \"\$\$\"; ")
+        deferredLinkerVariables.forEach { key ->
+            val stagedKey = "DSH_MANAGED_$key"
+            append("if [ \"\${$stagedKey+x}\" ]; then ")
+            append("export $key=\"\$stagedKey\"; unset $stagedKey; fi; ")
+        }
+        append("exec \"\$@\"")
+    }
+    builder.command(listOf(setsid, shell, "-c", launchScript, "managed") + originalCommand)
+}
+
 /** Each managed command owns a process group; Android 36 has no public Process.pid API. */
 class ManagedProcess private constructor(val process: Process, private val groupId: Long, private val shell: String) {
     private val ownedGroups = linkedSetOf(groupId)
@@ -68,8 +99,7 @@ class ManagedProcess private constructor(val process: Process, private val group
             val setsid = listOf("/system/bin/setsid", "/usr/bin/setsid", "/bin/setsid")
                 .firstOrNull { File(it).canExecute() }
                 ?: error("缺少 setsid，拒绝启动无法整体取消的进程")
-            val command = builder.command().toList()
-            builder.command(listOf(setsid, shell, "-c", "printf '%s\\n' \"\$\$\"; exec \"\$@\"", "managed") + command)
+            prepareManagedProcessLauncher(builder, setsid, shell)
             val process = builder.start()
             try {
                 // Read only the fixed startup line, without buffering any command output.
