@@ -13,10 +13,10 @@
 | 03 底部弹窗 | `SyResponsiveSheet`、`SyModalSheet`、`SyActionSheet`、`SyMultiSelectSheet` | 现行响应式弹层与新操作面板 |
 | 04 长按/滑动 | `SyConversationActionPopup`、`SyContextActionMenu`、`SySwipeActionRow` | 现行触点菜单 + 左滑显示操作 |
 | 05 通知与反馈 | `SyToastHost`、`SyUndoSnackbarHost`、`SyInlineBanner` | 轻提示、可撤销通知、持续状态 |
-| 06 加载与进度 | `SyLoadingState`、`SyProgressBar`、`SyEmptyState`、`SySkeletonBlock`、`SySkeletonCard` | 真实任务状态驱动，无伪进度 |
+| 06 加载与进度 | `SyLoadingState`、`SyProgressBar`、`SyProgressRing`、`SyEmptyState`、`SySkeletonBlock`、`SySkeletonCard` | 真实任务状态驱动，无伪进度 |
 | 07 引导与过渡 | `SyOnboardingCarousel`、`SyPageDots`、`SyCoachMark` | 新手引导、可访问的页码与提示 |
 | 08 表单/筛选 | `SyTextField`、`SySegmentedControl`、`SyDatePickerField`、`SyDateRangePickerDialog`、`SyNumericStepper` | 表单状态由调用方持有，日期时间采用系统毫秒值 |
-| 09 媒体播放 | `SyFullscreenMediaOverlay`、`SyMediaTransport` | 播放、进度和跳转由实际媒体播放器持有 |
+| 09 媒体播放 | `SyFullscreenMediaOverlay`、`SyMediaTransport`、`SyMiniPlayer` | 播放、进度和跳转由实际媒体播放器持有 |
 | 10 AI 聊天 | `SyConversationComposer`、`SyComposerField`、`SyConversationActionPopup`、`SyChatComposer` | 消息编辑、附件、语音与发送皆为真实回调 |
 
 新增复用能力集中在 `ShenyanInteractionAtlas.kt`，只补现有库缺失的交互，

@@ -604,6 +604,97 @@ fun SyMediaTransport(
     }
 }
 
+
+/** 由调用方提供真实完成比例；null 表示进行中且进度未知。 */
+@Composable
+fun SyProgressRing(
+    progress: Float?,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalSyColors.current
+    val amount = progress?.coerceIn(0f, 1f)
+    Row(
+        modifier.heightIn(min = SyMetric.touch),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (amount == null) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(30.dp),
+                color = palette.primary,
+                strokeWidth = 3.dp,
+            )
+        } else {
+            CircularProgressIndicator(
+                progress = { amount },
+                modifier = Modifier.size(30.dp),
+                color = palette.primary,
+                trackColor = palette.textTertiary.copy(alpha = .2f),
+                strokeWidth = 3.dp,
+            )
+        }
+        Text(
+            if (amount == null) label else "$label · ${(amount * 100f).roundToInt()}%",
+            color = palette.text,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
+/** 紧凑播放条仅负责交互展示；播放和关闭状态始终由上层持有。 */
+@Composable
+fun SyMiniPlayer(
+    title: String,
+    subtitle: String,
+    playing: Boolean,
+    onPlayPause: () -> Unit,
+    onExpand: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalSyColors.current
+    Surface(
+        modifier.fillMaxWidth(),
+        color = palette.materialL3,
+        contentColor = palette.text,
+        shape = RoundedCornerShape(SyMetric.radiusCard),
+        border = androidx.compose.foundation.BorderStroke(1.dp, palette.border),
+    ) {
+        Row(
+            Modifier.padding(8.dp).heightIn(min = SyMetric.touch),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Surface(
+                onClick = onExpand,
+                modifier = Modifier.weight(1f).heightIn(min = SyMetric.touch),
+                color = Color.Transparent,
+            ) {
+                Column(
+                    Modifier.padding(horizontal = 8.dp),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(title, color = palette.text, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleSmall)
+                    Text(subtitle, color = palette.textSecondary, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            SyIconButton(
+                if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                if (playing) "暂停播放" else "继续播放",
+                onPlayPause,
+                selected = playing,
+                bare = true,
+            )
+            SyIconButton(Icons.Default.Close, "关闭迷你播放器", onClose, bare = true)
+        }
+    }
+}
+
 @Composable
 fun SyChatComposer(
     value: String,
