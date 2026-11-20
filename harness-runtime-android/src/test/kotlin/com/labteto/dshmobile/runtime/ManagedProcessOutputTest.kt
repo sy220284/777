@@ -10,6 +10,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ManagedProcessOutputTest {
+    @Test fun sandboxProcSelfLinksRemainRelativeToTheChildProcess() {
+        assertEquals("/proc/self", isolationRootPath(java.io.File("/proc/self")))
+        assertEquals("/proc/thread-self", isolationRootPath(java.io.File("/proc/thread-self")))
+        // Ordinary paths still resolve canonically; only kernel-relative links
+        // must be deferred until the isolated child installs Landlock.
+        assertEquals(java.io.File("/tmp").canonicalPath, isolationRootPath(java.io.File("/tmp")))
+    }
     @Test fun keepsSupplementaryCodePointIntact() {
         assertEquals("A", truncateProcessOutput("A\uD83D\uDE00B", 2))
         assertEquals("A\uD83D\uDE00", truncateProcessOutput("A\uD83D\uDE00B", 3))
