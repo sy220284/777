@@ -463,6 +463,47 @@ class LocalConversationComposerRegressionTest {
     }
 
     @Test
+    fun runningChatCanQueueAnotherTurnWhileStopRemainsAvailable() {
+        val sent = mutableListOf<String>()
+        var stopped = 0
+        compose.setContent {
+            DshTheme {
+                LocalConversationComposer(
+                    state = LocalConversationSurfaceState(
+                        loading = false, configured = true,
+                        sessionId = "chat-queued-draft",
+                        usageMode = LocalUsageMode.CHAT, running = true,
+                    ),
+                    activeModelProfile = null,
+                    input = "下一轮再说这个",
+                    attachments = emptyList(),
+                    onInputChange = {},
+                    onRemoveAttachment = {},
+                    onClearAttachments = {},
+                    onOpenAttachmentPicker = {},
+                    onShowReplySuggestions = {},
+                    onGenerateReplySuggestions = { false },
+                    onSend = { text, _ ->
+                        sent += text
+                        LocalSendResult.Queued
+                    },
+                    onStop = { stopped++ },
+                    onPlanModeChange = {},
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("加入待发送队列").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("下一轮再说这个"), sent)
+            assertEquals(0, stopped)
+        }
+        compose.onNodeWithContentDescription(
+            context.getString(R.string.chat_composer_stop),
+        ).performClick()
+        compose.runOnIdle { assertEquals(1, stopped) }
+    }
+
+    @Test
     fun runningChatCompactComposerOnlyShowsStop() {
         var stopped = 0
         compose.setContent {

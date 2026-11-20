@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Inject
 import javax.inject.Singleton
+import javax.inject.Provider
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.uiBindingIdentity
 import com.labteto.dshmobile.uicontract.PersonaSelectionUiPort
@@ -44,6 +45,7 @@ class LocalChatRuntime @Inject internal constructor(
     private val groupMembership: LocalGroupChatMembershipCoordinator,
     private val replySuggestions: LocalReplySuggestionCoordinator,
     private val gallery: ChatPersonaGalleryStore,
+    private val composition: Provider<LocalChatComposition>,
 ) : PersonaSelectionUiPort, PersonaStoryUiPort, PersonaGalleryDeletionUiPort, PersonaGallerySaveUiPort {
     internal suspend fun configureChatPersona(profile: PersonaProfile): Result<Unit> = behaviorTuning.configure(profile)
     internal fun bindChatGallery(galleryId: String, galleryStoryId: String?) = personaCoordinator.bindGallery(galleryId, galleryStoryId)
@@ -326,6 +328,22 @@ class LocalChatRuntime @Inject internal constructor(
     internal fun selectChatMessageVariant(messageId: String, targetIndex: Int): Boolean =
         execution.selectMessageVariant(messageId, targetIndex)
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
+    internal fun retryFailedGroupReply(memberId: String): Boolean = execution.retryFailedGroupReply(memberId)
+    internal fun resumeGroupPending(): Boolean {
+        val current = runtimeStateStore.state.value
+        if (current.loading || current.kernel.running || current.usageMode != LocalUsageMode.CHAT ||
+            !current.chat.groupChat.enabled || !current.modelState.configured ||
+            current.chat.groupChat.context.pendingThroughSequence <=
+                current.chat.groupChat.context.processedThroughSequence) return false
+        return composition.get().resumePostTurn(current.sessionId,
+            sessionStorage.eventLogs.get(current.sessionId))
+    }
+    internal fun recallEvidenceForMessage(messageId: String): List<ChatRecallEvidence> {
+        val current = runtimeStateStore.state.value
+        if (current.loading || current.usageMode != LocalUsageMode.CHAT || messageId.isBlank())
+            return emptyList()
+        return readChatRecallEvidence(sessionStorage.eventLogs.get(current.sessionId), messageId)
+    }
     internal fun stop() = runtimeStateStore.performVisibleOperation("停止聊天时保存失败") {
         val sessionId = runtimeStateStore.currentSessionId
         LocalChatPostTurnJobOwner.cancel()

@@ -23,8 +23,10 @@ class ChatInteractionPlanner @Inject constructor(json: Json) {
         persona: PersonaProfile, state: ChatCharacterState, userMessage: String,
         assistantMessage: String, recentDialogue: List<Pair<String, String>> = emptyList(),
         context: ChatContextState = ChatContextState(),
+        intimacyModeEnabled: Boolean = false,
     ): String = promptBuilder.suggestionsPrompt(
         persona.forRuntimeStoryStage(context), state.canonicalizeLegacyCharacterState(), userMessage, assistantMessage, recentDialogue,
+        intimacyModeEnabled,
     )
 
     fun parseSuggestions(text: String): List<ChatReplySuggestion>? = parser.parseSuggestions(text)

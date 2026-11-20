@@ -35,6 +35,10 @@ class LocalChatWebContextProviderTest {
     fun roleplayAndExplicitNoNetworkStayOffline() {
         assertNull(chatWebLookup("你好，今天我们继续写小说"))
         assertNull(chatWebLookup("不要联网，分析这段故事"))
+        assertNull(chatWebLookup("别再联网了，搜一下今天的新闻"))
+        assertNull(chatWebLookup("不要帮我上网查，先讨论这个网址 https://example.com"))
+        assertNull(chatWebLookup("不要打开这个网页：https://example.com/news"))
+        assertNull(chatWebLookup("请勿网络搜索最新版本"))
         assertNull(chatWebLookup("请只根据角色设定回答"))
     }
 }

@@ -199,11 +199,31 @@ class ChatIntimacyModeTest {
     }
 
     @Test
+    fun manualSwitchControlsOriginalModelInstructions() {
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val persona = PersonaProfile(name = "阿青")
+        val input = "过来抱住我亲一下"
+        val disabled = projector.project(persona, ChatCharacterState(), ChatContextState(),
+            input, null, intimacyModeEnabled = false)
+        assertFalse(disabled.dynamicPrompt.contains("【亲密模式】"))
+        assertFalse(disabled.dynamicPrompt.contains("【身体反应强度】"))
+        val enabled = projector.project(persona, ChatCharacterState(), ChatContextState(),
+            input, null, intimacyModeEnabled = true)
+        assertTrue(enabled.dynamicPrompt.contains("【亲密模式】"))
+        assertTrue(enabled.dynamicPrompt.contains("【身体反应强度】当前=5/5"))
+        assertTrue(enabled.dynamicPrompt.contains("【本轮意图优先：成年亲密互动】"))
+        assertEquals(disabled.stablePrompt, enabled.stablePrompt)
+    }
+
+    @Test
     fun runtimeProjectionIncludesIntimacyOnlyForActiveTurn() {
         val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
         val persona = PersonaProfile(name = "阿青")
         val plain = projector.project(persona, ChatCharacterState(), ChatContextState(), "你好", null)
-        val active = projector.project(persona, ChatCharacterState(), ChatContextState(), "今晚撩我一下", null)
+        val disabled = projector.project(persona, ChatCharacterState(), ChatContextState(), "今晚撩我一下", null)
+        assertFalse(disabled.dynamicPrompt.contains("【亲密模式】"))
+        val active = projector.project(persona, ChatCharacterState(), ChatContextState(),
+            "今晚撩我一下", null, intimacyModeEnabled = true)
         assertFalse(plain.dynamicPrompt.contains("【亲密模式】"))
         assertFalse(plain.dynamicPrompt.contains("【互动倾向】"))
         assertTrue(active.dynamicPrompt.contains("【亲密模式】"))

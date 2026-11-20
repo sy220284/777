@@ -166,6 +166,14 @@ class LocalGroupChatTest {
     }
 
     @Test
+    fun ordinaryConversationRotatesEvenWhenTheLastSpeakerIsStillActive() {
+        val first = groupChatResponders("今天怎么样", listOf(zhao, ayaka, kafka), "kafka")
+        val second = groupChatResponders("接下来呢", listOf(ayaka, kafka, zhao), "zhao")
+        assertEquals(listOf("zhao"), first.map { it.galleryId })
+        assertEquals(listOf("ayaka"), second.map { it.galleryId })
+    }
+
+    @Test
     fun ordinaryMessageUsesOneRotatedPrimarySpeaker() {
         val responders = groupChatResponders(
             input = "今天怎么这么安静",

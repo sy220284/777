@@ -94,7 +94,10 @@ internal sealed interface ChatWebLookup {
 internal fun chatWebLookup(input: String, persona: PersonaProfile? = null): ChatWebLookup? {
     val normalized = input.trim()
     if (normalized.isEmpty()) return null
-    if (Regex("""(不要|不用|无需|禁止|别)(联网|上网|搜索网页|网页搜索|查网页)""").containsMatchIn(normalized)) {
+    // Explicit refusal takes precedence over URLs, fresh-data keywords and canon lookup.
+    // In particular, sharing a URL while saying "不要打开这个网页" must not fetch it.
+    if (Regex("""(?:不要|别再?|无需|无须|不必|不用|禁止|请勿|不许|不准|不需要|只在本地|仅离线)[^。！？!?\n]{0,16}(?:联网|上网|搜|查网|网络|网页|网站|网址|链接|浏览|打开这个|访问这个)""",
+            RegexOption.IGNORE_CASE).containsMatchIn(normalized)) {
         return null
     }
     val url = Regex("""https?://[^\s<>"'，。！？；;]+""", RegexOption.IGNORE_CASE)

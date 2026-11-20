@@ -86,6 +86,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatBranchInfoIndex
@@ -157,6 +158,7 @@ internal data class LocalTranscriptJumpTarget(val sessionId: String, val message
 internal class LocalConversationSurfaceArgs(
     val state: LocalConversationSurfaceState,
     val workActions: LocalWorkFeatureUiActions?,
+    val queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort?,
     val nativeDocuments: NativeV6Documents?,
     val onOpenWorkArtifact: (String) -> Unit,
     val activeModelProfile: LocalModelProfile?,
@@ -177,8 +179,12 @@ internal class LocalConversationSurfaceArgs(
     val onStopTeam: suspend () -> LocalWorkUiActionResult,
     val onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     val onLocateMemoryForMessage: (String) -> Unit,
+    val onReadChatRecallEvidence: (String) -> List<com.labteto.dshmobile.local.chat.ChatRecallEvidence>,
+    val onOpenRecallSource: (String, String) -> Unit,
     val onSelectMessageVariant: suspend (String, Int) -> Boolean,
     val onRegenerate: (String) -> Boolean,
+    val onRetryFailedGroupReply: (String) -> Boolean,
+    val onResumeGroupPending: () -> Boolean,
     val onGenerateReplySuggestions: suspend () -> Boolean,
     val onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)?,
     val searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
@@ -225,6 +231,7 @@ internal class LocalConversationSurfaceArgs(
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
     workActions: LocalWorkFeatureUiActions? = null,
+    queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort? = null,
     nativeDocuments: NativeV6Documents? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
     activeModelProfile: LocalModelProfile?,
@@ -245,8 +252,12 @@ internal fun LocalConversationSurface(
     onStopTeam: suspend () -> LocalWorkUiActionResult,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     onLocateMemoryForMessage: (String) -> Unit = {},
+    onReadChatRecallEvidence: (String) -> List<com.labteto.dshmobile.local.chat.ChatRecallEvidence> = { emptyList() },
+    onOpenRecallSource: (String, String) -> Unit = { _, _ -> },
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
+    onRetryFailedGroupReply: (String) -> Boolean = { false },
+    onResumeGroupPending: () -> Boolean = { false },
     onGenerateReplySuggestions: suspend () -> Boolean,
     onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)? = null,
     searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
@@ -291,6 +302,7 @@ internal fun LocalConversationSurface(
     val args = LocalConversationSurfaceArgs(
         state = state,
         workActions = workActions,
+        queuedUserPort = queuedUserPort,
         nativeDocuments = nativeDocuments,
         onOpenWorkArtifact = onOpenWorkArtifact,
         activeModelProfile = activeModelProfile,
@@ -311,8 +323,12 @@ internal fun LocalConversationSurface(
         onStopTeam = onStopTeam,
         onEditAndResend = onEditAndResend,
         onLocateMemoryForMessage = onLocateMemoryForMessage,
+        onReadChatRecallEvidence = onReadChatRecallEvidence,
+        onOpenRecallSource = onOpenRecallSource,
         onSelectMessageVariant = onSelectMessageVariant,
         onRegenerate = onRegenerate,
+        onRetryFailedGroupReply = onRetryFailedGroupReply,
+        onResumeGroupPending = onResumeGroupPending,
         onGenerateReplySuggestions = onGenerateReplySuggestions,
         onSampleSession = onSampleSession,
         searchTranscript = searchTranscript,
@@ -362,6 +378,7 @@ internal fun LocalConversationSurface(
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
     val workActions = args.workActions
+    val queuedUserPort = args.queuedUserPort
     var queuedMessagesOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val nativeDocuments = args.nativeDocuments
     val nativeDocumentSnapshot by (nativeDocuments?.snapshots ?: kotlinx.coroutines.flow.flowOf(
@@ -387,8 +404,12 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onStopTeam = args.onStopTeam
     val onEditAndResend = args.onEditAndResend
     val onLocateMemoryForMessage = args.onLocateMemoryForMessage
+    val onReadChatRecallEvidence = args.onReadChatRecallEvidence
+    val onOpenRecallSource = args.onOpenRecallSource
     val onSelectMessageVariant = args.onSelectMessageVariant
     val onRegenerate = args.onRegenerate
+    val onRetryFailedGroupReply = args.onRetryFailedGroupReply
+    val onResumeGroupPending = args.onResumeGroupPending
     val onGenerateReplySuggestions = args.onGenerateReplySuggestions
     val onSampleSession = args.onSampleSession
     val onLoadOlderTranscript = args.onLoadOlderTranscript
@@ -444,6 +465,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     // Background is painted once by the app scene, not in a separate header slab.
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
+    val draftPreferences = remember(appContext) {
+        appContext.getSharedPreferences("chat-next-session-drafts", android.content.Context.MODE_PRIVATE)
+    }
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
     val performanceCeiling = LocalModelPerformanceControls.state.collectAsStateWithLifecycle().value.temperatureCeiling
     var reasoningMode by remember(state.sessionId, state.usageMode) {
@@ -469,7 +493,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     LaunchedEffect(composerHandoff, state.sessionId) {
         if (composerHandoff.size == 2 && composerHandoff[0] == state.sessionId) {
             val previous = drafts[state.sessionId].orEmpty()
-            drafts.putBoundedLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
+            drafts.putLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
             onConsumeComposerHandoff()
         }
     }
@@ -494,6 +518,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     val loadedSearchState = rememberV6LoadedConversationSearchState(state.sessionId)
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
+    var showChatStoryContext by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var showChatStoryOverview by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var recallSheetMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
+    var recallSheetItems by remember(state.sessionId) {
+        mutableStateOf(emptyList<com.labteto.dshmobile.local.chat.ChatRecallEvidence>())
+    }
+    val latestChatSessionId by androidx.compose.runtime.rememberUpdatedState(state.sessionId)
     var showWorkEvidence by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
@@ -511,6 +542,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ),
     ) { LocalSessionAttachmentDraftCache() }
     val attachments = attachmentDrafts.forSession(state.sessionId)
+    var draftStorageReady by remember(drafts, attachmentDrafts) { mutableStateOf(false) }
+    LaunchedEffect(drafts, attachmentDrafts, draftPreferences) {
+        drafts.attach(draftPreferences)
+        attachmentDrafts.attach(draftPreferences)
+        draftStorageReady = true
+    }
+    // Persist changes from the actual mutable attachment list, including page selection,
+    // and restore the full set for every session after process death.
+    LaunchedEffect(draftStorageReady, state.sessionId, attachments) {
+        if (!draftStorageReady) return@LaunchedEffect
+        snapshotFlow { attachments.toList() }.distinctUntilChanged().collect {
+            attachmentDrafts.persistSession(state.sessionId)
+        }
+    }
     // Each conversation owns its scroll position. A shared list state can
     // flash the prior session's index before the new tail is positioned.
     val listState = androidx.compose.runtime.key(state.sessionId) { rememberLazyListState() }
@@ -1006,20 +1051,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             stringResource(R.string.local_chat_no_persona)
                         }
                         ChatSurfaceHeader(
-                            personaName = personaDisplayName,
+                            personaName = if (state.groupChat.enabled) sessionTitle else personaDisplayName,
                             portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-                            secondary = if (state.conversationMode == LocalConversationMode.INDEPENDENT) {
-                                stringResource(R.string.local_new_session_chat_new)
-                            } else {
-                                localConversationModeLabel(state.conversationMode)
-                            },
+                            secondary = currentGalleryStory?.title?.takeIf(String::isNotBlank)
+                                ?: if (state.conversationMode == LocalConversationMode.INDEPENDENT) {
+                                    stringResource(R.string.local_new_session_chat_new)
+                                } else {
+                                    localConversationModeLabel(state.conversationMode)
+                                },
                             groupEnabled = state.groupChat.enabled,
                             groupMembers = state.groupChat.members,
                             activeSpeakerName = state.groupActiveSpeakerName,
                             running = state.running || state.loading,
                             onContextClick = {
-                                if (state.groupChat.enabled) showGroupMemberPicker = true
-                                else showPersonaPicker = true
+                                showChatStoryContext = true
                             },
                             onExitGroupChat = onExitGroupChat,
                             onNewSession = onNewSession,
@@ -1144,7 +1189,22 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         if (state.groupChat.enabled && state.groupChat.failedReplyMemberIds.isNotEmpty()) {
-            GroupReplyFailureNotice(state.groupChat, state.running) { request -> onSend(request, emptyList()) }
+            GroupReplyFailureNotice(state.groupChat, state.running,
+                retry = { memberId -> onRetryFailedGroupReply(memberId) },
+                latestUserMessageId = state.messages.lastOrNull { it.role == "user" }?.id,
+            )
+            if (!state.running && state.configured &&
+                state.groupChat.context.pendingThroughSequence >
+                    state.groupChat.context.processedThroughSequence) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                    Text("已保存回复，人物经历正在整理或等待恢复。",
+                        style = SyType.small13.withReadingWeight(),
+                        color = colors.textSecondary, modifier = Modifier.weight(1f))
+                    SyButton("继续整理", onClick = { onResumeGroupPending() },
+                        variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
+                }
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
             val transcriptBody: @Composable () -> Unit = {
@@ -1210,17 +1270,28 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     item(key = "local-empty-guide") {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             if (showChatPersonaWelcome) {
-                                Text(
-                                    stringResource(R.string.local_chat_persona_welcome_title),
-                                    style = SyType.large20.withReadingWeight(),
-                                    color = colors.text,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp)
-                                        .widthIn(max = 280.dp),
-                                )
+                                        .widthIn(max = 300.dp),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.local_chat_persona_welcome_title),
+                                        style = SyType.large20.withReadingWeight(),
+                                        color = colors.text,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    )
+                                    Text("可以直接发送消息，也可以选择人物开始一个独立故事。",
+                                        style = SyType.small13.withReadingWeight(),
+                                        color = colors.textSecondary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                    SyButton(text = "选择人物", onClick = onOpenPersonaGallery,
+                                        variant = SyButtonVariant.Outline)
+                                }
                             } else {
                                 EmptyLocalHarness { suggestion ->
-                                    drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                                    drafts.putLocalDraft(state.sessionId, suggestion)
                                 }
                             }
                         }
@@ -1325,7 +1396,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                             LocalComposerAttachmentDecision.ACCEPT -> {
                                                 attachments += reusable
                                                 val current = drafts[state.sessionId].orEmpty()
-                                                drafts.putBoundedLocalDraft(state.sessionId,
+                                                drafts.putLocalDraft(state.sessionId,
                                                     listOf(generatedImageEditPrompt, current)
                                                         .filter(String::isNotBlank).joinToString("\n\n"))
                                                 null
@@ -1354,7 +1425,25 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     transcriptItem.message.role == "assistant" &&
                                     state.messages.any { it.id == transcriptItem.message.id }
                                 ) { message -> documentGenerationMessageId = message.id } else null,
-                                onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
+                                onLocateSourceMemory = { message ->
+                                    if (state.usageMode != LocalUsageMode.CHAT || message.role != "assistant") {
+                                        onLocateMemoryForMessage(message.id)
+                                    } else {
+                                        val originSessionId = state.sessionId
+                                        scope.launch {
+                                            val recorded = withContext(Dispatchers.IO) {
+                                                onReadChatRecallEvidence(message.id)
+                                            }
+                                            if (latestChatSessionId != originSessionId) return@launch
+                                            if (recorded.isEmpty()) {
+                                                onLocateMemoryForMessage(message.id)
+                                            } else {
+                                                recallSheetItems = recorded
+                                                recallSheetMessageId = message.id
+                                            }
+                                        }
+                                    }
+                                },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
@@ -1377,7 +1466,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     onPreparedDraft = {
                                         nativeDocuments.consumePreparedDraft(state.sessionId)?.let { prepared ->
                                             val previous = drafts[state.sessionId].orEmpty()
-                                            drafts.putBoundedLocalDraft(
+                                            drafts.putLocalDraft(
                                                 state.sessionId,
                                                 listOf(prepared, previous).filter(String::isNotBlank).joinToString("\n\n"),
                                             )
@@ -1410,7 +1499,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             },
                             onInsertText = { text ->
                                 val previous = drafts[state.sessionId].orEmpty()
-                                drafts.putBoundedLocalDraft(
+                                drafts.putLocalDraft(
                                     state.sessionId,
                                     listOf(previous, text).filter(String::isNotBlank).joinToString("\n\n"),
                                 )
@@ -1567,7 +1656,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 sendFeedback.rejectReason == LocalSendRejectReason.UNCONFIGURED,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
-            onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
+            onRestoreRequest = { drafts.putLocalDraft(state.sessionId, it) },
             onSwitchModelSource = {
                 if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
             },
@@ -1597,7 +1686,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
                     SyMaterialSurface(
-                        onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
+                        onClick = {
+                            val previous = drafts[state.sessionId].orEmpty()
+                            drafts.putLocalDraft(state.sessionId,
+                                listOf(previous, suggestion.text).filter(String::isNotBlank).joinToString("\n"))
+                        },
                         shape = SyShapes.pillFull,
                         tier = SyMaterialTier.L4_OVERLAY,
                         border = BorderStroke(1.dp, colors.border),
@@ -1632,7 +1725,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             ),
         )
 
-        if (state.queuedInputCount > 0 && workActions?.queuedUserPort != null) {
+        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled &&
+            !state.running && !state.loading && state.configured &&
+            state.queuedInputCount == 0 && state.messages.lastOrNull()?.role == "user") {
+            val lastUser = state.messages.last()
+            SyButton("重试本轮回复", onClick = { onRegenerate(lastUser.id) },
+                modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+        }
+        if (state.queuedInputCount > 0 && queuedUserPort != null) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
                 horizontalArrangement = Arrangement.End,
@@ -1653,7 +1753,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             input = input,
             attachments = attachments,
             attachmentImportProgress = attachmentImportProgress,
-            onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
+            onInputChange = { drafts.putLocalDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onSelectPdfPages = { index, pages ->
                 attachments.getOrNull(index)?.let { attachment ->
@@ -1830,6 +1930,79 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         onConfigurePersona = onConfigureChatPersona,
         onDismiss = { showCharacterTuning = false },
     )
+    if (showChatStoryContext && state.usageMode == LocalUsageMode.CHAT) {
+        SyResponsiveSheet(title = if (state.groupChat.enabled) "群聊与场景" else "人物与故事",
+            onDismiss = { showChatStoryContext = false }) {
+            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                Text(if (state.groupChat.enabled) sessionTitle else state.chatPersona.name,
+                    style = SyType.base16Strong.withReadingWeight(), color = colors.text)
+                if (!state.groupChat.enabled) {
+                    Text(currentGalleryStory?.title ?: "尚未选择人物故事",
+                        style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
+                    currentGalleryStory?.notes?.takeIf(String::isNotBlank)?.let { notes ->
+                        Text(notes.take(300), style = SyType.small13.withReadingWeight(),
+                            color = colors.textSecondary)
+                    }
+                    SyButton("故事概览与重要事件", onClick = {
+                        showChatStoryContext = false
+                        showChatStoryOverview = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                    SyButton("选择人物", onClick = {
+                        showChatStoryContext = false
+                        showPersonaPicker = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                    SyButton("查看人物故事", onClick = {
+                        showChatStoryContext = false
+                        onOpenPersonaGallery()
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
+                    SyButton("开始新故事", onClick = {
+                        showChatStoryContext = false
+                        onNewSession()
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
+                } else {
+                    Text("成员：" + state.groupChat.members.joinToString("、") { it.displayName },
+                        style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
+                    state.groupChat.announcement.takeIf(String::isNotBlank)?.let { summary ->
+                        Text(summary.take(240), style = SyType.small13.withReadingWeight(),
+                            color = colors.textSecondary)
+                    }
+                    SyButton("查看共同经历", onClick = {
+                        showChatStoryContext = false
+                        showChatStoryOverview = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                    SyButton("管理群聊成员", onClick = {
+                        showChatStoryContext = false
+                        showGroupMemberPicker = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                    SyButton("编辑公开场景", onClick = {
+                        showChatStoryContext = false
+                        showGroupAnnouncement = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
+                }
+            }
+        }
+    }
+    if (recallSheetMessageId != null && state.usageMode == LocalUsageMode.CHAT) {
+        ChatRecallEvidenceSheet(
+            items = recallSheetItems,
+            onOpenSource = { sourceSessionId, messageId ->
+                recallSheetMessageId = null
+                onOpenRecallSource(sourceSessionId, messageId)
+            },
+            onDismiss = { recallSheetMessageId = null },
+        )
+    }
+    if (showChatStoryOverview && state.usageMode == LocalUsageMode.CHAT) {
+        ChatStoryOverviewSheet(
+            storyTitle = currentGalleryStory?.title ?: sessionTitle,
+            context = if (state.groupChat.enabled) state.groupChat.context else state.chatContext,
+            onLocateMessage = { messageId ->
+                showChatStoryOverview = false
+                searchJumpTarget = LocalTranscriptJumpTarget(state.sessionId, messageId)
+            },
+            onDismiss = { showChatStoryOverview = false },
+        )
+    }
     if (
         showPersonaPicker &&
         state.usageMode == LocalUsageMode.CHAT &&
@@ -1869,9 +2042,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             },
         )
     }
-    if (queuedMessagesOpen && workActions?.queuedUserPort != null) {
+    if (queuedMessagesOpen && queuedUserPort != null) {
         LocalQueuedUserQueueSheet(
-            port = workActions.queuedUserPort,
+            port = queuedUserPort,
             sessionId = state.sessionId,
             queuedCount = state.queuedInputCount,
             onDismiss = { queuedMessagesOpen = false },
@@ -1925,7 +2098,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
                 SyFlatSurface(
                     onClick = {
-                        drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
+                        val previous = drafts[state.sessionId].orEmpty()
+                        drafts.putLocalDraft(state.sessionId,
+                            listOf(previous, suggestion.text).filter(String::isNotBlank).joinToString("\n"))
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -2066,7 +2241,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
                     val previous = drafts[state.sessionId].orEmpty()
-                    drafts.putBoundedLocalDraft(
+                    drafts.putLocalDraft(
                         state.sessionId,
                         listOf(previous, transcription).filter(String::isNotBlank).joinToString("\n\n"),
                     )
@@ -2099,7 +2274,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     memberName,
                 )
                 val previous = drafts[state.sessionId].orEmpty()
-                drafts.putBoundedLocalDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
+                drafts.putLocalDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
                 teamDispatchSelected = true
                 showTeamPanel = false
             },

@@ -29,6 +29,7 @@ data class UiSettingsSnapshot(
     val usage: DeepSeekUsageSnapshot = DeepSeekUsageSnapshot(), val error: String? = null,
     val miniMaxQuotaProfile: LocalModelProfile? = null,
     val personaBannedPhrases: List<String> = emptyList(),
+    val chatIntimacyModeEnabled: Boolean = false,
 ) { val modelProfiles: List<LocalModelProfile> get() = modelSelection.profiles }
 
 
@@ -80,6 +81,8 @@ interface SettingsUiPort {
     /** True only after the exact submitted generation is persisted and remains current. */
     suspend fun savePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean): Boolean
     fun configureChatStyleGuard(enabled: Boolean)
+    /** Persists the opt-in before publishing the new effective state. */
+    fun configureChatIntimacyMode(enabled: Boolean): Boolean
     fun addChatStyleGuardPhrase(value: String): Boolean
     fun removeChatStyleGuardPhrase(value: String)
     fun clearChatStyleGuardHits()
@@ -104,6 +107,7 @@ sealed interface SettingsUiCommand {
     data class RuntimeLimits(val main: Int, val subagent: Int, val attempts: Int, val workerProfileId: String?) : SettingsUiCommand
     data class Personalization(val rules: String, val autoRecall: Boolean, val autoMemory: Boolean) : SettingsUiCommand
     data class StyleGuard(val enabled: Boolean) : SettingsUiCommand
+    data class ChatIntimacyMode(val enabled: Boolean) : SettingsUiCommand
     data class AddStylePhrase(val phrase: String) : SettingsUiCommand
     data class RemoveStylePhrase(val phrase: String) : SettingsUiCommand
     data object ClearStyleHits : SettingsUiCommand
@@ -133,6 +137,8 @@ fun SettingsUiPort.submit(command: SettingsUiCommand): SettingsUiReceipt = try {
             return SettingsUiReceipt.Submitted
         }
         is SettingsUiCommand.StyleGuard -> configureChatStyleGuard(command.enabled)
+        is SettingsUiCommand.ChatIntimacyMode ->
+            if (!configureChatIntimacyMode(command.enabled)) return SettingsUiReceipt.Rejected
         is SettingsUiCommand.AddStylePhrase -> if (!addChatStyleGuardPhrase(command.phrase)) return SettingsUiReceipt.Rejected
         is SettingsUiCommand.RemoveStylePhrase -> removeChatStyleGuardPhrase(command.phrase)
         SettingsUiCommand.ClearStyleHits -> clearChatStyleGuardHits()

@@ -60,10 +60,11 @@ class ChatContinuityExperienceTest {
         } finally { root.deleteRecursively() }
     }
 
-    @Test fun ordinaryGroupReplyContinuesActualSpeakerAndExplicitAddressCanSwitch() {
+    @Test fun ordinaryGroupReplyBalancesRotationWithGenuineFollowupsAndDirectAddress() {
         val a = LocalGroupChatMember("a", "a", "阿青")
         val b = LocalGroupChatMember("b", "b", "小岚")
         assertEquals(listOf(a), groupChatResponders("后来呢？", listOf(b, a), "a"))
+        assertEquals(listOf(b), groupChatResponders("你怎么看今天天气", listOf(b, a), "a"))
         assertEquals(listOf(b), groupChatResponders("@小岚 你怎么看？", listOf(a, b), "a"))
         assertEquals(2, groupChatResponders("大家一起聊聊", listOf(a, b), "a").size)
     }

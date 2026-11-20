@@ -474,6 +474,21 @@ fun SettingsScreen(
 
         SettingsCard(stringResource(R.string.settings_page_chat)) {
             ToggleRow(
+                stringResource(R.string.settings_chat_intimacy_mode),
+                localHarness.chatIntimacyModeEnabled,
+            ) {
+                if (!viewModel.configureChatIntimacyMode(!localHarness.chatIntimacyModeEnabled)) {
+                    android.widget.Toast.makeText(context, R.string.settings_chat_intimacy_save_failed,
+                        android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            Text(
+                stringResource(R.string.settings_chat_intimacy_mode_hint),
+                style = SyType.small13.withReadingWeight(),
+                color = colors.textSecondary,
+            )
+
+            ToggleRow(
                 stringResource(R.string.settings_chat_style_guard),
                 localHarness.chatStyleGuardEnabled,
                             ) {

@@ -1204,7 +1204,10 @@
     <string name="local_persona_picker_saved_hint">已保存人物</string>
 
     <string name="settings_page_chat">聊天</string>
-    <string name="settings_chat_subtitle">避用表达与人物表达偏好</string>
+    <string name="settings_chat_subtitle">亲密模式与人物表达偏好</string>
+    <string name="settings_chat_intimacy_mode">亲密模式</string>
+    <string name="settings_chat_intimacy_mode_hint">默认关闭。主动开启后，人物单聊和群聊在相关话题中恢复原有的互动强度、动作变化和反应素材；普通聊天保持原样。关闭后，从下一轮回复起停用亲密模式引导。</string>
+    <string name="settings_chat_intimacy_save_failed">亲密模式设置保存失败，请重试</string>
     <string name="settings_chat_style_guard">表达偏好</string>
     <string name="settings_chat_style_guard_hint">把你填写的避用表达交给模型参考，回复原文完整保留。</string>
     <string name="settings_chat_filter_disabled_notice">表达偏好已关闭，回复中的用词保留模型原文。</string>

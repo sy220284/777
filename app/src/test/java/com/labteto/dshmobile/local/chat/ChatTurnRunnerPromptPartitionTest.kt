@@ -36,6 +36,35 @@ class ChatTurnRunnerPromptPartitionTest {
     }
 
     @Test
+    fun originalIntimacyInstructionsRequireExplicitOptInOnEveryModelTurn() {
+        val runner = ChatTurnRunner(
+            ChatPersonaStore(File(temporary.root, "intimacy-switch.json"), json),
+            ChatRelationshipEngine(), CharacterLoreEngine(),
+        )
+        val persona = PersonaProfile(name = "阿青", coreIdentity = "独立自主的原创人物")
+        val input = "过来抱住我亲一下"
+        val off = runner.prepareProfile(persona = persona, userInput = input)
+        assertFalse(off.prompt.contains("【亲密模式】"))
+        assertFalse(off.prompt.contains("【身体反应强度】"))
+
+        val on = runner.prepareProfile(
+            persona = persona, userInput = input, intimacyModeEnabled = true,
+        )
+        assertTrue(on.prompt.contains("【亲密模式】"))
+        assertTrue(on.prompt.contains("【身体反应强度】当前=5/5"))
+        assertTrue(ChatIntimacyMode().prompt(input, ChatCharacterState())
+            .contains("【本轮反应素材｜"))
+        assertEquals(off.stablePrompt, on.stablePrompt)
+
+        val offAgain = runner.prepareProfile(persona = persona, userInput = input,
+            intimacyModeEnabled = false)
+        assertFalse(offAgain.prompt.contains("【亲密模式】"))
+        val neutralWhenEnabled = runner.prepareProfile(persona = persona, userInput = "今天工作怎么样",
+            intimacyModeEnabled = true)
+        assertFalse(neutralWhenEnabled.prompt.contains("【亲密模式】"))
+    }
+
+    @Test
     fun stablePersonaFactsStaySeparateFromPerTurnState() {
         val runner = ChatTurnRunner(
             personaStore = ChatPersonaStore(File(temporary.root, "personas.json"), json),

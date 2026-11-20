@@ -3,6 +3,7 @@ package com.labteto.dshmobile.local.presentation
 import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.chat.ChatCharacterState
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.ChatPersonaCorrectionNotice
 import com.labteto.dshmobile.local.chat.ChatReplySuggestion
 import com.labteto.dshmobile.local.chat.LocalChatBranchState
@@ -38,6 +39,7 @@ data class LocalConversationSurfaceState(
     val galleryStoryId: String? = null,
     val chatPersona: PersonaProfile = PersonaProfile(),
     val chatState: ChatCharacterState = ChatCharacterState(),
+    val chatContext: ChatContextState = ChatContextState(),
     val replySuggestions: List<ChatReplySuggestion> = emptyList(),
     val chatBranches: LocalChatBranchState = LocalChatBranchState(),
     val groupChat: LocalGroupChatState = LocalGroupChatState(),
@@ -74,6 +76,7 @@ internal fun LocalHarnessState.toChatSurfaceUiState(): LocalConversationSurfaceS
         galleryStoryId = chat.galleryStoryId,
         chatPersona = chat.chatPersona,
         chatState = chat.chatState,
+        chatContext = chat.chatContext,
         replySuggestions = chat.replySuggestions,
         chatBranches = chat.chatBranches,
         groupChat = chat.groupChat,

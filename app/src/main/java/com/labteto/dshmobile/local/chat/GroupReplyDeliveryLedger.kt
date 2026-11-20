@@ -16,13 +16,23 @@ internal class GroupReplyDeliveryLedger(
 ) {
     private val failedIds = previousFailedMemberIds.filterNot { it in responderIds }.toMutableSet()
 
-    suspend fun fail(memberId: String, group: LocalGroupChatState): LocalGroupChatState {
+    suspend fun fail(
+        memberId: String,
+        group: LocalGroupChatState,
+        source: GroupReplyRetrySource? = null,
+    ): LocalGroupChatState {
         failedIds += memberId
-        return publish(group)
+        val withSource = if (source == null) group else group.copy(
+            failedReplySources = group.failedReplySources + (memberId to source),
+        )
+        return publish(withSource)
     }
 
     suspend fun publish(group: LocalGroupChatState): LocalGroupChatState {
-        val candidate = group.copy(failedReplyMemberIds = failedIds.toList())
+        val candidate = group.copy(
+            failedReplyMemberIds = failedIds.toList(),
+            failedReplySources = group.failedReplySources.filterKeys { it in failedIds },
+        )
         var accepted = false
         state.update { current ->
             accepted = current.sessionId == sessionId

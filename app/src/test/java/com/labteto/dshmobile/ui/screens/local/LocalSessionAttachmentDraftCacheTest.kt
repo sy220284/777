@@ -25,12 +25,13 @@ class LocalSessionAttachmentDraftCacheTest {
         assertEquals(listOf(valid), restored.forSession("chat-1").toList())
     }
 
-    @Test fun attachmentDraftsEvictOldestSessionAfterTwelve() {
+    @Test fun attachmentDraftsPreserveAllTwentySessions() {
         val cache = LocalSessionAttachmentDraftCache()
-        repeat(13) { i ->
+        repeat(20) { i ->
             cache.forSession("chat-$i").add(LocalImportedAttachment("x", "inputs/$i", "text/plain", 1L))
         }
-        assertEquals(12, cache.save().size / 2)
-        assertTrue(LocalSessionAttachmentDraftCache.restore(cache.save()).forSession("chat-0").isEmpty())
+        assertEquals(20, cache.save().size / 2)
+        assertEquals(1, LocalSessionAttachmentDraftCache.restore(cache.save()).forSession("chat-0").size)
+        assertEquals(1, LocalSessionAttachmentDraftCache.restore(cache.save()).forSession("chat-19").size)
     }
 }

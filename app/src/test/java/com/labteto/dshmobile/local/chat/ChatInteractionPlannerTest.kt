@@ -1427,6 +1427,29 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun replySuggestionsExcludeIntimacyWhenSettingDisabled() {
+        val state = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+            recentActionTags = listOf("靠近"),
+        )
+        val disabled = planner.suggestionsPrompt(
+            persona = PersonaProfile(name = "测试人物"), state = state,
+            userMessage = "继续刚才的", assistantMessage = "我在。",
+            intimacyModeEnabled = false,
+        )
+        val enabled = planner.suggestionsPrompt(
+            persona = PersonaProfile(name = "测试人物"), state = state,
+            userMessage = "继续刚才的", assistantMessage = "我在。",
+            intimacyModeEnabled = true,
+        )
+        assertFalse(disabled.contains("互动状态："))
+        assertFalse(disabled.contains("当前为亲密语境"))
+        assertTrue(enabled.contains("互动状态："))
+    }
+
+    @Test
     fun replySuggestionsInheritFlirtingIntensityAndChineseInnuendo() {
         val prompt = planner.suggestionsPrompt(
             persona = PersonaProfile(name = "测试角色"),
@@ -1440,6 +1463,7 @@ class ChatInteractionPlannerTest {
             ),
             userMessage = "你行不行啊，别光说",
             assistantMessage = "这可是你说的。",
+            intimacyModeEnabled = true,
             recentDialogue = listOf(
                 "user" to "你行不行啊，别光说",
                 "assistant" to "这可是你说的。",

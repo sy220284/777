@@ -90,7 +90,7 @@ internal fun ChatSurfaceHeader(
                 }
                 Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
-                        if (groupEnabled) stringResource(R.string.local_group_chat_title) else personaName,
+                        personaName,
                         style = SyType.base16Strong.withReadingWeight(),
                         color = colors.text,
                         maxLines = 1,

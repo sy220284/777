@@ -59,6 +59,8 @@ internal val settingsSearchEntries = settingsPageEntries + listOf(
     row("quiet-hours", SettingsDestination.NOTIFICATIONS, R.string.settings_notification_quiet_title, "免打扰", "静音", "quiet hours"),
     row("reasoning", SettingsDestination.MODEL_PERFORMANCE, R.string.settings_model_performance_reasoning, "推理深度", "思考档位", "reasoning effort"),
     row("temperature", SettingsDestination.MODEL_PERFORMANCE, R.string.settings_model_performance_temperature, "温度", "表达变化", "temperature"),
+    row("chat-intimacy-mode", SettingsDestination.CHAT, R.string.settings_chat_intimacy_mode,
+        "亲密互动", "亲密开关", "恋爱", "intimacy"),
 )
 
 internal fun settingsPageEntry(page: SettingsDestination): SettingsSearchEntry? =

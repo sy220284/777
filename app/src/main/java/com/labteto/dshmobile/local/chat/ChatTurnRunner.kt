@@ -30,12 +30,14 @@ class ChatTurnRunner @Inject constructor(
         context: ChatContextState = ChatContextState(),
         userInput: String = "",
         storyContext: String? = null,
+        intimacyModeEnabled: Boolean = false,
     ): ChatTurnContext = prepareProfile(
         persona = personaStore.get(personaId),
         state = state,
         context = context,
         userInput = userInput,
         storyContext = storyContext,
+        intimacyModeEnabled = intimacyModeEnabled,
     )
 
     fun prepareProfile(
@@ -44,6 +46,7 @@ class ChatTurnRunner @Inject constructor(
         context: ChatContextState = ChatContextState(),
         userInput: String = "",
         storyContext: String? = null,
+        intimacyModeEnabled: Boolean = false,
     ): ChatTurnContext {
         if (persona.isUnboundChatPersona()) {
             val continuationPrompt = ChatTurnContextPolicy.storyLines(
@@ -72,6 +75,7 @@ class ChatTurnRunner @Inject constructor(
             context = context,
             userInput = userInput,
             storyContext = storyContext,
+            intimacyModeEnabled = intimacyModeEnabled,
         )
         return ChatTurnContext(
             persona = persona,

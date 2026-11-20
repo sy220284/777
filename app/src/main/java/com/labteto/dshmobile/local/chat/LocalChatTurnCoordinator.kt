@@ -59,6 +59,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
                 context = correctedContext,
                 userInput = input,
                 storyContext = snapshot.handoffSummary,
+                intimacyModeEnabled = snapshot.chat.chatIntimacyModeEnabled,
             )
         } else {
             runner.prepare(
@@ -67,6 +68,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
                 context = correctedContext,
                 userInput = input,
                 storyContext = snapshot.handoffSummary,
+                intimacyModeEnabled = snapshot.chat.chatIntimacyModeEnabled,
             )
         }
         val recentAssistantReplies = recentRoleReplies(
@@ -93,12 +95,14 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         userInput: String,
         storyContext: String?,
         subjectKey: String? = null,
+        intimacyModeEnabled: Boolean = false,
     ): ChatTurnContext {
         val decisions = subjectKey?.let { persistence?.diaryStore?.decisionsForExperience(it, context) }.orEmpty()
         val effectiveContext = reconcileDiaryContext(context, decisions)
         val prepared = runner.prepareProfile(
             persona = persona, state = reconcileDiaryState(state, decisions),
             context = effectiveContext, userInput = userInput, storyContext = storyContext,
+            intimacyModeEnabled = intimacyModeEnabled,
         )
         val parts = prepared.dynamicParts + ChatContextPart(
             ChatContextLayer.HISTORICAL, renderDiaryDecisions(decisions),
@@ -182,6 +186,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
         messages: List<LocalHarnessMessage>,
         latestAssistantMessageId: String,
         context: ChatContextState = ChatContextState(),
+        intimacyModeEnabled: Boolean = false,
     ): String {
         val recentDialogue = recentReplySuggestionDialogue(
             messages = messages,
@@ -196,6 +201,7 @@ internal class LocalChatTurnCoordinator @Inject constructor(
             assistantMessage = assistantMessage,
             recentDialogue = recentDialogue,
             context = context,
+            intimacyModeEnabled = intimacyModeEnabled,
         )
     }
 

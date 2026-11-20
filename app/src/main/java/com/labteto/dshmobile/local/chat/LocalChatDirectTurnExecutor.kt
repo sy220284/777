@@ -224,10 +224,12 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
                 )
             }
+            var recalledSources = emptyList<ChatRecallEvidence>()
             val relationshipMemory = chatMemory.relationshipContext(
                 query = input,
                 snapshot = generationSnapshot,
                 excludedAssistantMessageIds = supersededAnswerIds,
+                onRecallUsed = { recalledSources = it },
             )
             val preparedChat = chatTurnCoordinator.prepare(
                 snapshot = generationSnapshot,
@@ -235,6 +237,7 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                 relationshipMemory = relationshipMemory,
             )
             val turnContext = preparedChat.context
+            val actuallyProvidedSources = recalledSources.filter { turnContext.prompt.contains(it.content) }
             val networkContext = webContext.forInput(input, turnContext.persona)
             val dynamicContext = networkContext + preparedChat.dynamicContext
             // The normal cached history can be compacted in place. Regeneration instead
@@ -493,6 +496,11 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     replyCards.reportedFor(reply.content.orEmpty()))
             }
 
+            assistantTranscript?.let { confirmed ->
+                appendChatRecallEvidence(eventLog, confirmed.id,
+                    sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                    actuallyProvidedSources)
+            }
             if (replacingMessageId == null) {
                 modelHistory.history.append(durableReply.message)
             }

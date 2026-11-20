@@ -11,6 +11,7 @@ import com.labteto.dshmobile.local.runtime.prepareLocalHarnessStartup
 import com.labteto.dshmobile.local.session.LocalSessionDeletionCleanup
 import com.labteto.dshmobile.local.session.LocalPendingSessionRegistry
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
+import com.labteto.dshmobile.local.chat.LocalChatIntimacySettingsPort
 import com.labteto.dshmobile.local.work.LocalWorkComposition
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -37,6 +38,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
     private val foregroundWake: LocalForegroundTurnWakeCoordinator,
     private val foregroundSessionLoader: LocalForegroundSessionLoader,
     private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
+    private val chatIntimacySettings: LocalChatIntimacySettingsPort,
     private val chatMemoryProjection: com.labteto.dshmobile.local.chat.LocalChatMemoryProjectionPort,
 ) : LocalRuntimeBootstrapPort {
     private val root = File(context.filesDir, "local-harness").apply { mkdirs() }
@@ -53,6 +55,7 @@ internal class LocalRuntimeBootstrapComposition @Inject constructor(
                 usage = usageTracker.state.value,
                 chat = com.labteto.dshmobile.local.chat.LocalChatState(
                     chatStyleGuardEnabled = chatGuard.enabled,
+                    chatIntimacyModeEnabled = chatIntimacySettings.initialEnabled(),
                     chatStyleGuardCustomPhrases = chatGuard.customPhrases,
                 ),
             ),

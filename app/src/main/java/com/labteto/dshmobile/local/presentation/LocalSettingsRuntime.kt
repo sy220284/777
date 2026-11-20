@@ -5,6 +5,7 @@ import com.labteto.dshmobile.local.LocalWebProvider
 import com.labteto.dshmobile.local.security.LocalManagedExecutionPolicy
 import com.labteto.dshmobile.uicontract.UiExecutionPolicySnapshot
 import com.labteto.dshmobile.local.chat.LocalChatStyleGuardSettingsPort
+import com.labteto.dshmobile.local.chat.LocalChatIntimacySettingsPort
 import com.labteto.dshmobile.local.interaction.LocalApprovalMode
 import com.labteto.dshmobile.local.interaction.LocalApprovalPreferences
 import com.labteto.dshmobile.local.model.LocalImageInputMode
@@ -41,6 +42,7 @@ class LocalSettingsRuntime @Inject internal constructor(
     private val modelSettings: LocalModelSettingsCoordinator,
     private val settingsCoordinator: LocalHarnessSettingsCoordinator,
     private val chatStyleGuardSettings: LocalChatStyleGuardSettingsPort,
+    private val chatIntimacySettings: LocalChatIntimacySettingsPort,
     private val web: LocalWebProvider,
     private val sessionStorage: LocalSessionStorageRuntime,
     private val approvalPreferences: LocalApprovalPreferences,
@@ -87,6 +89,8 @@ class LocalSettingsRuntime @Inject internal constructor(
     override suspend fun savePersonalization(rules: String, autoRecall: Boolean, autoMemory: Boolean): Boolean =
         settingsCoordinator.savePersonalization(rules, autoRecall, autoMemory)
     override fun configureChatStyleGuard(enabled: Boolean) = chatStyleGuardSettings.configureEnabled(enabled)
+    override fun configureChatIntimacyMode(enabled: Boolean): Boolean =
+        chatIntimacySettings.configureEnabled(enabled)
     override fun addChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.addPhrase(value)
     override fun removeChatStyleGuardPhrase(value: String) = chatStyleGuardSettings.removePhrase(value)
     override fun clearChatStyleGuardHits() = chatStyleGuardSettings.clearHits()
@@ -130,6 +134,7 @@ private fun LocalHarnessSettingsState.toNeutralSnapshot() = com.labteto.dshmobil
     loading, model, baseUrl, modelSelection, mainMaxSteps, subagentMaxSteps, modelAttempts,
     imageInputMode, userRules, autoRecall, autoMemory, chatStyleGuardEnabled, chatStyleGuardCustomPhrases,
     styleGuardHits, chatPersona.name, usage, error, miniMaxQuotaProfile, chatPersona.bannedPhrases,
+    chatIntimacyModeEnabled = chatIntimacyModeEnabled,
 )
 
 @dagger.Module

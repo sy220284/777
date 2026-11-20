@@ -88,6 +88,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.SyAnimations
 import com.labteto.dshmobile.ui.theme.SyShapes
 import com.labteto.dshmobile.ui.theme.SyType
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.ui.theme.AppBackgroundState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -197,7 +198,15 @@ internal fun LocalConversationComposer(
     // A chat temperature change is committed asynchronously. Do not submit the next
     // turn with the old sampling value while the new persona setting is still saving.
     val temperatureWritePending = state.usageMode == LocalUsageMode.CHAT && temperatureSaving
+    val containsVisualInput = attachments.any { file ->
+        file.mediaType.startsWith("image/") || file.pdfPages.isNotEmpty()
+    }
+    val knownUnsupportedVisualInput = state.usageMode == LocalUsageMode.CHAT &&
+        activeModelProfile != null && containsVisualInput &&
+        LocalModelPresets.documentedImageInputSupport(
+            activeModelProfile.model, activeModelProfile.baseUrl) == false
     val canSend = !state.loading && attachmentImportProgress == null &&
+        !knownUnsupportedVisualInput &&
         !temperatureWritePending &&
         groupChatReady &&
         (input.isNotBlank() || attachments.isNotEmpty())
@@ -270,7 +279,7 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun AttachmentControl() {
-        if (state.running) return
+        if (state.running && state.usageMode == LocalUsageMode.WORK) return
         SyComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_add),
@@ -333,23 +342,43 @@ internal fun LocalConversationComposer(
         )
     }
 
-    // Keep one right-hand action across both composer layouts.
-    // Running Work draft submission lives above, not beside Stop.
+    // Chat can queue the next user turn while the current response streams. Stop is
+    // a separate persistent action; Work keeps its established single primary stop.
+    @Composable
+    fun StopControl() {
+        if (state.usageMode != LocalUsageMode.CHAT || !state.running) return
+        SyComposerAction(
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
+            iconSize = 28.dp,
+            tint = colors.dangerInk,
+            contentDescription = stringResource(R.string.chat_composer_stop),
+            onClick = onStop,
+            enabled = true,
+            containerColor = Color.Transparent,
+            visualSize = 32.dp,
+        )
+    }
+
     @Composable
     fun PrimaryActionControl() {
+        val stopPrimary = state.running && state.usageMode == LocalUsageMode.WORK
+        val queuedChat = state.running && state.usageMode == LocalUsageMode.CHAT
         SyComposerAction(
             icon = null,
             iconPainter = painterResource(
-                if (state.running) R.drawable.ic_ui_button_stop_glyph
+                if (stopPrimary) R.drawable.ic_ui_button_stop_glyph
                 else R.drawable.ic_ui_button_send_glyph,
             ),
             iconSize = 32.dp,
-            tint = if (state.running || canSend) colors.onPrimary else colors.text,
-            contentDescription = stringResource(
-                if (state.running) R.string.chat_composer_stop else R.string.chat_composer_send,
-            ),
-            onClick = if (state.running) onStop else ::submit,
-            enabled = state.running || canSend,
+            tint = if (stopPrimary || canSend) colors.onPrimary else colors.text,
+            contentDescription = when {
+                queuedChat -> "加入待发送队列"
+                stopPrimary -> stringResource(R.string.chat_composer_stop)
+                else -> stringResource(R.string.chat_composer_send)
+            },
+            onClick = if (stopPrimary) onStop else ::submit,
+            enabled = stopPrimary || canSend,
             containerColor = colors.primary,
             visualSize = 32.dp,
         )
@@ -423,6 +452,20 @@ internal fun LocalConversationComposer(
                     SyButton("清空", onClearAttachments,
                         variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                 }
+            }
+        }
+        if (knownUnsupportedVisualInput) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("当前模型预设不支持图片或选定的扫描 PDF 页面，请先换用图像模型。",
+                    style = SyType.small13.withReadingWeight(),
+                    color = colors.dangerInk,
+                    modifier = Modifier.weight(1f))
+                SyButton("切换模型", onOpenModelPicker,
+                    variant = SyButtonVariant.Outline, size = SyButtonSize.Small)
             }
         }
         if (attachments.isNotEmpty()) {
@@ -525,7 +568,10 @@ internal fun LocalConversationComposer(
                     enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
                     exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
                 ) {
-                    PrimaryActionControl()
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                        StopControl()
+                        PrimaryActionControl()
+                    }
                 }
             }
         }
@@ -566,7 +612,12 @@ internal fun LocalConversationComposer(
                     onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
                 )
             },
-            primaryAction = { PrimaryActionControl() },
+            primaryAction = {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                    StopControl()
+                    PrimaryActionControl()
+                }
+            },
         )
     }
 }

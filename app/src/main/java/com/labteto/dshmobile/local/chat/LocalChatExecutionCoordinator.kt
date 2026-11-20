@@ -54,6 +54,9 @@ internal class LocalChatExecutionCoordinator @Inject constructor(
     override fun regenerateReply(messageId: String): Boolean =
         timeline.regenerateReply(messageId)
 
+    override fun retryFailedGroupReply(memberId: String): Boolean =
+        sendCoordinator.retryFailedGroupReply(memberId)
+
     override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult {
         val instruction = request.instruction.trim()
         val sessionId = request.targetSessionId.trim()

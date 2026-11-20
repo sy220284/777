@@ -19,6 +19,14 @@ data class LocalGroupChatMember(
     val chatState: ChatCharacterState = ChatCharacterState(),
 )
 
+/** The original user request remains authoritative when retrying one failed group member. */
+@Serializable
+data class GroupReplyRetrySource(
+    val sourceMessageId: String,
+    val originalInput: String,
+    val partialContent: String = "",
+)
+
 @Serializable
 data class LocalGroupChatState(
     val mode: LocalChatMode = LocalChatMode.SINGLE,
@@ -32,6 +40,8 @@ data class LocalGroupChatState(
     val announcement: String = "",
     /** Durable partial delivery notice; cleared only for members whose next response succeeds. */
     val failedReplyMemberIds: List<String> = emptyList(),
+    /** Durable source of each failed delivery, so retry never forges a new user message. */
+    val failedReplySources: Map<String, GroupReplyRetrySource> = emptyMap(),
 ) {
     val enabled: Boolean get() = mode == LocalChatMode.GROUP
 }
@@ -199,7 +209,13 @@ internal fun groupChatResponders(
         (listOfNotNull(active) + distinct.filterNot { it.galleryId == active?.galleryId })
             .take(MAX_GROUP_CHAT_RESPONDERS_PER_TURN)
     } else {
-        listOfNotNull(active ?: distinct.first())
+        // Explicit follow-ups continue the person being addressed. Independent
+        // everyday turns use the caller's rotating roster; an active speaker must
+        // not monopolize all unspecific conversation.
+        val followsCurrentSpeaker = listOf(
+            "后来呢", "接着说", "继续说", "说下去", "你刚才", "接着讲", "然后呢",
+        ).any { input.trim().contains(it) }
+        listOf(if (followsCurrentSpeaker && active != null) active else distinct.first())
     }
 }
 

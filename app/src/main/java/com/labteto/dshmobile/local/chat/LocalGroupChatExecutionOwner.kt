@@ -19,6 +19,7 @@ internal suspend fun runOwnedGroupChatTurn(
     executor: LocalGroupChatTurnExecutor,
     input: String,
     sourceMessageId: String? = null,
+    retryMemberId: String? = null,
 ) {
     if (currentSessionId() != sessionId) {
         throw CancellationException("会话已切换")
@@ -29,6 +30,6 @@ internal suspend fun runOwnedGroupChatTurn(
         error = currentError,
         onRejected = onForegroundRejected,
     ) {
-        executor.run(input, sourceMessageId)
+        executor.run(input, sourceMessageId, retryMemberId)
     }
 }

@@ -27,6 +27,7 @@ internal class LocalChatTurnDispatcher @Inject constructor(
         input: String,
         memoryInput: String = input,
         sourceMessageId: String? = null,
+        retryMemberId: String? = null,
     ) {
         val snapshot = runtimeStateStore.state.value
         check(snapshot.sessionId == expectedSessionId &&
@@ -35,7 +36,7 @@ internal class LocalChatTurnDispatcher @Inject constructor(
         }
 
         if (snapshot.chat.groupChat.enabled) {
-            personaCorrections.captureGroup(memoryInput)
+            if (retryMemberId == null) personaCorrections.captureGroup(memoryInput)
             runOwnedGroupChatTurn(
                 context = context,
                 sessionId = snapshot.sessionId,
@@ -45,6 +46,7 @@ internal class LocalChatTurnDispatcher @Inject constructor(
                 executor = groupExecutor,
                 input = input,
                 sourceMessageId = sourceMessageId,
+                retryMemberId = retryMemberId,
             )
             return
         }
