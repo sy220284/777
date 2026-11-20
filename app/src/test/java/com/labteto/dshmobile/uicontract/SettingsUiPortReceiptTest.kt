@@ -32,6 +32,25 @@ class SettingsUiPortReceiptTest {
         assertEquals("channel closed", (receipt as SettingsUiReceipt.Failed).message)
     }
 
+    @Test fun intimacySwitchAcknowledgesOnlyCommittedChanges() {
+        var last: Boolean? = null
+        val port = fakePort { method ->
+            when (method) {
+                "configureChatIntimacyMode" -> { last = true; true }
+                else -> error("Unexpected port call: $method")
+            }
+        }
+        assertEquals(SettingsUiReceipt.Applied,
+            port.submit(SettingsUiCommand.ChatIntimacyMode(true)))
+        assertEquals(true, last)
+        val failed = fakePort { method ->
+            if (method == "configureChatIntimacyMode") false
+            else error("Unexpected port call: $method")
+        }
+        assertEquals(SettingsUiReceipt.Rejected,
+            failed.submit(SettingsUiCommand.ChatIntimacyMode(false)))
+    }
+
     private fun fakePort(call: (String) -> Any?): SettingsUiPort =
         Proxy.newProxyInstance(
             SettingsUiPort::class.java.classLoader,
