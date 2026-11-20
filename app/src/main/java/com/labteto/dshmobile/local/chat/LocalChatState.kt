@@ -17,6 +17,8 @@ data class LocalChatState(
     val groupActiveSpeakerName: String? = null,
     val personaCorrectionNotice: ChatPersonaCorrectionNotice? = null,
     val chatStyleGuardEnabled: Boolean = true,
+    /** User-enabled original intimacy response repertoire. Off until explicitly opted in. */
+    val chatIntimacyModeEnabled: Boolean = false,
     val chatStyleGuardCustomPhrases: List<String> = emptyList(),
     val styleGuardHits: List<String> = emptyList(),
 )
