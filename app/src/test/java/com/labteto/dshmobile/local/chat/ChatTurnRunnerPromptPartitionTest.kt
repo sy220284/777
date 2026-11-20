@@ -52,7 +52,8 @@ class ChatTurnRunnerPromptPartitionTest {
         )
         assertTrue(on.prompt.contains("【亲密模式】"))
         assertTrue(on.prompt.contains("【身体反应强度】当前=5/5"))
-        assertTrue(on.prompt.contains("【本轮反应素材】"))
+        assertTrue(ChatIntimacyMode().prompt(input, ChatCharacterState())
+            .contains("【本轮反应素材｜"))
         assertEquals(off.stablePrompt, on.stablePrompt)
 
         val offAgain = runner.prepareProfile(persona = persona, userInput = input,
