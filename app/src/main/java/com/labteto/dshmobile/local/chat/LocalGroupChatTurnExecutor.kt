@@ -778,6 +778,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
     suspend fun run(
         input: String,
         sourceMessageId: String? = null,
+        retryMemberId: String? = null,
     ) {
         val ownedSessionId = sessionId
         runtimeStateStore.projection.setForegroundRunning(
@@ -804,13 +805,22 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 "群聊至少需要添加 $MIN_GROUP_CHAT_MEMBERS 个角色"
             }
             ensureSystemMessage()
-            captureAutoMemoryDirective(input, sourceMessageId)
+            // A retry belongs to the already recorded user turn; do not capture
+            // the same directive as a second fresh user instruction.
+            if (retryMemberId == null) captureAutoMemoryDirective(input, sourceMessageId)
 
             val key = modelRequestMarkerOrNull(snapshot) ?: error("请先配置模型账户或 API Key")
             val members = snapshot.chat.groupChat.members
             val cursor = snapshot.chat.groupChat.turnCursor % members.size
             val rotated = members.drop(cursor) + members.take(cursor)
-            val responders = groupChatResponders(input, rotated,
+            val responders = if (retryMemberId != null) {
+                val saved = snapshot.chat.groupChat.failedReplySources[retryMemberId]
+                require(saved != null && saved.sourceMessageId == sourceMessageId &&
+                    saved.originalInput == input && retryMemberId in snapshot.chat.groupChat.failedReplyMemberIds) {
+                    "群聊失败回合已变化，请重新打开对应消息"
+                }
+                members.filter { it.galleryId == retryMemberId }
+            } else groupChatResponders(input, rotated,
                 snapshot.chat.groupChat.activeSpeakerId ?: snapshot.messages.asReversed()
                     .firstOrNull { it.role == "assistant" && it.speakerId != null }?.speakerId,
             )
@@ -855,6 +865,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 put("mode", "group-chat")
                 put("member_count", members.size)
                 put("responder_count", responders.size)
+                if (retryMemberId != null) put("retry_member_id", retryMemberId)
             })
 
             val turnId = sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId
@@ -919,7 +930,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         turnId = turnId,
                     )
                     generated.failure?.let { failure ->
-                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup,
+                            GroupReplyRetrySource(turnId.orEmpty(), input))
                         eventLog.append("group/agent-failed", buildJsonObject {
                             put("gallery_id", generated.member.galleryId)
                             put("persona_id", generated.member.personaId)
@@ -933,9 +945,20 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     }
 
                     delivery.observe(generated.completionReason)
-                    if (generated.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED)
-                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
                     val content = generated.content
+                    if (generated.completionReason != com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED) {
+                        // A truncated utterance may be readable, but cannot yet become a
+                        // public event, character promise, model-history fact or diary input.
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup,
+                            GroupReplyRetrySource(turnId.orEmpty(), input, content))
+                        eventLog.append("group/agent-partial", buildJsonObject {
+                            put("gallery_id", generated.member.galleryId)
+                            put("source_message_id", turnId.orEmpty())
+                            put("content", content)
+                            put("completion", generated.completionReason.name)
+                        })
+                        return@forEachIndexed
+                    }
                     if (content == GROUP_CHAT_SILENT_TOKEN) {
                         // Listening is an intentional choice, never a failed delivery or
                         // a fabricated public utterance.
@@ -946,7 +969,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         return@forEachIndexed
                     }
                     if (content.isBlank() || content == GROUP_CHAT_SILENT_TOKEN) {
-                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup)
+                        currentGroup = delivery.fail(generated.member.galleryId, currentGroup,
+                            GroupReplyRetrySource(turnId.orEmpty(), input))
                         eventLog.append("group/agent-empty", buildJsonObject {
                             put("gallery_id", generated.member.galleryId)
                             put("persona_id", generated.member.personaId)
@@ -1093,7 +1117,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     currentGroup.members, refreshedStates, repliesForStateUpdate,
                 ),
             )
-            val nextCursor = (snapshot.chat.groupChat.turnCursor + 1) % members.size
+            val nextCursor = if (retryMemberId == null)
+                (snapshot.chat.groupChat.turnCursor + 1) % members.size
+                else snapshot.chat.groupChat.turnCursor
             currentGroup = currentGroup.copy(turnCursor = nextCursor)
             chatState.update { current ->
                 if (current.sessionId == snapshot.sessionId) {
