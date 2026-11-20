@@ -1,5 +1,9 @@
 package com.labteto.dshmobile.runtime
 
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -62,5 +66,40 @@ class ManagedProcessOutputTest {
         assertTrue(stdout.lines().contains("API_TOKEN=secret-check-value"))
         assertFalse(stdout.contains("DSH_MANAGED_LD_LIBRARY_PATH="))
         assertFalse(command.any { it.contains("secret-check-value") })
+    }
+    @Test fun processThatExitedBeforePollingStillYieldsBufferedPid() {
+        // Android's process pipe may report available() == 0 after a fast
+        // executable exits even while its handshake header remains readable.
+        val pipe = object : ByteArrayInputStream("4242\\nversion".toByteArray()) {
+            override fun available() = 0
+        }
+        val exited = object : Process() {
+            override fun getInputStream(): InputStream = pipe
+            override fun getOutputStream(): OutputStream = ByteArrayOutputStream()
+            override fun getErrorStream(): InputStream = ByteArrayInputStream(byteArrayOf())
+            override fun waitFor() = 0
+            override fun exitValue() = 0
+            override fun destroy() = Unit
+            override fun isAlive() = false
+        }
+        assertEquals(4242L, readManagedProcessGroup(exited))
+        assertEquals("version", pipe.readBytes().toString(Charsets.UTF_8))
+    }
+
+    @Test fun failedLauncherKeepsItsRealStderrInsteadOfGenericHandshakeError() {
+        val exited = object : Process() {
+            override fun getInputStream(): InputStream = ByteArrayInputStream(byteArrayOf())
+            override fun getOutputStream(): OutputStream = ByteArrayOutputStream()
+            override fun getErrorStream(): InputStream =
+                ByteArrayInputStream("CANNOT LINK EXECUTABLE: libexample.so missing".toByteArray())
+            override fun waitFor() = 127
+            override fun exitValue() = 127
+            override fun destroy() = Unit
+            override fun isAlive() = false
+        }
+        val error = runCatching { readManagedProcessGroup(exited) }.exceptionOrNull()
+        assertTrue(error is IllegalStateException)
+        assertTrue(error?.message.orEmpty().contains("退出码 127"))
+        assertTrue(error?.message.orEmpty().contains("libexample.so missing"))
     }
 }
