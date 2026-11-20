@@ -1353,7 +1353,7 @@ fun LocalHarnessScreen(
                         newSessionOpenedFromDrawer = false
                     }
                 },
-                canContinueCurrent = shell.messages.any { it.role == "user" || it.role == "assistant" },
+                canContinueCurrent = chatSurface.messages.any { it.role == "user" || it.role == "assistant" },
             )
         } else {
             NewSessionModeDialog(
