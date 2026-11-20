@@ -109,6 +109,31 @@ else: raise AssertionError('inherited private fd')
 
 
 class SeccompTest(unittest.TestCase):
+    def test_node_stdio_fionbio_allowed_but_network_and_unsafe_ioctl_remain_denied(self):
+        code = """
+import ctypes,errno,fcntl,os,runpy,socket,struct
+helper=runpy.run_path(%r)
+helper['syscalls']()
+read_fd,write_fd=os.pipe()
+try:
+    fcntl.ioctl(read_fd,0x5421,struct.pack('I',1))
+    for operation in [
+        lambda: socket.socket(socket.AF_INET,socket.SOCK_STREAM),
+        lambda: socket.socket(socket.AF_UNIX,socket.SOCK_STREAM),
+        lambda: fcntl.ioctl(read_fd,0x5412,b'X'),
+    ]:
+        try: operation()
+        except OSError as error:
+            assert error.errno == errno.EPERM,error
+        else: raise AssertionError('sandbox accepted forbidden operation')
+finally:
+    os.close(read_fd)
+    os.close(write_fd)
+""" % str(HELPER)
+        result = subprocess.run([sys.executable, '-I', '-c', code],
+                                capture_output=True,text=True,timeout=10)
+        self.assertEqual(0,result.returncode,result.stderr)
+
     def test_network_process_signals_and_alternate_abi_are_denied(self):
         code = """
 import runpy,socket,os,ctypes

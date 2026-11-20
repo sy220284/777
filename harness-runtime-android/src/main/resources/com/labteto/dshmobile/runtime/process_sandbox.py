@@ -102,7 +102,9 @@ def syscalls():
     for number in sorted(set(denied)):
         code += [Filter(0x15, 0, 1, number), Filter(0x06, 0, 0, deny)]
     # Deny all non-terminal ioctl, including Binder/device escape paths.
-    tty = [0x5401, 0x5402, 0x5403, 0x5404, 0x540F, 0x5410, 0x5413, 0x5414, 0x541B]
+    # FIONBIO is needed for Node/libuv to initialize stdio pipes.
+    # This is a local fd operation, not a network permission.
+    tty = [0x5401, 0x5402, 0x5403, 0x5404, 0x540F, 0x5410, 0x5413, 0x5414, 0x541B, 0x5421]
     code += [Filter(0x15, 0, 2 * len(tty) + 2, ioctl_nr), Filter(0x20, 0, 0, 24)]
     for operation in tty:
         code += [Filter(0x15, 0, 1, operation), Filter(0x06, 0, 0, 0x7FFF0000)]

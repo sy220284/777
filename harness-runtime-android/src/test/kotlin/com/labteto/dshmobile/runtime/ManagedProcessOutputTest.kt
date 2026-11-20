@@ -13,6 +13,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ManagedProcessOutputTest {
+    @Test fun isolatedRuntimeKeepsPackageRootsInsideWorkspace() {
+        val policy = isolatedChildRuntimeEnvironment(File("/tmp/workspace"), mapOf(
+            "PIP_TARGET" to "/data/private",
+            "npm_config_cache" to "/data/cache",
+        ))
+        for (key in listOf("PIP_TARGET", "npm_config_cache", "npm_config_prefix")) {
+            assertTrue(policy.getValue(key).startsWith(File("/tmp/workspace").path))
+        }
+    }
     @Test fun sandboxProcSelfLinksRemainRelativeToTheChildProcess() {
         assertEquals("/proc/self", isolationRootPath(java.io.File("/proc/self")))
         assertEquals("/proc/thread-self", isolationRootPath(java.io.File("/proc/thread-self")))

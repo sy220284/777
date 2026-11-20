@@ -68,7 +68,10 @@ private suspend fun isolatedProcessCommand(
     // process state and Binder endpoints remain excluded.
     val roots = (listOf("/system", "/apex", "/vendor", "/product", "/system_ext",
         "/linkerconfig", "/proc/self", "/proc/thread-self", "/proc/cpuinfo", "/proc/meminfo",
-        "/dev/null", "/dev/urandom", "/dev/tty") +
+        // V8's random initialization needs the standard random device; omitting
+        // it can trigger Android's denied legacy sysctl(156) fallback (SIGSYS).
+        // Admit only standard device nodes, never the whole /dev directory.
+        "/dev/null", "/dev/urandom", "/dev/random", "/dev/zero", "/dev/tty") +
         trustedReadRoots.map { it.canonicalPath } + trustedPaths.map { it.canonicalPath } + trustedEnvironment.filterKeys { it in runtimeKeys }.values
             .flatMap { it.split(File.pathSeparatorChar) }).map(::File).filter(File::exists).map(::isolationRootPath).distinct()
     val policy = buildJsonObject {
