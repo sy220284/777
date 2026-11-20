@@ -33,9 +33,9 @@ permissions:
 
 concurrency:
   group: android-unified-${{ github.workflow }}-${{ github.ref }}
-  # Let an expensive Android run finish; newer pushes replace only the pending run.
-  # This yields a complete verifiable snapshot while bounding queue and emulator cost.
-  cancel-in-progress: false
+  # PR 的新提交使旧提交的设备结果过期，优先完整验收最新 SHA。
+  # 手动触发的验收仍保留完整运行与证据，不受 PR 更新影响。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   plan:
