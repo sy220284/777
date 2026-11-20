@@ -92,8 +92,12 @@ def syscalls():
     else:
         raise RuntimeError("unsupported sandbox syscall ABI")
     deny = 0x00050000 | errno.EPERM
-    # BPF_LD|W|ABS, JMP|JEQ|K, RET|K. Kill mismatched arch; reject x32 nr space.
-    code = [Filter(0x20, 0, 0, 4), Filter(0x15, 1, 0, arch), Filter(0x06, 0, 0, 0x80000000),
+    # BPF_LD|W|ABS, JMP|JEQ|K, RET|K.
+    # Reject *every* syscall on a foreign ABI with EPERM. A few Android
+    # binaries issue a compat-ABI probe before falling back to native calls;
+    # killing the whole process with SIGSYS makes that safe fallback impossible.
+    # EPERM still executes no foreign-ABI syscall and keeps the sandbox closed.
+    code = [Filter(0x20, 0, 0, 4), Filter(0x15, 1, 0, arch), Filter(0x06, 0, 0, deny),
             Filter(0x20, 0, 0, 0), Filter(0x35, 0, 1, 0x40000000), Filter(0x06, 0, 0, deny)]
     for number in sorted(set(denied)):
         code += [Filter(0x15, 0, 1, number), Filter(0x06, 0, 0, deny)]
