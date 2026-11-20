@@ -39,7 +39,7 @@ internal fun prepareManagedProcessLauncher(
         deferredLinkerVariables.forEach { key ->
             val stagedKey = "DSH_MANAGED_$key"
             append("if [ \"\${$stagedKey+x}\" ]; then ")
-            append("export $key=\"\$stagedKey\"; unset $stagedKey; fi; ")
+            append("export $key=\"\${stagedKey}\"; unset $stagedKey; fi; ")
         }
         append("exec \"\$@\"")
     }
