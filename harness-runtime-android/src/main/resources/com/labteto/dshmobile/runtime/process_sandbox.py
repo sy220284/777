@@ -92,13 +92,19 @@ def syscalls():
     else:
         raise RuntimeError("unsupported sandbox syscall ABI")
     deny = 0x00050000 | errno.EPERM
-    # BPF_LD|W|ABS, JMP|JEQ|K, RET|K. Kill mismatched arch; reject x32 nr space.
-    code = [Filter(0x20, 0, 0, 4), Filter(0x15, 1, 0, arch), Filter(0x06, 0, 0, 0x80000000),
+    # BPF_LD|W|ABS, JMP|JEQ|K, RET|K.
+    # Reject *every* syscall on a foreign ABI with EPERM. A few Android
+    # binaries issue a compat-ABI probe before falling back to native calls;
+    # killing the whole process with SIGSYS makes that safe fallback impossible.
+    # EPERM still executes no foreign-ABI syscall and keeps the sandbox closed.
+    code = [Filter(0x20, 0, 0, 4), Filter(0x15, 1, 0, arch), Filter(0x06, 0, 0, deny),
             Filter(0x20, 0, 0, 0), Filter(0x35, 0, 1, 0x40000000), Filter(0x06, 0, 0, deny)]
     for number in sorted(set(denied)):
         code += [Filter(0x15, 0, 1, number), Filter(0x06, 0, 0, deny)]
     # Deny all non-terminal ioctl, including Binder/device escape paths.
-    tty = [0x5401, 0x5402, 0x5403, 0x5404, 0x540F, 0x5410, 0x5413, 0x5414, 0x541B]
+    # FIONBIO is needed for Node/libuv to initialize stdio pipes.
+    # This is a local fd operation, not a network permission.
+    tty = [0x5401, 0x5402, 0x5403, 0x5404, 0x540F, 0x5410, 0x5413, 0x5414, 0x541B, 0x5421]
     code += [Filter(0x15, 0, 2 * len(tty) + 2, ioctl_nr), Filter(0x20, 0, 0, 24)]
     for operation in tty:
         code += [Filter(0x15, 0, 1, operation), Filter(0x06, 0, 0, 0x7FFF0000)]
@@ -128,7 +134,15 @@ def main():
     filesystem(policy)
     syscalls()
     if len(sys.argv) > 3:
-        child_environment = json.loads(sys.argv[3])
+        child_keys = json.loads(sys.argv[3])
+        if not isinstance(child_keys, list) or any(not isinstance(key, str) or not key for key in child_keys):
+            raise ValueError("invalid staged child environment")
+        if len(child_keys) != len(set(child_keys)):
+            raise ValueError("duplicate staged child environment keys")
+        child_environment = {
+            key: os.environ["DSH_SANDBOX_ENV_" + str(index)]
+            for index, key in enumerate(child_keys)
+        }
         os.environ.clear()
         os.environ.update(child_environment)
     os.environ["HOME"] = workspace

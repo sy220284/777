@@ -16,6 +16,7 @@ class AndroidProcessRuntime(
     private val extraSearchPaths: List<File> = emptyList(),
     private val dynamicSearchPaths: () -> List<File> = { emptyList() },
     private val baseEnvironment: () -> Map<String, String> = { emptyMap() },
+    private val commandAliases: () -> Map<String, List<String>> = { emptyMap() },
     private val inheritEnvironment: Boolean = true,
     private val trustedReadRoots: List<File> = emptyList(),
 ) : HarnessProcessRuntime {
@@ -23,6 +24,9 @@ class AndroidProcessRuntime(
     override fun isCommandAvailable(command: String): Boolean {
         if (command.isBlank()) return false
         if (command.contains(File.separatorChar)) return File(command).isExecutableCommand()
+        commandAliases()[command]?.let { alias ->
+            return alias.isNotEmpty() && File(alias.first()).isExecutableCommand()
+        }
         return searchPaths().any { directory -> File(directory, command).isExecutableCommand() }
     }
 
@@ -62,6 +66,12 @@ class AndroidProcessRuntime(
     fun resolveCommand(command: List<String>): List<String> {
         val executable = command.first()
         if (executable.contains(File.separatorChar)) return command
+        commandAliases()[executable]?.let { alias ->
+            require(alias.isNotEmpty() && File(alias.first()).isExecutableCommand()) {
+                "内置解释型命令尚未就绪：$executable"
+            }
+            return alias + command.drop(1)
+        }
         val resolved = searchPaths()
             .asSequence()
             .map { directory -> File(directory, executable) }
@@ -106,7 +116,7 @@ class RuntimeDiagnostics(
     companion object {
         val DEFAULT_COMMANDS = listOf(
             "sh", "git", "python3", "python", "node", "curl", "ssh",
-            "rg", "jq", "tar", "zip",
+            "rg", "jq", "npm", "pip", "pip3", "tar", "zip",
         )
     }
 }

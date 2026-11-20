@@ -27,6 +27,15 @@ class LocalBundledRuntimeManager @Inject internal constructor(
         listOf(python.environment(), node.environment(), git.environment()),
     )
 
+    /** Entry points for interpreted package managers; no writable-data executable shims. */
+    fun commandAliases(): Map<String, List<String>> = buildMap {
+        node.npmCommand().takeIf { it.isNotEmpty() }?.let { put("npm", it) }
+        python.pipCommand().takeIf { it.isNotEmpty() }?.let {
+            put("pip", it)
+            put("pip3", it)
+        }
+    }
+
     fun statuses(): List<String> = listOf(node.status(), python.status(), git.status())
 }
 

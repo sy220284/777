@@ -66,6 +66,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
         defaultWorkingDirectory = File(workspace.path),
         dynamicSearchPaths = bundledRuntimeManager::searchPaths,
         baseEnvironment = bundledRuntimeManager::environment,
+        commandAliases = bundledRuntimeManager::commandAliases,
     )
     internal val agentWorkspaces = com.labteto.dshmobile.runtime.GitWorkspaceRuntime(File(workspace.path), process)
 
@@ -295,6 +296,7 @@ internal class LocalToolCompositionRoot @Inject constructor(
         defaultWorkingDirectory = File(workspace.path),
         extraSearchPaths = bundledRuntimeManager::searchPaths,
         baseEnvironment = bundledRuntimeManager::environment,
+        commandAliases = bundledRuntimeManager::commandAliases,
     )
     internal val webTools = pluginFactory.createWebTools(
         searchKeyProvider = modelConfiguration::resolveDeepSeekSearchCredential,

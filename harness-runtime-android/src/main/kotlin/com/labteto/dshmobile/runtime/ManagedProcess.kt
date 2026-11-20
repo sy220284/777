@@ -15,6 +15,39 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
+/**
+ * The system setsid/sh loader must start with Android's platform libraries.
+ * Bundled Termux libraries belong only to the actual child command. Pass them
+ * through inert environment keys until the trusted shell has printed its PID.
+ * No caller command or environment value is interpolated into shell source.
+ */
+internal fun prepareManagedProcessLauncher(
+    builder: ProcessBuilder,
+    setsid: String,
+    shell: String,
+) {
+    val originalCommand = builder.command().toList()
+    val deferredLinkerVariables = listOf("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")
+    val bootstrapEnvironment = builder.environment()
+    deferredLinkerVariables.forEach { key ->
+        val stagedKey = "DSH_MANAGED_$key"
+        require(!bootstrapEnvironment.containsKey(stagedKey)) { "进程启动环境变量冲突：$stagedKey" }
+        bootstrapEnvironment.remove(key)?.let { bootstrapEnvironment[stagedKey] = it }
+    }
+    val launchScript = buildString {
+        // Android mksh has a built-in echo; printf may require an external binary
+        // excluded from the restricted PATH before process isolation is installed.
+        append("echo \"\$\$\"; ")
+        deferredLinkerVariables.forEach { key ->
+            val stagedKey = "DSH_MANAGED_$key"
+            append("if [ \"\${$stagedKey+x}\" ]; then ")
+            append("export $key=\"\$${stagedKey}\"; unset $stagedKey; fi; ")
+        }
+        append("exec \"\$@\"")
+    }
+    builder.command(listOf(setsid, shell, "-c", launchScript, "managed") + originalCommand)
+}
+
 /** Each managed command owns a process group; Android 36 has no public Process.pid API. */
 class ManagedProcess private constructor(val process: Process, private val groupId: Long, private val shell: String) {
     private val ownedGroups = linkedSetOf(groupId)
@@ -68,35 +101,50 @@ class ManagedProcess private constructor(val process: Process, private val group
             val setsid = listOf("/system/bin/setsid", "/usr/bin/setsid", "/bin/setsid")
                 .firstOrNull { File(it).canExecute() }
                 ?: error("缺少 setsid，拒绝启动无法整体取消的进程")
-            val command = builder.command().toList()
-            builder.command(listOf(setsid, shell, "-c", "printf '%s\\n' \"\$\$\"; exec \"\$@\"", "managed") + command)
+            prepareManagedProcessLauncher(builder, setsid, shell)
             val process = builder.start()
             try {
-                // Read only the fixed startup line, without buffering any command output.
-                val pid = StringBuilder()
-                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
-                while (System.nanoTime() < deadline && pid.length < 20) {
-                    if (process.inputStream.available() == 0) {
-                        check(process.isAlive) { "进程组启动失败" }
-                        Thread.sleep(2)
-                        continue
-                    }
-                    val byte = process.inputStream.read()
-                    if (byte == 10) {
-                        val group = pid.toString().toLongOrNull()
-                        require(group != null && group > 1) { "进程组编号无效" }
-                        return ManagedProcess(process, group, shell)
-                    }
-                    require(byte in 48..57) { "进程组握手无效" }
-                    pid.append(byte.toChar())
-                }
-                error("进程组启动超时")
+                // The child can exit between available() and isAlive, especially
+                // for a tiny --version command. A dead process may still have
+                // unread PID bytes in the OS pipe; always drain them before
+                // treating it as a launcher failure.
+                return ManagedProcess(process, readManagedProcessGroup(process), shell)
             } catch (error: Throwable) {
                 process.destroyForcibly()
                 throw error
             }
         }
     }
+}
+
+/**
+ * Consume only the PID header. A short-lived executable may exit before the
+ * Java pipe reports bytes as available; an exited process is still readable.
+ * Never consume the command's stdout after the newline.
+ */
+internal fun readManagedProcessGroup(process: Process): Long {
+    val pid = StringBuilder()
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+    while (System.nanoTime() < deadline && pid.length < 20) {
+        if (process.inputStream.available() == 0 && process.isAlive) {
+            Thread.sleep(2)
+            continue
+        }
+        val byte = process.inputStream.read()
+        if (byte == 10) {
+            val group = pid.toString().toLongOrNull()
+            require(group != null && group > 1L) { "进程组编号无效" }
+            return group
+        }
+        if (byte < 0) {
+            val state = if (process.isAlive) "启动器输出已关闭" else "退出码 ${process.exitValue()}"
+            val detail = if (process.isAlive) "" else process.errorStream.bufferedReader().readText().takeLast(1400)
+            error("进程组握手提前结束（$state，已读 $pid）：$detail")
+        }
+        require(byte in 48..57) { "进程组握手无效" }
+        pid.append(byte.toChar())
+    }
+    error("进程组启动超时（已读 $pid）")
 }
 
 /** Preserve surrogate pairs when bounding UTF-16 process output. */

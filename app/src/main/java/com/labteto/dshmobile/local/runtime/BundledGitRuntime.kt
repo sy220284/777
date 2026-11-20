@@ -63,6 +63,14 @@ class BundledGitRuntime @Inject constructor(
             }
 
             BundledRuntimeInstallation.linkExecutable(nativeGit, File(binDir, "git"))
+            // rg/curl/jq share Git's signed Termux dependency closure and TLS store.
+            for (command in listOf("rg", "curl", "jq")) {
+                val nativeCommand = File(context.applicationInfo.nativeLibraryDir, "libdsh_$command.so")
+                require(nativeCommand.isFile && nativeCommand.canExecute()) {
+                    "内置 CLI 未从 APK 提取：$command"
+                }
+                BundledRuntimeInstallation.linkExecutable(nativeCommand, File(binDir, command))
+            }
 
             helperDir.listFiles()?.forEach { it.delete() }
             val helpers = context.assets.open("$ASSET_ROOT/$abi/helpers.tsv")
@@ -126,6 +134,7 @@ class BundledGitRuntime @Inject constructor(
             "GIT_CONFIG_KEY_0" to "core.hooksPath",
             "GIT_CONFIG_VALUE_0" to "/dev/null",
             "GIT_SSL_CAINFO" to certFile.path,
+            "CURL_CA_BUNDLE" to certFile.path,
             "SSL_CERT_FILE" to certFile.path,
             "HOME" to context.filesDir.path,
             "TMPDIR" to context.cacheDir.path,

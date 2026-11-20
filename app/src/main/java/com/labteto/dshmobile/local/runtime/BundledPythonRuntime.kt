@@ -39,15 +39,22 @@ class BundledPythonRuntime @Inject constructor(
                 ?: return@withLock
             val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
             require(version.isNotBlank()) { "内置 Python 版本信息为空" }
+            val pipVersion = context.assets.open(PIP_VERSION_ASSET).bufferedReader().use { it.readText().trim() }
+            require(pipVersion.isNotBlank()) { "内置 pip 版本信息为空" }
 
             val versionRoot = File(runtimeHome, "$version/$abi")
             val libraryDir = File(versionRoot, "lib")
             val homeDir = File(versionRoot, "home")
-            BundledRuntimeInstallation.prepareVersion(context, "python", versionRoot, version, abi) {
+            BundledRuntimeInstallation.prepareVersion(context, "python", versionRoot, "$version+pip-$pipVersion", abi) {
                 homeDir.mkdirs()
                 BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/$abi/home", homeDir)
             }
 
+            require(File(homeDir, "lib/python$PYTHON_MAJOR_MINOR/site-packages/pip/__main__.py").isFile) {
+                "内置 pip 模块未打包"
+            }
+            check(File(context.filesDir, "python-packages").isDirectory ||
+                File(context.filesDir, "python-packages").mkdirs()) { "无法创建 Python 包目录" }
             require(File(homeDir, "etc/tls/cert.pem").isFile) {
                 "内置 Python CA 证书未打包"
             }
@@ -74,20 +81,29 @@ class BundledPythonRuntime @Inject constructor(
 
     fun searchPaths(): List<File> = if (prepared) listOf(binDir) else emptyList()
 
+    fun pipCommand(): List<String> = if (prepared) {
+        listOf(File(binDir, "python3").absolutePath, "-m", "pip")
+    } else emptyList()
+
     fun environment(): Map<String, String> {
         val homeDir = activeHomeDir ?: return emptyMap()
         val libraryDir = activeLibraryDir ?: return emptyMap()
         val nativeDir = context.applicationInfo.nativeLibraryDir
         val stdlib = File(homeDir, "lib/python$PYTHON_MAJOR_MINOR")
+        val userPackages = File(context.filesDir, "python-packages")
         val certFile = File(homeDir, "etc/tls/cert.pem")
         val opensslConfig = File(homeDir, "etc/tls/openssl.cnf")
         return mapOf(
             "LD_LIBRARY_PATH" to listOf(libraryDir.path, nativeDir).joinToString(File.pathSeparator),
             "PYTHONHOME" to homeDir.path,
-            "PYTHONPATH" to listOf(stdlib.path, File(stdlib, "lib-dynload").path)
+            "PYTHONPATH" to listOf(stdlib.path, File(stdlib, "lib-dynload").path,
+                File(stdlib, "site-packages").path, userPackages.path)
                 .joinToString(File.pathSeparator),
             "PYTHONDONTWRITEBYTECODE" to "1",
             "PYTHONNOUSERSITE" to "1",
+            "PIP_TARGET" to userPackages.path,
+            "PIP_CACHE_DIR" to File(context.cacheDir, "pip-cache").absolutePath,
+            "PIP_DISABLE_PIP_VERSION_CHECK" to "1",
             "SSL_CERT_FILE" to certFile.path,
             "OPENSSL_CONF" to opensslConfig.path,
             "HOME" to context.filesDir.path,
@@ -106,6 +122,7 @@ class BundledPythonRuntime @Inject constructor(
         private val prepareMutex = Mutex()
         const val ASSET_ROOT = "runtime/python"
         const val VERSION_ASSET = "$ASSET_ROOT/python-version.txt"
+        const val PIP_VERSION_ASSET = "$ASSET_ROOT/pip-version.txt"
         const val NATIVE_PYTHON_NAME = "libdsh_python.so"
         const val PYTHON_MAJOR_MINOR = "3.14"
         val PYTHON_COMMANDS = listOf("python", "python3", "python3.14")

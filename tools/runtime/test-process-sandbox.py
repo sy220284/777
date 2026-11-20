@@ -86,6 +86,20 @@ else: raise AssertionError('inherited private fd')
 """, pass_fds=(secret.fileno(),))
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_staged_environment_restored_after_isolation(self):
+        env = os.environ.copy()
+        env['DSH_SANDBOX_ENV_0'] = 'hidden-secret'
+        env['DSH_SANDBOX_ENV_1'] = 'inside-workspace'
+        result = subprocess.run([
+            sys.executable, '-I', str(HELPER), json.dumps(self.policy),
+            json.dumps([sys.executable, '-I', '-c',
+                        "import os; assert os.environ['TEST_SECRET'].startswith('hidden-'); "
+                        "assert os.environ['TEST_LOCATION']=='inside-workspace'; "
+                        "assert not any(k.startswith('DSH_SANDBOX_ENV_') for k in os.environ)"]),
+            json.dumps(['TEST_SECRET', 'TEST_LOCATION'])
+        ], env=env, text=True, capture_output=True, timeout=10)
+        self.assertEqual(0, result.returncode, result.stderr)
+
     def test_missing_permission_never_falls_back_to_unsandboxed_command(self):
         self.policy['read'] = []
         result = self.run_child("open('should-not-run','w').write('unsafe')")
@@ -95,6 +109,31 @@ else: raise AssertionError('inherited private fd')
 
 
 class SeccompTest(unittest.TestCase):
+    def test_node_stdio_fionbio_allowed_but_network_and_unsafe_ioctl_remain_denied(self):
+        code = """
+import ctypes,errno,fcntl,os,runpy,socket,struct
+helper=runpy.run_path(%r)
+helper['syscalls']()
+read_fd,write_fd=os.pipe()
+try:
+    fcntl.ioctl(read_fd,0x5421,struct.pack('I',1))
+    for operation in [
+        lambda: socket.socket(socket.AF_INET,socket.SOCK_STREAM),
+        lambda: socket.socket(socket.AF_UNIX,socket.SOCK_STREAM),
+        lambda: fcntl.ioctl(read_fd,0x5412,b'X'),
+    ]:
+        try: operation()
+        except OSError as error:
+            assert error.errno == errno.EPERM,error
+        else: raise AssertionError('sandbox accepted forbidden operation')
+finally:
+    os.close(read_fd)
+    os.close(write_fd)
+""" % str(HELPER)
+        result = subprocess.run([sys.executable, '-I', '-c', code],
+                                capture_output=True,text=True,timeout=10)
+        self.assertEqual(0,result.returncode,result.stderr)
+
     def test_network_process_signals_and_alternate_abi_are_denied(self):
         code = """
 import runpy,socket,os,ctypes

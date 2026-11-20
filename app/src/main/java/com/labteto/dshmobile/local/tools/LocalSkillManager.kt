@@ -286,7 +286,7 @@ internal class LocalSkillStore(
                 if (!Files.isRegularFile(baseline, LinkOption.NOFOLLOW_LINKS) ||
                     !Files.isRegularFile(document, LinkOption.NOFOLLOW_LINKS)
                 ) continue
-                val recorded = Files.readString(baseline).trim()
+                val recorded = baseline.toFile().readText(Charsets.UTF_8).trim()
                 require(Regex("[0-9a-f]{64}").matches(recorded)) {
                     "已安装技能来源标记无效：$name"
                 }

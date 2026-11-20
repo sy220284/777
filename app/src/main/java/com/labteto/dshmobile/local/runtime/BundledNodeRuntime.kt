@@ -41,6 +41,9 @@ class BundledNodeRuntime @Inject constructor(
     @Volatile
     private var platformCaBundle: File? = null
 
+    @Volatile
+    private var activeNpmCli: File? = null
+
     suspend fun prepare() = withContext(Dispatchers.IO) {
         // Multiple runtime instances may be created by startup, instrumentation and recovery.
         // Serialize the entire prepare/cleanup/link sequence, not only blob extraction.
@@ -49,10 +52,18 @@ class BundledNodeRuntime @Inject constructor(
                 ?: return@withLock
             val version = context.assets.open(VERSION_ASSET).bufferedReader().use { it.readText().trim() }
             require(version.isNotBlank()) { "内置 Node 版本信息为空" }
+            val npmVersion = context.assets.open(NPM_VERSION_ASSET).bufferedReader().use { it.readText().trim() }
+            require(npmVersion.isNotBlank()) { "内置 npm 版本信息为空" }
 
             val versionRoot = File(runtimeHome, "$version/$abi")
             val libraryDir = File(versionRoot, "lib")
-            BundledRuntimeInstallation.prepareVersion(context, "node", versionRoot, version, abi)
+            val npmRoot = File(versionRoot, "npm")
+            BundledRuntimeInstallation.prepareVersion(context, "node", versionRoot, "$version+npm-$npmVersion", abi) {
+                check(npmRoot.isDirectory || npmRoot.mkdirs())
+                BundledRuntimeInstallation.copyAssetDirectory(context, "$ASSET_ROOT/npm", npmRoot)
+            }
+            val npmCli = File(npmRoot, "package/bin/npm-cli.js")
+            require(npmCli.isFile && npmCli.length() > 0L) { "内置 npm CLI 缺失" }
 
             val nativeNode = File(context.applicationInfo.nativeLibraryDir, NATIVE_NODE_NAME)
             require(nativeNode.isFile && nativeNode.canExecute()) {
@@ -69,12 +80,17 @@ class BundledNodeRuntime @Inject constructor(
             val caBundle = installPlatformCaBundle()
             activeLibraryDir = libraryDir
             platformCaBundle = caBundle
+            activeNpmCli = npmCli
             runtimeVersion = version
             prepared = true
         }
     }
 
     fun searchPaths(): List<File> = if (prepared) listOf(binDir) else emptyList()
+
+    fun npmCommand(): List<String> = activeNpmCli?.takeIf { prepared && it.isFile }?.let {
+        listOf(File(binDir, "node").absolutePath, it.absolutePath)
+    }.orEmpty()
 
     fun environment(): Map<String, String> {
         val libraryDir = activeLibraryDir ?: return emptyMap()
@@ -84,6 +100,12 @@ class BundledNodeRuntime @Inject constructor(
             "HOME" to context.filesDir.path,
             "TMPDIR" to context.cacheDir.path,
             "NODE_EXTRA_CA_CERTS" to checkNotNull(platformCaBundle).absolutePath,
+            "DSH_NPM_CLI" to checkNotNull(activeNpmCli).absolutePath,
+            "DSH_NPM_HOME" to checkNotNull(activeNpmCli).parentFile.parentFile.parentFile.absolutePath,
+            "npm_config_cache" to File(context.cacheDir, "npm-cache").absolutePath,
+            "npm_config_ignore_scripts" to "true",
+            "npm_config_audit" to "false",
+            "npm_config_update_notifier" to "false",
         )
     }
 
@@ -137,6 +159,7 @@ class BundledNodeRuntime @Inject constructor(
         private val prepareMutex = Mutex()
         const val ASSET_ROOT = "runtime/node"
         const val VERSION_ASSET = "$ASSET_ROOT/node-version.txt"
+        const val NPM_VERSION_ASSET = "$ASSET_ROOT/npm-version.txt"
         const val NATIVE_NODE_NAME = "libdsh_node.so"
         val SUPPORTED_ABIS = setOf("arm64-v8a", "x86_64")
     }

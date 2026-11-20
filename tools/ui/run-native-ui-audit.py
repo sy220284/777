@@ -9,6 +9,7 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'app/build/outputs/ui-audit';OUT.mkdir(parents=True,exist_ok=True)
 VIDEOS=OUT/'videos';VIDEOS.mkdir(exist_ok=True)
 CLASSES=[
+ 'com.labteto.dshmobile.local.BundledCliAndroidTest',
  'com.shenyan.designsystem.components.ShenyanAtlasInteractionTest',
  'com.labteto.dshmobile.ui.screens.local.ShenyanAtlasClosureTest',
  'com.shenyan.designsystem.components.SyLiquidRefractionAndroidTest',
@@ -108,6 +109,23 @@ for name in CLASSES:
    raise RuntimeError('Native class did not produce passing non-empty results: '+text[-5000:])
   return {'class':name,'tests':int(match.group(1))}
  phase(name.rsplit('.',1)[1],run_class,record=True)
+ # Bundled CLI startup is a prerequisite for every subsequent Work/Agent UI
+ # journey. If its real Android smoke fails, preserve its video and manifest,
+ # then stop before repeating half an hour of unrelated UI steps. A green run
+ # still executes the entire original audit and baseline comparison.
+ if name.endswith('BundledCliAndroidTest') and not summary[-1]['passed']:
+  # Capture the Android crash buffer before the emulator stops. It can reveal
+  # the exact syscall and seccomp action behind a native SIGSYS failure.
+  target=OUT/'BundledCliAndroidTest-crash-logcat.txt'
+  try:
+   captured=subprocess.run(['adb','logcat','-d','-b','crash','-t','1200'],
+     cwd=ROOT,text=True,capture_output=True,timeout=20)
+   target.write_text('adb exit code: '+str(captured.returncode)+'\n'+
+     captured.stdout+'\n'+captured.stderr,encoding='utf-8')
+  except subprocess.TimeoutExpired as failure:
+   target.write_text('Android crash buffer retrieval timed out: '+str(failure),encoding='utf-8')
+  print('关键运行时设备验收失败，已保存日志、崩溃缓冲区与录屏，终止本次无效的后续巡检',flush=True)
+  sys.exit(1)
 
 def export_components():
  return checked(['adb','pull','/sdcard/Android/data/com.sy220284.dshmobile.debug/files/ui-audit/.',str(OUT/'components')])
