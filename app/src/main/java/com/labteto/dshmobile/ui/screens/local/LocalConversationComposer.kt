@@ -88,6 +88,7 @@ import com.labteto.dshmobile.ui.components.FeatherIcons
 import com.labteto.dshmobile.ui.theme.SyAnimations
 import com.labteto.dshmobile.ui.theme.SyShapes
 import com.labteto.dshmobile.ui.theme.SyType
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.ui.theme.AppBackgroundState
 import com.labteto.dshmobile.ui.theme.BackgroundRegion
 import com.labteto.dshmobile.ui.theme.WallpaperSurfaceLevel
@@ -197,7 +198,15 @@ internal fun LocalConversationComposer(
     // A chat temperature change is committed asynchronously. Do not submit the next
     // turn with the old sampling value while the new persona setting is still saving.
     val temperatureWritePending = state.usageMode == LocalUsageMode.CHAT && temperatureSaving
+    val containsVisualInput = attachments.any { file ->
+        file.mediaType.startsWith("image/") || file.pdfPages.isNotEmpty()
+    }
+    val knownUnsupportedVisualInput = state.usageMode == LocalUsageMode.CHAT &&
+        activeModelProfile != null && containsVisualInput &&
+        LocalModelPresets.documentedImageInputSupport(
+            activeModelProfile.model, activeModelProfile.baseUrl) == false
     val canSend = !state.loading && attachmentImportProgress == null &&
+        !knownUnsupportedVisualInput &&
         !temperatureWritePending &&
         groupChatReady &&
         (input.isNotBlank() || attachments.isNotEmpty())
@@ -443,6 +452,20 @@ internal fun LocalConversationComposer(
                     SyButton("清空", onClearAttachments,
                         variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
                 }
+            }
+        }
+        if (knownUnsupportedVisualInput) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("当前模型预设不支持图片或选定的扫描 PDF 页面，请先换用图像模型。",
+                    style = SyType.small13.withReadingWeight(),
+                    color = colors.dangerInk,
+                    modifier = Modifier.weight(1f))
+                SyButton("切换模型", onOpenModelPicker,
+                    variant = SyButtonVariant.Outline, size = SyButtonSize.Small)
             }
         }
         if (attachments.isNotEmpty()) {
