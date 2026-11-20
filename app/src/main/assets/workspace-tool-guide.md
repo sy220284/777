@@ -11,6 +11,7 @@
 - 命令检查：`rg --version`、`curl --version`、`jq --version`、`npm --version`、`pip --version`。
 - npm 运行在内置 Node 上，pip 运行在内置 Python 上。两者直接调用与工作区 `bash` 均使用解释器入口，适应 Android 的可执行文件限制。
 - 默认禁用 npm 安装脚本；pip 安装的软件包保存在应用私有目录，重新打开工作区可以继续使用。
+- 普通 Work/本机工作区命令在安卓应用授权范围内执行；额外启用的进程内核隔离要求设备提供 Landlock ABI 3+。内核不提供该能力时，隔离命令明确报错并拒绝执行，保持文件访问安全边界，绝不会自动改用不隔离执行。
 
 ## Code Mode 前序结果的实际写法
 - 已有 `配置.json` 内容为 `{"file":{"path":"文档.md"}}` 时，可执行：`{"steps":[{"tool":"json_query","args":{"path":"配置.json","query":""}},{"tool":"read","args":{"path":{"$step_result":1,"path":"file.path"}}}]}`；第一步返回 JSON 内容，第二步读取其中的文件路径。
