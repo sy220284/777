@@ -116,11 +116,26 @@ class ChatIntimacyReactionLibraryTest {
                 "慢热而温柔", provenance = CharacterFactProvenance.USER_CREATED)))
         val context = ChatContextState(scene = ChatSceneState(location = "沙发", sceneTime = "夜晚"))
         val projection = projector.project(persona, ChatCharacterState(mood = "开心"),
-            context, "她轻轻抱住了我", null)
+            context, "她轻轻抱住了我", null, intimacyModeEnabled = true)
         assertTrue(projection.dynamicPrompt.contains("【本轮反应素材"))
         assertTrue(projection.dynamicPrompt.contains("注意坐姿、肩膀与支撑点"))
         assertTrue(projection.dynamicPrompt.contains("人物表达：可先停顿"))
         assertFalse(projection.stablePrompt.contains("【本轮反应素材"))
+    }
+
+    @Test
+    fun intimacyActionDoesNotInjectReactionWhenSettingIsDisabled() {
+        val projector = CharacterRuntimeProjector(ChatRelationshipEngine(), CharacterLoreEngine())
+        val projection = projector.project(
+            PersonaProfile(name = "阿青"),
+            ChatCharacterState(),
+            ChatContextState(scene = ChatSceneState(location = "沙发")),
+            "她轻轻抱住了我",
+            null,
+            intimacyModeEnabled = false,
+        )
+        assertFalse(projection.dynamicPrompt.contains("【本轮反应素材"))
+        assertFalse(projection.dynamicPrompt.contains("【身体反应强度】"))
     }
 
     @Test
