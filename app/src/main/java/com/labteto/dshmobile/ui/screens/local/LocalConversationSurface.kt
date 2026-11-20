@@ -179,6 +179,8 @@ internal class LocalConversationSurfaceArgs(
     val onStopTeam: suspend () -> LocalWorkUiActionResult,
     val onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     val onLocateMemoryForMessage: (String) -> Unit,
+    val onReadChatRecallEvidence: (String) -> List<com.labteto.dshmobile.local.chat.ChatRecallEvidence>,
+    val onOpenRecallSource: (String, String) -> Unit,
     val onSelectMessageVariant: suspend (String, Int) -> Boolean,
     val onRegenerate: (String) -> Boolean,
     val onRetryFailedGroupReply: (String) -> Boolean,
@@ -249,6 +251,8 @@ internal fun LocalConversationSurface(
     onStopTeam: suspend () -> LocalWorkUiActionResult,
     onEditAndResend: suspend (String, String) -> LocalChatUserEditResult,
     onLocateMemoryForMessage: (String) -> Unit = {},
+    onReadChatRecallEvidence: (String) -> List<com.labteto.dshmobile.local.chat.ChatRecallEvidence> = { emptyList() },
+    onOpenRecallSource: (String, String) -> Unit = { _, _ -> },
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onRetryFailedGroupReply: (String) -> Boolean = { false },
@@ -317,6 +321,8 @@ internal fun LocalConversationSurface(
         onStopTeam = onStopTeam,
         onEditAndResend = onEditAndResend,
         onLocateMemoryForMessage = onLocateMemoryForMessage,
+        onReadChatRecallEvidence = onReadChatRecallEvidence,
+        onOpenRecallSource = onOpenRecallSource,
         onSelectMessageVariant = onSelectMessageVariant,
         onRegenerate = onRegenerate,
         onRetryFailedGroupReply = onRetryFailedGroupReply,
@@ -395,6 +401,8 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onStopTeam = args.onStopTeam
     val onEditAndResend = args.onEditAndResend
     val onLocateMemoryForMessage = args.onLocateMemoryForMessage
+    val onReadChatRecallEvidence = args.onReadChatRecallEvidence
+    val onOpenRecallSource = args.onOpenRecallSource
     val onSelectMessageVariant = args.onSelectMessageVariant
     val onRegenerate = args.onRegenerate
     val onRetryFailedGroupReply = args.onRetryFailedGroupReply
@@ -508,6 +516,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showChatStoryContext by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showChatStoryOverview by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var recallSheetMessageId by rememberSaveable(state.sessionId) { mutableStateOf<String?>(null) }
+    var recallSheetItems by remember(state.sessionId) {
+        mutableStateOf(emptyList<com.labteto.dshmobile.local.chat.ChatRecallEvidence>())
+    }
+    val latestChatSessionId by androidx.compose.runtime.rememberUpdatedState(state.sessionId)
     var showWorkEvidence by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
@@ -1396,7 +1409,25 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     transcriptItem.message.role == "assistant" &&
                                     state.messages.any { it.id == transcriptItem.message.id }
                                 ) { message -> documentGenerationMessageId = message.id } else null,
-                                onLocateSourceMemory = { message -> onLocateMemoryForMessage(message.id) },
+                                onLocateSourceMemory = { message ->
+                                    if (state.usageMode != LocalUsageMode.CHAT || message.role != "assistant") {
+                                        onLocateMemoryForMessage(message.id)
+                                    } else {
+                                        val originSessionId = state.sessionId
+                                        scope.launch {
+                                            val recorded = withContext(Dispatchers.IO) {
+                                                onReadChatRecallEvidence(message.id)
+                                            }
+                                            if (latestChatSessionId != originSessionId) return@launch
+                                            if (recorded.isEmpty()) {
+                                                onLocateMemoryForMessage(message.id)
+                                            } else {
+                                                recallSheetItems = recorded
+                                                recallSheetMessageId = message.id
+                                            }
+                                        }
+                                    }
+                                },
                                 onSelectVariant = onSelectMessageVariant,
                                 onRegenerate = onRegenerate,
                             )
@@ -1934,6 +1965,16 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
             }
         }
+    }
+    if (recallSheetMessageId != null && state.usageMode == LocalUsageMode.CHAT) {
+        ChatRecallEvidenceSheet(
+            items = recallSheetItems,
+            onOpenSource = { sourceSessionId, messageId ->
+                recallSheetMessageId = null
+                onOpenRecallSource(sourceSessionId, messageId)
+            },
+            onDismiss = { recallSheetMessageId = null },
+        )
     }
     if (showChatStoryOverview && state.usageMode == LocalUsageMode.CHAT) {
         ChatStoryOverviewSheet(

@@ -8,6 +8,7 @@ import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.ChatDiaryDelta
 import com.labteto.dshmobile.local.chat.ChatDiaryEntry
+import com.labteto.dshmobile.local.chat.ChatRecallEvidence
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
 import com.labteto.dshmobile.local.chat.PersonaAppendSuggestion
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
@@ -327,6 +328,8 @@ class LocalHarnessViewModel @Inject constructor(
     private fun refreshTranscriptHistoryAfterTimelineRewrite() =
         transcriptHistoryController.refreshAfterTimelineRewrite()
     fun retryFailedGroupReply(memberId: String): Boolean = runtime.chat.retryFailedGroupReply(memberId)
+    fun chatRecallEvidence(messageId: String): List<ChatRecallEvidence> =
+        runtime.chat.recallEvidenceForMessage(messageId)
 
     fun regenerateReply(messageId: String): Boolean = when (state.value.usageMode) {
         LocalUsageMode.WORK -> runtime.work.regenerateReply(messageId)

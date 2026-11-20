@@ -41,6 +41,7 @@ internal data class LocalShellFeatureUiActions(
     val selectMessageVariant: suspend (String, Int) -> Boolean,
     val regenerate: (String) -> Boolean,
     val retryFailedGroupReply: (String) -> Boolean,
+    val recallEvidence: (String) -> List<com.labteto.dshmobile.local.chat.ChatRecallEvidence>,
     val generateReplySuggestions: suspend () -> Boolean,
     val sampleSession: suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult,
     val searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,

@@ -520,6 +520,7 @@ fun LocalHarnessScreen(
         selectMessageVariant = viewModel::selectChatMessageVariant,
         regenerate = viewModel::regenerateReply,
         retryFailedGroupReply = viewModel::retryFailedGroupReply,
+        recallEvidence = viewModel::chatRecallEvidence,
         generateReplySuggestions = viewModel::generateReplySuggestions,
         sampleSession = viewModel::sampleSession,
         searchTranscript = viewModel::searchTranscript,
@@ -695,6 +696,11 @@ fun LocalHarnessScreen(
                 settingsDestination = SettingsDestination.MEMORY_MANAGEMENT
                 settingsEntryRequest++
                 pushFeature(LocalFeaturePage.SETTINGS)
+            },
+            onOpenRecallSource = { sourceSessionId, sourceMessageId ->
+                if (sourceSessionId.isNotBlank() && sourceMessageId.isNotBlank()) {
+                    switchToSessionAndShowConversation(sourceSessionId, sourceMessageId = sourceMessageId)
+                }
             },
             composerHandoff = composerHandoff,
             skillDisplayNames = installedSkillDisplayNames,
