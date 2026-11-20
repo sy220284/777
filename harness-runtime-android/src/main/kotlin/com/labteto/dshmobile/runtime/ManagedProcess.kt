@@ -35,7 +35,9 @@ internal fun prepareManagedProcessLauncher(
         bootstrapEnvironment.remove(key)?.let { bootstrapEnvironment[stagedKey] = it }
     }
     val launchScript = buildString {
-        append("printf '%s\\n' \"\$\$\"; ")
+        // Android mksh has a built-in echo; printf may require an external binary
+        // excluded from the restricted PATH before process isolation is installed.
+        append("echo \"\$\$\"; ")
         deferredLinkerVariables.forEach { key ->
             val stagedKey = "DSH_MANAGED_$key"
             append("if [ \"\${$stagedKey+x}\" ]; then ")
