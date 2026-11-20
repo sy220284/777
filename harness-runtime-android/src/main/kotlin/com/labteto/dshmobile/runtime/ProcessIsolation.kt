@@ -15,6 +15,17 @@ class ProcessIsolationContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<ProcessIsolationContext>
 }
 
+/**
+ * /proc/self and /proc/thread-self are process-relative kernel links, not
+ * ordinary filesystem aliases. Canonicalizing them in the Android app would
+ * freeze the app's PID/TID into a Landlock policy used later by another child.
+ * Preserve the links so Landlock resolves them in the sandbox launcher itself.
+ */
+internal fun isolationRootPath(file: File): String = when (file.path) {
+    "/proc/self", "/proc/thread-self" -> file.path
+    else -> file.canonicalPath
+}
+
 /** Wrap only the untrusted child, preserving the host's PTY/process-group/receipt ownership. */
 private suspend fun isolatedProcessCommand(
     command: List<String>, directory: File?, trustedPaths: List<File>, trustedEnvironment: Map<String, String>,
@@ -36,7 +47,7 @@ private suspend fun isolatedProcessCommand(
         "/linkerconfig", "/proc/self", "/proc/thread-self", "/proc/cpuinfo", "/proc/meminfo",
         "/dev/null", "/dev/urandom", "/dev/tty") +
         trustedReadRoots.map { it.canonicalPath } + trustedPaths.map { it.canonicalPath } + trustedEnvironment.filterKeys { it in runtimeKeys }.values
-            .flatMap { it.split(File.pathSeparatorChar) }).map(::File).filter(File::exists).map { it.canonicalPath }.distinct()
+            .flatMap { it.split(File.pathSeparatorChar) }).map(::File).filter(File::exists).map(::isolationRootPath).distinct()
     val policy = buildJsonObject {
         put("read", JsonArray(roots.map(::JsonPrimitive)))
         put("write", JsonArray(listOf(JsonPrimitive(workspace.path))))
