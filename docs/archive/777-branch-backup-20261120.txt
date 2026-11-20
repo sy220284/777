@@ -1401,3 +1401,62 @@ b7b8ef1e6a6aabc7126dcd75210c9dd3095a2624 refs/tags/v0.12.0-777.98
 # 十一番补删 2026-11-20 第二波（main=b8e10e74d1 #977合并后）
 # PATCH-EQ×4: ci/prune-session-architecture-artifacts-20261118 codex/refresh-latest-release-notes-20261119 codex/repair-incomplete-latest-release-note-20261119 fix/workspace-lazylist-test-matcher-20261116 (patch-id全量索引精判)
 # TREE-EQ×1: codex/global-adaptive-liquid-glass (#977 head, squash合并吸收, diff仅剩后续备份文档)
+# 十一番第三波 2026-11-20 15:06（TA扩权：closed PR head 全清）
+# closed+NOTMERGED×9（abandoned，SHA可恢复）+ closed+MERGED×48（squash吸收残留）
+DEL codex/777-v6-ui-ux-system-20261116
+DEL codex/ui-color-scheme-unify-20261116
+DEL codex/ui-visual-gates-and-prototype-parity-20261116
+DEL codex/ui-visual-gates-stacked-20261116
+DEL design/777-nocturne-20261117
+DEL design/777-ui-v7-20261117
+DEL design/777-v56-visual-reconstruction-20261117
+DEL design/compact-conversation-action-menus
+DEL feat/agent-discovery-natural-work-20261114
+DEL audit/post930-direct-history-retention-20261116
+DEL chore/remove-seven-builtin-skills-20261118
+DEL ci/prune-ui-media-artifacts-20261118
+DEL codex/ci-share-apk-parallel-tests
+DEL codex/concise-pr-release-notes-20261119
+DEL codex/dsh-ui-flow-20261117
+DEL codex/improve-release-summary-quality-20261119
+DEL codex/refresh-notes-after-release-20261119
+DEL codex/register-four-design-skills
+DEL codex/shenyan-component-atlas-redesign
+DEL codex/ui-v6-unified-ux-20261116
+DEL codex/unified-android-ui
+DEL docs/777-current-cleanup-20261118
+DEL docs/777-secondary-cleanup-20261118
+DEL docs/v6-visual-material-spec-20261113
+DEL feat/895-unified-autonomous-exploration-20261114
+DEL feat/agent-discovery-natural-work-integration-20261114
+DEL feat/codex-capability-alignment-20261112
+DEL feat/codex-extension-market-rebuild-20261114
+DEL feat/keep-work-running-across-disconnect-20261116
+DEL feat/model-protocol-responses-20261116
+DEL feat/ui-reading-flow-accessibility-20261112
+DEL feat/work-investigation-closed-loop-20261114
+DEL feature/conversation-context-menu-interaction
+DEL feature/permission-setup-dshgo
+DEL fix/android-device-virtual-display-contract-20261114
+DEL fix/android-node-identity-and-memory-review-20261114
+DEL fix/android-work-reliability-20261114
+DEL fix/anthropic-tool-json-continuation-20261116
+DEL fix/cli-parity-merge-preview-20261113
+DEL fix/github-skills-install-no-size-cap-20261114
+DEL fix/mcp-schema-completion-20261117
+DEL fix/pr895-claude317-closure-20261114
+DEL fix/pr895-claude317-runtime-contracts-20261114
+DEL fix/team-result-lifecycle-codex-claude-20261114
+DEL improve-work-execution-prompts
+DEL main
+DEL opt/architecture3-runtime-skill-storage-ui-20261116
+DEL optimize/session-request-delta-v4
+DEL perf/777-ci-gates-artifact-reuse-20261112
+DEL refactor/context-model-tool-budget-20261114
+DEL refactor/direct-tool-dispatch-20261116
+DEL refactor/remove-retired-preset-history-20261118
+DEL refactor/unified-extension-session-lifecycle-20261114
+DEL ui/extension-catalog-cn-icons-20261114
+DEL ui/move-model-usage-to-settings-20261118
+DEL ui/skill-plugin-simple-flow-20261114
+DEL ui/unified-capability-center-20261118
