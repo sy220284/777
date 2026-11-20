@@ -29,7 +29,7 @@ class ManagedProcessOutputTest {
             command.take(3))
         assertEquals(listOf("/work/cli", "--version"), command.takeLast(2))
         val script = command[3]
-        assertTrue(script.startsWith("printf '%s\\n'"))
+        assertTrue(script.startsWith("echo \"\$\$\""))
         assertTrue(script.indexOf("printf") < script.indexOf("export LD_LIBRARY_PATH"))
         assertTrue(script.endsWith("exec " + '"' + '$' + "@\""))
         for (key in listOf("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")) {
