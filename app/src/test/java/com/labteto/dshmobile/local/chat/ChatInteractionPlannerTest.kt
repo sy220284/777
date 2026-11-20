@@ -1446,12 +1446,11 @@ class ChatInteractionPlannerTest {
             ),
         )
 
-        assertTrue(prompt.contains("互动状态"))
-        assertTrue(prompt.contains("强度=3/5"))
-        assertTrue(prompt.contains("当前为亲密语境"))
-        assertTrue(prompt.contains("建议承接当前互动"))
-        assertTrue(prompt.contains("存在中文双关"))
-        assertTrue(prompt.contains("不做词义解释"))
+        assertTrue(prompt.contains("情感或亲近语境"))
+        assertTrue(prompt.contains("人物性格"))
+        assertTrue(prompt.contains("个人意愿") || prompt.contains("表达方式"))
+        assertFalse(prompt.contains("强度=3/5"))
+        assertFalse(prompt.contains("动作=靠近"))
     }
 
     @Test

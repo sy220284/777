@@ -209,9 +209,13 @@ internal fun groupChatResponders(
         (listOfNotNull(active) + distinct.filterNot { it.galleryId == active?.galleryId })
             .take(MAX_GROUP_CHAT_RESPONDERS_PER_TURN)
     } else {
-        // The caller rotates the roster with turnCursor. Reusing active here would
-        // select the same member indefinitely during ordinary unspecific conversation.
-        listOf(distinct.first())
+        // Explicit follow-ups continue the person being addressed. Independent
+        // everyday turns use the caller's rotating roster; an active speaker must
+        // not monopolize all unspecific conversation.
+        val followsCurrentSpeaker = listOf(
+            "后来呢", "接着说", "继续说", "说下去", "你刚才", "接着讲", "然后呢",
+        ).any { input.trim().contains(it) }
+        listOf(if (followsCurrentSpeaker && active != null) active else distinct.first())
     }
 }
 
