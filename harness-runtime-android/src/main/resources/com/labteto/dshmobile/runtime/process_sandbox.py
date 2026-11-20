@@ -132,7 +132,15 @@ def main():
     filesystem(policy)
     syscalls()
     if len(sys.argv) > 3:
-        child_environment = json.loads(sys.argv[3])
+        child_keys = json.loads(sys.argv[3])
+        if not isinstance(child_keys, list) or any(not isinstance(key, str) or not key for key in child_keys):
+            raise ValueError("invalid staged child environment")
+        if len(child_keys) != len(set(child_keys)):
+            raise ValueError("duplicate staged child environment keys")
+        child_environment = {
+            key: os.environ["DSH_SANDBOX_ENV_" + str(index)]
+            for index, key in enumerate(child_keys)
+        }
         os.environ.clear()
         os.environ.update(child_environment)
     os.environ["HOME"] = workspace

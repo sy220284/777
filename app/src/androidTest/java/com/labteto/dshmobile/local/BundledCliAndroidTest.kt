@@ -10,6 +10,8 @@ import com.labteto.dshmobile.local.runtime.BundledPythonRuntime
 import com.labteto.dshmobile.local.runtime.LocalBundledRuntimeManager
 import com.labteto.dshmobile.runtime.AndroidProcessRuntime
 import com.labteto.dshmobile.runtime.ProcessIsolationContext
+import com.labteto.dshmobile.runtime.secureIsolatedProcessBuilder
+import com.labteto.dshmobile.runtime.executeManagedProcess
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -87,7 +89,13 @@ class BundledCliAndroidTest {
                     }
                 }
             }
-            assertTrue("Isolated runtime diagnostics: ${isolationFailures.joinToString("; ")}",
+            // Debug-only differential diagnosis: if npm crashes, run the same
+            // hardcoded --version probe with exactly one policy layer removed.
+            // This is instrumentation code, never a production execution fallback.
+            val detailedCause = if (isolationFailures.any { it.startsWith("npm crashed/failed") }) {
+                diagnoseNpmSandboxLayers(manager, sandboxRoot)
+            } else ""
+            assertTrue("Isolated runtime diagnostics: ${isolationFailures.joinToString("; ")}\n$detailedCause",
                 isolationFailures.isEmpty())
             assertEquals("All commands must see the same immutable kernel sandbox capability",
                 1, isolatedOutcomes.size)
@@ -105,5 +113,38 @@ class BundledCliAndroidTest {
             )
             assertTrue("shell invocation failed: ${result.content}", !result.isError)
         }
+    }
+
+    private suspend fun diagnoseNpmSandboxLayers(
+        manager: LocalBundledRuntimeManager,
+        workspace: File,
+    ): String {
+        val environment = manager.environment()
+        val original = withContext(ProcessIsolationContext()) {
+            secureIsolatedProcessBuilder(
+                ProcessBuilder(manager.commandAliases().getValue("npm") + "--version")
+                    .directory(workspace).apply { environment().putAll(environment) },
+                manager.searchPaths(), environment,
+            )
+        }
+        val originalArgs = original.command()
+        val originalScript = originalArgs[5]
+        val anchor = "    filesystem(policy)\n    syscalls()"
+        check(originalScript.contains(anchor)) { "隔离诊断脚本缺少已知的保护安装点" }
+        val modes = mapOf(
+            "仅 Landlock" to "    filesystem(policy)\n    # test-only: omit seccomp",
+            "仅 Seccomp" to "    # test-only: omit Landlock\n    syscalls()",
+        )
+        return modes.map { (name, replacement) ->
+            val diagnostic = originalArgs.toMutableList().apply {
+                this[5] = originalScript.replace(anchor, replacement)
+            }
+            val builder = ProcessBuilder(diagnostic).directory(workspace).apply {
+                environment().clear()
+                environment().putAll(original.environment())
+            }
+            val result = executeManagedProcess(builder, timeoutMillis = 15_000L)
+            "$name: exit=${result.exitCode}, timeout=${result.timedOut}, stdout=${result.stdout.take(1000)}, stderr=${result.stderr.take(1800)}"
+        }.joinToString("\n")
     }
 }

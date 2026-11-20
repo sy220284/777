@@ -4,6 +4,9 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.File
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -17,6 +20,59 @@ class ManagedProcessOutputTest {
         // must be deferred until the isolated child installs Landlock.
         assertEquals(java.io.File("/tmp").canonicalPath, isolationRootPath(java.io.File("/tmp")))
     }
+    @Test fun isolatedPackageManagersUseOnlyWorkspaceWriteRoots() {
+        val workspace = File("/tmp/workspace")
+        val environment = isolatedChildRuntimeEnvironment(workspace, mapOf(
+            "PIP_TARGET" to "/app/private/python-packages",
+            "PIP_CACHE_DIR" to "/app/cache/pip",
+            "PYTHONPATH" to "/app/python/site-packages",
+            "npm_config_cache" to "/app/cache/npm",
+        ))
+        val prefix = File(workspace, ".dsh/runtime-packages").path + File.separator
+        for (key in listOf("PIP_TARGET", "PIP_CACHE_DIR", "npm_config_cache", "npm_config_prefix")) {
+            assertTrue("$key must remain writable under the sandbox root",
+                environment.getValue(key).startsWith(prefix))
+        }
+        assertTrue("sandbox-installed packages must win Python import precedence",
+            environment.getValue("PYTHONPATH").startsWith(environment.getValue("PIP_TARGET")))
+    }
+
+    @Test fun childSecretsAreStagedInEnvironmentNeverAsProcessArguments() = runBlocking {
+        val root = kotlin.io.path.createTempDirectory("isolated-env").toFile()
+        try {
+            File(root, "python3").apply {
+                writeText("#!/bin/sh\nexit 0\n")
+                assertTrue(setExecutable(true))
+            }
+            val builder = ProcessBuilder("npm", "--version").directory(root).apply {
+                environment().clear()
+                environment()["API_TOKEN"] = "private-token-value"
+                environment()["LD_PRELOAD"] = "/user/should-not-load.so"
+                environment()["PIP_TARGET"] = "/private/outside"
+                environment()["npm_config_cache"] = "/private/cache"
+            }
+            withContext(ProcessIsolationContext()) {
+                secureIsolatedProcessBuilder(builder, listOf(root), emptyMap())
+            }
+            val argv = builder.command()
+            assertTrue("sandbox helper must be the child command", argv.contains("-c"))
+            assertFalse("secret values must not enter process argv",
+                argv.any { it.contains("private-token-value") || it.contains("/user/should-not-load.so") })
+            assertFalse("untrusted preload must be inert until after isolation",
+                builder.environment().containsKey("LD_PRELOAD"))
+            val childNames = kotlinx.serialization.json.Json.parseToJsonElement(argv.last())
+                .let { it as kotlinx.serialization.json.JsonArray }
+                .map { it.toString().trim('"') }
+            val tokenIndex = childNames.indexOf("API_TOKEN")
+            assertTrue(tokenIndex >= 0)
+            assertEquals("private-token-value", builder.environment()["DSH_SANDBOX_ENV_$tokenIndex"])
+            val preloadIndex = childNames.indexOf("LD_PRELOAD")
+            assertEquals("/user/should-not-load.so", builder.environment()["DSH_SANDBOX_ENV_$preloadIndex"])
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun keepsSupplementaryCodePointIntact() {
         assertEquals("A", truncateProcessOutput("A\uD83D\uDE00B", 2))
         assertEquals("A\uD83D\uDE00", truncateProcessOutput("A\uD83D\uDE00B", 3))
