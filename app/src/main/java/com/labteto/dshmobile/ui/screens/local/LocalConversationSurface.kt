@@ -86,6 +86,7 @@ import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.LocalUsageMode
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.chat.LocalChatUserEditResult
+import com.labteto.dshmobile.local.chat.ChatContextState
 import com.labteto.dshmobile.local.chat.PersonaGalleryEntry
 import com.labteto.dshmobile.local.chat.PersonaProfile
 import com.labteto.dshmobile.local.presentation.chatBranchInfoIndex
@@ -506,6 +507,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val loadedSearchState = rememberV6LoadedConversationSearchState(state.sessionId)
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
     var showChatStoryContext by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    var showChatStoryOverview by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showWorkEvidence by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
@@ -1887,6 +1889,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         Text(notes.take(300), style = SyType.small13.withReadingWeight(),
                             color = colors.textSecondary)
                     }
+                    SyButton("故事概览与重要事件", onClick = {
+                        showChatStoryContext = false
+                        showChatStoryOverview = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
                     SyButton("选择人物", onClick = {
                         showChatStoryContext = false
                         showPersonaPicker = true
@@ -1906,6 +1912,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                         Text(summary.take(240), style = SyType.small13.withReadingWeight(),
                             color = colors.textSecondary)
                     }
+                    SyButton("查看共同经历", onClick = {
+                        showChatStoryContext = false
+                        showChatStoryOverview = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
                     SyButton("管理群聊成员", onClick = {
                         showChatStoryContext = false
                         showGroupMemberPicker = true
@@ -1917,6 +1927,17 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 }
             }
         }
+    }
+    if (showChatStoryOverview && state.usageMode == LocalUsageMode.CHAT) {
+        ChatStoryOverviewSheet(
+            storyTitle = currentGalleryStory?.title ?: sessionTitle,
+            context = if (state.groupChat.enabled) state.groupChat.context else state.chatContext,
+            onLocateMessage = { messageId ->
+                showChatStoryOverview = false
+                searchJumpTarget = LocalTranscriptJumpTarget(state.sessionId, messageId)
+            },
+            onDismiss = { showChatStoryOverview = false },
+        )
     }
     if (
         showPersonaPicker &&
