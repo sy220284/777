@@ -53,14 +53,36 @@ class BundledCliAndroidTest {
                 baseEnvironment = manager::environment,
                 commandAliases = manager::commandAliases,
             )
+            // The Android emulator can block syscall 444 (Landlock) with ENOSYS
+            // even though Linux desktop hosts support the same sandbox. The
+            // only permitted device outcomes are a real isolated execution
+            // OR a verified fail-closed refusal before the CLI ever starts.
+            // Never substitute an unisolated child for a rejected sandbox.
+            val isolatedOutcomes = mutableSetOf<Boolean>()
             withContext(ProcessIsolationContext()) {
                 for (name in listOf("rg", "curl", "jq", "npm", "pip")) {
                     val result = isolated.execute(
                         ProcessRequest(listOf(name, "--version"), timeoutMillis = 25_000),
                     )
-                    assertEquals("$name isolated process: ${result.stderr}", 0, result.exitCode)
+                    if (result.exitCode == 0) {
+                        assertTrue("$name sandboxed output missing",
+                            result.stdout.isNotBlank() || result.stderr.isNotBlank())
+                        isolatedOutcomes += true
+                    } else {
+                        assertEquals("$name failed for a reason other than denied sandbox: " +
+                            "${result.stderr} / ${result.stdout}", 125, result.exitCode)
+                        assertTrue("$name sandbox must refuse execution only when kernel " +
+                            "Landlock protection is unavailable: ${result.stderr}",
+                            result.stderr.contains("PROCESS_ISOLATION_UNAVAILABLE:") &&
+                                (result.stderr.contains("Landlock ABI unavailable") ||
+                                    result.stderr.contains("Landlock ABI >= 3 required")))
+                        assertTrue("$name sandbox refusal must not execute CLI", result.stdout.isBlank())
+                        isolatedOutcomes += false
+                    }
                 }
             }
+            assertEquals("All commands must see the same immutable kernel sandbox capability",
+                1, isolatedOutcomes.size)
 
             val root = File(context.cacheDir, "cli-smoke").apply { mkdirs() }
             val workspace = LocalWorkspace(
