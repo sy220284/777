@@ -114,7 +114,17 @@ for name in CLASSES:
  # then stop before repeating half an hour of unrelated UI steps. A green run
  # still executes the entire original audit and baseline comparison.
  if name.endswith('BundledCliAndroidTest') and not summary[-1]['passed']:
-  print('关键运行时设备验收失败，已保存日志与录屏，终止本次无效的后续巡检',flush=True)
+  # Capture the Android crash buffer before the emulator stops. It can reveal
+  # the exact syscall and seccomp action behind a native SIGSYS failure.
+  target=OUT/'BundledCliAndroidTest-crash-logcat.txt'
+  try:
+   captured=subprocess.run(['adb','logcat','-d','-b','crash','-t','1200'],
+     cwd=ROOT,text=True,capture_output=True,timeout=20)
+   target.write_text('adb exit code: '+str(captured.returncode)+'\n'+
+     captured.stdout+'\n'+captured.stderr,encoding='utf-8')
+  except subprocess.TimeoutExpired as failure:
+   target.write_text('Android crash buffer retrieval timed out: '+str(failure),encoding='utf-8')
+  print('关键运行时设备验收失败，已保存日志、崩溃缓冲区与录屏，终止本次无效的后续巡检',flush=True)
   sys.exit(1)
 
 def export_components():
