@@ -326,6 +326,8 @@ class LocalHarnessViewModel @Inject constructor(
 
     private fun refreshTranscriptHistoryAfterTimelineRewrite() =
         transcriptHistoryController.refreshAfterTimelineRewrite()
+    fun retryFailedGroupReply(memberId: String): Boolean = runtime.chat.retryFailedGroupReply(memberId)
+
     fun regenerateReply(messageId: String): Boolean = when (state.value.usageMode) {
         LocalUsageMode.WORK -> runtime.work.regenerateReply(messageId)
         LocalUsageMode.CHAT -> runtime.chat.regenerateReply(messageId)

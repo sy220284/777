@@ -6,6 +6,8 @@ import com.labteto.dshmobile.local.session.LOCAL_AGENT_INBOX_EVENT_TYPE
 import com.labteto.dshmobile.local.agent.encodeLocalAgentInboxEvent
 import com.labteto.dshmobile.local.attachment.LocalImportedAttachment
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeKind
+import com.labteto.dshmobile.local.runtime.LocalSessionRuntimeRegistry
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import com.labteto.dshmobile.local.runtime.MAX_PENDING_INPUTS
 import com.labteto.dshmobile.local.send.LocalPreparedSend
@@ -38,6 +40,7 @@ internal class LocalChatSendCoordinator @Inject constructor(
     private val chatState: LocalChatStatePort,
     private val userActivity: LocalChatUserActivityPort,
     private val turn: LocalChatTurnPort,
+    private val retryStarter: LocalChatTurnStarter,
     private val json: Json,
 ) {
     internal fun send(
@@ -117,6 +120,51 @@ internal class LocalChatSendCoordinator @Inject constructor(
         }
         started?.start()
         return result
+    }
+
+    /** Retry only the latest failed group turn; never create a fabricated user bubble. */
+    internal fun retryFailedGroupReply(memberId: String): Boolean {
+        val handle = runtimeStateStore.foregroundRunHandle
+        var started: Job? = null
+        val accepted = synchronized(handle.lock) {
+            val snapshot = runtimeStateStore.state.value
+            val source = snapshot.chat.groupChat.failedReplySources[memberId]
+            if (snapshot.usageMode != LocalUsageMode.CHAT || !snapshot.chat.groupChat.enabled ||
+                snapshot.loading || !snapshot.modelState.configured ||
+                runtimeStateStore.sessionTransitioning || handle.hasLiveJob() ||
+                handle.pendingInputs.size() != 0 || handle.cancellationRequested ||
+                source == null || memberId !in snapshot.chat.groupChat.failedReplyMemberIds ||
+                source.sourceMessageId.isBlank() ||
+                snapshot.messages.lastOrNull { it.role == "user" }?.id != source.sourceMessageId
+            ) {
+                runtimeStateStore.projection.publishError(
+                    "只能重试最近一轮尚未完成的群聊角色回复，请检查会话与模型状态",
+                )
+                return@synchronized false
+            }
+            val lease = LocalSessionRuntimeRegistry.tryAcquire(
+                snapshot.sessionId, LocalSessionRuntimeKind.FOREGROUND,
+            ) ?: run {
+                runtimeStateStore.projection.publishError("群聊正在执行其他任务，请稍后重试")
+                return@synchronized false
+            }
+            try {
+                runtimeStateStore.prepareForegroundRestart(sessionStorage.eventLogs.get(snapshot.sessionId))
+                started = retryStarter.startGroupRetry(
+                    content = source.originalInput,
+                    sourceMessageId = source.sourceMessageId,
+                    memberId = memberId,
+                    sessionLease = lease,
+                ).also { handle.job = it }
+                true
+            } catch (error: Exception) {
+                lease.close()
+                runtimeStateStore.projection.publishError(error.message ?: "群聊角色重试未启动")
+                false
+            }
+        }
+        started?.start()
+        return accepted
     }
 
     private fun recordUserTranscript(

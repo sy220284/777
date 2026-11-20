@@ -59,6 +59,7 @@ internal interface LocalChatExecutionPort {
     fun reorderQueuedUserInputs(orderedIds: List<String>): Boolean
 
     fun regenerateReply(messageId: String): Boolean
+    fun retryFailedGroupReply(memberId: String): Boolean
 
     suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult
 

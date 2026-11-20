@@ -37,6 +37,22 @@ internal class LocalChatTurnStarter @Inject constructor(
         memoryInput: String,
         sourceMessageId: String,
         sessionLease: LocalSessionRuntimeLease?,
+    ): Job = launchTurn(content, memoryInput, sourceMessageId, sessionLease, null)
+
+    /** Continue a failed group participant's original user turn. */
+    internal fun startGroupRetry(
+        content: String,
+        sourceMessageId: String,
+        memberId: String,
+        sessionLease: LocalSessionRuntimeLease,
+    ): Job = launchTurn(content, content, sourceMessageId, sessionLease, memberId)
+
+    private fun launchTurn(
+        content: String,
+        memoryInput: String,
+        sourceMessageId: String,
+        sessionLease: LocalSessionRuntimeLease?,
+        retryMemberId: String?,
     ): Job {
         val sessionId = runtimeStateStore.currentSessionId
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -44,7 +60,7 @@ internal class LocalChatTurnStarter @Inject constructor(
                 LocalSessionRuntimeRegistry.withOwner(
                     sessionId, LocalSessionRuntimeKind.FOREGROUND, sessionLease,
                 ) {
-                    dispatcher.run(sessionId, content, memoryInput, sourceMessageId)
+                    dispatcher.run(sessionId, content, memoryInput, sourceMessageId, retryMemberId)
                 }
             } catch (error: Exception) {
                 if (error is kotlinx.coroutines.CancellationException) throw error

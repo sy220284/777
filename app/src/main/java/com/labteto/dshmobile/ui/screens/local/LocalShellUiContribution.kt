@@ -97,6 +97,7 @@ internal fun localShellFeatureUiContribution(
             onLocateMemoryForMessage = onLocateMemoryForMessage,
             onSelectMessageVariant = actions.selectMessageVariant,
             onRegenerate = actions.regenerate,
+            onRetryFailedGroupReply = actions.retryFailedGroupReply,
             onGenerateReplySuggestions = actions.generateReplySuggestions,
             onSampleSession = actions.sampleSession,
             searchTranscript = actions.searchTranscript,

@@ -3,6 +3,7 @@ package com.labteto.dshmobile.ui.screens.local
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,10 +24,15 @@ internal fun GroupReplyFailureNotice(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
         SyInlineBanner(stringResource(R.string.audit_group_partial), SyBannerKind.WARNING)
         group.members.filter { it.galleryId in group.failedReplyMemberIds }.forEach { member ->
-            val request = stringResource(R.string.audit_group_retry_request, member.displayName)
+            group.failedReplySources[member.galleryId]?.partialContent
+                ?.takeIf(String::isNotBlank)?.let { partial ->
+                    Text("未完成的回复：" + partial.take(240),
+                        style = com.labteto.dshmobile.ui.theme.SyType.small13,
+                        color = com.shenyan.designsystem.foundation.LocalSyColors.current.textSecondary)
+                }
             SyButton(
                 text = stringResource(R.string.audit_group_retry_member, member.displayName),
-                onClick = { retry(request) },
+                onClick = { retry(member.galleryId) },
                 enabled = !running,
                 variant = SyButtonVariant.Ghost,
             )

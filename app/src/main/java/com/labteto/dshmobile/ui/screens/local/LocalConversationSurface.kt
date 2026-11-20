@@ -179,6 +179,7 @@ internal class LocalConversationSurfaceArgs(
     val onLocateMemoryForMessage: (String) -> Unit,
     val onSelectMessageVariant: suspend (String, Int) -> Boolean,
     val onRegenerate: (String) -> Boolean,
+    val onRetryFailedGroupReply: (String) -> Boolean,
     val onGenerateReplySuggestions: suspend () -> Boolean,
     val onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)?,
     val searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
@@ -247,6 +248,7 @@ internal fun LocalConversationSurface(
     onLocateMemoryForMessage: (String) -> Unit = {},
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
+    onRetryFailedGroupReply: (String) -> Boolean = { false },
     onGenerateReplySuggestions: suspend () -> Boolean,
     onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)? = null,
     searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
@@ -313,6 +315,7 @@ internal fun LocalConversationSurface(
         onLocateMemoryForMessage = onLocateMemoryForMessage,
         onSelectMessageVariant = onSelectMessageVariant,
         onRegenerate = onRegenerate,
+        onRetryFailedGroupReply = onRetryFailedGroupReply,
         onGenerateReplySuggestions = onGenerateReplySuggestions,
         onSampleSession = onSampleSession,
         searchTranscript = searchTranscript,
@@ -389,6 +392,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onLocateMemoryForMessage = args.onLocateMemoryForMessage
     val onSelectMessageVariant = args.onSelectMessageVariant
     val onRegenerate = args.onRegenerate
+    val onRetryFailedGroupReply = args.onRetryFailedGroupReply
     val onGenerateReplySuggestions = args.onGenerateReplySuggestions
     val onSampleSession = args.onSampleSession
     val onLoadOlderTranscript = args.onLoadOlderTranscript
@@ -1144,7 +1148,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         if (state.groupChat.enabled && state.groupChat.failedReplyMemberIds.isNotEmpty()) {
-            GroupReplyFailureNotice(state.groupChat, state.running) { request -> onSend(request, emptyList()) }
+            GroupReplyFailureNotice(state.groupChat, state.running) { memberId ->
+                onRetryFailedGroupReply(memberId)
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
             val transcriptBody: @Composable () -> Unit = {

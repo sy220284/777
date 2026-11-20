@@ -518,6 +518,7 @@ fun LocalHarnessScreen(
         editAndResend = viewModel::editAndResendUserMessage,
         selectMessageVariant = viewModel::selectChatMessageVariant,
         regenerate = viewModel::regenerateReply,
+        retryFailedGroupReply = viewModel::retryFailedGroupReply,
         generateReplySuggestions = viewModel::generateReplySuggestions,
         sampleSession = viewModel::sampleSession,
         searchTranscript = viewModel::searchTranscript,
