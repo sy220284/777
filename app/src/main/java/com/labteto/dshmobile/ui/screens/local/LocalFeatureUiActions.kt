@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 /** Narrow Shell actions consumed by the HOME contribution; composition owns the ViewModel. */
 internal data class LocalShellFeatureUiActions(
     val streamingState: StateFlow<LocalHarnessStreamingState>,
+    val queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort? = null,
     val selectModel: (String) -> Unit,
     val send: (String, List<LocalImportedAttachment>) -> LocalSendResult,
     val sendWithTeam: (String, List<LocalImportedAttachment>) -> LocalSendResult,

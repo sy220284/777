@@ -270,7 +270,7 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun AttachmentControl() {
-        if (state.running) return
+        if (state.running && state.usageMode == LocalUsageMode.WORK) return
         SyComposerAction(
             icon = null,
             iconPainter = painterResource(R.drawable.ic_ui_add),
@@ -333,23 +333,43 @@ internal fun LocalConversationComposer(
         )
     }
 
-    // Keep one right-hand action across both composer layouts.
-    // Running Work draft submission lives above, not beside Stop.
+    // Chat can queue the next user turn while the current response streams. Stop is
+    // a separate persistent action; Work keeps its established single primary stop.
+    @Composable
+    fun StopControl() {
+        if (state.usageMode != LocalUsageMode.CHAT || !state.running) return
+        SyComposerAction(
+            icon = null,
+            iconPainter = painterResource(R.drawable.ic_ui_button_stop_glyph),
+            iconSize = 28.dp,
+            tint = colors.dangerInk,
+            contentDescription = stringResource(R.string.chat_composer_stop),
+            onClick = onStop,
+            enabled = true,
+            containerColor = Color.Transparent,
+            visualSize = 32.dp,
+        )
+    }
+
     @Composable
     fun PrimaryActionControl() {
+        val stopPrimary = state.running && state.usageMode == LocalUsageMode.WORK
+        val queuedChat = state.running && state.usageMode == LocalUsageMode.CHAT
         SyComposerAction(
             icon = null,
             iconPainter = painterResource(
-                if (state.running) R.drawable.ic_ui_button_stop_glyph
+                if (stopPrimary) R.drawable.ic_ui_button_stop_glyph
                 else R.drawable.ic_ui_button_send_glyph,
             ),
             iconSize = 32.dp,
-            tint = if (state.running || canSend) colors.onPrimary else colors.text,
-            contentDescription = stringResource(
-                if (state.running) R.string.chat_composer_stop else R.string.chat_composer_send,
-            ),
-            onClick = if (state.running) onStop else ::submit,
-            enabled = state.running || canSend,
+            tint = if (stopPrimary || canSend) colors.onPrimary else colors.text,
+            contentDescription = when {
+                queuedChat -> "加入待发送队列"
+                stopPrimary -> stringResource(R.string.chat_composer_stop)
+                else -> stringResource(R.string.chat_composer_send)
+            },
+            onClick = if (stopPrimary) onStop else ::submit,
+            enabled = stopPrimary || canSend,
             containerColor = colors.primary,
             visualSize = 32.dp,
         )
@@ -525,7 +545,10 @@ internal fun LocalConversationComposer(
                     enter = expandHorizontally(composerRevealSpec) + fadeIn(composerFadeSpec),
                     exit = shrinkHorizontally(composerRevealSpec) + fadeOut(composerFadeSpec),
                 ) {
-                    PrimaryActionControl()
+                    Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                        StopControl()
+                        PrimaryActionControl()
+                    }
                 }
             }
         }
@@ -566,7 +589,12 @@ internal fun LocalConversationComposer(
                     onReasoningModeChange = { if (!state.running) onReasoningModeChange(it) },
                 )
             },
-            primaryAction = { PrimaryActionControl() },
+            primaryAction = {
+                Row(horizontalArrangement = Arrangement.spacedBy(SyMetric.gapXs)) {
+                    StopControl()
+                    PrimaryActionControl()
+                }
+            },
         )
     }
 }

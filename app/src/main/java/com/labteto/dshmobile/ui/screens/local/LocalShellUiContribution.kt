@@ -59,6 +59,7 @@ internal fun localShellFeatureUiContribution(
         LocalConversationSurface(
             state = surface,
             workActions = workActions,
+            queuedUserPort = actions.queuedUserPort,
             nativeDocuments = nativeDocuments,
             onOpenWorkArtifact = onOpenWorkArtifact,
             usageRevision = actions.usageRevision,

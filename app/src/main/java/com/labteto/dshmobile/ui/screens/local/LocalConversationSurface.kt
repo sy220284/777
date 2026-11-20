@@ -157,6 +157,7 @@ internal data class LocalTranscriptJumpTarget(val sessionId: String, val message
 internal class LocalConversationSurfaceArgs(
     val state: LocalConversationSurfaceState,
     val workActions: LocalWorkFeatureUiActions?,
+    val queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort?,
     val nativeDocuments: NativeV6Documents?,
     val onOpenWorkArtifact: (String) -> Unit,
     val activeModelProfile: LocalModelProfile?,
@@ -226,6 +227,7 @@ internal class LocalConversationSurfaceArgs(
 internal fun LocalConversationSurface(
     state: LocalConversationSurfaceState,
     workActions: LocalWorkFeatureUiActions? = null,
+    queuedUserPort: com.labteto.dshmobile.uicontract.UiQueuedUserPort? = null,
     nativeDocuments: NativeV6Documents? = null,
     onOpenWorkArtifact: (String) -> Unit = {},
     activeModelProfile: LocalModelProfile?,
@@ -293,6 +295,7 @@ internal fun LocalConversationSurface(
     val args = LocalConversationSurfaceArgs(
         state = state,
         workActions = workActions,
+        queuedUserPort = queuedUserPort,
         nativeDocuments = nativeDocuments,
         onOpenWorkArtifact = onOpenWorkArtifact,
         activeModelProfile = activeModelProfile,
@@ -365,6 +368,7 @@ internal fun LocalConversationSurface(
 private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val state = args.state
     val workActions = args.workActions
+    val queuedUserPort = args.queuedUserPort
     var queuedMessagesOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     val nativeDocuments = args.nativeDocuments
     val nativeDocumentSnapshot by (nativeDocuments?.snapshots ?: kotlinx.coroutines.flow.flowOf(
@@ -448,6 +452,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     // Background is painted once by the app scene, not in a separate header slab.
     val scope = rememberCoroutineScope()
     val appContext = LocalContext.current
+    val draftPreferences = remember(appContext) {
+        appContext.getSharedPreferences("chat-next-session-drafts", android.content.Context.MODE_PRIVATE)
+    }
     // Global ceiling changes must also refresh the exact per-model persona/Work projection.
     val performanceCeiling = LocalModelPerformanceControls.state.collectAsStateWithLifecycle().value.temperatureCeiling
     var reasoningMode by remember(state.sessionId, state.usageMode) {
@@ -473,7 +480,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     LaunchedEffect(composerHandoff, state.sessionId) {
         if (composerHandoff.size == 2 && composerHandoff[0] == state.sessionId) {
             val previous = drafts[state.sessionId].orEmpty()
-            drafts.putBoundedLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
+            drafts.putLocalDraft(state.sessionId, listOf(composerHandoff[1], previous).filter(String::isNotBlank).joinToString("\n\n"))
             onConsumeComposerHandoff()
         }
     }
@@ -515,6 +522,20 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         ),
     ) { LocalSessionAttachmentDraftCache() }
     val attachments = attachmentDrafts.forSession(state.sessionId)
+    var draftStorageReady by remember(drafts, attachmentDrafts) { mutableStateOf(false) }
+    LaunchedEffect(drafts, attachmentDrafts, draftPreferences) {
+        drafts.attach(draftPreferences)
+        attachmentDrafts.attach(draftPreferences)
+        draftStorageReady = true
+    }
+    // Persist changes from the actual mutable attachment list, including page selection,
+    // and restore the full set for every session after process death.
+    LaunchedEffect(draftStorageReady, state.sessionId, attachments) {
+        if (!draftStorageReady) return@LaunchedEffect
+        snapshotFlow { attachments.toList() }.distinctUntilChanged().collect {
+            attachmentDrafts.persistSession(state.sessionId)
+        }
+    }
     // Each conversation owns its scroll position. A shared list state can
     // flash the prior session's index before the new tail is positioned.
     val listState = androidx.compose.runtime.key(state.sessionId) { rememberLazyListState() }
@@ -1010,13 +1031,14 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             stringResource(R.string.local_chat_no_persona)
                         }
                         ChatSurfaceHeader(
-                            personaName = personaDisplayName,
+                            personaName = if (state.groupChat.enabled) sessionTitle else personaDisplayName,
                             portraitPath = currentGalleryEntry?.portraitPath.orEmpty(),
-                            secondary = if (state.conversationMode == LocalConversationMode.INDEPENDENT) {
-                                stringResource(R.string.local_new_session_chat_new)
-                            } else {
-                                localConversationModeLabel(state.conversationMode)
-                            },
+                            secondary = currentGalleryStory?.title?.takeIf(String::isNotBlank)
+                                ?: if (state.conversationMode == LocalConversationMode.INDEPENDENT) {
+                                    stringResource(R.string.local_new_session_chat_new)
+                                } else {
+                                    localConversationModeLabel(state.conversationMode)
+                                },
                             groupEnabled = state.groupChat.enabled,
                             groupMembers = state.groupChat.members,
                             activeSpeakerName = state.groupActiveSpeakerName,
@@ -1216,17 +1238,28 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     item(key = "local-empty-guide") {
                         Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                             if (showChatPersonaWelcome) {
-                                Text(
-                                    stringResource(R.string.local_chat_persona_welcome_title),
-                                    style = SyType.large20.withReadingWeight(),
-                                    color = colors.text,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd),
                                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp)
-                                        .widthIn(max = 280.dp),
-                                )
+                                        .widthIn(max = 300.dp),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.local_chat_persona_welcome_title),
+                                        style = SyType.large20.withReadingWeight(),
+                                        color = colors.text,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    )
+                                    Text("可以直接发送消息，也可以选择人物开始一个独立故事。",
+                                        style = SyType.small13.withReadingWeight(),
+                                        color = colors.textSecondary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                    SyButton(text = "选择人物", onClick = onOpenPersonaGallery,
+                                        variant = SyButtonVariant.Outline)
+                                }
                             } else {
                                 EmptyLocalHarness { suggestion ->
-                                    drafts.putBoundedLocalDraft(state.sessionId, suggestion)
+                                    drafts.putLocalDraft(state.sessionId, suggestion)
                                 }
                             }
                         }
@@ -1331,7 +1364,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                             LocalComposerAttachmentDecision.ACCEPT -> {
                                                 attachments += reusable
                                                 val current = drafts[state.sessionId].orEmpty()
-                                                drafts.putBoundedLocalDraft(state.sessionId,
+                                                drafts.putLocalDraft(state.sessionId,
                                                     listOf(generatedImageEditPrompt, current)
                                                         .filter(String::isNotBlank).joinToString("\n\n"))
                                                 null
@@ -1383,7 +1416,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                                     onPreparedDraft = {
                                         nativeDocuments.consumePreparedDraft(state.sessionId)?.let { prepared ->
                                             val previous = drafts[state.sessionId].orEmpty()
-                                            drafts.putBoundedLocalDraft(
+                                            drafts.putLocalDraft(
                                                 state.sessionId,
                                                 listOf(prepared, previous).filter(String::isNotBlank).joinToString("\n\n"),
                                             )
@@ -1416,7 +1449,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             },
                             onInsertText = { text ->
                                 val previous = drafts[state.sessionId].orEmpty()
-                                drafts.putBoundedLocalDraft(
+                                drafts.putLocalDraft(
                                     state.sessionId,
                                     listOf(previous, text).filter(String::isNotBlank).joinToString("\n\n"),
                                 )
@@ -1573,7 +1606,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 sendFeedback.rejectReason == LocalSendRejectReason.UNCONFIGURED,
             stateError = state.error,
             restoreRequest = state.messages.lastOrNull { it.role == "user" }?.content,
-            onRestoreRequest = { drafts.putBoundedLocalDraft(state.sessionId, it) },
+            onRestoreRequest = { drafts.putLocalDraft(state.sessionId, it) },
             onSwitchModelSource = {
                 if (state.modelProfiles.isNotEmpty()) showModelPicker = true else onConfigure()
             },
@@ -1603,7 +1636,11 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     key = { suggestion -> suggestion.label + "|" + suggestion.text },
                 ) { suggestion ->
                     SyMaterialSurface(
-                        onClick = { drafts.putBoundedLocalDraft(state.sessionId, suggestion.text) },
+                        onClick = {
+                            val previous = drafts[state.sessionId].orEmpty()
+                            drafts.putLocalDraft(state.sessionId,
+                                listOf(previous, suggestion.text).filter(String::isNotBlank).joinToString("\n"))
+                        },
                         shape = SyShapes.pillFull,
                         tier = SyMaterialTier.L4_OVERLAY,
                         border = BorderStroke(1.dp, colors.border),
@@ -1638,7 +1675,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             ),
         )
 
-        if (state.queuedInputCount > 0 && workActions?.queuedUserPort != null) {
+        if (state.queuedInputCount > 0 && queuedUserPort != null) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
                 horizontalArrangement = Arrangement.End,
@@ -1659,7 +1696,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             input = input,
             attachments = attachments,
             attachmentImportProgress = attachmentImportProgress,
-            onInputChange = { drafts.putBoundedLocalDraft(state.sessionId, it) },
+            onInputChange = { drafts.putLocalDraft(state.sessionId, it) },
             onRemoveAttachment = { index -> attachments.removeAt(index) },
             onSelectPdfPages = { index, pages ->
                 attachments.getOrNull(index)?.let { attachment ->
@@ -1875,9 +1912,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             },
         )
     }
-    if (queuedMessagesOpen && workActions?.queuedUserPort != null) {
+    if (queuedMessagesOpen && queuedUserPort != null) {
         LocalQueuedUserQueueSheet(
-            port = workActions.queuedUserPort,
+            port = queuedUserPort,
             sessionId = state.sessionId,
             queuedCount = state.queuedInputCount,
             onDismiss = { queuedMessagesOpen = false },
@@ -1931,7 +1968,9 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             state.replySuggestions.filter { it.text.isNotBlank() }.forEach { suggestion ->
                 SyFlatSurface(
                     onClick = {
-                        drafts.putBoundedLocalDraft(state.sessionId, suggestion.text)
+                        val previous = drafts[state.sessionId].orEmpty()
+                        drafts.putLocalDraft(state.sessionId,
+                            listOf(previous, suggestion.text).filter(String::isNotBlank).joinToString("\n"))
                         showReplySuggestions = false
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -2072,7 +2111,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 initialKind = com.labteto.dshmobile.local.model.LocalMediaKind.valueOf(mediaInitialKind),
                 onInsertTranscript = { transcription ->
                     val previous = drafts[state.sessionId].orEmpty()
-                    drafts.putBoundedLocalDraft(
+                    drafts.putLocalDraft(
                         state.sessionId,
                         listOf(previous, transcription).filter(String::isNotBlank).joinToString("\n\n"),
                     )
@@ -2105,7 +2144,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                     memberName,
                 )
                 val previous = drafts[state.sessionId].orEmpty()
-                drafts.putBoundedLocalDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
+                drafts.putLocalDraft(state.sessionId, listOf(request, previous).filter(String::isNotBlank).joinToString("\n\n"))
                 teamDispatchSelected = true
                 showTeamPanel = false
             },

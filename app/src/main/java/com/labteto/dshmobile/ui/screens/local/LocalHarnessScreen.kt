@@ -508,6 +508,7 @@ fun LocalHarnessScreen(
 
     val shellActions = LocalShellFeatureUiActions(
         streamingState = viewModel.streamingState,
+        queuedUserPort = viewModel.queuedUserPort,
         selectModel = viewModel::selectModel,
         send = viewModel::send,
         sendWithTeam = viewModel::sendWithTeam,
