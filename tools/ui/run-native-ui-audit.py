@@ -109,6 +109,13 @@ for name in CLASSES:
    raise RuntimeError('Native class did not produce passing non-empty results: '+text[-5000:])
   return {'class':name,'tests':int(match.group(1))}
  phase(name.rsplit('.',1)[1],run_class,record=True)
+ # Bundled CLI startup is a prerequisite for every subsequent Work/Agent UI
+ # journey. If its real Android smoke fails, preserve its video and manifest,
+ # then stop before repeating half an hour of unrelated UI steps. A green run
+ # still executes the entire original audit and baseline comparison.
+ if name.endswith('BundledCliAndroidTest') and not summary[-1]['passed']:
+  print('关键运行时设备验收失败，已保存日志与录屏，终止本次无效的后续巡检',flush=True)
+  sys.exit(1)
 
 def export_components():
  return checked(['adb','pull','/sdcard/Android/data/com.sy220284.dshmobile.debug/files/ui-audit/.',str(OUT/'components')])
