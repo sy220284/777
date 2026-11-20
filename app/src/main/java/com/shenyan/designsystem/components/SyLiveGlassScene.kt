@@ -87,6 +87,44 @@ fun SyLiveGlassScene(
     }
 }
 
+/**
+ * Capture the screen behind a modal surface exactly once while it is visible.
+ * The live backing is handed only to the overlay subtree; it can never record
+ * its own reflection. On normal screens the modifier draws without GPU capture.
+ */
+@Composable
+internal fun SyLiveGlassUnderlayHost(
+    enabled: Boolean,
+    content: @Composable (Modifier, SyLiveGlassBacking?) -> Unit,
+) {
+    val graphicsLayer = rememberGraphicsLayer()
+    val rootView = LocalView.current.rootView
+    val windowOnScreen = remember { IntArray(2) }
+    var origin by remember { mutableStateOf(IntOffset.Zero) }
+    var viewport by remember { mutableStateOf(IntSize.Zero) }
+    val underlayModifier = Modifier
+        .onGloballyPositioned { coordinates ->
+            rootView.getLocationOnScreen(windowOnScreen)
+            val inWindow = coordinates.positionInWindow()
+            val nextOrigin = IntOffset(
+                inWindow.x.roundToInt() + windowOnScreen[0],
+                inWindow.y.roundToInt() + windowOnScreen[1],
+            )
+            if (origin != nextOrigin) origin = nextOrigin
+            if (viewport != coordinates.size) viewport = coordinates.size
+        }
+        .drawWithContent {
+            if (enabled) {
+                graphicsLayer.record { this@drawWithContent.drawContent() }
+                drawLayer(graphicsLayer)
+            } else drawContent()
+        }
+    val backing = remember(graphicsLayer, origin, viewport, rootView) {
+        SyLiveGlassBacking(graphicsLayer, origin, viewport, rootView)
+    }
+    content(underlayModifier, backing.takeIf { enabled && viewport.width > 0 && viewport.height > 0 })
+}
+
 /** Source pixels are positioned in window coordinates, then clipped by the lens. */
 @Composable
 internal fun SyPaintLiveGlassBacking(

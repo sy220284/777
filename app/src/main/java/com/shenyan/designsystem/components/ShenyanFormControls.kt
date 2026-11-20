@@ -86,7 +86,9 @@ fun SyTextField(
     colors: TextFieldColors? = null,
 ) {
     val p = LocalSyColors.current
-    val inputFill = syMaterialColor(SyMaterialTier.L1_SECTION)
+    // All standalone forms share the same live glass as navigation and composers.
+    // Flat fields (inside an existing glass composer) inherit their parent's lens.
+    val fieldContent: @Composable () -> Unit = {
     OutlinedTextField(
         value = value, onValueChange = onValueChange,
         modifier = modifier.heightIn(min = SyMetric.touch),
@@ -100,9 +102,9 @@ fun SyTextField(
         colors = colors ?: OutlinedTextFieldDefaults.colors(
             focusedTextColor = p.text, unfocusedTextColor = p.text,
             disabledTextColor = p.textTertiary,
-            focusedContainerColor = inputFill,
-            unfocusedContainerColor = inputFill,
-            disabledContainerColor = inputFill,
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
             cursorColor = p.primary,
             focusedBorderColor = if (flat) Color.Transparent else p.primary,
             unfocusedBorderColor = if (flat) Color.Transparent else p.border,
@@ -115,6 +117,21 @@ fun SyTextField(
             errorCursorColor = p.danger,
         ),
     )
+    }
+    if (flat) {
+        fieldContent()
+    } else {
+        // The actual text field retains the caller's modifier, focus semantics and
+        // test tag. The optical surface is a non-interactive sibling behind it.
+        Box {
+            SyMaterialSurface(
+                modifier = Modifier.matchParentSize(),
+                tier = SyMaterialTier.L2_BAR,
+                shape = shape,
+            ) {}
+            fieldContent()
+        }
+    }
 }
 
 @Composable
@@ -220,9 +237,12 @@ fun SySegmentedControl(
         with(density) { measurer.measure(option.label, style = labelStyle, softWrap = false).size.width.toDp() }
     }
     val scroll = rememberScrollState()
-    BoxWithConstraints(modifier.selectableGroup().clip(shape)
-        .background(syMaterialColor(SyMaterialTier.L2_BAR))
-        .border(1.dp, p.border, shape).padding(2.dp)) {
+    SyMaterialSurface(
+        modifier = modifier,
+        tier = SyMaterialTier.L2_BAR,
+        shape = shape,
+    ) {
+    BoxWithConstraints(Modifier.fillMaxWidth().selectableGroup().padding(2.dp)) {
         // Equal tracks are useful only when every complete label fits. Otherwise retain
         // the natural reading direction and let the single choice track scroll.
         val equalTracks = stretch &&
@@ -281,5 +301,6 @@ fun SySegmentedControl(
                 }
             }
         }
+    }
     }
 }

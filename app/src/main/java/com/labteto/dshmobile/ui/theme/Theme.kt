@@ -305,7 +305,7 @@ fun DshTheme(
             darkTheme = dark,
             surfaceBase = themed.bgBase,
             surfaceTransparency = wallpaperSurfaceTransparency.coerceIn(0f, 1f),
-            fluidGlass = !dark,
+            fluidGlass = true,
             ambientGlow = ambientGlow.coerceIn(0f, 1f),
             ambientPalette = controlPalette,
         ) {
@@ -318,7 +318,7 @@ fun DshTheme(
             com.shenyan.designsystem.foundation.ShenyanTheme(
                 mode = canonicalMode,
                 reduceMotion = reducedMotion,
-                reduceTransparency = dark,
+                reduceTransparency = false,
             ) {
                 CompositionLocalProvider(
                     com.shenyan.designsystem.foundation.LocalSyColors provides controlPalette,
@@ -326,7 +326,7 @@ fun DshTheme(
                     SyThemeProvider(
                         mode = syMode,
                         reduceMotion = reducedMotion,
-                        reduceTransparency = dark,
+                        reduceTransparency = false,
                     ) {
                         // Preserve user-defined accent and reading accessibility controls.
                         val resolvedScheme = if (projected.isDefaultAccent)

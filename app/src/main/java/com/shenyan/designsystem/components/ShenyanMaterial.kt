@@ -198,7 +198,7 @@ fun SyMaterialSurface(
     )
     // One GPU lens for anchored chrome and overlays; list cards retain their
     // inexpensive rim unless they explicitly own a live underlay.
-    val refract = optics.glass && syShouldRefract(resolved, nested, backdrop != null)
+    val refract = optics.glass && syShouldRefract(resolved, nested, backdrop != null, interactive = onClick != null)
     var lensPoint by remember { mutableStateOf(Offset.Zero) }
     var lensDrag by remember { mutableStateOf(Offset.Zero) }
     var lensDown by remember { mutableStateOf(false) }

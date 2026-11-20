@@ -117,14 +117,25 @@ internal object SyLiquidShader {
                 refracted = mix(refracted, soft, half(0.08 + 0.10 * rim));
             }
 
-            float tintAlpha = glassTint.a * (1.0 - clarity * rim);
+            // A wallpaper far from the chosen light/dark ink needs a stronger
+            // local veil. On neutral backgrounds the lens remains clear.
+            // This adapts PER PIXEL without an extra GPU sampling pass.
+            float sourceLuma = dot(refracted, half3(0.2126, 0.7152, 0.0722));
+            float materialLuma = dot(glassTint.rgb, half3(0.2126, 0.7152, 0.0722));
+            float mismatch = smoothstep(0.22, 0.70, abs(sourceLuma - materialLuma)) *
+                smoothstep(0.01, 0.16, float(glassTint.a));
+            float protectiveAlpha = mix(float(glassTint.a), max(float(glassTint.a), 0.88), mismatch);
+            float tintAlpha = protectiveAlpha * (1.0 - clarity * rim * 0.65);
             half3 colour = mix(refracted, glassTint.rgb, half(tintAlpha));
             half alpha = mix(centerSample.a, half(1.0), half(tintAlpha));
-            // A single, directional highlight hugs the inner edge. There is
-            // no simulated underside shadow, stroke or full-surface glare.
-            float glint = pow(rim, 5.0) * reflection *
-                max(dot(normal, float2(-0.71, -0.71)), 0.0) * mix(0.12, 0.18, pulse);
-            colour = mix(colour, half3(alpha), half(glint));
+            // The optical rim adapts to the live brightness underneath:
+            // pale scenes reveal a thin darker edge; dark scenes reflect light.
+            // No drop shadow, opaque stroke, or full-surface glare is drawn.
+            float luminance = sourceLuma;
+            float facing = max(dot(normal, float2(-0.71, -0.71)), 0.0);
+            float edgeLight = pow(rim, 3.0) * reflection * (0.035 + (0.12 + 0.06 * pulse) * facing);
+            half3 edgeTone = half3(luminance > 0.64 ? 0.43 : 1.0) * half(alpha);
+            colour = mix(colour, edgeTone, half(edgeLight));
 
             float coverage = 1.0 - smoothstep(-1.0, 0.7, deformedDistance);
             return half4(min(colour, half3(alpha)), alpha) * half(coverage);
@@ -136,9 +147,14 @@ internal fun syShouldRefract(
     tier: SyMaterialTier,
     nestedDepth: Int,
     explicitBackdrop: Boolean,
+    interactive: Boolean = false,
 ): Boolean =
     (nestedDepth == 0 || explicitBackdrop) &&
-        (tier == SyMaterialTier.L2_BAR || tier == SyMaterialTier.L4_OVERLAY || explicitBackdrop)
+        when (tier) {
+            SyMaterialTier.L2_BAR, SyMaterialTier.L4_OVERLAY -> true
+            SyMaterialTier.L3_CARD -> (interactive && nestedDepth == 0) || explicitBackdrop
+            SyMaterialTier.L1_SECTION, SyMaterialTier.L5_SOLID -> false
+        }
 
 /** The input is rendered live each draw. Uniforms are updated with the layer properties. */
 @Composable

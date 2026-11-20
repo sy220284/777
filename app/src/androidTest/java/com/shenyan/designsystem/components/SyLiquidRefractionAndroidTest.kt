@@ -18,12 +18,14 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.shenyan.designsystem.foundation.ShenyanTheme
+import com.shenyan.designsystem.foundation.ShenyanMode
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -48,6 +50,22 @@ class SyLiquidRefractionAndroidTest {
         shader.setFloatUniform("drag", 3f, -1f)
         shader.setColorUniform("glassTint", Color(0xC2FFFFFF).toArgb())
         assertTrue(RenderEffect.createRuntimeShaderEffect(shader, SyLiquidShader.INPUT) != null)
+    }
+
+    @Test fun glassInputKeepsDirectFocusAndTextEntrySemantics() {
+        var query by mutableStateOf("")
+        compose.setContent {
+            ShenyanTheme {
+                SyTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.testTag("glass-text-input"),
+                    singleLine = true,
+                )
+            }
+        }
+        compose.onNodeWithTag("glass-text-input").performTextInput("插件搜索")
+        compose.runOnIdle { assertEquals("插件搜索", query) }
     }
 
     @Test fun sharedGpuSceneRefractsRealSiblingPixelsWithoutDuplicatingContent() {
@@ -166,10 +184,12 @@ class SyLiquidRefractionAndroidTest {
             val y = lens.height / 2
             assertEquals(plain[lens.width / 16, y], lens[lens.width / 16, y])
             for (x in lens.width / 12 until lens.width * 11 / 12) {
-                assertTrue("$state: A flat source must not darken at column $x",
-                    lens[x, y].red >= plain[x, y].red - .012f &&
-                        lens[x, y].green >= plain[x, y].green - .012f &&
-                        lens[x, y].blue >= plain[x, y].blue - .012f)
+                val interior = x in lens.width / 4..lens.width * 3 / 4
+                val limit = if (interior) .012f else .06f
+                assertTrue("$state: glass should have a thin optical rim, no broad gray frame at $x",
+                    lens[x, y].red >= plain[x, y].red - limit &&
+                        lens[x, y].green >= plain[x, y].green - limit &&
+                        lens[x, y].blue >= plain[x, y].blue - limit)
             }
         }
         assertCleanEdge(region.captureToImage().toPixelMap(), "Rest")
@@ -207,4 +227,74 @@ class SyLiquidRefractionAndroidTest {
         val pixelTwo = frameTwo.toPixelMap()[frameTwo.width / 2, frameTwo.height / 2]
         assertNotEquals("Live underlay must update through the AGSL compositor", pixelOne, pixelTwo)
     }
+    @Test fun drawerGlassRefractsLiveConversationUnderlayWithoutReplicatingItsSemantics() {
+        var underlay by mutableStateOf(Color(0xFFB74730))
+        compose.setContent {
+            ShenyanTheme {
+                SyLiveGlassUnderlayHost(enabled = true) { captureModifier, backing ->
+                    Box(Modifier.size(220.dp, 130.dp)) {
+                        Box(Modifier.fillMaxSize().then(captureModifier)) {
+                            Box(Modifier.fillMaxSize().background(underlay))
+                        }
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalSyLiveGlassBacking provides backing,
+                        ) {
+                            SyMaterialSurface(
+                                modifier = Modifier.fillMaxSize().testTag("drawer-real-underlay"),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                tier = SyMaterialTier.L4_OVERLAY,
+                            ) {}
+                        }
+                    }
+                }
+            }
+        }
+        fun center(): Color {
+            compose.waitForIdle()
+            val image = compose.onNodeWithTag("drawer-real-underlay").captureToImage()
+            return image.toPixelMap()[image.width / 2, image.height / 2]
+        }
+        val first = center()
+        compose.runOnIdle { underlay = Color(0xFF247B4E) }
+        val second = center()
+        assertNotEquals("Drawer must refract the actual live underlay", first, second)
+    }
+
+    @Test fun liveGlassRetainsVisibleBackgroundResponseAcrossBothThemeModes() {
+        var mode by mutableStateOf(ShenyanMode.LIGHT)
+        var source by mutableStateOf(Color.White)
+        compose.setContent {
+            ShenyanTheme(mode = mode) {
+                SyLiveGlassScene(
+                    modifier = Modifier.size(width = 220.dp, height = 130.dp),
+                    underlay = { Box(Modifier.fillMaxSize().background(source)) },
+                    glass = {
+                        SyMaterialSurface(
+                            modifier = Modifier.fillMaxSize().testTag("all-background-glass"),
+                            tier = SyMaterialTier.L2_BAR,
+                        ) {}
+                    },
+                )
+            }
+        }
+        fun sample(): Color {
+            compose.waitForIdle()
+            val img = compose.onNodeWithTag("all-background-glass").captureToImage()
+            return img.toPixelMap()[img.width / 2, img.height / 2]
+        }
+        val lightWhite = sample()
+        compose.runOnIdle { source = Color(0xFF292929) }
+        val lightBlack = sample()
+        compose.runOnIdle { source = Color(0xFFBE5034) }
+        val lightCoral = sample()
+        compose.runOnIdle { mode = ShenyanMode.MATTE }
+        val matteCoral = sample()
+        compose.runOnIdle { source = Color(0xFF26684E) }
+        val matteGreen = sample()
+        assertNotEquals("Bright/dark scenes must change live glass pixels", lightWhite, lightBlack)
+        assertNotEquals("Colored scenes must remain visible through glass", lightBlack, lightCoral)
+        assertNotEquals("Switching palettes must regenerate the optical material", lightCoral, matteCoral)
+        assertNotEquals("Dark glass must still transmit wallpaper changes", matteCoral, matteGreen)
+    }
+
 }

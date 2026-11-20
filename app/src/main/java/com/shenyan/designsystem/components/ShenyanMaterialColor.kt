@@ -36,8 +36,8 @@ internal fun syResolveMaterialFill(
         SyMaterialTier.L4_OVERLAY -> colors.materialL4
         SyMaterialTier.L5_SOLID -> colors.materialL5
     }
-    // Matte is intentionally solid; detached previews fall back to the same canvas-based tokens.
-    if (colors.materialL3.alpha == 1f || scene == null) return token
+    // Detached previews retain their palette; both light and matte live scenes use adaptive glass.
+    if (scene == null) return token
 
     val index = when {
         regionY < .30f -> 0
@@ -95,7 +95,7 @@ internal fun syResolveMaterialFill(
     // above is the starting point, not a mandate to paint an almost-white opaque slab.
     tinted = lerp(tinted, sample.copy(alpha = 1f), .12f * transparency)
     val desiredAlpha = (token.alpha +
-        com.shenyan.designsystem.foundation.SyMaterialPolicy.adjustment(transparency)).coerceIn(.08f, 1f)
+        com.shenyan.designsystem.foundation.SyMaterialPolicy.adjustment(transparency)).coerceIn(.08f, .96f)
     if (!scene.adaptiveContrast) return tinted.copy(alpha = desiredAlpha)
 
     // Find the contrast-safe backing at the "clearer" end, but do not let that safety
@@ -116,5 +116,5 @@ internal fun syResolveMaterialFill(
     // prioritises a real see-through surface. "Clearer" retains full contrast protection.
     val adaptiveWeight = 1f - .44f * transparency
     val alpha = desiredAlpha + (contrastAlpha - desiredAlpha) * adaptiveWeight
-    return tinted.copy(alpha = alpha.coerceIn(.08f, 1f))
+    return tinted.copy(alpha = alpha.coerceIn(.08f, .96f))
 }

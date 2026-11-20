@@ -8,14 +8,14 @@
 <rect x="15" y="15" width="518" height="58" rx="13" fill="none" stroke="#777777" stroke-opacity="0.2196"/>
 <text x="32" y="49" font-family="sans-serif" font-size="19" fill="#000000" font-weight="600">典雅白</text>
 <text x="28" y="101" font-family="sans-serif" font-size="13" fill="#000000">共用场景 / 无额外不透明顶栏</text>
-<rect x="22" y="173" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.302" stroke="#777777" stroke-opacity="0.2196"/>
-<text x="40" y="202" font-family="sans-serif" font-size="14" fill="#000000">L1 · 30% alpha · 4DFFFFFF</text>
-<rect x="22" y="233" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.7608" stroke="#777777" stroke-opacity="0.2196"/>
-<text x="40" y="262" font-family="sans-serif" font-size="14" fill="#000000">L2 · 76% alpha · C2FFFFFF</text>
-<rect x="22" y="293" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.902" stroke="#777777" stroke-opacity="0.2196"/>
-<text x="40" y="322" font-family="sans-serif" font-size="14" fill="#000000">L3 · 90% alpha · E6FFFFFF</text>
-<rect x="22" y="353" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.9686" stroke="#777777" stroke-opacity="0.2196"/>
-<text x="40" y="382" font-family="sans-serif" font-size="14" fill="#000000">L4 · 97% alpha · F7FFFFFF</text>
+<rect x="22" y="173" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.251" stroke="#777777" stroke-opacity="0.2196"/>
+<text x="40" y="202" font-family="sans-serif" font-size="14" fill="#000000">L1 · 25% alpha · 40FFFFFF</text>
+<rect x="22" y="233" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.6902" stroke="#777777" stroke-opacity="0.2196"/>
+<text x="40" y="262" font-family="sans-serif" font-size="14" fill="#000000">L2 · 69% alpha · B0FFFFFF</text>
+<rect x="22" y="293" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.7882" stroke="#777777" stroke-opacity="0.2196"/>
+<text x="40" y="322" font-family="sans-serif" font-size="14" fill="#000000">L3 · 79% alpha · C9FFFFFF</text>
+<rect x="22" y="353" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="0.8784" stroke="#777777" stroke-opacity="0.2196"/>
+<text x="40" y="382" font-family="sans-serif" font-size="14" fill="#000000">L4 · 88% alpha · E0FFFFFF</text>
 <rect x="22" y="413" width="504" height="46" rx="13" fill="#FFFFFF" fill-opacity="1.0" stroke="#777777" stroke-opacity="0.2196"/>
 <text x="40" y="442" font-family="sans-serif" font-size="14" fill="#000000">L5 · 100% alpha · FFFFFFFF</text>
 <text x="23" y="470" font-family="sans-serif" font-size="12" fill="#000000">文件图标源：assets/file-icons/</text>
@@ -26,14 +26,14 @@
 <rect x="15" y="15" width="518" height="58" rx="13" fill="none" stroke="#FFFFFF" stroke-opacity="0.102"/>
 <text x="32" y="49" font-family="sans-serif" font-size="19" fill="#F5F0E8" font-weight="600">磨砂黑</text>
 <text x="28" y="101" font-family="sans-serif" font-size="13" fill="#F5F0E8">共用场景 / 无额外不透明顶栏</text>
-<rect x="22" y="173" width="504" height="46" rx="13" fill="#181819" fill-opacity="1.0" stroke="#FFFFFF" stroke-opacity="0.102"/>
-<text x="40" y="202" font-family="sans-serif" font-size="14" fill="#F5F0E8">L1 · 100% alpha · FF181819</text>
-<rect x="22" y="233" width="504" height="46" rx="13" fill="#1E1E20" fill-opacity="1.0" stroke="#FFFFFF" stroke-opacity="0.102"/>
-<text x="40" y="262" font-family="sans-serif" font-size="14" fill="#F5F0E8">L2 · 100% alpha · FF1E1E20</text>
-<rect x="22" y="293" width="504" height="46" rx="13" fill="#232324" fill-opacity="1.0" stroke="#FFFFFF" stroke-opacity="0.102"/>
-<text x="40" y="322" font-family="sans-serif" font-size="14" fill="#F5F0E8">L3 · 100% alpha · FF232324</text>
-<rect x="22" y="353" width="504" height="46" rx="13" fill="#29292B" fill-opacity="1.0" stroke="#FFFFFF" stroke-opacity="0.102"/>
-<text x="40" y="382" font-family="sans-serif" font-size="14" fill="#F5F0E8">L4 · 100% alpha · FF29292B</text>
+<rect x="22" y="173" width="504" height="46" rx="13" fill="#181819" fill-opacity="0.4" stroke="#FFFFFF" stroke-opacity="0.102"/>
+<text x="40" y="202" font-family="sans-serif" font-size="14" fill="#F5F0E8">L1 · 40% alpha · 66181819</text>
+<rect x="22" y="233" width="504" height="46" rx="13" fill="#1E1E20" fill-opacity="0.702" stroke="#FFFFFF" stroke-opacity="0.102"/>
+<text x="40" y="262" font-family="sans-serif" font-size="14" fill="#F5F0E8">L2 · 70% alpha · B31E1E20</text>
+<rect x="22" y="293" width="504" height="46" rx="13" fill="#232324" fill-opacity="0.8" stroke="#FFFFFF" stroke-opacity="0.102"/>
+<text x="40" y="322" font-family="sans-serif" font-size="14" fill="#F5F0E8">L3 · 80% alpha · CC232324</text>
+<rect x="22" y="353" width="504" height="46" rx="13" fill="#29292B" fill-opacity="0.8784" stroke="#FFFFFF" stroke-opacity="0.102"/>
+<text x="40" y="382" font-family="sans-serif" font-size="14" fill="#F5F0E8">L4 · 88% alpha · E029292B</text>
 <rect x="22" y="413" width="504" height="46" rx="13" fill="#29292B" fill-opacity="1.0" stroke="#FFFFFF" stroke-opacity="0.102"/>
 <text x="40" y="442" font-family="sans-serif" font-size="14" fill="#F5F0E8">L5 · 100% alpha · FF29292B</text>
 <text x="23" y="470" font-family="sans-serif" font-size="12" fill="#F5F0E8">文件图标源：assets/file-icons/</text>

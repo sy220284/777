@@ -76,6 +76,32 @@ jobs:
           python3 -m unittest discover -s tools/ci -p 'test_select_android_checks.py' -v
       - name: 共享运行时、MCP、进程隔离与设备契约全量单测
         run: ./gradlew --max-workers=2 :core:test :harness-core:test :harness-runtime-android:test :harness-interop:test :harness-device-android:testDebugUnitTest :reference-validation:test --stacktrace --console=plain
+      - name: 校验 Kotlin 插件元数据的真实来源（失败时）
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import pathlib
+          import re
+          import urllib.request
+          expected = "f3b27910045c1e1e21cb48d68a7e177ea1a4a3dda467e546c15c30b9c098187c"
+          artifact = "org/jetbrains/kotlin/jvm/org.jetbrains.kotlin.jvm.gradle.plugin/2.4.20/org.jetbrains.kotlin.jvm.gradle.plugin-2.4.20.pom"
+          for origin in ("https://plugins.gradle.org/m2/", "https://repo.maven.apache.org/maven2/"):
+              url = origin + artifact
+              try:
+                  with urllib.request.urlopen(url, timeout=18) as response:
+                      body = response.read()
+                      resolved = response.url
+                  observed = hashlib.sha256(body).hexdigest()
+                  print(f"source={url} resolved={resolved} bytes={len(body)} sha256={observed} matches_pin={observed == expected}")
+              except Exception as exc:
+                  print(f"source={url} error={exc}")
+          for report in pathlib.Path("build/reports/dependency-verification").rglob("dependency-verification-report.html"):
+              content = re.sub("<[^>]*>", " ", report.read_text(encoding="utf-8", errors="replace"))
+              content = re.sub(r"\\s+", " ", content)
+              index = content.find("org.jetbrains.kotlin.jvm.gradle.plugin-2.4.20.pom")
+              print(f"report={report} snippet={content[max(0,index-180):index+900]}")
+          PY
 
   android-apks:
     name: 应用全量 JVM 单测与统一 APK 构建
@@ -95,6 +121,32 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: 单次执行应用 JVM 单测、UI 测试编译及双 APK 构建
         run: ./gradlew --max-workers=2 :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace --console=plain
+      - name: 校验 Kotlin 插件元数据的真实来源（失败时）
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import pathlib
+          import re
+          import urllib.request
+          expected = "f3b27910045c1e1e21cb48d68a7e177ea1a4a3dda467e546c15c30b9c098187c"
+          artifact = "org/jetbrains/kotlin/jvm/org.jetbrains.kotlin.jvm.gradle.plugin/2.4.20/org.jetbrains.kotlin.jvm.gradle.plugin-2.4.20.pom"
+          for origin in ("https://plugins.gradle.org/m2/", "https://repo.maven.apache.org/maven2/"):
+              url = origin + artifact
+              try:
+                  with urllib.request.urlopen(url, timeout=18) as response:
+                      body = response.read()
+                      resolved = response.url
+                  observed = hashlib.sha256(body).hexdigest()
+                  print(f"source={url} resolved={resolved} bytes={len(body)} sha256={observed} matches_pin={observed == expected}")
+              except Exception as exc:
+                  print(f"source={url} error={exc}")
+          for report in pathlib.Path("build/reports/dependency-verification").rglob("dependency-verification-report.html"):
+              content = re.sub("<[^>]*>", " ", report.read_text(encoding="utf-8", errors="replace"))
+              content = re.sub(r"\\s+", " ", content)
+              index = content.find("org.jetbrains.kotlin.jvm.gradle.plugin-2.4.20.pom")
+              print(f"report={report} snippet={content[max(0,index-180):index+900]}")
+          PY
       - name: 生成并校验本提交 APK 摘要
         run: |
           sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk > app/build/outputs/apk/SHA256SUMS

@@ -47,7 +47,12 @@ fun SyTopBar(
     onAction: (() -> Unit)? = null,
 ) {
     val tokens = LocalSyColors.current
-    Column(modifier = modifier.fillMaxWidth()) {
+    SyMaterialSurface(
+        modifier = modifier.fillMaxWidth(),
+        tier = SyMaterialTier.L2_BAR,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+    ) {
+        Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().heightIn(
                 min = if (LocalConfiguration.current.screenWidthDp >= 600) 64.dp else 56.dp,
@@ -95,6 +100,7 @@ fun SyTopBar(
             Text(subtitle, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
                 color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
         }
     }
 }

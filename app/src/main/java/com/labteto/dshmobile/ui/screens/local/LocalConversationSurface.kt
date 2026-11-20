@@ -66,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -978,11 +979,17 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val toastFeedback = com.labteto.dshmobile.ui.shenyan.rememberSyToast()
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(rootSurfaceColor).safeDrawingPadding().imePadding()) {
-        Column(
-            Modifier.fillMaxWidth()
-                .padding(horizontal = SyHostMetrics.screenHorizontal, vertical = SyMetric.gapMd),
+        SyMaterialSurface(
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = SyHostMetrics.screenHorizontal, vertical = SyMetric.gapMd)
+                .testTag("sy-global-glass-header"),
+            tier = SyMaterialTier.L2_BAR,
+            shape = SyShapes.row,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (onOpenDrawer != null) SyIconButton(
                     icon = FeatherIcons.Menu,
                     contentDescription = stringResource(R.string.app_open_navigation),

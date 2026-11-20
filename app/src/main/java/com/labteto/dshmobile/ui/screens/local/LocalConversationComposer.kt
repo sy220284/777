@@ -27,11 +27,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import com.shenyan.designsystem.components.SyFlatSurface
+import com.shenyan.designsystem.components.SyMaterialSurface
+import com.shenyan.designsystem.components.SyMaterialTier
+import com.shenyan.designsystem.components.SySceneBackgroundSurface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -96,7 +100,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Preserve the V6 L2 material instead of pre-compositing an opaque input slab.
- * Wallpaper mode reuses the existing bottom-region contrast analysis. Matte is always solid.
+ * Wallpaper mode reuses bottom-region contrast analysis; both themes use live glass.
  */
 internal fun v6ConversationComposerSurface(background: AppBackgroundState, palette: SyColors): Color =
     if (!background.hasImage || palette.materialL2.alpha == 1f) {
@@ -287,10 +291,17 @@ internal fun LocalConversationComposer(
 
     @Composable
     fun ModelControl() {
-        SyFlatSurface(
+        SyMaterialSurface(
             onClick = onOpenModelPicker,
             enabled = !state.loading,
-            color = colors.primary.copy(alpha = .08f),
+            tier = SyMaterialTier.L3_CARD,
+            // The model chip is nested inside the composer lens. Supply an aligned
+            // underlay explicitly so this control has its own genuine optical rim.
+            backdrop = { SySceneBackgroundSurface(
+                modifier = Modifier.fillMaxSize(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(SyMetric.radiusControl),
+            ) {} },
+            tint = colors.primary.copy(alpha = .10f),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(SyMetric.radiusControl),
             modifier = Modifier.fillMaxWidth().heightIn(min = SyMetric.touch)
                 .testTag("composer-model-selection"),
