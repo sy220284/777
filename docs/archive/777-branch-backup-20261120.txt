@@ -1398,3 +1398,6 @@ a30a274acf18b4de73b4ebc476179947c5db536d refs/tags/v0.12.0-777.90
 94fde1af25ed15c1c208cd17ea337b4be912db0a refs/tags/v0.12.0-777.97
 b7b8ef1e6a6aabc7126dcd75210c9dd3095a2624 refs/tags/v0.12.0-777.98
 006af4c1aebac05dc42389f789c2154b9f1ebd29 refs/tags/v0.12.0-777.99
+# 十一番补删 2026-11-20 第二波（main=b8e10e74d1 #977合并后）
+# PATCH-EQ×4: ci/prune-session-architecture-artifacts-20261118 codex/refresh-latest-release-notes-20261119 codex/repair-incomplete-latest-release-note-20261119 fix/workspace-lazylist-test-matcher-20261116 (patch-id全量索引精判)
+# TREE-EQ×1: codex/global-adaptive-liquid-glass (#977 head, squash合并吸收, diff仅剩后续备份文档)
