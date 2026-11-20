@@ -1317,23 +1317,43 @@ fun LocalHarnessScreen(
     }
 
     if (showNewSessionMode) {
-        if (shell.usageMode == LocalUsageMode.CHAT && shell.groupChat.enabled) {
-            GroupNewSessionDialog(
+        if (shell.usageMode == LocalUsageMode.CHAT) {
+            ChatNextNewSessionSheet(
                 onDismiss = ::dismissNewSessionMode,
+                onFreeChat = {
+                    if (viewModel.createSingleChatSession()) {
+                        showNewSessionMode = false
+                        conversationOpenedFromDrawer = newSessionOpenedFromDrawer
+                        newSessionOpenedFromDrawer = false
+                    }
+                },
+                onChoosePersona = {
+                    // Selecting a character happens in the existing gallery's story
+                    // flow. Do not allocate a blank Chat Session before selection.
+                    showNewSessionMode = false
+                    newSessionOpenedFromDrawer = false
+                    if (viewModel.hasUnsavedCurrentPersona()) {
+                        showPersonaGallerySavePrompt = true
+                    } else {
+                        drawerGalleryTargetId = null
+                        drawerGalleryEntryVersion++
+                        pushFeature(LocalFeaturePage.PERSONA_GALLERY)
+                    }
+                },
                 onNewGroup = {
                     showNewSessionMode = false
                     groupSetupOpenedFromDrawer = newSessionOpenedFromDrawer
                     newSessionOpenedFromDrawer = false
                     showGroupSetup = true
                 },
-                onNewSingle = {
-                    if (viewModel.createSingleChatSession()) {
+                onContinueCurrent = {
+                    if (viewModel.createSession(LocalConversationMode.CONTINUATION)) {
                         showNewSessionMode = false
                         conversationOpenedFromDrawer = newSessionOpenedFromDrawer
                         newSessionOpenedFromDrawer = false
-                        // The settled session observer owns navigation reset.
                     }
                 },
+                canContinueCurrent = shell.messages.any { it.role == "user" || it.role == "assistant" },
             )
         } else {
             NewSessionModeDialog(
@@ -1344,7 +1364,6 @@ fun LocalHarnessScreen(
                         showNewSessionMode = false
                         conversationOpenedFromDrawer = newSessionOpenedFromDrawer
                         newSessionOpenedFromDrawer = false
-                        // The settled session observer owns navigation reset.
                     }
                 },
             )

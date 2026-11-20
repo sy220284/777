@@ -115,6 +115,42 @@ internal fun NewSessionModeDialog(
     }
 }
 
+/** One entry for free Chat, character stories and multi-person Chat. */
+@Composable
+internal fun ChatNextNewSessionSheet(
+    onDismiss: () -> Unit,
+    onFreeChat: () -> Unit,
+    onChoosePersona: () -> Unit,
+    onNewGroup: () -> Unit,
+    onContinueCurrent: () -> Unit,
+    canContinueCurrent: Boolean,
+) {
+    SyResponsiveSheet(title = "开始聊天", onDismiss = onDismiss, seamlessBackground = true) {
+        SySheetChoiceRow(
+            modifier = Modifier.heightIn(min = 72.dp),
+            title = "自由聊天",
+            onClick = onFreeChat,
+        )
+        SySheetChoiceRow(
+            modifier = Modifier.heightIn(min = 72.dp),
+            title = "选择人物",
+            onClick = onChoosePersona,
+        )
+        SySheetChoiceRow(
+            modifier = Modifier.heightIn(min = 72.dp),
+            title = "多人聊天",
+            onClick = onNewGroup,
+        )
+        if (canContinueCurrent) {
+            SySheetChoiceRow(
+                modifier = Modifier.heightIn(min = 64.dp),
+                title = "继续当前故事",
+                onClick = onContinueCurrent,
+            )
+        }
+    }
+}
+
 @Composable
 internal fun GroupNewSessionDialog(
     onDismiss: () -> Unit,
