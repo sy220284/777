@@ -133,12 +133,14 @@ class BundledCliAndroidTest {
         check(originalScript.contains(anchor)) { "隔离诊断脚本缺少已知的保护安装点" }
         val basePolicy = kotlinx.serialization.json.Json.parseToJsonElement(originalArgs[6])
             as kotlinx.serialization.json.JsonObject
-        val allReadPolicy = kotlinx.serialization.json.JsonObject(basePolicy + (
-            "read" to kotlinx.serialization.json.JsonArray(
-                listOf(kotlinx.serialization.json.JsonPrimitive("/")) +
-                    (basePolicy.getValue("read") as kotlinx.serialization.json.JsonArray),
-            )
-        )).toString()
+        fun policyWithExtraRead(vararg roots: String): String =
+            kotlinx.serialization.json.JsonObject(basePolicy + (
+                "read" to kotlinx.serialization.json.JsonArray(
+                    roots.map { kotlinx.serialization.json.JsonPrimitive(it) } +
+                        (basePolicy.getValue("read") as kotlinx.serialization.json.JsonArray),
+                )
+            )).toString()
+        val allReadPolicy = policyWithExtraRead("/")
         val landlockOnly = originalScript.replace(anchor,
             "    filesystem(policy)\n    # test-only: omit seccomp")
         val seccompOnly = originalScript.replace(anchor,
@@ -146,13 +148,33 @@ class BundledCliAndroidTest {
         val permissiveIoctl = seccompOnly
             .replace("ioctl_nr = 16", "ioctl_nr = -1")
             .replace("ioctl_nr = 29", "ioctl_nr = -1")
+        val fionbioIoctl = seccompOnly.replace(
+            "0x5414, 0x541B]", "0x5414, 0x541B, 0x5421]")
+        val standardIoctl = seccompOnly.replace(
+            "0x5414, 0x541B]", "0x5414, 0x541B, 0x5421, 0x5450, 0x5451]")
+        val allowSocketpair = seccompOnly
+            .replace("49, 50, 53, 54, 55, 62", "49, 50, 54, 55, 62")
+            .replace("198, 199, 200, 201", "198, 200, 201")
+        val landlockNoDeviceIoctl = landlockOnly.replace(
+            "handled = (1 << (16 if abi >= 5 else 15)) - 1",
+            "handled = ((1 << (16 if abi >= 5 else 15)) - 1) & ~(1 << 15)")
         // Targeted test matrix. This never runs caller-provided code and lives
         // exclusively in androidTest; production always installs both policies.
         val modes = listOf(
             Triple("仅 Landlock", landlockOnly, originalArgs[6]),
             Triple("仅 Seccomp", seccompOnly, originalArgs[6]),
             Triple("Landlock 允许全量只读", landlockOnly, allReadPolicy),
+            Triple("Landlock 读取 data", landlockOnly, policyWithExtraRead("/data")),
+            Triple("Landlock 读取 dev", landlockOnly, policyWithExtraRead("/dev")),
+            Triple("Landlock 读取 proc", landlockOnly, policyWithExtraRead("/proc")),
+            Triple("Landlock 读取 sys", landlockOnly, policyWithExtraRead("/sys")),
+            Triple("Landlock 读取 mnt", landlockOnly, policyWithExtraRead("/mnt")),
+            Triple("Landlock 读取 odm", landlockOnly, policyWithExtraRead("/odm")),
+            Triple("Landlock 不管控设备 ioctl", landlockNoDeviceIoctl, originalArgs[6]),
             Triple("Seccomp 允许 ioctl", permissiveIoctl, originalArgs[6]),
+            Triple("Seccomp 允许 FIONBIO", fionbioIoctl, originalArgs[6]),
+            Triple("Seccomp 允许 FIONBIO 与 FIOCLEX", standardIoctl, originalArgs[6]),
+            Triple("Seccomp 允许 socketpair", allowSocketpair, originalArgs[6]),
         )
         return modes.map { (name, script, policy) ->
             val diagnostic = originalArgs.toMutableList().apply {
