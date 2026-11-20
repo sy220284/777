@@ -102,31 +102,47 @@ class ManagedProcess private constructor(val process: Process, private val group
             prepareManagedProcessLauncher(builder, setsid, shell)
             val process = builder.start()
             try {
-                // Read only the fixed startup line, without buffering any command output.
-                val pid = StringBuilder()
-                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
-                while (System.nanoTime() < deadline && pid.length < 20) {
-                    if (process.inputStream.available() == 0) {
-                        check(process.isAlive) { "进程组启动失败" }
-                        Thread.sleep(2)
-                        continue
-                    }
-                    val byte = process.inputStream.read()
-                    if (byte == 10) {
-                        val group = pid.toString().toLongOrNull()
-                        require(group != null && group > 1) { "进程组编号无效" }
-                        return ManagedProcess(process, group, shell)
-                    }
-                    require(byte in 48..57) { "进程组握手无效" }
-                    pid.append(byte.toChar())
-                }
-                error("进程组启动超时")
+                // The child can exit between available() and isAlive, especially
+                // for a tiny --version command. A dead process may still have
+                // unread PID bytes in the OS pipe; always drain them before
+                // treating it as a launcher failure.
+                return ManagedProcess(process, readManagedProcessGroup(process), shell)
             } catch (error: Throwable) {
                 process.destroyForcibly()
                 throw error
             }
         }
     }
+}
+
+/**
+ * Consume only the PID header. A short-lived executable may exit before the
+ * Java pipe reports bytes as available; an exited process is still readable.
+ * Never consume the command's stdout after the newline.
+ */
+internal fun readManagedProcessGroup(process: Process): Long {
+    val pid = StringBuilder()
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+    while (System.nanoTime() < deadline && pid.length < 20) {
+        if (process.inputStream.available() == 0 && process.isAlive) {
+            Thread.sleep(2)
+            continue
+        }
+        val byte = process.inputStream.read()
+        if (byte == 10) {
+            val group = pid.toString().toLongOrNull()
+            require(group != null && group > 1L) { "进程组编号无效" }
+            return group
+        }
+        if (byte < 0) {
+            val state = if (process.isAlive) "启动器输出已关闭" else "退出码 ${process.exitValue()}"
+            val detail = if (process.isAlive) "" else process.errorStream.bufferedReader().readText().takeLast(1400)
+            error("进程组握手提前结束（$state，已读 $pid）：$detail")
+        }
+        require(byte in 48..57) { "进程组握手无效" }
+        pid.append(byte.toChar())
+    }
+    error("进程组启动超时（已读 $pid）")
 }
 
 /** Preserve surrogate pairs when bounding UTF-16 process output. */
