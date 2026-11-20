@@ -102,6 +102,7 @@ internal fun localShellFeatureUiContribution(
             onSelectMessageVariant = actions.selectMessageVariant,
             onRegenerate = actions.regenerate,
             onRetryFailedGroupReply = actions.retryFailedGroupReply,
+            onResumeGroupPending = actions.resumeGroupPending,
             onGenerateReplySuggestions = actions.generateReplySuggestions,
             onSampleSession = actions.sampleSession,
             searchTranscript = actions.searchTranscript,

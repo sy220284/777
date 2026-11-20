@@ -184,6 +184,7 @@ internal class LocalConversationSurfaceArgs(
     val onSelectMessageVariant: suspend (String, Int) -> Boolean,
     val onRegenerate: (String) -> Boolean,
     val onRetryFailedGroupReply: (String) -> Boolean,
+    val onResumeGroupPending: () -> Boolean,
     val onGenerateReplySuggestions: suspend () -> Boolean,
     val onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)?,
     val searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
@@ -256,6 +257,7 @@ internal fun LocalConversationSurface(
     onSelectMessageVariant: suspend (String, Int) -> Boolean,
     onRegenerate: (String) -> Boolean,
     onRetryFailedGroupReply: (String) -> Boolean = { false },
+    onResumeGroupPending: () -> Boolean = { false },
     onGenerateReplySuggestions: suspend () -> Boolean,
     onSampleSession: (suspend (String, String) -> com.labteto.dshmobile.local.model.LocalConversationSampleResult)? = null,
     searchTranscript: suspend (String, String, com.labteto.dshmobile.uicontract.UiMessageSearchCursor?) -> com.labteto.dshmobile.uicontract.UiMessageSearchReceipt,
@@ -326,6 +328,7 @@ internal fun LocalConversationSurface(
         onSelectMessageVariant = onSelectMessageVariant,
         onRegenerate = onRegenerate,
         onRetryFailedGroupReply = onRetryFailedGroupReply,
+        onResumeGroupPending = onResumeGroupPending,
         onGenerateReplySuggestions = onGenerateReplySuggestions,
         onSampleSession = onSampleSession,
         searchTranscript = searchTranscript,
@@ -406,6 +409,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     val onSelectMessageVariant = args.onSelectMessageVariant
     val onRegenerate = args.onRegenerate
     val onRetryFailedGroupReply = args.onRetryFailedGroupReply
+    val onResumeGroupPending = args.onResumeGroupPending
     val onGenerateReplySuggestions = args.onGenerateReplySuggestions
     val onSampleSession = args.onSampleSession
     val onLoadOlderTranscript = args.onLoadOlderTranscript
@@ -1189,6 +1193,18 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                 retry = { memberId -> onRetryFailedGroupReply(memberId) },
                 latestUserMessageId = state.messages.lastOrNull { it.role == "user" }?.id,
             )
+            if (!state.running && state.configured &&
+                state.groupChat.context.pendingThroughSequence >
+                    state.groupChat.context.processedThroughSequence) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(SyMetric.gapSm)) {
+                    Text("已保存回复，人物经历正在整理或等待恢复。",
+                        style = SyType.small13.withReadingWeight(),
+                        color = colors.textSecondary, modifier = Modifier.weight(1f))
+                    SyButton("继续整理", onClick = { onResumeGroupPending() },
+                        variant = SyButtonVariant.Ghost, size = SyButtonSize.Small)
+                }
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
             val transcriptBody: @Composable () -> Unit = {
