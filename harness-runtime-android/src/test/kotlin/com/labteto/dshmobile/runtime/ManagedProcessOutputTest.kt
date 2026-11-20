@@ -33,10 +33,34 @@ class ManagedProcessOutputTest {
                 builder.environment().containsKey(key))
             assertTrue(builder.environment().containsKey("DSH_MANAGED_$key"))
             assertTrue(script.contains("unset DSH_MANAGED_$key"))
+            assertTrue("必须从暂存变量恢复 $key",
+                script.contains("export $key=\"\$DSH_MANAGED_$key\""))
         }
         assertEquals("secret stays in environment", builder.environment()["API_TOKEN"])
         assertFalse("Credentials must never enter a command argument",
             command.any { it.contains("secret stays in environment") })
     }
 
+    @Test fun childReceivesRestoredLibraryPathAndSecretsStayOutOfArguments() {
+        val builder = ProcessBuilder("/usr/bin/env").apply {
+            environment().clear()
+            environment()["LD_LIBRARY_PATH"] = "/trusted/runtime/lib:/trusted/native"
+            environment()["API_TOKEN"] = "secret-check-value"
+        }
+        prepareManagedProcessLauncher(builder, "/usr/bin/setsid", "/bin/sh")
+        // Execute the real generated shell script without session wrapping; the
+        // JVM test checks value restoration, while Android instrumentation covers setsid.
+        val command = builder.command()
+        val child = ProcessBuilder(command.drop(1)).apply {
+            environment().clear()
+            environment().putAll(builder.environment())
+        }.start()
+        val stdout = child.inputStream.bufferedReader().readText()
+        val stderr = child.errorStream.bufferedReader().readText()
+        assertEquals("restore failed: $stderr", 0, child.waitFor())
+        assertTrue(stdout.lines().contains("LD_LIBRARY_PATH=/trusted/runtime/lib:/trusted/native"))
+        assertTrue(stdout.lines().contains("API_TOKEN=secret-check-value"))
+        assertFalse(stdout.contains("DSH_MANAGED_LD_LIBRARY_PATH="))
+        assertFalse(command.any { it.contains("secret-check-value") })
+    }
 }
