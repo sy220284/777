@@ -477,8 +477,26 @@ internal class LocalChatTimelineCoordinator @Inject constructor(
 
                 val last = state.messages.lastOrNull()
                     ?: return@synchronized rejectRegeneration("当前会话没有可重新生成的回复")
-                if (last.id != messageId || last.role != "assistant") {
-                    return@synchronized rejectRegeneration("只能重新生成当前会话的最后一条助手回复")
+                if (last.id != messageId) {
+                    return@synchronized rejectRegeneration("只能重新尝试当前会话最后一轮回复")
+                }
+                if (last.role == "user") {
+                    // The previous direct run failed before any assistant message was
+                    // delivered. Its original user model message (including attachments)
+                    // remains in modelHistory; do not create a duplicate user turn.
+                    if (modelHistory.history.lastOrNull()
+                            ?.get("role")?.jsonPrimitive?.contentOrNull != "user") {
+                        return@synchronized rejectRegeneration(
+                            "原始多模态请求尚未完整恢复，请重新打开会话后重试")
+                    }
+                    started = directTurn.start(
+                        input = last.content,
+                        sourceMessageId = last.id,
+                    ).also { handle.job = it }
+                    return@synchronized true
+                }
+                if (last.role != "assistant") {
+                    return@synchronized rejectRegeneration("当前最后一条记录不能重新生成")
                 }
                 val promptMessage = state.messages.dropLast(1).lastOrNull { it.role == "user" }
                     ?: return@synchronized rejectRegeneration("无法定位这条回复的用户请求")

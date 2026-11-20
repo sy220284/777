@@ -1678,6 +1678,13 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
             ),
         )
 
+        if (state.usageMode == LocalUsageMode.CHAT && !state.groupChat.enabled &&
+            !state.running && !state.loading && state.configured &&
+            state.queuedInputCount == 0 && state.messages.lastOrNull()?.role == "user") {
+            val lastUser = state.messages.last()
+            SyButton("重试本轮回复", onClick = { onRegenerate(lastUser.id) },
+                modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+        }
         if (state.queuedInputCount > 0 && queuedUserPort != null) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = SyMetric.gapLg),
