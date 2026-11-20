@@ -30,7 +30,9 @@ class ManagedProcessOutputTest {
         assertEquals(listOf("/work/cli", "--version"), command.takeLast(2))
         val script = command[3]
         assertTrue(script.startsWith("echo \"\$\$\""))
-        assertTrue(script.indexOf("printf") < script.indexOf("export LD_LIBRARY_PATH"))
+        assertTrue("PID handshake must precede linker restoration",
+            script.indexOf("echo \\\"") >= 0 &&
+                script.indexOf("echo \\\"") < script.indexOf("export LD_LIBRARY_PATH"))
         assertTrue(script.endsWith("exec " + '"' + '$' + "@\""))
         for (key in listOf("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")) {
             assertFalse("$key must not affect the platform setsid/sh linker",
