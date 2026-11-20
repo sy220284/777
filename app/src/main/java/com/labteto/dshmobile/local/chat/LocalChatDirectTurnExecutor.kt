@@ -496,17 +496,10 @@ internal class LocalChatDirectTurnExecutor @Inject constructor(
                     replyCards.reportedFor(reply.content.orEmpty()))
             }
 
-            if (assistantTranscript != null && actuallyProvidedSources.isNotEmpty()) {
-                eventLog.append("chat/recall-used", buildJsonObject {
-                    put("assistant_message_id", assistantTranscript.id)
-                    put("source_user_message_id", sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId)
-                    put("references", JsonArray(actuallyProvidedSources.map { item -> buildJsonObject {
-                        put("kind", item.kind)
-                        put("content", item.content.take(1200))
-                        put("source_session_id", item.sourceSessionId)
-                        put("source_message_id", item.sourceMessageId)
-                    } }))
-                })
+            assistantTranscript?.let { confirmed ->
+                appendChatRecallEvidence(eventLog, confirmed.id,
+                    sourceMessageId ?: snapshot.transcriptIndex.latestUserMessageId,
+                    actuallyProvidedSources)
             }
             if (replacingMessageId == null) {
                 modelHistory.history.append(durableReply.message)

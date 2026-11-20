@@ -15,6 +15,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -28,6 +29,26 @@ internal data class ChatRecallEvidence(
     val sourceSessionId: String = "",
     val sourceMessageId: String = "",
 )
+
+/** Append a durable, bounded receipt only after a real assistant message was committed. */
+internal fun appendChatRecallEvidence(
+    log: LocalSessionEventLog,
+    assistantMessageId: String,
+    sourceUserMessageId: String?,
+    references: List<ChatRecallEvidence>,
+) {
+    if (assistantMessageId.isBlank() || references.isEmpty()) return
+    log.append("chat/recall-used", buildJsonObject {
+        put("assistant_message_id", assistantMessageId)
+        put("source_user_message_id", sourceUserMessageId)
+        put("references", JsonArray(references.take(12).map { item -> buildJsonObject {
+            put("kind", item.kind)
+            put("content", item.content.take(1200))
+            put("source_session_id", item.sourceSessionId)
+            put("source_message_id", item.sourceMessageId)
+        } }))
+    })
+}
 
 /** Read only the latest evidence for the exact assistant message. No parallel fact store. */
 internal fun readChatRecallEvidence(log: LocalSessionEventLog, assistantMessageId: String): List<ChatRecallEvidence> {
@@ -116,12 +137,14 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         viewerSubjectKey: String? = null,
         viewerName: String? = null,
         groupAudience: Boolean = false,
+        onRecallUsed: (List<ChatRecallEvidence>) -> Unit = {},
     ): String = relationshipContext(
         query = query,
         snapshot = runtimeStateStore.state.value,
         viewerSubjectKey = viewerSubjectKey,
         viewerName = viewerName,
         groupAudience = groupAudience,
+        onRecallUsed = onRecallUsed,
     )
 
     internal fun relationshipContext(

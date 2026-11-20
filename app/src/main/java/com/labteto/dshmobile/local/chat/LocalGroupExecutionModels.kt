@@ -25,6 +25,7 @@ internal data class GroupGeneratedReply(
     val uiUsageReported: Boolean = false,
     val completionReason: com.labteto.dshmobile.local.model.LocalModelCompletionReason = com.labteto.dshmobile.local.model.LocalModelCompletionReason.COMPLETED,
     val rawStopReason: String? = null,
+    val usedMemoryEvidence: List<ChatRecallEvidence> = emptyList(),
 )
 
 /**

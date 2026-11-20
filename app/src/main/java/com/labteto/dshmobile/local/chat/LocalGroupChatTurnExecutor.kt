@@ -199,6 +199,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         allMembers: List<LocalGroupChatMember>,
         member: LocalGroupChatMember,
         memoryContext: String,
+        memoryEvidence: List<ChatRecallEvidence>,
         index: Int,
         turnId: String?,
     ): GroupGeneratedReply {
@@ -311,6 +312,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             })
             replyCards.normalizeGroup(member.displayName, persona.name)
             groupGeneratedReplyFromFinalReply(member, persona, finalReply, replyCards.definitionFor(finalContent))
+                .copy(usedMemoryEvidence = memoryEvidence.filter { turnContext.prompt.contains(it.content) })
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -827,6 +829,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             require(responders.isNotEmpty()) { "群聊里还没有可发言的角色" }
             // Search at most once for the group turn; reuse only within the current turn.
             val sharedWebContext = webContext.forInput(input)
+            val memoryEvidenceByMember = mutableMapOf<String, List<ChatRecallEvidence>>()
             val groupMemoryContexts = responders.associate { member ->
                 val persona = chatPersonaStore.get(member.personaId)
                 val subjectKey = com.labteto.dshmobile.local.chat.chatRelationshipSubjectKey(
@@ -839,6 +842,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         viewerSubjectKey = it,
                         viewerName = persona.name,
                         groupAudience = true,
+                        onRecallUsed = { used -> memoryEvidenceByMember[member.galleryId] = used },
                     )
                 }.orEmpty() + sharedWebContext
             }
@@ -914,6 +918,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                                 viewerSubjectKey = it,
                                 viewerName = persona.name,
                                 groupAudience = true,
+                                onRecallUsed = { used -> memoryEvidenceByMember[member.galleryId] = used },
                             )
                         }.orEmpty()
                         related + sharedWebContext
@@ -926,6 +931,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         allMembers = members,
                         member = member,
                         memoryContext = memoryForMember,
+                        memoryEvidence = memoryEvidenceByMember[member.galleryId].orEmpty(),
                         index = index,
                         turnId = turnId,
                     )
@@ -997,6 +1003,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                         put("_dsh_completion", generated.completionReason.name)
                         generated.rawStopReason?.let { put("_dsh_stop_reason", it) }
                     }))
+                    appendChatRecallEvidence(eventLog, transcript.id, turnId, generated.usedMemoryEvidence)
                     replyDocuments.publish(generated.uiDefinition,
                         com.labteto.dshmobile.uicontract.UiDocumentSource(snapshot.sessionId, transcript.id,
                             snapshot.chat.chatContext.generation,
