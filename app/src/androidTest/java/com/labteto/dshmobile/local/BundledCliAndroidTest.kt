@@ -59,28 +59,36 @@ class BundledCliAndroidTest {
             // OR a verified fail-closed refusal before the CLI ever starts.
             // Never substitute an unisolated child for a rejected sandbox.
             val isolatedOutcomes = mutableSetOf<Boolean>()
+            val isolationFailures = mutableListOf<String>()
             withContext(ProcessIsolationContext()) {
-                for (name in listOf("rg", "curl", "jq", "npm", "pip")) {
+                // Record every interpreter independently before failing the gate. In
+                // particular, node --version distinguishes the native runtime from
+                // npm's JavaScript entry point after Android installs its seccomp policy.
+                for (name in listOf("rg", "curl", "jq", "pip", "node", "npm")) {
                     val result = isolated.execute(
                         ProcessRequest(listOf(name, "--version"), timeoutMillis = 25_000),
                     )
                     if (result.exitCode == 0) {
-                        assertTrue("$name sandboxed output missing",
-                            result.stdout.isNotBlank() || result.stderr.isNotBlank())
+                        if (result.stdout.isBlank() && result.stderr.isBlank()) {
+                            isolationFailures += "$name returned no output in sandbox"
+                        }
                         isolatedOutcomes += true
-                    } else {
-                        assertEquals("$name failed for a reason other than denied sandbox: " +
-                            "${result.stderr} / ${result.stdout}", 125, result.exitCode)
-                        assertTrue("$name sandbox must refuse execution only when kernel " +
-                            "Landlock protection is unavailable: ${result.stderr}",
-                            result.stderr.contains("PROCESS_ISOLATION_UNAVAILABLE:") &&
-                                (result.stderr.contains("Landlock ABI unavailable") ||
-                                    result.stderr.contains("Landlock ABI >= 3 required")))
-                        assertTrue("$name sandbox refusal must not execute CLI", result.stdout.isBlank())
+                    } else if (result.exitCode == 125) {
+                        if (!result.stderr.contains("PROCESS_ISOLATION_UNAVAILABLE:") ||
+                            !(result.stderr.contains("Landlock ABI unavailable") ||
+                                result.stderr.contains("Landlock ABI >= 3 required")) ||
+                            result.stdout.isNotBlank()
+                        ) {
+                            isolationFailures += "$name refused isolation without verified kernel cause: ${result.stderr} / ${result.stdout}"
+                        }
                         isolatedOutcomes += false
+                    } else {
+                        isolationFailures += "$name crashed/failed under isolation (exit ${result.exitCode}): ${result.stderr} / ${result.stdout}"
                     }
                 }
             }
+            assertTrue("Isolated runtime diagnostics: ${isolationFailures.joinToString("; ")}",
+                isolationFailures.isEmpty())
             assertEquals("All commands must see the same immutable kernel sandbox capability",
                 1, isolatedOutcomes.size)
 
