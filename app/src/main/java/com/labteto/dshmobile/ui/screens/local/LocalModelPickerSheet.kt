@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.labteto.dshmobile.R
 import com.labteto.dshmobile.local.model.LocalModelProfile
+import com.labteto.dshmobile.local.model.LocalModelPresets
 import com.labteto.dshmobile.ui.shenyan.SyResponsiveSheet
 import com.shenyan.designsystem.components.SyMaterialSurface
 import com.shenyan.designsystem.components.SyMaterialTier
@@ -77,6 +78,12 @@ internal fun LocalModelPickerSheet(
             }
             profiles.forEach { profile ->
                 val selected = profile.id == activeProfileId
+                val imageCapability = LocalModelPresets.documentedImageInputSupport(profile.model, profile.baseUrl)
+                val capabilitiesText = when (imageCapability) {
+                    true -> "图片输入：预设支持"
+                    false -> "图片输入：预设不支持"
+                    null -> "图片输入：尚未验证"
+                }
                 val detail = when {
                     selected -> stringResource(R.string.app_model_current)
                     profile.contextWindowTokensOverride != null -> stringResource(
@@ -119,6 +126,13 @@ internal fun LocalModelPickerSheet(
                             detail,
                             style = SyType.caption11.withReadingWeight(),
                             color = colors.textTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            capabilitiesText,
+                            style = SyType.caption11.withReadingWeight(),
+                            color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )

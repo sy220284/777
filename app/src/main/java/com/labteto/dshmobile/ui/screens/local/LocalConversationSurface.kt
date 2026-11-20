@@ -505,6 +505,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
     var showModelPicker by rememberSaveable { mutableStateOf(false) }
     val loadedSearchState = rememberV6LoadedConversationSearchState(state.sessionId)
     var showPersonaPicker by rememberSaveable { mutableStateOf(false) }
+    var showChatStoryContext by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showWorkEvidence by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showCharacterTuning by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var showGroupMemberPicker by rememberSaveable { mutableStateOf(false) }
@@ -1044,8 +1045,7 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
                             activeSpeakerName = state.groupActiveSpeakerName,
                             running = state.running || state.loading,
                             onContextClick = {
-                                if (state.groupChat.enabled) showGroupMemberPicker = true
-                                else showPersonaPicker = true
+                                showChatStoryContext = true
                             },
                             onExitGroupChat = onExitGroupChat,
                             onNewSession = onNewSession,
@@ -1170,9 +1170,10 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         }
 
         if (state.groupChat.enabled && state.groupChat.failedReplyMemberIds.isNotEmpty()) {
-            GroupReplyFailureNotice(state.groupChat, state.running) { memberId ->
-                onRetryFailedGroupReply(memberId)
-            }
+            GroupReplyFailureNotice(state.groupChat, state.running,
+                retry = { memberId -> onRetryFailedGroupReply(memberId) },
+                latestUserMessageId = state.messages.lastOrNull { it.role == "user" }?.id,
+            )
         }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(scrollConnection)) {
             val transcriptBody: @Composable () -> Unit = {
@@ -1873,6 +1874,50 @@ private fun LocalConversationSurfaceBody(args: LocalConversationSurfaceArgs) {
         onConfigurePersona = onConfigureChatPersona,
         onDismiss = { showCharacterTuning = false },
     )
+    if (showChatStoryContext && state.usageMode == LocalUsageMode.CHAT) {
+        SyResponsiveSheet(title = if (state.groupChat.enabled) "群聊与场景" else "人物与故事",
+            onDismiss = { showChatStoryContext = false }) {
+            Column(verticalArrangement = Arrangement.spacedBy(SyMetric.gapMd)) {
+                Text(if (state.groupChat.enabled) sessionTitle else state.chatPersona.name,
+                    style = SyType.base16Strong.withReadingWeight(), color = colors.text)
+                if (!state.groupChat.enabled) {
+                    Text(currentGalleryStory?.title ?: "尚未选择人物故事",
+                        style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
+                    currentGalleryStory?.notes?.takeIf(String::isNotBlank)?.let { notes ->
+                        Text(notes.take(300), style = SyType.small13.withReadingWeight(),
+                            color = colors.textSecondary)
+                    }
+                    SyButton("选择人物", onClick = {
+                        showChatStoryContext = false
+                        showPersonaPicker = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                    SyButton("查看人物故事", onClick = {
+                        showChatStoryContext = false
+                        onOpenPersonaGallery()
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
+                    SyButton("开始新故事", onClick = {
+                        showChatStoryContext = false
+                        onNewSession()
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
+                } else {
+                    Text("成员：" + state.groupChat.members.joinToString("、") { it.displayName },
+                        style = SyType.small13.withReadingWeight(), color = colors.textSecondary)
+                    state.groupChat.announcement.takeIf(String::isNotBlank)?.let { summary ->
+                        Text(summary.take(240), style = SyType.small13.withReadingWeight(),
+                            color = colors.textSecondary)
+                    }
+                    SyButton("管理群聊成员", onClick = {
+                        showChatStoryContext = false
+                        showGroupMemberPicker = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Outline)
+                    SyButton("编辑公开场景", onClick = {
+                        showChatStoryContext = false
+                        showGroupAnnouncement = true
+                    }, modifier = Modifier.fillMaxWidth(), variant = SyButtonVariant.Ghost)
+                }
+            }
+        }
+    }
     if (
         showPersonaPicker &&
         state.usageMode == LocalUsageMode.CHAT &&
