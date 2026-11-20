@@ -87,6 +87,7 @@ class LocalConversationUiPortTest {
             return true
         }
         override fun regenerateReply(messageId: String) = false
+        override fun retryFailedGroupReply(memberId: String) = false
         override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult = error("unused")
         override fun cancel(sessionId: String) = false
         override suspend fun cancelAndJoin(sessionId: String) = false

@@ -27,6 +27,7 @@ class LocalChatAutomationExecutionAdapterTest {
             override fun removeQueuedUserInput(messageId: String) = false
             override fun reorderQueuedUserInputs(orderedIds: List<String>) = false
             override fun regenerateReply(messageId: String): Boolean = false
+            override fun retryFailedGroupReply(memberId: String): Boolean = false
 
             override suspend fun execute(request: LocalChatExecutionRequest): LocalChatExecutionResult {
                 captured = request
