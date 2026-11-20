@@ -4,16 +4,50 @@ import com.labteto.dshmobile.local.LocalHarnessState
 import com.labteto.dshmobile.local.documentedContextWindowTokens
 import com.labteto.dshmobile.local.memory.MemoryKind
 import com.labteto.dshmobile.local.memory.MemoryManager
+import com.labteto.dshmobile.local.memory.MemoryRecord
 import com.labteto.dshmobile.local.memory.MemoryScope
 import com.labteto.dshmobile.local.memory.MemoryStore
 import com.labteto.dshmobile.observability.AppLog
 import com.labteto.dshmobile.local.runtime.LocalRuntimeStateStore
 import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
+import com.labteto.dshmobile.local.session.LocalSessionEventLog
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+
+/** A read-only trace of recalled facts sent in a confirmed assistant turn. */
+internal data class ChatRecallEvidence(
+    val kind: String,
+    val content: String,
+    val sourceSessionId: String = "",
+    val sourceMessageId: String = "",
+)
+
+/** Read only the latest evidence for the exact assistant message. No parallel fact store. */
+internal fun readChatRecallEvidence(log: LocalSessionEventLog, assistantMessageId: String): List<ChatRecallEvidence> {
+    if (assistantMessageId.isBlank()) return emptyList()
+    val latest = log.latestMatching(setOf("chat/recall-used")) { data ->
+        data["assistant_message_id"]?.jsonPrimitive?.contentOrNull == assistantMessageId
+    } ?: return emptyList()
+    val items = latest.data["references"] as? JsonArray ?: return emptyList()
+    return items.mapNotNull { element ->
+        val data = element as? JsonObject ?: return@mapNotNull null
+        val content = data["content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+        val kind = data["kind"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        if (content.isBlank() || kind !in setOf("fact", "diary")) return@mapNotNull null
+        ChatRecallEvidence(
+            kind = kind, content = content,
+            sourceSessionId = data["source_session_id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            sourceMessageId = data["source_message_id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        )
+    }.distinct()
+}
 
 /**
  * Chat-owned long-term memory boundary used by foreground/group generation.
@@ -97,6 +131,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         viewerName: String? = null,
         groupAudience: Boolean = snapshot.chat.groupChat.enabled,
         excludedAssistantMessageIds: Set<String> = emptySet(),
+        onRecallUsed: (List<ChatRecallEvidence>) -> Unit = {},
     ): String {
         if (!snapshot.autoRecall) return ""
         val subjectKey = viewerSubjectKey ?: chatRelationshipSubjectKey(
@@ -124,6 +159,7 @@ internal class LocalChatMemoryRuntime @Inject constructor(
         )
         val budget = chatLongTermMemoryBudget(contextWindow)
         val blocks = mutableListOf<String>()
+        val recallEvidence = mutableListOf<ChatRecallEvidence>()
         run {
             val relationshipKinds = setOf(
                 MemoryKind.RELATIONSHIP_FACT,
@@ -163,6 +199,13 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 ChatUnifiedTurnContext.allowsHistoricalRecord(query, conversation, memory.content)
             }.distinctBy { it.id }
             if (recalled.isNotEmpty()) {
+                recalled.forEach { fact ->
+                    val source = fact.sourceMessages.lastOrNull()
+                    recallEvidence += ChatRecallEvidence(
+                        "fact", fact.content, source?.sessionId.orEmpty(),
+                        source?.messageId.orEmpty(),
+                    )
+                }
                 blocks += takeWithinModelTokenBudget(
                     buildString {
                         appendLine(
@@ -210,6 +253,13 @@ internal class LocalChatMemoryRuntime @Inject constructor(
                 )
             }
             if (diary.isNotEmpty()) {
+                diary.forEach { entry ->
+                    val source = entry.sources.lastOrNull()
+                    recallEvidence += ChatRecallEvidence(
+                        "diary", entry.event, source?.sessionId.orEmpty(),
+                        source?.assistantMessageId?.ifBlank { source.userMessageId }.orEmpty(),
+                    )
+                }
                 blocks += takeWithinModelTokenBudget(
                     buildString {
                         appendLine("【相关人物日记｜角色自己的长期经历】")
@@ -224,10 +274,12 @@ internal class LocalChatMemoryRuntime @Inject constructor(
             }
         }
 
-        return takeWithinModelTokenBudget(
+        val projected = takeWithinModelTokenBudget(
             blocks.filter(String::isNotBlank).joinToString("\n\n") +
                 if (blocks.isEmpty()) "" else "\n\n已被明确修正的旧版本仅属于历史；人物日记中的感受和猜测属于人物主观认识。",
             budget.totalTokens,
         )
+        onRecallUsed(recallEvidence.filter { it.content.isNotBlank() && projected.contains(it.content) }.distinct())
+        return projected
     }
 }

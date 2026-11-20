@@ -327,6 +327,12 @@ class LocalChatRuntime @Inject internal constructor(
         execution.selectMessageVariant(messageId, targetIndex)
     internal fun regenerateReply(messageId: String): Boolean = execution.regenerateReply(messageId)
     internal fun retryFailedGroupReply(memberId: String): Boolean = execution.retryFailedGroupReply(memberId)
+    internal fun recallEvidenceForMessage(messageId: String): List<ChatRecallEvidence> {
+        val current = runtimeStateStore.state.value
+        if (current.loading || current.usageMode != LocalUsageMode.CHAT || messageId.isBlank())
+            return emptyList()
+        return readChatRecallEvidence(sessionStorage.eventLogs.get(current.sessionId), messageId)
+    }
     internal fun stop() = runtimeStateStore.performVisibleOperation("停止聊天时保存失败") {
         val sessionId = runtimeStateStore.currentSessionId
         LocalChatPostTurnJobOwner.cancel()
