@@ -118,6 +118,7 @@ internal class ChatInteractionPromptBuilder {
         userMessage: String,
         assistantMessage: String,
         recentDialogue: List<Pair<String, String>> = emptyList(),
+        intimacyModeEnabled: Boolean = false,
     ): String = buildString {
         appendLine("根据最近对话生成用户下一句可直接发送的建议，只输出 JSON。")
         appendReplySuggestionPersonaContext(persona)
@@ -140,9 +141,11 @@ internal class ChatInteractionPromptBuilder {
             appendLine("用户：${userMessage.take(MAX_MESSAGE_CHARS)}")
             appendLine("人物：${assistantMessage.take(MAX_MESSAGE_CHARS)}")
         }
-        intimacyMode.suggestionContext(userMessage, state)
-            .takeIf(String::isNotBlank)
-            ?.let { appendLine(it) }
+        if (intimacyModeEnabled) {
+            intimacyMode.suggestionContext(userMessage, state)
+                .takeIf(String::isNotBlank)
+                ?.let { appendLine(it) }
+        }
         appendLine(
             "输出：{\"suggestions\":[{\"label\":\"2到6字短标签\",\"style\":\"自然|俏皮|直球|放飞\",\"text\":\"用户可直接发送的下一句\",\"bold\":false}]}",
         )

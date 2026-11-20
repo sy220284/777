@@ -220,6 +220,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                 announcement = snapshot.chat.groupChat.announcement,
                 mayStaySilent = groupMemberMayStaySilent(input, member, index),
                 silentToken = GROUP_CHAT_SILENT_TOKEN,
+                intimacyModeEnabled = snapshot.chat.chatIntimacyModeEnabled,
             )
             val groupRequestHistory = withChatTurnContext(
                 history = baseHistory,
@@ -864,6 +865,7 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
                     announcement = snapshot.chat.groupChat.announcement,
                     mayStaySilent = false,
                     silentToken = GROUP_CHAT_SILENT_TOKEN,
+                intimacyModeEnabled = snapshot.chat.chatIntimacyModeEnabled,
                 )
                 estimateModelTokens(turnContext.prompt)
             } ?: 0

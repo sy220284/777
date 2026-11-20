@@ -31,6 +31,7 @@ internal class CharacterRuntimeProjector(
         context: ChatContextState,
         userInput: String,
         storyContext: String?,
+        intimacyModeEnabled: Boolean = false,
     ): CharacterRuntimeProjection {
         // Only facts visible at the current plot stage may influence replies or behavior.
         val activePersona = persona.forRuntimeStoryStage(context)
@@ -78,7 +79,8 @@ internal class CharacterRuntimeProjector(
                         unlockedStages = context.visibleStoryStages(),
                     )),
                     ChatContextPart(ChatContextLayer.HISTORICAL, relationshipEngine.prompt(userInput, relevantRelationshipState)),
-                    ChatContextPart(ChatContextLayer.INSTRUCTION, intimacyMode.prompt(userInput, runtimeState, context, activePersona)),
+                    ChatContextPart(ChatContextLayer.INSTRUCTION,
+                        if (intimacyModeEnabled) intimacyMode.prompt(userInput, runtimeState, context, activePersona) else ""),
                 )
         return CharacterRuntimeProjection(
             stablePrompt = stablePrompt(activePersona),

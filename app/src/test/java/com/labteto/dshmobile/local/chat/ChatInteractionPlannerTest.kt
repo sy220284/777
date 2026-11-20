@@ -1427,6 +1427,29 @@ class ChatInteractionPlannerTest {
     }
 
     @Test
+    fun replySuggestionsExcludeIntimacyWhenSettingDisabled() {
+        val state = ChatCharacterState(
+            interactionIntent = ChatInteractionIntent.INTIMATE.name,
+            interactionIntentStrength = 100,
+            interactionIntensity = 5,
+            recentActionTags = listOf("靠近"),
+        )
+        val disabled = planner.suggestionsPrompt(
+            persona = PersonaProfile(name = "测试人物"), state = state,
+            userMessage = "继续刚才的", assistantMessage = "我在。",
+            intimacyModeEnabled = false,
+        )
+        val enabled = planner.suggestionsPrompt(
+            persona = PersonaProfile(name = "测试人物"), state = state,
+            userMessage = "继续刚才的", assistantMessage = "我在。",
+            intimacyModeEnabled = true,
+        )
+        assertFalse(disabled.contains("互动状态："))
+        assertFalse(disabled.contains("当前为亲密语境"))
+        assertTrue(enabled.contains("互动状态："))
+    }
+
+    @Test
     fun replySuggestionsInheritFlirtingIntensityAndChineseInnuendo() {
         val prompt = planner.suggestionsPrompt(
             persona = PersonaProfile(name = "测试角色"),
@@ -1440,17 +1463,19 @@ class ChatInteractionPlannerTest {
             ),
             userMessage = "你行不行啊，别光说",
             assistantMessage = "这可是你说的。",
+            intimacyModeEnabled = true,
             recentDialogue = listOf(
                 "user" to "你行不行啊，别光说",
                 "assistant" to "这可是你说的。",
             ),
         )
 
-        assertTrue(prompt.contains("情感或亲近语境"))
-        assertTrue(prompt.contains("人物性格"))
-        assertTrue(prompt.contains("个人意愿") || prompt.contains("表达方式"))
-        assertFalse(prompt.contains("强度=3/5"))
-        assertFalse(prompt.contains("动作=靠近"))
+        assertTrue(prompt.contains("互动状态"))
+        assertTrue(prompt.contains("强度=3/5"))
+        assertTrue(prompt.contains("当前为亲密语境"))
+        assertTrue(prompt.contains("建议承接当前互动"))
+        assertTrue(prompt.contains("存在中文双关"))
+        assertTrue(prompt.contains("不做词义解释"))
     }
 
     @Test

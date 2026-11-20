@@ -174,6 +174,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
         announcement: String,
         mayStaySilent: Boolean,
         silentToken: String,
+        intimacyModeEnabled: Boolean = false,
     ): com.labteto.dshmobile.local.chat.ChatTurnContext {
         val prepared = chatTurnCoordinator.prepareProfile(
             persona = persona,
@@ -182,6 +183,7 @@ internal class LocalChatReplyCoordinator @Inject constructor(
             userInput = input,
             storyContext = handoffSummary,
             subjectKey = chatRelationshipSubjectKey(member.galleryId, member.personaId),
+            intimacyModeEnabled = intimacyModeEnabled,
         )
         val participantNames = allMembers.joinToString("、") { it.displayName }
         val silenceRule = groupChatSpeechInstruction(mayStaySilent, silentToken)

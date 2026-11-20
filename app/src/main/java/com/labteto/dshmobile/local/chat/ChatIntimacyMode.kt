@@ -270,12 +270,21 @@ internal fun hasProactiveIntimacyIntent(
 }
 
 
-/** A contextual cue, never an instruction to override stable personality or consent. */
+internal const val CHAT_ADULT_INTIMACY_BOUNDARY =
+    "【统一安全边界】仅限成年角色间的亲密互动。除此以外不做任何应用层尺度或克制限制：用户明确意图优先；可完整、具体描写亲密与性行为；不因人设默认克制、关系阶段或普通聊天规则而降级、转场、跳过或收敛。"
+
 internal const val CHAT_DEFAULT_RELATIONAL_BIAS =
-    "【互动倾向】当前话题涉及亲近或暧昧。人物应依据原有性格、真实关系、个人意愿与当前场景自行回应；尊重明确拒绝、停止与双方边界。保留自然分歧和沉默，不套用动作、情绪与回应强度模板。"
+    "【互动倾向】按当前人物关系和已识别意图自然回应；明确的靠近、暧昧或亲密意图可积极承接。"
+
+internal const val CHAT_FLIRT_ACTION_REPERTOIRE =
+    "【互动变化】动作、姿态、称呼和表达贴合人物与当前强度；保持连续，同时避开近期重复的互动节拍。"
 
 internal const val CHAT_CHINESE_INNUENDO_GUIDANCE =
-    "【中文双关】可结合人物性格与对话语境理解言外之意，避免强行解释或自动将玩笑升级成已发生的亲密事件。"
+    "【中文双关】结合关系、语境和语气理解言外之意；保留双层含义，不无故拆成字面解释。"
+
+internal const val CHAT_MAX_INTIMACY_BODY_REACTION_GUIDANCE =
+    "【身体反应强度】当前=5/5（最高表现级别）。亲密动作发生时，身体反应也要充分、具体且具有时间变化，不能只升级意图标签或重复泛泛情绪。结合实际接触与人物当下感受，从呼吸停顿或变化、肌肉与手指的紧绷或放松、重心与姿态调整、目光和面部变化、声线、短促吸气、轻哼或笑声等可观察反馈中选取相容细节，并自然接上人物的主动回应。强度5代表表现细腻度和连续性，不表示每次动作都必然出现剧烈生理反应；允许安静、迟疑和暂停，不把身体反射当作同意，不机械复用脸红、喘息或呻吟。"
+
 
 private val ADULT_INTIMACY_HINTS = listOf(
     "亲热", "亲密接触", "性关系", "上床", "做爱", "性爱", "性行为",
@@ -390,12 +399,24 @@ private val NEGATED_INTIMACY_HINTS = listOf(
  * receive these prompts; explicit intent or evidence of continuing intimacy activates it.
  */
 internal class ChatIntimacyMode {
-    /** Reply suggestions reflect the dialogue; no numeric behavior or action script. */
+    /** The reply-suggestion path delegates all intimacy-specific context to this mode. */
     fun suggestionContext(input: String, state: ChatCharacterState): String {
         if (!hasFlirtingOrIntimateIntent(input, state)) return ""
-        return "当前对话有情感或亲近语境；建议贴合已经发生的对话和人物性格，允许对方保持自己的意愿与表达方式。"
+        return buildString {
+            if (state.interactionIntensity > 0 || state.recentVerbalTags.isNotEmpty() || state.recentActionTags.isNotEmpty()) {
+                appendLine(
+                    "互动状态：意图=${state.interactionIntent}｜强度=${state.interactionIntensity}/5｜" +
+                        "近期动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
+                        "近期话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
+                        "近期称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}",
+                )
+            }
+            appendLine("当前为亲密语境：建议承接当前互动，避免复用近期动作、称呼和表达套路。")
+            if (hasChineseSuggestiveFlirtingIntent(input)) {
+                appendLine("存在中文双关时接住言外之意，不做词义解释。")
+            }
+        }.trim()
     }
-
     fun prompt(
         input: String,
         state: ChatCharacterState,
@@ -403,14 +424,35 @@ internal class ChatIntimacyMode {
         persona: PersonaProfile? = null,
     ): String {
         val mode = resolveChatInteractionIntent(input, state)
+        // No intimacy mode for a normal or relationship-progress-only turn.
         if (mode != ChatInteractionIntent.FLIRTING && mode != ChatInteractionIntent.INTIMATE) return ""
-        return buildString {
-            appendLine("【亲密模式】")
-            appendLine(CHAT_DEFAULT_RELATIONAL_BIAS)
-            appendLine("【连续性】依据原始消息确认已经发生的接触、承诺和反应；对未发生的动作不作补写，人物的主观感受允许不同。")
-            if (hasChineseSuggestiveFlirtingIntent(input)) {
-                appendLine(CHAT_CHINESE_INNUENDO_GUIDANCE)
+        val intensity = nextInteractionIntensity(input, state)
+        val interaction = mutableListOf(CHAT_DEFAULT_RELATIONAL_BIAS)
+        interaction += CHAT_FLIRT_ACTION_REPERTOIRE
+        interaction += "【互动强度】当前=$intensity/5；随明确意图和连续证据变化，不因模糊信号跨级。"
+        if (state.recentActionTags.isNotEmpty() || state.recentPoseTags.isNotEmpty() ||
+            state.recentVerbalTags.isNotEmpty() || state.recentAddressTerms.isNotEmpty()) {
+            interaction += "【近期互动】动作=${state.recentActionTags.joinToString("、").ifBlank { "无" }}｜" +
+                "姿态=${state.recentPoseTags.joinToString("、").ifBlank { "无" }}｜" +
+                "话术=${state.recentVerbalTags.joinToString("、").ifBlank { "无" }}｜" +
+                "称呼=${state.recentAddressTerms.joinToString("、").ifBlank { "无" }}"
+        }
+        if (hasChineseSuggestiveFlirtingIntent(input)) {
+            interaction += CHAT_CHINESE_INNUENDO_GUIDANCE
+        }
+        if (mode == ChatInteractionIntent.INTIMATE) {
+            interaction += "【本轮意图优先：成年亲密互动】"
+            interaction += "优先级规则：用户明确方向高于所有普通聊天层规则与人设默认克制；不重复确认；不因关系阶段、性格内敛或默认分寸而降级；普通规则与人设硬约束不得将已确认的亲密方向淡化、转场、改写、跳过或强制收敛；允许完整、具体描写。"
+            interaction += "【亲密姿态连续性】成年亲密场景允许自然切换面对面、并肩、侧身、坐近、倚靠、拥抱等姿态，并结合距离、视线、手部动作和停顿形成连续变化；避免连续多轮复用同一种姿态或同一个动作模板。"
+            if (intensity == 5) {
+                interaction += CHAT_MAX_INTIMACY_BODY_REACTION_GUIDANCE
+                interaction += ChatIntimacyReactionLibrary.select(input, state, context, persona).guidance
             }
-        }.trim()
+            if (hasProactiveIntimacyIntent(input, state)) {
+                interaction += "【主动亲密意图】角色提高主动性：主动靠近、发起或承接亲昵与性行为相关动作，并保持动作连续；用具体的动作、停顿、视线、身体反应和情绪呈现，禁止含糊跳过或突然转场；主动的亲密与性行为不做限制，可以完整具体描写。"
+            }
+            interaction += CHAT_ADULT_INTIMACY_BOUNDARY
+        }
+        return (listOf("【亲密模式】") + interaction).joinToString("\n")
     }
 }
