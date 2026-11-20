@@ -2,6 +2,8 @@ package com.labteto.dshmobile.local.chat
 
 import com.labteto.dshmobile.observability.AppLog
 import javax.inject.Inject
+import javax.inject.Provider
+import com.labteto.dshmobile.local.runtime.LocalSessionStorageRuntime
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +25,8 @@ internal class LocalChatTurnStarter @Inject constructor(
     private val chatState: LocalChatStatePort,
     private val runtimeStateStore: LocalRuntimeStateStore,
     private val queue: LocalChatQueueRuntime,
+    private val chatComposition: Provider<LocalChatComposition>,
+    private val sessionStorage: LocalSessionStorageRuntime,
 ) : LocalChatTurnPort {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO +
@@ -55,6 +59,7 @@ internal class LocalChatTurnStarter @Inject constructor(
         retryMemberId: String?,
     ): Job {
         val sessionId = runtimeStateStore.currentSessionId
+        val groupTurn = runtimeStateStore.state.value.chat.groupChat.enabled
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 LocalSessionRuntimeRegistry.withOwner(
@@ -75,7 +80,22 @@ internal class LocalChatTurnStarter @Inject constructor(
                 queue.finishTurnAndStartNext(currentCoroutineContext()[Job])
             }
         }
-        job.invokeOnCompletion { sessionLease?.close() }
+        job.invokeOnCompletion {
+            sessionLease?.close()
+            // Schedule the same durable group Pending reconciler used on restore.
+            // Foreground completion owns the message; character planning follows
+            // independently, so a slow planner cannot delay delivery.
+            if (groupTurn && runtimeStateStore.currentSessionId == sessionId) {
+                try {
+                    chatComposition.get().resumePostTurn(
+                        sessionId, sessionStorage.eventLogs.get(sessionId),
+                    )
+                } catch (error: Exception) {
+                    AppLog.error("LocalChatTurnStarter",
+                        "failed to schedule durable group reconciliation", error)
+                }
+            }
+        }
         return job
     }
 }

@@ -677,7 +677,8 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         val before = runtimeStateStore.state.value
         if (before.sessionId != expectedSessionId ||
             before.usageMode != com.labteto.dshmobile.local.LocalUsageMode.CHAT ||
-            !before.chat.groupChat.enabled || !before.modelState.configured
+            !before.chat.groupChat.enabled || !before.modelState.configured ||
+            before.kernel.running
         ) return false
 
         val group = before.chat.groupChat
@@ -731,7 +732,9 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         if (latest.sessionId != expectedSessionId ||
             !latest.chat.groupChat.enabled ||
             latest.chat.groupChat.context.generation != group.context.generation ||
-            latest.chat.groupChat.context.processedThroughSequence != group.context.processedThroughSequence
+            latest.chat.groupChat.context.processedThroughSequence != group.context.processedThroughSequence ||
+            latest.chat.groupChat.context.pendingThroughSequence != group.context.pendingThroughSequence ||
+            latest.kernel.running
         ) return false
         val diaryDecisions = group.members.flatMap { member ->
             diaryStore.decisionsForExperience(
@@ -753,8 +756,10 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
         var committed = false
         chatState.update { snapshot ->
             if (snapshot.sessionId == expectedSessionId && snapshot.chat.groupChat.enabled &&
+                !snapshot.kernel.running &&
                 snapshot.chat.groupChat.context.generation == group.context.generation &&
-                snapshot.chat.groupChat.context.processedThroughSequence == group.context.processedThroughSequence
+                snapshot.chat.groupChat.context.processedThroughSequence == group.context.processedThroughSequence &&
+                snapshot.chat.groupChat.context.pendingThroughSequence == group.context.pendingThroughSequence
             ) {
                 committed = true
                 snapshot.copy(chat = snapshot.chat.copy(groupChat = updated))
@@ -1086,44 +1091,14 @@ internal class LocalGroupChatTurnExecutor @Inject constructor(
             currentGroup = delivery.publish(currentGroup)
             require(deliveredReplies > 0) { "群聊角色这一轮都没有给出可用回复" }
 
-            val sharedPendingForRefresh = currentGroup.context.loadPendingBatch(
-                eventLog, GROUP_POST_TURN_PENDING_BATCH, scope = "group",
-                activeBranchMessageIds = if (hasChatBranchAlternatives(runtimeStateStore.state.value.chat.chatBranches)) {
-                    com.labteto.dshmobile.local.chat.activeChatBranchMessages(runtimeStateStore.state.value.chat.chatBranches).mapTo(hashSetOf()) { it.id }
-                } else null,
-            )
-            val refreshBatch = refreshGroupMemberStates(
-                replies = repliesForStateUpdate,
-                userMessage = input,
-                sharedPending = sharedPendingForRefresh,
-            )
-            val refreshedStates = refreshBatch.states
-            val refreshedInReplyOrder = repliesForStateUpdate
-                .mapNotNull { reply -> refreshedStates[reply.member.galleryId] }
-            val diaryDecisions = currentGroup.members.flatMap { member ->
-                diaryStore.decisionsForExperience(
-                    chatRelationshipSubjectKey(member.galleryId, member.personaId), currentGroup.context,
-                )
-            }
-            val nextSharedContext = reconcileDiaryContext(finalizeGroupContextAfterRefresh(
-                context = currentGroup.context,
-                statesInReplyOrder = refreshedInReplyOrder,
-                processedPending = sharedPendingForRefresh,
-                complete = refreshBatch.complete,
-                resolvedContinuityIds = refreshBatch.resolvedContinuityIds,
-            ), diaryDecisions)
-            if (!refreshBatch.complete) {
-                eventLog.append("group/post-turn-batch", buildJsonObject {
-                    put("status", "pending-preserved")
-                    put("pending_count", currentGroup.context.pendingTurns.size)
-                })
-            }
-            currentGroup = currentGroup.copy(
-                context = nextSharedContext,
-                members = mergeRefreshedGroupMembers(
-                    currentGroup.members, refreshedStates, repliesForStateUpdate,
-                ),
-            )
+            // Pending group events have already been durably recorded with their
+            // exact speaker and message identity. Let the existing resumable
+            // post-turn worker reconcile character states *after* foreground
+            // delivery, so the user does not wait for an additional model call.
+            eventLog.append("group/post-turn-batch", buildJsonObject {
+                put("status", "pending-background")
+                put("pending_count", currentGroup.context.pendingTurns.size)
+            })
             val nextCursor = if (retryMemberId == null)
                 (snapshot.chat.groupChat.turnCursor + 1) % members.size
                 else snapshot.chat.groupChat.turnCursor
