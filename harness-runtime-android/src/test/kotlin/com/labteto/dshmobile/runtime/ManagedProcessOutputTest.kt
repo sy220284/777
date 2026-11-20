@@ -70,7 +70,7 @@ class ManagedProcessOutputTest {
     @Test fun processThatExitedBeforePollingStillYieldsBufferedPid() {
         // Android's process pipe may report available() == 0 after a fast
         // executable exits even while its handshake header remains readable.
-        val pipe = object : ByteArrayInputStream("4242\\nversion".toByteArray()) {
+        val pipe = object : ByteArrayInputStream("4242\nversion".toByteArray()) {
             override fun available() = 0
         }
         val exited = object : Process() {
